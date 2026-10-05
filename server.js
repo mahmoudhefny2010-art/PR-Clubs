@@ -1847,4 +1847,14 @@ const startServer = async () => {
   });
 };
 
-startServer();
+let connectPromise = null;
+function ensureReady() {
+  if (!connectPromise) connectPromise = connectMongo();
+  return connectPromise;
+}
+
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = { app, ensureReady };
