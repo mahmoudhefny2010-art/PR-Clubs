@@ -1,0 +1,60 @@
+/* Events page (public/pages/events.html) */
+.events-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+  margin-top: 22px;
+}
+
+.events-list .event-tile {
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  width: 100%;
+  background: #fff;
+}
+
+.event-tile-club {
+  display: inline-block;
+  margin-bottom: 6px;
+  color: var(--gold);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.event-detail { margin-top: 22px; }
+
+.event-detail-club {
+  display: inline-block;
+  margin-bottom: 6px;
+  color: var(--gold);
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.event-detail-meta {
+  color: var(--muted);
+  font-size: 0.95rem;
+  margin: 8px 0;
+}
+
+#regForm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+  max-width: 420px;
+}
+
+#regForm input {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font: inherit;
+  background: #fff;
+  color: var(--text);
+}

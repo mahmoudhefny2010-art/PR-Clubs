@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Events</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/assets/css/base.css?v=20261005-form-statuses" />
+    <link rel="stylesheet" href="/assets/css/responsive.css?v=20261005-form-statuses" />
+    <link rel="stylesheet" href="/assets/css/dark.css?v=20261005-form-statuses" />
+    <link rel="stylesheet" href="/assets/css/features.css?v=20261005-form-statuses" />
+    <link rel="stylesheet" href="/assets/css/pages/events.css?v=1" />
+    <link rel="icon" href="/assets/img/pics/logo.svg.png" type="image/png">
+  </head>
+  <body>
+    <div class="page-shell">
+      <div id="site-header"></div>
+
+      <main class="app-container">
+        <section class="events-page">
+          <div class="welcome-box hero-panel">
+            <h1>Upcoming Events</h1>
+            <p>Every club event in one place. Pick an event to see its full details and register.</p>
+            <div class="home-form-actions">
+              <a class="secondary-btn" href="/">Back to homepage</a>
+            </div>
+          </div>
+
+          <div id="eventsList" class="events-list"></div>
+
+          <div id="eventDetail" class="event-detail hidden">
+            <button id="eventBack" class="secondary-btn" type="button">← All events</button>
+            <div class="calendar-detail-card">
+              <img id="detailImg" src="" alt="event" />
+              <div>
+                <span class="event-detail-club" id="detailClub"></span>
+                <h3 id="detailTitle"></h3>
+                <p class="event-detail-meta" id="detailMeta"></p>
+                <p id="detailDesc"></p>
+                <form id="regForm">
+                  <input id="regName" placeholder="Your name" required />
+                  <input id="regEmail" type="email" placeholder="University email" required />
+                  <button class="primary-btn" type="submit">Register for event</button>
+                </form>
+                <p id="regFeedback" class="admin-feedback"></p>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <div id="site-footer"></div>
+    </div>
+
+    <script src="/assets/js/pages/events.js?v=1"></script>
+    <script src="/assets/js/layout.js?v=1" defer></script>
+    <script src="/assets/js/theme.js?v=20261005-global-theme" defer></script>
+  </body>
+</html>

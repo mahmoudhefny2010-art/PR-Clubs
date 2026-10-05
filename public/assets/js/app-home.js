@@ -364,7 +364,7 @@ function renderClubGrid() {
 
 function getAllEvents() {
   return (state.clubs || []).flatMap((club) =>
-    (Array.isArray(club.events) ? club.events : []).map((event) => ({ ...event, clubName: club.name, clubImage: club.image }))
+    (Array.isArray(club.events) ? club.events : []).map((event, eventIndex) => ({ ...event, clubId: club.id, clubName: club.name, clubImage: club.image, eventIndex }))
   );
 }
 
@@ -408,13 +408,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const calendarModal = document.getElementById('calendarModal');
   const calendarClose = document.getElementById('calendarClose');
   const calendarGrid = document.getElementById('calendarGrid');
-  const detail = document.getElementById('calendarDetail');
-  const detailImg = document.getElementById('calendarDetailImg');
-  const detailTitle = document.getElementById('calendarDetailTitle');
-  const detailMeta = document.getElementById('calendarDetailMeta');
-  const detailDesc = document.getElementById('calendarDetailDesc');
-  const regForm = document.getElementById('eventRegForm');
-  const regFeedback = document.getElementById('regFeedback');
 
   const parseDate = (value) => {
     const d = new Date(value);
@@ -438,7 +431,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (calendarGrid) calendarGrid.innerHTML = html;
     if (calendarGrid) {
       calendarGrid.querySelectorAll('.calendar-event').forEach((btn) => {
-        btn.addEventListener('click', () => openCalendarDetail(Number(btn.dataset.idx)));
+        btn.addEventListener('click', () => {
+          const event = events[Number(btn.dataset.idx)];
+          if (event) window.location.href = `/pages/events.html?club=${event.clubId}&event=${event.eventIndex}`;
+        });
       });
       calendarGrid.querySelectorAll('.calendar-more').forEach((btn) => {
         btn.addEventListener('click', () => {
@@ -451,38 +447,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  let currentCalendarEvents = [];
-  function openCalendarDetail(idx) {
-    currentCalendarEvents = getAllEvents().map((e) => ({ ...e, parsed: parseDate(e.date) })).filter((e) => e.parsed);
-    const event = currentCalendarEvents[idx];
-    if (!event) return;
-    detailImg.src = event.image || event.clubImage || '';
-    detailTitle.textContent = event.title || 'Event';
-    detailMeta.textContent = `${event.clubName || ''} · ${event.date || ''}${event.location ? ' · ' + event.location : ''}`;
-    detailDesc.textContent = event.description || '';
-    regFeedback.textContent = '';
-    calendarGrid.classList.add('hidden');
-    detail.classList.remove('hidden');
-  }
-
-  const calendarBack = document.getElementById('calendarBack');
-  if (calendarBack) calendarBack.addEventListener('click', () => {
-    detail.classList.add('hidden');
-    calendarGrid.classList.remove('hidden');
-  });
-
   if (calendarButton) calendarButton.addEventListener('click', () => {
     calendarModal.classList.remove('hidden');
     renderCalendar();
   });
   if (calendarClose) calendarClose.addEventListener('click', () => calendarModal.classList.add('hidden'));
   if (calendarModal) calendarModal.addEventListener('click', (event) => { if (event.target === calendarModal) calendarModal.classList.add('hidden'); });
-  if (regForm) regForm.addEventListener('submit', (event) => {
-    event.preventDefault();
-    regFeedback.textContent = 'Thanks! You are registered for this event.';
-    regFeedback.classList.remove('is-error');
-    regForm.reset();
-  });
 });
 
 function escapeHtml(value) {

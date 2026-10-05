@@ -11,7 +11,7 @@ const pub = path.join(root, 'public');
 // Expected content hashes of the concatenated split bundles.
 // If these change, the CSS/JS modules were edited — update the hash on purpose.
 const EXPECTED_CSS_HASH = '2a9aa3edd6f5f1e259be4349b7db272a8f46125a1075be4302ab835ececa5248';
-const EXPECTED_JS_HASH = '22785f108b35edd8671b87baa0310090422db91adced2592923cec3d8dabd517';
+const EXPECTED_JS_HASH = '0a1c22fcc66dda0b89395a0c3fe009c7e1e68b0c9b46b30faf718950c44dd4c6';
 
 const CSS_FILES = ['base.css', 'responsive.css', 'dark.css', 'features.css'];
 const JS_FILES = ['app-home.js', 'app-admin.js', 'app-dashboard.js'];
@@ -86,10 +86,13 @@ console.log('Header/footer placeholders + layout.js present on every page ✓');
 (async () => {
   const base = 'http://localhost:1111';
   const checks = [
-    '/', '/pages/club-content.html?embed=1', '/pages/applicant-login.html',
+    '/', '/pages/club-content.html?embed=1', '/pages/applicant-login.html', '/pages/events.html',
+    '/pages/events.html?club=2&event=0',
     '/dashboards/pr-dashboard.html', '/dashboards/english-dashboard.html', '/dashboards/dean-dashboard.html',
     '/assets/css/base.css', '/assets/css/responsive.css', '/assets/css/dark.css', '/assets/css/features.css',
+    '/assets/css/pages/events.css',
     '/assets/js/app-home.js', '/assets/js/app-admin.js', '/assets/js/app-dashboard.js',
+    '/assets/js/pages/events.js',
     '/assets/js/layout.js', '/assets/js/theme.js',
     '/components/site-header.html', '/components/site-footer.html',
     '/assets/img/pics/logo.svg.png', '/assets/img/pics/mun.jpg',
