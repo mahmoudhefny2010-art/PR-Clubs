@@ -8,7 +8,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=20261005-my-forms">
+  <link rel="stylesheet" href="/assets/css/base.css?v=20261005-my-forms" />
+    <link rel="stylesheet" href="/assets/css/responsive.css?v=20261005-my-forms" />
+    <link rel="stylesheet" href="/assets/css/dark.css?v=20261005-my-forms" />
+    <link rel="stylesheet" href="/assets/css/features.css?v=20261005-my-forms" />
   <style>
     :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, sans-serif; color: var(--text); background: var(--bg-main); }
     :root[data-theme="dark"] { color-scheme: dark; --bg-main: #111315; --bg-panel: #1b1e21; --bg-strong: #25292d; --bg-soft: #202428; --border: rgba(255,255,255,.14); --text: #f3f4f6; --muted: #c0c4c9; --shadow: rgba(0,0,0,.35); }
@@ -90,15 +93,11 @@
       .record-actions > select { width: 100%; }
     }
   </style>
-  <link rel="icon" href="/logo.svg.png" type="image/png">
+  <link rel="icon" href="/assets/img/pics/logo.svg.png" type="image/png">
 </head>
 <body>
   <div class="page-shell">
-    <header class="topbar">
-      <a class="brand-banner brand-home-link" href="/" aria-label="MIU homepage">
-        <img class="brand-mark" src="/logo.svg.png" alt="MIU logo">
-      </a>
-    </header>
+    <div id="site-header"></div>
   <main>
     <div class="page-heading">
       <div><h1>Global administrator</h1><p>Manage applications and committee heads across every club.</p></div>
@@ -134,10 +133,8 @@
       <div id="applicationRecords" class="records"></div>
     </section>
   </main>
+    <div id="site-footer"></div>
   </div>
-  <footer class="site-footer">
-    <p>Copyright 2026 &copy; Misr International University, All Right Reserved | Made by <a href="https://www.linkedin.com/in/mahmoud-hefny-1264763b0" target="_blank" rel="noopener noreferrer">Mahmoud Hefny</a></p>
-  </footer>
   <script>
     const clubs = [];
     let heads = [];
@@ -272,6 +269,7 @@
     }
     init();
   </script>
-  <script src="/theme.js?v=20261005-global-theme" defer></script>
-</body>
+  <script src="/assets/js/theme.js?v=20261005-global-theme" defer></script>
+    <script src="/assets/js/layout.js?v=1" defer></script>
+  </body>
 </html>

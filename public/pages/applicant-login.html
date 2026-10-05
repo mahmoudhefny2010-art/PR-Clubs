@@ -5,8 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MIU Student Login</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/style.css?v=20261005-my-forms" />
-    <link rel="icon" href="/logo.svg.png" type="image/png">
+    <link rel="stylesheet" href="/assets/css/base.css?v=20261005-my-forms" />
+    <link rel="stylesheet" href="/assets/css/responsive.css?v=20261005-my-forms" />
+    <link rel="stylesheet" href="/assets/css/dark.css?v=20261005-my-forms" />
+    <link rel="stylesheet" href="/assets/css/features.css?v=20261005-my-forms" />
+    <link rel="icon" href="/assets/img/pics/logo.svg.png" type="image/png">
     <style>
       .login-wrap { max-width: 430px; margin: 48px auto; background: #fff; border: 1px solid #f0d7d7; border-radius: 22px; padding: 34px 32px; box-shadow: 0 14px 34px rgba(0,0,0,.06); }
       .login-wrap img { display: block; width: 150px; height: auto; margin: 6px auto 46px; }
@@ -26,16 +29,17 @@
   <body>
     <main class="app-container">
       <div class="login-wrap">
-        <img src="/logo.svg.png" alt="MIU logo" />
+        <img src="/assets/img/pics/logo.svg.png" alt="MIU logo" />
         <h1>Student Sign In</h1>
         <p class="sub">Use your university account to access your applications.</p>
         <form id="studentLoginForm">
-          <label for="uniId">University ID</label>
-          <input id="uniId" type="text" placeholder="e.g. 26-06700" autocomplete="username" required />
+          <label for="uniId">Email / University ID</label>
+          <input id="uniId" type="text" placeholder="e.g. name@miuegypt.edu.eg or 26-06700" autocomplete="username" required />
           <label for="uniPassword">Password</label>
           <input id="uniPassword" type="password" placeholder="••••••••" autocomplete="current-password" required />
           <button class="primary" type="submit">Sign In</button>
         </form>
+        <p id="loginFeedback" style="color:#b71c1c;font-weight:700;margin-top:10px"></p>
         <div class="login-divider">OR</div>
         <button class="google-btn" type="button" id="googleLoginBtn">
           <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47c-.29 1.48-1.14 2.73-2.4 3.58v3h3.86c2.26-2.09 3.56-5.17 3.56-8.82z"/><path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96H1.29v3.09C3.26 21.3 7.31 24 12 24z"/><path fill="#FBBC05" d="M5.27 14.29C5.02 13.57 4.89 12.8 4.89 12s.13-1.57.38-2.29V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.98-3.09z"/><path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.98 3.09C6.22 6.86 8.87 4.75 12 4.75z"/></svg>
@@ -44,16 +48,32 @@
         <p class="login-foot">Don't have an account? <a href="/">Back to home</a></p>
       </div>
     </main>
+    <div id="site-footer"></div>
     <script>
-      document.getElementById('studentLoginForm').addEventListener('submit', (event) => {
+      document.getElementById('studentLoginForm').addEventListener('submit', async (event) => {
         event.preventDefault();
-        const uniId = document.getElementById('uniId').value.trim();
-        if (!uniId) return;
-        window.location.assign('/');
+        const feedback = document.getElementById('loginFeedback');
+        feedback.textContent = '';
+        try {
+          const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: document.getElementById('uniId').value.trim(),
+              password: document.getElementById('uniPassword').value,
+            }),
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.message || 'Login failed.');
+          window.location.assign(result.redirect || '/');
+        } catch (error) {
+          feedback.textContent = error.message;
+        }
       });
       document.getElementById('googleLoginBtn').addEventListener('click', () => {
-        window.location.assign('/');
+        window.location.assign('/?myForms=1');
       });
     </script>
+      <script src="/assets/js/layout.js?v=1" defer></script>
   </body>
 </html>

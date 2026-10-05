@@ -65,13 +65,34 @@ const clubAccountSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   salt: { type: String, required: true },
   passwordHash: { type: String, required: true },
-  role: { type: String, enum: ['president', 'head'], default: 'president' },
+  role: { type: String, enum: ['president', 'head', 'pr', 'english', 'dean'], default: 'president' },
   committee: { type: String, default: '' }
 }, { timestamps: true, autoIndex: false });
+
+const contentRequestSchema = new mongoose.Schema({
+  id: { type: Number, required: true, unique: true, index: true },
+  clubId: { type: Number, required: true, index: true },
+  clubName: { type: String, default: '' },
+  type: { type: String, enum: ['post', 'event'], required: true },
+  title: { type: String, required: true, trim: true },
+  description: { type: String, default: '' },
+  date: { type: String, default: '' },
+  location: { type: String, default: '' },
+  image: { type: String, default: '' },
+  status: { type: String, enum: ['draft', 'pending_pr', 'pending_english', 'pending_dean', 'changes_requested', 'rejected', 'published'], default: 'draft', index: true },
+  comments: {
+    pr: { type: String, default: '' },
+    english: { type: String, default: '' },
+    dean: { type: String, default: '' }
+  },
+  submittedAt: { type: Date, default: Date.now },
+  publishedAt: { type: Date }
+}, { timestamps: true });
 
 const Club = mongoose.models.Club || mongoose.model('Club', clubSchema);
 const Application = mongoose.models.Application || mongoose.model('Application', applicationSchema);
 const SiteSetting = mongoose.models.SiteSetting || mongoose.model('SiteSetting', siteSettingSchema);
 const ClubAccount = mongoose.models.ClubAccount || mongoose.model('ClubAccount', clubAccountSchema);
+const ContentRequest = mongoose.models.ContentRequest || mongoose.model('ContentRequest', contentRequestSchema);
 
-module.exports = { Club, Application, SiteSetting, ClubAccount };
+module.exports = { Club, Application, SiteSetting, ClubAccount, ContentRequest };

@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const cloudinary = require('cloudinary').v2;
-const { Club, Application, SiteSetting, ClubAccount } = require('./models');
+const { Club, Application, SiteSetting, ClubAccount, ContentRequest } = require('./models');
 require('dotenv').config();
 
 const app = express();
@@ -36,7 +36,7 @@ const defaultClubs = [
     committee: 'Utopia Club',
     category: 'Innovation',
     tagline: 'Creative projects and student initiatives',
-    image: '/pics/Utopia.jpg',
+    image: '/assets/img/pics/Utopia.jpg',
     imageFit: 'contain',
     status: 'open',
     seats: 25,
@@ -51,7 +51,7 @@ const defaultClubs = [
     committee: 'Model United Nations',
     category: 'Debate & Leadership',
     tagline: 'Diplomacy, debate, and public speaking',
-    image: '/pics/mun.jpg',
+    image: '/assets/img/pics/mun.jpg',
     imageFit: 'contain',
     status: 'open',
     seats: 30,
@@ -66,7 +66,7 @@ const defaultClubs = [
     committee: 'Career Development Club',
     category: 'Career Growth',
     tagline: 'Career skills and professional growth',
-    image: '/pics/cdc.jpg',
+    image: '/assets/img/pics/cdc.jpg',
     imageFit: 'contain',
     status: 'open',
     seats: 20,
@@ -81,7 +81,7 @@ const defaultClubs = [
     committee: 'Dimas Club',
     category: 'Media & Content',
     tagline: 'Media production and creative content',
-    image: '/pics/dimas.jpg',
+    image: '/assets/img/pics/dimas.jpg',
     imageFit: 'contain',
     status: 'full',
     seats: 18,
@@ -96,7 +96,7 @@ const defaultClubs = [
     committee: 'IEEE Student Chapter',
     category: 'Technology',
     tagline: 'Engineering, technology, and innovation',
-    image: '/pics/ieee.jpg',
+    image: '/assets/img/pics/ieee.jpg',
     imageFit: 'contain',
     status: 'open',
     seats: 26,
@@ -111,7 +111,7 @@ const defaultClubs = [
     committee: 'ACPC Club',
     category: 'Programming',
     tagline: 'Competitive programming and problem-solving',
-    image: '/pics/acpc.jpg',
+    image: '/assets/img/pics/acpc.jpg',
     imageFit: 'contain',
     status: 'open',
     seats: 24,
@@ -126,7 +126,7 @@ const defaultClubs = [
     committee: 'Tunners Club',
     category: 'Sports',
     tagline: 'Fitness, sports, and team activities',
-    image: '/pics/tuners.jpg',
+    image: '/assets/img/pics/tuners.jpg',
     imageFit: 'contain',
     status: 'open',
     seats: 22,
@@ -141,7 +141,7 @@ const defaultClubs = [
     committee: 'Theater Club',
     category: 'Arts & Performance',
     tagline: 'Acting, stage performance, and storytelling',
-    image: '/pics/theater.jpg',
+    image: '/assets/img/pics/theater.jpg',
     imageFit: 'contain',
     status: 'full',
     seats: 16,
@@ -156,7 +156,7 @@ const defaultClubs = [
     committee: 'MSP Club',
     category: 'Student Life',
     tagline: 'Campus events and student community',
-    image: '/pics/msp.jpg',
+    image: '/assets/img/pics/msp.jpg',
     imageFit: 'contain',
     status: 'open',
     seats: 28,
@@ -171,7 +171,7 @@ const defaultClubs = [
     committee: 'Gamers Legacy Club',
     category: 'Gaming & Esports',
     tagline: 'Gaming, competition, and community',
-    image: '/pics/gamerslegacy.jpg',
+    image: '/assets/img/pics/gamerslegacy.jpg',
     imageFit: 'contain',
     status: 'open',
     seats: 24,
@@ -186,7 +186,7 @@ const defaultClubs = [
     committee: 'International Hepatitis Club',
     category: 'Health Awareness',
     tagline: 'Hepatitis awareness and education',
-    image: '/pics/ihepc.jpg',
+    image: '/assets/img/pics/ihepc.jpg',
     imageFit: 'contain',
     status: 'open',
     seats: 20,
@@ -201,7 +201,7 @@ const defaultClubs = [
     committee: 'TEDx MIU',
     category: 'Ideas & Events',
     tagline: 'Ideas worth sharing through campus events',
-    image: '/pics/tedx.jpg',
+    image: '/assets/img/pics/tedx.jpg',
     imageFit: 'contain',
     status: 'open',
     seats: 24,
@@ -217,7 +217,7 @@ const clubsFile = path.join(dataDirectory, 'clubs.json');
 const homepageFile = path.join(dataDirectory, 'homepage.json');
 const adminCredentialsFile = path.join(dataDirectory, 'admin.json');
 const clubAccountsFile = path.join(dataDirectory, 'club-accounts.json');
-const picsDirectory = path.join(__dirname, 'public', 'pics');
+const picsDirectory = path.join(__dirname, 'public', 'assets', 'img', 'pics');
 
 fs.mkdirSync(dataDirectory, { recursive: true });
 fs.mkdirSync(picsDirectory, { recursive: true });
@@ -246,7 +246,7 @@ let clubs = readJsonFile(clubsFile, defaultClubs).map((club, index) => ({
 }));
 let clubAccounts = readJsonFile(clubAccountsFile, []).map((account) => ({
   ...account,
-  role: account.role === 'head' ? 'head' : 'president',
+  role: account.role === 'head' || account.role === 'pr' || account.role === 'english' || account.role === 'dean' ? account.role : 'president',
   committee: typeof account.committee === 'string' ? account.committee : ''
 }));
 
@@ -352,7 +352,7 @@ async function makeClub(payload, existing, id) {
       const extension = imageMatch[1] === 'jpeg' ? 'jpg' : imageMatch[1];
       const imageName = `club-${id}.${extension}`;
       fs.writeFileSync(path.join(picsDirectory, imageName), imageBuffer);
-      club.image = `/pics/${imageName}`;
+      club.image = `/assets/img/pics/${imageName}`;
       club.imagePublicId = '';
     }
   }
@@ -705,7 +705,7 @@ async function initializeMongoData() {
     await ClubAccount.bulkWrite(clubAccounts.map(({ clubId, email, salt, passwordHash, role, committee }) => ({
       updateOne: {
         filter: { clubId, email },
-        update: { $setOnInsert: { clubId, email, salt, passwordHash, role: role === 'head' ? 'head' : 'president', committee: committee || '' } },
+        update: { $setOnInsert: { clubId, email, salt, passwordHash, role: role === 'head' || role === 'pr' || role === 'english' || role === 'dean' ? role : 'president', committee: committee || '' } },
         upsert: true
       }
     })));
@@ -733,7 +733,7 @@ async function initializeMongoData() {
   clubAccounts = (await ClubAccount.find().sort({ clubId: 1, role: 1, committee: 1 }).lean()).map((account) => ({
     ...toApiRecord(account),
     password: privatePasswordsByEmail.get(account.email) || '',
-    role: account.role === 'head' ? 'head' : 'president',
+    role: account.role === 'head' || account.role === 'pr' || account.role === 'english' || account.role === 'dean' ? account.role : 'president',
     committee: account.committee || ''
   }));
 }
@@ -771,6 +771,13 @@ app.get('/api/admin/session', (req, res) => {
 
 app.get('/api/club-auth/session', (req, res) => {
   const account = getClubAccountFromRequest(req);
+  if (account && ['pr', 'english', 'dean'].includes(account.role)) {
+    return res.json({
+      configured: clubAccounts.length > 0,
+      authenticated: true,
+      club: { id: 0, name: account.role.toUpperCase(), image: '/assets/img/pics/logo.svg.png', role: account.role, committee: '' }
+    });
+  }
   const club = account && clubs.find((item) => item.id === account.clubId);
   res.json({
     configured: clubAccounts.length > 0,
@@ -1048,6 +1055,200 @@ app.delete('/api/club/heads/:email', requireClubAuth, requireClubPresident, asyn
     console.error('Database operation failed:', error.name);
     res.status(503).json({ message: 'Could not delete this committee head.' });
   }
+});
+
+function requireCommitteeRole(req, res, next) {
+  const role = req.clubAccount?.role;
+  if (!['pr', 'english', 'dean'].includes(role)) {
+    return res.status(403).json({ message: 'Committee access only.' });
+  }
+  next();
+}
+
+const committeeStage = { pr: 'pending_pr', english: 'pending_english', dean: 'pending_dean' };
+
+function committeeNextStage(role, action) {
+  if (role === 'pr' && action === 'approve') return 'pending_english';
+  if (role === 'english' && action === 'approve') return 'pending_dean';
+  if (role === 'dean' && action === 'approve') return 'published';
+  if (action === 'reject') return 'rejected';
+  if (action === 'changes') return 'changes_requested';
+  return null;
+}
+
+app.get('/api/club/content', requireClubAuth, async (req, res) => {
+  if (!['president', 'head'].includes(req.clubAccount.role)) {
+    return res.status(403).json({ message: 'Only club presidents and heads can manage content.' });
+  }
+  try {
+    if (!mongoReady) return res.status(503).json({ message: 'Content storage needs MongoDB.' });
+    const records = await ContentRequest.find({ clubId: req.clubAccount.clubId }).sort({ id: -1 }).lean();
+    res.json(records.map((record) => { const { _id, __v, ...rest } = record; return rest; }));
+  } catch (error) {
+    console.error('Database operation failed:', error.name);
+    res.status(503).json({ message: 'Could not load content right now.' });
+  }
+});
+
+app.post('/api/club/content', requireClubAuth, async (req, res) => {
+  if (!['president', 'head'].includes(req.clubAccount.role)) {
+    return res.status(403).json({ message: 'Only club presidents and heads can manage content.' });
+  }
+  try {
+    if (!mongoReady) return res.status(503).json({ message: 'Content storage needs MongoDB.' });
+    const type = req.body.type === 'event' ? 'event' : 'post';
+    const title = cleanText(req.body.title, 140);
+    const description = cleanText(req.body.description, 2000);
+    if (!title) return res.status(400).json({ message: 'Enter a title.' });
+    const club = clubs.find((item) => item.id === req.clubAccount.clubId);
+    const last = await ContentRequest.findOne().sort({ id: -1 }).lean();
+    const record = await ContentRequest.create({
+      id: (last?.id || 0) + 1,
+      clubId: req.clubAccount.clubId,
+      clubName: club?.name || '',
+      type,
+      title,
+      description,
+      date: cleanText(req.body.date, 40),
+      location: cleanText(req.body.location, 120),
+      image: typeof req.body.image === 'string' ? req.body.image.slice(0, 4 * 1024 * 1024) : '',
+      status: req.body.submit === true ? 'pending_pr' : 'draft'
+    });
+    const { _id, __v, ...rest } = record.toObject();
+    res.status(201).json(rest);
+  } catch (error) {
+    console.error('Database operation failed:', error.name);
+    res.status(503).json({ message: 'Could not save content right now.' });
+  }
+});
+
+app.put('/api/club/content/:id', requireClubAuth, async (req, res) => {
+  if (!['president', 'head'].includes(req.clubAccount.role)) {
+    return res.status(403).json({ message: 'Only club presidents and heads can manage content.' });
+  }
+  try {
+    if (!mongoReady) return res.status(503).json({ message: 'Content storage needs MongoDB.' });
+    const record = await ContentRequest.findOne({ id: Number(req.params.id), clubId: req.clubAccount.clubId });
+    if (!record) return res.status(404).json({ message: 'Content not found.' });
+    if (!['draft', 'changes_requested', 'rejected'].includes(record.status)) {
+      return res.status(409).json({ message: 'This content is already under review or published.' });
+    }
+    if (req.body.type === 'event' || req.body.type === 'post') record.type = req.body.type;
+    record.title = cleanText(req.body.title, 140) || record.title;
+    record.description = cleanText(req.body.description, 2000);
+    record.date = cleanText(req.body.date, 40);
+    record.location = cleanText(req.body.location, 120);
+    if (typeof req.body.image === 'string') record.image = req.body.image.slice(0, 4 * 1024 * 1024);
+    record.status = req.body.submit === true ? 'pending_pr' : 'draft';
+    await record.save();
+    const { _id, __v, ...rest } = record.toObject();
+    res.json(rest);
+  } catch (error) {
+    console.error('Database operation failed:', error.name);
+    res.status(503).json({ message: 'Could not update content right now.' });
+  }
+});
+
+app.delete('/api/club/content/:id', requireClubAuth, async (req, res) => {
+  if (!['president', 'head'].includes(req.clubAccount.role)) {
+    return res.status(403).json({ message: 'Only club presidents and heads can manage content.' });
+  }
+  try {
+    if (!mongoReady) return res.status(503).json({ message: 'Content storage needs MongoDB.' });
+    const record = await ContentRequest.findOneAndDelete({ id: Number(req.params.id), clubId: req.clubAccount.clubId });
+    if (!record) return res.status(404).json({ message: 'Content not found.' });
+    if (record.status === 'published') {
+      await Club.updateOne({ id: record.clubId }, record.type === 'event'
+        ? { $pull: { events: { title: record.title, date: record.date } } }
+        : { $pull: { posts: { title: record.title, date: record.date } } });
+    }
+    res.status(204).end();
+  } catch (error) {
+    console.error('Database operation failed:', error.name);
+    res.status(503).json({ message: 'Could not delete content right now.' });
+  }
+});
+
+app.get('/api/committee/requests', requireClubAuth, requireCommitteeRole, async (req, res) => {
+  try {
+    if (!mongoReady) return res.status(503).json({ message: 'Content storage needs MongoDB.' });
+    const stage = committeeStage[req.clubAccount.role];
+    const records = await ContentRequest.find({ status: stage }).sort({ id: -1 }).lean();
+    res.json(records.map((record) => { const { _id, __v, ...rest } = record; return rest; }));
+  } catch (error) {
+    console.error('Database operation failed:', error.name);
+    res.status(503).json({ message: 'Could not load requests right now.' });
+  }
+});
+
+app.post('/api/committee/requests/:id/action', requireClubAuth, requireCommitteeRole, async (req, res) => {
+  try {
+    if (!mongoReady) return res.status(503).json({ message: 'Content storage needs MongoDB.' });
+    const record = await ContentRequest.findOne({ id: Number(req.params.id) });
+    if (!record) return res.status(404).json({ message: 'Request not found.' });
+    const expected = committeeStage[req.clubAccount.role];
+    if (record.status !== expected) return res.status(409).json({ message: 'This request is not waiting for your review.' });
+    const action = ['approve', 'reject', 'changes'].includes(req.body.action) ? req.body.action : null;
+    if (!action) return res.status(400).json({ message: 'Choose approve, reject, or changes.' });
+    const comment = cleanText(req.body.comment, 2000);
+    if (req.clubAccount.role === 'pr') record.comments.pr = comment;
+    if (req.clubAccount.role === 'english') record.comments.english = comment;
+    if (req.clubAccount.role === 'dean') record.comments.dean = comment;
+    const nextStatus = committeeNextStage(req.clubAccount.role, action);
+    record.status = nextStatus;
+    if (nextStatus === 'published') {
+      record.publishedAt = new Date();
+      const club = await Club.findOne({ id: record.clubId });
+      if (club) {
+        const item = {
+          title: record.title,
+          date: record.date,
+          location: record.location,
+          description: record.description,
+          image: record.image || club.image
+        };
+        if (record.type === 'event') club.events.push(item);
+        else club.posts.push({ ...item, author: club.name, text: record.description });
+        await club.save();
+      }
+    }
+    await record.save();
+    const { _id, __v, ...rest } = record.toObject();
+    res.json(rest);
+  } catch (error) {
+    console.error('Database operation failed:', error.name);
+    res.status(503).json({ message: 'Could not update request right now.' });
+  }
+});
+
+app.post('/api/auth/login', (req, res) => {
+  const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+  const password = req.body.password;
+
+  if (emailMatches(email) && typeof password === 'string' && passwordMatches(password)) {
+    setAdminSessionCookie(req, res);
+    return res.json({ authenticated: true, role: 'admin', redirect: '/admin/global' });
+  }
+
+  const account = clubAccounts.find((item) => item.email === email);
+  if (account && typeof password === 'string' && clubPasswordMatches(password, account)) {
+    setClubSessionCookie(req, res, account);
+    const roleRedirects = {
+      president: '/club-login',
+      head: '/club-login',
+      pr: '/dashboards/pr-dashboard.html',
+      english: '/dashboards/english-dashboard.html',
+      dean: '/dashboards/dean-dashboard.html',
+    };
+    return res.json({ authenticated: true, role: account.role, redirect: roleRedirects[account.role] || '/club-login' });
+  }
+
+  const hasApplication = applications.some((application) => String(application.email || '').trim().toLowerCase() === email);
+  if (hasApplication) {
+    return res.json({ authenticated: true, role: 'student', redirect: '/' });
+  }
+
+  return res.status(401).json({ message: 'Incorrect email or password.' });
 });
 
 app.post('/api/admin/setup', (req, res) => {

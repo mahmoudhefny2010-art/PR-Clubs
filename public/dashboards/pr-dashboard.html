@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Committee Review</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/assets/css/base.css?v=20261005-my-forms" />
+    <link rel="stylesheet" href="/assets/css/responsive.css?v=20261005-my-forms" />
+    <link rel="stylesheet" href="/assets/css/dark.css?v=20261005-my-forms" />
+    <link rel="stylesheet" href="/assets/css/features.css?v=20261005-my-forms" />
+    <link rel="icon" href="/assets/img/pics/logo.svg.png" type="image/png">
+    <style>
+      .req-card { border: 1px solid #eee; border-radius: 16px; padding: 14px; display: flex; gap: 14px; margin-bottom: 12px; background: #fff; }
+      .req-card img { width: 90px; height: 90px; object-fit: cover; border-radius: 12px; }
+      .req-meta { font-size: .82rem; color: #6b7280; }
+      .badge-status { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #fff1d5; color: #92400e; font-size: .7rem; font-weight: 800; text-transform: uppercase; }
+      .req-actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+      .req-actions button, .req-actions input { padding: 6px 12px; border-radius: 999px; border: 1px solid #ddd; background: #fff; font-weight: 700; cursor: pointer; font-size: .8rem; }
+      .req-actions .approve { background: #dcfce7; border-color: #86efac; color: #166534; }
+      .req-actions .reject { background: #fee2e2; border-color: #fca5a5; color: #991b1b; }
+      .req-actions .changes { background: #fff1d5; border-color: #fcd34d; color: #92400e; }
+    </style>
+  </head>
+  <body>
+    <div id="site-header"></div>
+    <main class="app-container">
+      <section class="committee-card">
+        <div class="committee-top">
+          <div>
+            <div class="committee-label">APPROVALS COMMITTEE</div>
+            <h2 id="committeeTitle">Committee dashboard</h2>
+          </div>
+          <div class="top-actions">
+            <a class="secondary-btn" href="/">Back</a>
+            <button id="logoutBtn" class="logout-btn" type="button">Logout</button>
+          </div>
+        </div>
+        <p id="sessionMessage"></p>
+        <p id="hintText"></p>
+        <div id="requestsList"></div>
+      </section>
+    </main>
+    <div id="site-footer"></div>
+    <script>
+      const sessionMessage = document.getElementById('sessionMessage');
+      const hintText = document.getElementById('hintText');
+      const requestsList = document.getElementById('requestsList');
+      let currentRole = '';
+
+      async function ensureSession() {
+        try {
+          const res = await fetch('/api/club-auth/session');
+          const data = await res.json();
+          if (!data.authenticated || !data.club) {
+            sessionMessage.textContent = 'Please sign in with a PR / English / Dean account.';
+            return false;
+          }
+          if (!['pr', 'english', 'dean'].includes(data.club.role)) {
+            sessionMessage.textContent = 'This dashboard is for PR, English Department, or the Dean.';
+            return false;
+          }
+          currentRole = data.club.role;
+          const titles = { pr: 'PR Department — Approvals', english: 'English Department — Preview & Approve', dean: 'Dean — Final Approval' };
+          document.getElementById('committeeTitle').textContent = titles[currentRole];
+          hintText.textContent = currentRole === 'pr'
+            ? 'Pending requests from clubs. Approve, reject, or comment.'
+            : currentRole === 'english'
+              ? 'Requests approved by PR. Preview, approve, reject, or request changes.'
+              : 'Requests approved by English Department. Final approve or reject.';
+          return true;
+        } catch {
+          sessionMessage.textContent = 'Could not check your session.';
+          return false;
+        }
+      }
+
+      async function loadRequests() {
+        try {
+          const res = await fetch('/api/committee/requests');
+          const items = await res.json();
+          if (!res.ok) throw new Error(items.message || 'Could not load');
+          requestsList.innerHTML = items.map((item) => `
+            <article class="req-card">
+              ${item.image ? `<img src="${item.image}" alt="" />` : ''}
+              <div style="flex:1">
+                <strong>${item.title}</strong>
+                <div class="req-meta">${item.clubName || ''} · ${item.type} · ${item.date || 'no date'} · ${item.location || ''}</div>
+                <p style="margin:6px 0 0;font-size:.9rem">${item.description || ''}</p>
+                <div class="req-actions">
+                  <input placeholder="Comment (optional)" data-comment="${item.id}" />
+                  <button class="approve" data-action="approve" data-id="${item.id}">Approve</button>
+                  ${currentRole !== 'dean' ? `<button class="reject" data-action="reject" data-id="${item.id}">Reject</button>` : `<button class="reject" data-action="reject" data-id="${item.id}">Reject</button>`}
+                  ${currentRole === 'english' ? `<button class="changes" data-action="changes" data-id="${item.id}">Request changes</button>` : ''}
+                </div>
+              </div>
+            </article>
+          `).join('') || '<p>No pending requests for your stage.</p>';
+          requestsList.querySelectorAll('[data-action]').forEach((btn) => btn.addEventListener('click', () => act(Number(btn.dataset.id), btn.dataset.action)));
+        } catch (error) {
+          requestsList.innerHTML = `<p>${error.message}</p>`;
+        }
+      }
+
+      async function act(id, action) {
+        const input = requestsList.querySelector(`input[data-comment="${id}"]`);
+        const comment = input ? input.value : '';
+        try {
+          const res = await fetch(`/api/committee/requests/${id}/action`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action, comment })
+          });
+          const result = await res.json();
+          if (!res.ok) throw new Error(result.message || 'Action failed');
+          await loadRequests();
+        } catch (error) {
+          alert(error.message);
+        }
+      }
+
+      document.getElementById('logoutBtn').addEventListener('click', async () => {
+        await fetch('/api/club-auth/logout', { method: 'POST' });
+        window.location.href = '/';
+      });
+
+      (async () => {
+        if (await ensureSession()) await loadRequests();
+      })();
+    </script>
+      <script src="/assets/js/layout.js?v=1" defer></script>
+  </body>
+</html>

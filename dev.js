@@ -23,7 +23,7 @@ portProbe.listen(port, () => {
       nodemonPath,
       '--exitcrash',
       '--ignore', 'data/**',
-      '--ignore', 'public/pics/**',
+      '--ignore', 'public/assets/img/pics/**',
       'server.js'
     ], {
       cwd: __dirname,

@@ -12,7 +12,7 @@ const defaultClubs = [
     committee: 'Utopia Club',
     category: 'Innovation',
     tagline: 'Creative projects and student initiatives',
-    image: '/pics/Utopia.jpg',
+    image: '/assets/img/pics/Utopia.jpg',
     imageFit: 'contain',
     status: 'open',
     seats: 25,
@@ -27,7 +27,7 @@ const defaultClubs = [
     committee: 'Model United Nations',
     category: 'Debate & Leadership',
     tagline: 'Diplomacy, debate, and public speaking',
-    image: '/pics/mun.jpg',
+    image: '/assets/img/pics/mun.jpg',
     imageFit: 'contain',
     status: 'open',
     seats: 30,
@@ -42,7 +42,7 @@ const defaultClubs = [
     committee: 'Career Development Club',
     category: 'Career Growth',
     tagline: 'Career skills and professional growth',
-    image: '/pics/cdc.jpg',
+    image: '/assets/img/pics/cdc.jpg',
     imageFit: 'contain',
     status: 'open',
     seats: 20,
@@ -57,7 +57,7 @@ const defaultClubs = [
     committee: 'Dimas Club',
     category: 'Media & Content',
     tagline: 'Media production and creative content',
-    image: '/pics/dimas.jpg',
+    image: '/assets/img/pics/dimas.jpg',
     imageFit: 'contain',
     status: 'full',
     seats: 18,
@@ -72,7 +72,7 @@ const defaultClubs = [
     committee: 'IEEE Student Chapter',
     category: 'Technology',
     tagline: 'Engineering, technology, and innovation',
-    image: '/pics/ieee.jpg',
+    image: '/assets/img/pics/ieee.jpg',
     imageFit: 'contain',
     status: 'open',
     seats: 26,
@@ -87,7 +87,7 @@ const defaultClubs = [
     committee: 'ACPC Club',
     category: 'Programming',
     tagline: 'Competitive programming and problem-solving',
-    image: '/pics/acpc.jpg',
+    image: '/assets/img/pics/acpc.jpg',
     imageFit: 'contain',
     status: 'open',
     seats: 24,
@@ -102,7 +102,7 @@ const defaultClubs = [
     committee: 'Tunners Club',
     category: 'Sports',
     tagline: 'Fitness, sports, and team activities',
-    image: '/pics/tuners.jpg',
+    image: '/assets/img/pics/tuners.jpg',
     imageFit: 'contain',
     status: 'open',
     seats: 22,
@@ -117,7 +117,7 @@ const defaultClubs = [
     committee: 'Theater Club',
     category: 'Arts & Performance',
     tagline: 'Acting, stage performance, and storytelling',
-    image: '/pics/theater.jpg',
+    image: '/assets/img/pics/theater.jpg',
     imageFit: 'contain',
     status: 'full',
     seats: 16,
@@ -132,7 +132,7 @@ const defaultClubs = [
     committee: 'MSP Club',
     category: 'Student Life',
     tagline: 'Campus events and student community',
-    image: '/pics/msp.jpg',
+    image: '/assets/img/pics/msp.jpg',
     imageFit: 'contain',
     status: 'open',
     seats: 28,
@@ -147,7 +147,7 @@ const defaultClubs = [
     committee: 'Gamers Legacy Club',
     category: 'Gaming & Esports',
     tagline: 'Gaming, competition, and community',
-    image: '/pics/gamerslegacy.jpg',
+    image: '/assets/img/pics/gamerslegacy.jpg',
     imageFit: 'contain',
     status: 'open',
     seats: 24,
@@ -162,7 +162,7 @@ const defaultClubs = [
     committee: 'International Hepatitis Club',
     category: 'Health Awareness',
     tagline: 'Hepatitis awareness and education',
-    image: '/pics/ihepc.jpg',
+    image: '/assets/img/pics/ihepc.jpg',
     imageFit: 'contain',
     status: 'open',
     seats: 20,
@@ -177,7 +177,7 @@ const defaultClubs = [
     committee: 'TEDx MIU',
     category: 'Ideas & Events',
     tagline: 'Ideas worth sharing through campus events',
-    image: '/pics/tedx.jpg',
+    image: '/assets/img/pics/tedx.jpg',
     imageFit: 'contain',
     status: 'open',
     seats: 24,
@@ -239,7 +239,7 @@ async function seedMongo() {
           filter: { clubId: account.clubId, email: account.email },
           update: { $setOnInsert: {
             ...account,
-            role: account.role === 'head' ? 'head' : 'president',
+            role: ['head', 'pr', 'english', 'dean'].includes(account.role) ? account.role : 'president',
             committee: account.committee || ''
           } },
           upsert: true
@@ -293,6 +293,26 @@ function seedClubAccounts(dataDirectory) {
     });
     newCredentials.push({ clubId: club.id, clubName: club.name, email, password });
     knownClubIds.add(club.id);
+  }
+
+  const committeeAccounts = [
+    { clubId: 0, email: 'pr@miu.local', role: 'pr' },
+    { clubId: 0, email: 'english@miu.local', role: 'english' },
+    { clubId: 0, email: 'dean@miu.local', role: 'dean' }
+  ];
+  for (const committee of committeeAccounts) {
+    if (accounts.some((account) => account.email === committee.email)) continue;
+    const password = crypto.randomBytes(18).toString('base64url');
+    const salt = crypto.randomBytes(16).toString('hex');
+    accounts.push({
+      clubId: 0,
+      email: committee.email,
+      salt,
+      passwordHash: crypto.scryptSync(password, salt, 64).toString('hex'),
+      role: committee.role,
+      committee: ''
+    });
+    newCredentials.push({ clubName: committee.role.toUpperCase(), email: committee.email, password });
   }
 
   if (newCredentials.length) {

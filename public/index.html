@@ -7,24 +7,33 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/style.css?v=20261005-form-statuses" />
-    <link rel="icon" href="/logo.svg.png" type="image/png">
+    <link rel="stylesheet" href="/assets/css/base.css?v=20261005-form-statuses" />
+    <link rel="stylesheet" href="/assets/css/responsive.css?v=20261005-form-statuses" />
+    <link rel="stylesheet" href="/assets/css/dark.css?v=20261005-form-statuses" />
+    <link rel="stylesheet" href="/assets/css/features.css?v=20261005-form-statuses" />
+    <link rel="icon" href="/assets/img/pics/logo.svg.png" type="image/png">
 </head>
   <body>
     <div class="page-shell">
-      <header class="topbar">
-        <a class="brand-banner brand-home-link" href="/" aria-label="MIU homepage">
-          <img class="brand-mark" src="/logo.svg.png" alt="MIU logo" />
-        </a>
-      </header>
+      <div id="site-header"></div>
 
       <main class="app-container">
         <section id="homeView" class="view active">
           <div class="welcome-box hero-panel">
             <h1 id="homePageTitle">University Clubs</h1>
             <p id="homePageSubtitle">Explore all clubs and apply to the ones that match your interests.</p>
-            <div class="home-form-actions"><a id="myFormsButton" class="secondary-btn" href="/applicant-login.html">Sign In</a></div>
+            <div class="home-form-actions"><a id="myFormsButton" class="secondary-btn" href="/pages/applicant-login.html">Sign In</a> <button id="calendarButton" class="secondary-btn" type="button">Calendar</button></div>
           </div>
+
+          <section class="events-slideshow" id="eventsSlideshow">
+            <div class="events-slideshow-head">
+              <h2>Upcoming events</h2>
+            </div>
+            <div class="events-slideshow-track" id="eventsSlideshowTrack"></div>
+            <button class="slide-arrow slide-prev" id="slidePrev" type="button" aria-label="Previous">‹</button>
+            <button class="slide-arrow slide-next" id="slideNext" type="button" aria-label="Next">›</button>
+            <div class="events-slideshow-dots" id="eventsSlideshowDots"></div>
+          </section>
 
           <div class="stats-summary">
             <div class="summary-card">
@@ -50,6 +59,28 @@
           </div>
 
           <div id="clubGrid" class="club-grid"></div>
+        </section>
+
+        <section id="signInView" class="view">
+          <div class="admin-login-panel">
+            <img class="club-login-miu-logo" src="/assets/img/pics/logo.svg.png" alt="MIU logo" />
+            <span class="admin-eyebrow">SIGN IN</span>
+            <h2>Welcome back</h2>
+            <p>Sign in with your university/club account. You will be taken to the dashboard you have access to.</p>
+            <form id="unifiedLoginForm">
+              <div class="field-group">
+                <label for="unifiedEmail">Email</label>
+                <input id="unifiedEmail" type="text" autocomplete="username" required />
+              </div>
+              <div class="field-group">
+                <label for="unifiedPassword">Password</label>
+                <input id="unifiedPassword" type="password" autocomplete="current-password" required />
+              </div>
+              <button class="primary-btn" type="submit">Sign In</button>
+            </form>
+            <p id="unifiedLoginFeedback" class="admin-feedback"></p>
+            <button id="unifiedLoginBackBtn" class="text-button" type="button">Back to homepage</button>
+          </div>
         </section>
 
         <section id="adminLoginView" class="view">
@@ -79,7 +110,7 @@
 
         <section id="clubLoginView" class="view">
           <div class="club-login-panel">
-            <img class="club-login-miu-logo" src="/logo.svg.png" alt="MIU logo" />
+            <img class="club-login-miu-logo" src="/assets/img/pics/logo.svg.png" alt="MIU logo" />
             <span class="admin-eyebrow">MIU CLUB PORTAL</span>
             <h2>Club dashboard login</h2>
             <p>Presidents manage committee heads. Committee heads review applications assigned to their committee.</p>
@@ -361,6 +392,7 @@
                 </div>
               </div>
               <div class="top-actions">
+                <a class="secondary-btn" href="/pages/club-content.html">Content Studio</a>
                 <button id="backHomeBtn" class="secondary-btn" type="button">Back to Clubs</button>
                 <button id="logoutBtn" class="logout-btn" type="button">Log out</button>
               </div>
@@ -456,8 +488,48 @@
 
             <div id="applicationsList" class="applications-list"></div>
           </div>
+
+          <div class="committee-card" style="margin-top:18px">
+            <div class="committee-top">
+              <div>
+                <div class="committee-label">CONTENT STUDIO</div>
+                <h2>Posts & upcoming events</h2>
+              </div>
+              <div class="top-actions">
+                <a class="secondary-btn" href="/pages/club-content.html" target="_blank">Open full page</a>
+              </div>
+            </div>
+            <iframe src="/pages/club-content.html?embed=1" style="width:100%;min-height:620px;border:1px solid #f0d7d7;border-radius:16px" title="Content Studio"></iframe>
+          </div>
         </section>
       </main>
+
+      <div class="calendar-modal hidden" id="calendarModal">
+        <div class="calendar-panel">
+          <div class="calendar-head">
+            <h2>Events calendar</h2>
+            <button id="calendarClose" class="secondary-btn" type="button">Close</button>
+          </div>
+          <div id="calendarGrid" class="calendar-grid"></div>
+          <div class="calendar-detail hidden" id="calendarDetail">
+            <button id="calendarBack" class="secondary-btn" type="button">← Back to calendar</button>
+            <div class="calendar-detail-card">
+              <img id="calendarDetailImg" src="" alt="event" />
+              <div>
+                <h3 id="calendarDetailTitle"></h3>
+                <p id="calendarDetailMeta"></p>
+                <p id="calendarDetailDesc"></p>
+                <form id="eventRegForm">
+                  <input id="regName" placeholder="Your name" required />
+                  <input id="regEmail" type="email" placeholder="University email" required />
+                  <button class="primary-btn" type="submit">Register for event</button>
+                </form>
+                <p id="regFeedback" class="admin-feedback"></p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div id="reviewModal" class="modal hidden">
@@ -531,11 +603,12 @@
       </div>
     </div>
 
-    <footer class="site-footer">
-      <p>Copyright 2026 © Misr International University, All Right Reserved | Made by <a href="https://www.linkedin.com/in/mahmoud-hefny-1264763b0" target="_blank" rel="noopener noreferrer">Mahmoud Hefny</a></p>
-    </footer>
+    <div id="site-footer"></div>
 
-    <script src="/script.js?v=20261005-form-statuses"></script>
-    <script src="/theme.js?v=20261005-global-theme" defer></script>
+    <script src="/assets/js/app-home.js?v=20261005-form-statuses"></script>
+    <script src="/assets/js/app-admin.js?v=20261005-form-statuses"></script>
+    <script src="/assets/js/app-dashboard.js?v=20261005-form-statuses"></script>
+    <script src="/assets/js/layout.js?v=1" defer></script>
+    <script src="/assets/js/theme.js?v=20261005-global-theme" defer></script>
   </body>
 </html>
