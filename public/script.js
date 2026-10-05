@@ -999,17 +999,23 @@ function openClubDetail(clubId) {
     ${Array.isArray(club.events) && club.events.length ? `
     <section class="detail-section">
       <h3>Upcoming events</h3>
-      <div class="detail-cards-grid">
+      <div class="detail-cards-grid detail-club-cards">
         ${club.events.map((event, index) => `
-          <div class="event-tile">
-            <img src="${escapeHtml(event.image || club.image)}" alt="${escapeHtml(event.title || 'event')}" />
-            <div class="event-tile-body">
-              <strong>${escapeHtml(event.title || 'Event')}</strong>
-              <span class="event-tile-date">${escapeHtml(event.date || '')}${event.location ? ' · ' + escapeHtml(event.location) : ''}</span>
-              <button class="event-info-btn" type="button" data-info="event-${index}">Info</button>
+          <article class="club-card feed-card">
+            <div class="club-image-wrap">
+              <img class="club-image" src="${escapeHtml(event.image || club.image)}" alt="${escapeHtml(event.title || 'event')}" />
+            </div>
+            <div class="club-card-content">
+              <div class="club-card-header">
+                <div class="club-name">${escapeHtml(event.title || 'Event')}</div>
+              </div>
+              <div class="club-tagline">${escapeHtml(event.date || '')}${event.location ? ' · ' + escapeHtml(event.location) : ''}</div>
+              <div class="club-actions">
+                <button class="event-info-btn" type="button" data-info="event-${index}">Info</button>
+              </div>
               <p class="event-tile-desc" id="event-desc-${index}" hidden>${escapeHtml(event.description || '')}</p>
             </div>
-          </div>
+          </article>
         `).join('')}
       </div>
     </section>
@@ -1018,17 +1024,23 @@ function openClubDetail(clubId) {
     ${Array.isArray(club.posts) && club.posts.length ? `
     <section class="detail-section">
       <h3>Club feed</h3>
-      <div class="detail-cards-grid">
+      <div class="detail-cards-grid detail-club-cards">
         ${club.posts.map((post, index) => `
-          <div class="event-tile post-card">
-            <img src="${escapeHtml(post.image || club.image)}" alt="${escapeHtml(post.title || 'post')}" />
-            <div class="event-tile-body">
-              <strong>${escapeHtml(post.title || 'Post')}</strong>
-              <span class="event-tile-date">${escapeHtml(post.date || '')}${post.location ? ' · ' + escapeHtml(post.location) : ''}</span>
-              <button class="event-info-btn" type="button" data-info="post-${index}">Info</button>
+          <article class="club-card feed-card">
+            <div class="club-image-wrap">
+              <img class="club-image" src="${escapeHtml(post.image || club.image)}" alt="${escapeHtml(post.title || 'post')}" />
+            </div>
+            <div class="club-card-content">
+              <div class="club-card-header">
+                <div class="club-name">${escapeHtml(post.title || 'Post')}</div>
+              </div>
+              <div class="club-tagline">${escapeHtml(post.date || '')}${post.location ? ' · ' + escapeHtml(post.location) : ''}</div>
+              <div class="club-actions">
+                <button class="event-info-btn" type="button" data-info="post-${index}">Info</button>
+              </div>
               <p class="event-tile-desc" id="post-desc-${index}" hidden>${escapeHtml(post.text || post.description || '')}</p>
             </div>
-          </div>
+          </article>
         `).join('')}
       </div>
     </section>
@@ -1043,9 +1055,9 @@ function openClubDetail(clubId) {
   clubDetail.querySelector('[data-action="apply-club"]').addEventListener('click', () => openApplicationForm(clubId));
   clubDetail.querySelector('[data-action="go-home"]').addEventListener('click', () => showView('home'));
 
-  clubDetail.querySelectorAll('.event-info-btn, .post-card .event-info-btn').forEach((btn) => {
+  clubDetail.querySelectorAll('.event-info-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
-      const [, kind, rawIndex] = btn.dataset.info.split('-');
+      const [kind, rawIndex] = btn.dataset.info.split('-');
       const target = clubDetail.querySelector(`#${kind === 'post' ? 'post' : 'event'}-desc-${rawIndex}`);
       if (target) target.hidden = !target.hidden;
     });
