@@ -412,16 +412,22 @@ function renderEventsSlideshow() {
   }
   if (slideIndex >= events.length) slideIndex = 0;
   track.innerHTML = events.map((event, i) => `
-    <div class="event-slide${i === slideIndex ? ' active' : ''}">
+    <div class="event-slide${i === slideIndex ? ' active' : ''}" data-club="${event.clubId}" data-idx="${event.eventIndex}">
       <img src="${escapeHtml(event.image || event.clubImage)}" alt="${escapeHtml(event.title || 'event')}" />
       <div class="event-slide-copy">
         <span class="event-slide-club">${escapeHtml(event.clubName || '')}</span>
         <h3>${escapeHtml(event.title || 'Event')}</h3>
         <p class="event-slide-meta">${escapeHtml(event.date || '')}${event.location ? ' · ' + escapeHtml(event.location) : ''}</p>
         <p>${escapeHtml(event.description || '')}</p>
+        <span class="event-slide-cta">View details →</span>
       </div>
     </div>
   `).join('');
+  track.querySelectorAll('.event-slide').forEach((slide) => {
+    slide.addEventListener('click', () => {
+      window.location.href = `/pages/events.html?club=${slide.dataset.club}&event=${slide.dataset.idx}`;
+    });
+  });
   dots.innerHTML = events.map((_, i) => `<button type="button" class="${i === slideIndex ? 'active' : ''}" data-slide="${i}" aria-label="slide ${i + 1}"></button>`).join('');
   dots.querySelectorAll('button').forEach((dot) => dot.addEventListener('click', () => { slideIndex = Number(dot.dataset.slide); renderEventsSlideshow(); }));
   const prev = document.getElementById('slidePrev');
