@@ -1020,16 +1020,16 @@ function openClubDetail(clubId) {
       <h3>Club feed</h3>
       <div class="detail-cards-grid">
         ${club.posts.map((post, index) => `
-          <button class="post-tile" type="button" data-post="${index}">
+          <div class="event-tile post-card">
             <img src="${escapeHtml(post.image || club.image)}" alt="${escapeHtml(post.title || 'post')}" />
-            <span class="post-tile-label">${escapeHtml(post.title || post.date || 'Post')}</span>
-          </button>
+            <div class="event-tile-body">
+              <strong>${escapeHtml(post.title || 'Post')}</strong>
+              <span class="event-tile-date">${escapeHtml(post.date || '')}${post.location ? ' · ' + escapeHtml(post.location) : ''}</span>
+              <button class="event-info-btn" type="button" data-info="post-${index}">Info</button>
+              <p class="event-tile-desc" id="post-desc-${index}" hidden>${escapeHtml(post.text || post.description || '')}</p>
+            </div>
+          </div>
         `).join('')}
-      </div>
-      <div class="post-detail" id="postDetail" hidden>
-        <h4 id="postDetailTitle"></h4>
-        <p id="postDetailText"></p>
-        <span id="postDetailMeta"></span>
       </div>
     </section>
     ` : ''}
@@ -1043,26 +1043,11 @@ function openClubDetail(clubId) {
   clubDetail.querySelector('[data-action="apply-club"]').addEventListener('click', () => openApplicationForm(clubId));
   clubDetail.querySelector('[data-action="go-home"]').addEventListener('click', () => showView('home'));
 
-  clubDetail.querySelectorAll('.event-info-btn').forEach((btn) => {
+  clubDetail.querySelectorAll('.event-info-btn, .post-card .event-info-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
-      const target = clubDetail.querySelector(`#event-desc-${btn.dataset.info.split('-')[1]}`);
+      const [, kind, rawIndex] = btn.dataset.info.split('-');
+      const target = clubDetail.querySelector(`#${kind === 'post' ? 'post' : 'event'}-desc-${rawIndex}`);
       if (target) target.hidden = !target.hidden;
-    });
-  });
-  clubDetail.querySelectorAll('.post-tile').forEach((tile) => {
-    tile.addEventListener('click', () => {
-      const post = (club.posts || [])[Number(tile.dataset.post)];
-      if (!post) return;
-      const panel = clubDetail.querySelector('#postDetail');
-      const title = clubDetail.querySelector('#postDetailTitle');
-      const text = clubDetail.querySelector('#postDetailText');
-      const meta = clubDetail.querySelector('#postDetailMeta');
-      if (!panel || !title || !text || !meta) return;
-      title.textContent = post.title || post.author || 'Post';
-      text.textContent = post.text || post.description || '';
-      meta.textContent = [post.date, post.location].filter(Boolean).join(' · ');
-      panel.hidden = false;
-      panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
   });
 
