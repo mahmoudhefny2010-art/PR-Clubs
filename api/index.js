@@ -1,4 +1,5 @@
-const { app, ensureReady } = require('../server');
+const app = require('../server');
+const ensureReady = app.ensureReady;
 
 module.exports = async (req, res) => {
   await ensureReady();

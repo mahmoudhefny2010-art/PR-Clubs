@@ -1855,6 +1855,9 @@ function ensureReady() {
 
 if (require.main === module) {
   startServer();
+} else {
+  ensureReady();
 }
 
-module.exports = { app, ensureReady };
+module.exports = app;
+module.exports.ensureReady = ensureReady;

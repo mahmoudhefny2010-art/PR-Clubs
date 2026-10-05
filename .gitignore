@@ -3,3 +3,5 @@ node_modules/
 data/admin.json
 data/club-accounts.json
 data/club-logins.generated.json
+.vercel
+.env*
