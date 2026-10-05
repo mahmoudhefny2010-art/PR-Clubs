@@ -22,7 +22,6 @@
 .today-event-chip img{width:28px;height:28px;border-radius:50%;object-fit:cover;background:#fff}
 .today-event-badge{font-size:.66rem;font-weight:800;color:#b71c1c;background:#fde8e8;padding:3px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:.04em}
 .today-event-title{font-weight:700;font-size:.88rem;white-space:nowrap}
-.hero-actions-divider{height:0;margin-top:18px;border:none;border-top:2px solid rgba(185,27,31,.35)}
 
 /* Event slideshow clickable CTA */
 .event-slide{cursor:pointer}
