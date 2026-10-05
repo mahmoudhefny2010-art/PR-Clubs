@@ -1,146 +1,89 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow, noarchive">
-  <title>Global administrator dashboard</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/css/base.css?v=20261005e" />
-    <link rel="stylesheet" href="/assets/css/responsive.css?v=20261005e" />
-    <link rel="stylesheet" href="/assets/css/dark.css?v=20261005e" />
-    <link rel="stylesheet" href="/assets/css/features.css?v=20261005e" />
-  <style>
-    :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, sans-serif; color: var(--text); background: var(--bg-main); }
-    :root[data-theme="dark"] { color-scheme: dark; --bg-main: #111315; --bg-panel: #1b1e21; --bg-strong: #25292d; --bg-soft: #202428; --border: rgba(255,255,255,.14); --text: #f3f4f6; --muted: #c0c4c9; --shadow: rgba(0,0,0,.35); }
-    * { box-sizing: border-box; }
-    body { margin: 0; padding: 0; background: radial-gradient(circle at top, rgba(201,34,42,.12), transparent 24%), linear-gradient(180deg, #fff 0%, #f7f5f4 28%, #f3f0ee 100%); color: var(--text); }
-    :root[data-theme="dark"] body { background: radial-gradient(circle at top, rgba(201,34,42,.12), transparent 28%), linear-gradient(180deg, #191c1f 0%, #121416 32%, #0e1012 100%); }
-    .page-shell { flex: 1 0 auto; min-height: 0; padding: 0 16px 48px; }
-    .topbar { flex: 0 0 auto; }
-    main { width: min(1180px, calc(100% - 36px)); flex: 1; margin: 0 auto; padding: 28px 0 42px; }
-    .page-heading, .section-heading, .record-top, .record-actions { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
-    .page-heading { margin-bottom: 24px; flex-wrap: wrap; }
-    .site-footer p, .site-footer a { color: #fff; }
-    :root[data-theme="dark"] .section, :root[data-theme="dark"] .record { background: var(--bg-panel); border-color: var(--border); box-shadow: 0 10px 24px var(--shadow); }
-    :root[data-theme="dark"] h1, :root[data-theme="dark"] h2, :root[data-theme="dark"] h3, :root[data-theme="dark"] .record-title, :root[data-theme="dark"] summary { color: var(--text); }
-    :root[data-theme="dark"] p, :root[data-theme="dark"] label, :root[data-theme="dark"] .record-meta, :root[data-theme="dark"] .detail-item strong { color: var(--muted); }
-    :root[data-theme="dark"] input, :root[data-theme="dark"] select, :root[data-theme="dark"] textarea { background: var(--bg-panel); color: var(--text); border-color: var(--border); }
-    :root[data-theme="dark"] .empty { color: var(--muted); border-color: var(--border); }
-    :root[data-theme="dark"] .answer { background: var(--bg-soft); color: var(--text); }
-    :root[data-theme="dark"] .answer p { color: var(--text); }
-    :root[data-theme="dark"] .badge.accepted { background: #173b2e; color: #72d5a9; }
-    :root[data-theme="dark"] .badge.rejected { background: #442528; color: #ff9298; }
-    :root[data-theme="dark"] .badge.pending { background: #45381e; color: #ffd071; }
-    :root[data-theme="dark"] .badge.processing { background: #19354a; color: #8bcaff; }
-    :root[data-theme="dark"] .answer { border-left-color: #e25359; }
-    :root[data-theme="dark"] .site-footer p, :root[data-theme="dark"] .site-footer a { color: #fff; }
-    h1 { margin: 0; font-size: clamp(1.6rem, 4vw, 2.2rem); }
-    h2 { margin: 0; font-size: 1.3rem; }
-    h3 { margin: 0; font-size: 1.08rem; }
-    p { color: #555; }
-    .section { margin-top: 22px; padding: 22px; border: 1px solid rgba(185,27,31,.18); border-radius: 16px; background: #fff; box-shadow: 0 10px 24px rgba(17,17,17,.04); }
-    .section-heading { margin-bottom: 14px; flex-wrap: wrap; }
-    .toolbar, .form-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 14px; align-items: end; }
-    label { display: grid; gap: 7px; color: #555; font-size: .9rem; }
-    input, select, textarea { width: 100%; min-width: 0; padding: 11px 12px; border: 1px solid rgba(17,17,17,.16); border-radius: 9px; background: #fff; color: #111; font: inherit; }
-    button, .link-button { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 9px 13px; border: 1px solid rgba(185,27,31,.22); border-radius: 9px; background: #fff; color: #111; font: inherit; font-weight: 700; text-decoration: none; cursor: pointer; }
-    button.primary { background: #b51d23; color: #fff; border-color: #b51d23; }
-    button.danger { background: #151515; color: #fff; border-color: #151515; }
-    .form-grid button { grid-column: 1 / -1; }
-    .records { display: grid; gap: 12px; margin-top: 16px; }
-    .record { padding: 16px; border: 1px solid rgba(185,27,31,.16); border-radius: 12px; background: #fffdfd; }
-    .record-top { align-items: flex-start; }
-    .record-title { font-weight: 800; font-size: 1.04rem; }
-    .record-meta { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 8px; color: #555; overflow-wrap: anywhere; }
-    .record-actions { margin-top: 14px; justify-content: flex-start; flex-wrap: wrap; }
-    .badge { flex: 0 0 auto; padding: 6px 10px; border-radius: 999px; background: #f0f0f0; text-transform: capitalize; }
-    .badge.accepted { background: #d9f0e7; color: #25845e; }
-    .badge.rejected { background: #f7dddd; color: #b51d23; }
-    .badge.pending { background: #fff5e4; color: #b51d23; }
-    .badge.processing { background: #e6f4ff; color: #4d9bd4; }
-    details { margin-top: 14px; border-top: 1px solid #eee; padding-top: 12px; }
-    summary { cursor: pointer; font-weight: 700; }
-    .detail-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px 18px; margin-top: 12px; }
-    .detail-item { overflow-wrap: anywhere; }
-    .detail-item strong { display: block; margin-bottom: 4px; color: #555; font-size: .85rem; }
-    .answer { margin: 10px 0; padding: 10px 12px; border-left: 3px solid #c9222a; background: #faf4f3; }
-    .answer p { margin: 5px 0 0; white-space: pre-wrap; }
-    .application-photo { display: block; width: 110px; height: 110px; margin-top: 12px; border-radius: 12px; object-fit: cover; }
-    .edit-form { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; align-items: end; }
-    .edit-form .record-actions { grid-column: 1 / -1; margin-top: 0; }
-    .message { min-height: 1.4em; margin: 10px 0 0; color: #176b3e; font-weight: 700; }
-    .message.error { color: #a51d27; }
-    .empty { padding: 18px; text-align: center; color: #666; border: 1px dashed #ddd; border-radius: 10px; }
-    @media (max-width: 760px) {
-      .page-shell { padding: 0 12px 24px; }
-      .toolbar, .form-grid, .edit-form, .detail-grid { grid-template-columns: 1fr; }
-      .form-grid button, .edit-form .record-actions { grid-column: auto; }
-      .section { padding: 16px; }
-      main { width: 100%; padding: 20px 0 28px; }
-      .page-heading { align-items: flex-start; }
-      .page-heading > div:first-child { width: 100%; }
-      .page-heading .record-actions { display: grid; width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-      .page-heading .record-actions > * { min-width: 0; }
-      .record-top { gap: 8px; }
-    }
-    @media (max-width: 420px) {
-      .page-shell { padding-right: 10px; padding-left: 10px; }
-      .page-heading .record-actions { grid-template-columns: 1fr; }
-      .record { padding: 13px; }
-      .record-actions > select { width: 100%; }
-    }
-  </style>
+  <title>Global Admin</title>
+  <link rel="stylesheet" href="/assets/css/base.css?v=20261005f" />
+  <link rel="stylesheet" href="/assets/css/responsive.css?v=20261005f" />
+  <link rel="stylesheet" href="/assets/css/dark.css?v=20261005f" />
+  <link rel="stylesheet" href="/assets/css/features.css?v=20261005f" />
   <link rel="icon" href="/assets/img/pics/logo.svg.png" type="image/png">
+  <style>
+    .section { margin-bottom: 28px; }
+    .section-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
+    .section-heading h2 { margin: 0; font-size: clamp(1.2rem, 3vw, 1.6rem); }
+    .section-heading p { margin: 4px 0 0; color: var(--muted); font-size: .92rem; }
+    .toolbar { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+    .toolbar label { display: flex; align-items: center; gap: 8px; font-size: .88rem; color: var(--muted); }
+    .toolbar select { padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-panel); color: var(--text); font: inherit; }
+    .records { display: grid; gap: 10px; }
+    .record { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; }
+    .record-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+    .record-title { margin: 0; font-size: 1.05rem; font-weight: 700; }
+    .record-meta { color: var(--muted); font-size: .82rem; }
+    .record-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .record-actions button { padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-panel); color: var(--text); cursor: pointer; font-weight: 600; }
+    .record-actions button.danger { border-color: var(--red); color: var(--red); }
+    .empty { color: var(--muted); text-align: center; padding: 24px; }
+    .message { min-height: 1.5em; margin-top: 10px; font-size: .9rem; }
+    .message.error { color: var(--red); }
+    .committee-label { color: var(--gold); font-weight: 800; font-size: .7rem; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 4px; display: block; }
+  </style>
 </head>
 <body>
   <div class="page-shell">
     <div id="site-header"></div>
-  <main>
-    <div class="page-heading">
-      <div><h1>Global administrator</h1><p>Manage applications and committee heads across every club.</p></div>
-      <div class="record-actions">
-        <a class="link-button" href="/admin">Website settings</a>
-        <a class="link-button" href="/admin/club-credentials">Club credentials</a>
-        <button id="logout" class="danger" type="button">Log out</button>
-      </div>
-    </div>
 
-    <section class="section">
-      <div class="section-heading"><div><h2>Committee heads</h2><p>Create, edit, or remove a head account for any club.</p></div></div>
-      <form id="createHeadForm" class="form-grid">
-        <label>Club<select name="clubId" id="createHeadClub" required></select></label>
-        <label>Committee<input name="committee" maxlength="100" required></label>
-        <label>Head email<input name="email" type="email" autocomplete="username" required></label>
-        <label>Password (12+ characters)<input name="password" type="password" minlength="12" autocomplete="new-password" required></label>
-        <button class="primary" type="submit">Create head</button>
-      </form>
-      <p id="headMessage" class="message" role="status"></p>
-      <div class="toolbar">
-        <label>Filter heads by club<select id="headClubFilter"></select></label>
-      </div>
-      <div id="headRecords" class="records"></div>
-    </section>
+    <main class="app-container">
+      <section class="welcome-box hero-panel">
+        <div>
+          <span class="committee-label">GLOBAL ADMIN</span>
+          <h1 id="adminTitle">Admin Dashboard</h1>
+          <p id="adminSubtitle">Manage clubs, heads, and applications globally.</p>
+        </div>
+        <div class="top-actions">
+          <button id="logoutBtn" class="secondary-btn" type="button">Sign out</button>
+        </div>
+      </section>
 
-    <section class="section">
-      <div class="section-heading"><div><h2>Applications</h2><p>View and manage applications submitted to any club.</p></div></div>
-      <div class="toolbar">
-        <label>Filter applications by club<select id="applicationClubFilter"></select></label>
-      </div>
-      <p id="applicationMessage" class="message" role="status"></p>
-      <div id="applicationRecords" class="records"></div>
-    </section>
-  </main>
+      <section class="section">
+        <div class="section-heading">
+          <div><h2>Club Heads</h2><p>Add or remove club heads (president/head).</p></div>
+          <div class="top-actions">
+            <button id="addHeadBtn" class="primary-btn" type="button">Add head</button>
+          </div>
+        </section>
+        <div class="toolbar">
+          <label>Filter heads by club<select id="headClubFilter"></select></label>
+        </div>
+        <div id="headRecords" class="records"></div>
+      </section>
+
+      <section class="section">
+        <div class="section-heading">
+          <div><h2>Applications</h2><p>View and manage applications submitted to any club.</p></div>
+        </div>
+        <div class="toolbar">
+          <label>Filter applications by club<select id="applicationClubFilter"></select></label>
+        </div>
+        <p id="applicationMessage" class="message" role="status"></p>
+        <div id="applicationRecords" class="records"></div>
+      </section>
+    </main>
+
     <div id="site-footer"></div>
   </div>
+
+  <script src="/assets/js/layout.js?v=6" defer></script>
+  <script src="/assets/js/theme.js?v=20261005f" defer></script>
   <script>
     const clubs = [];
     let heads = [];
     let applications = [];
     const byId = (id) => document.getElementById(id);
-    const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
+    const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&', '<': '<', '>': '>', '"': '"', "'": ''' })[character]);
     const setMessage = (id, message, isError = false) => { const node = byId(id); node.textContent = message; node.classList.toggle('error', isError); };
     const filterValue = (id) => byId(id).value;
     async function request(url, options) {
@@ -152,124 +95,127 @@
     }
     function fillClubSelect(select, includeAll) {
       select.replaceChildren();
-      if (includeAll) select.add(new Option('All clubs', 'all'));
-      for (const club of clubs) select.add(new Option(club.name, String(club.id)));
+      if (includeAll) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = 'All clubs';
+        select.appendChild(opt);
+      }
+      for (const club of clubs) {
+        const opt = document.createElement('option');
+        opt.value = club.id;
+        opt.textContent = club.name;
+        select.appendChild(opt);
+      }
     }
-    async function reloadHeads() { heads = await request('/api/admin/club-heads'); renderHeads(); }
-    async function reloadApplications() { applications = await request('/api/admin/applications'); renderApplications(); }
     function renderHeads() {
-      const selectedClub = filterValue('headClubFilter');
-      const records = heads.filter((head) => selectedClub === 'all' || String(head.clubId) === selectedClub);
-      const container = byId('headRecords');
-      container.replaceChildren();
-      if (!records.length) { container.innerHTML = '<div class="empty">No committee heads for this filter.</div>'; return; }
-      for (const head of records) {
-        const card = document.createElement('article');
-        card.className = 'record';
-        const top = document.createElement('div'); top.className = 'record-top';
-        const detail = document.createElement('div');
-        const title = document.createElement('div'); title.className = 'record-title'; title.textContent = `${head.clubName} - ${head.committee} Head`;
-        const meta = document.createElement('div'); meta.className = 'record-meta'; meta.textContent = head.email;
-        detail.append(title, meta); top.append(detail); card.append(top);
-        const actions = document.createElement('div'); actions.className = 'record-actions';
-        const edit = document.createElement('button'); edit.type = 'button'; edit.textContent = 'Edit'; edit.addEventListener('click', () => editHead(head, card));
-        const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'danger'; remove.textContent = 'Delete'; remove.addEventListener('click', () => deleteHead(head));
-        actions.append(edit, remove); card.append(actions); container.append(card);
-      }
-    }
-    function editHead(head, card) {
-      const form = document.createElement('form'); form.className = 'edit-form';
-      for (const [labelText, name, type, value] of [['Committee', 'committee', 'text', head.committee], ['Head email', 'email', 'email', head.email], ['New password (optional)', 'password', 'password', '']]) {
-        const label = document.createElement('label'); label.textContent = labelText;
-        const input = document.createElement('input'); input.name = name; input.type = type; input.value = value;
-        if (name !== 'password') input.required = true;
-        if (name === 'committee') input.maxLength = 100;
-        if (name === 'password') { input.minLength = 12; input.placeholder = 'Leave blank to keep current password'; }
-        label.append(input); form.append(label);
-      }
-      const actions = document.createElement('div'); actions.className = 'record-actions';
-      const save = document.createElement('button'); save.className = 'primary'; save.type = 'submit'; save.textContent = 'Save changes';
-      const cancel = document.createElement('button'); cancel.type = 'button'; cancel.textContent = 'Cancel'; cancel.addEventListener('click', renderHeads);
-      actions.append(save, cancel); form.append(actions);
-      form.addEventListener('submit', async (event) => {
-        event.preventDefault(); const values = new FormData(form);
-        try {
-          await request(`/api/admin/club-heads/${encodeURIComponent(head.email)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ committee: values.get('committee'), email: values.get('email'), password: values.get('password') }) });
-          setMessage('headMessage', 'Head account updated. Existing applications moved with the committee if it changed.');
-          await reloadHeads(); await reloadApplications();
-        } catch (error) { setMessage('headMessage', error.message, true); }
+      const list = byId('headRecords');
+      if (!heads.length) { list.innerHTML = '<p class="empty">No heads added yet.</p>'; return; }
+      list.innerHTML = heads.map((head) => {
+        const club = clubs.find((c) => Number(c.id) === Number(head.clubId));
+        return `
+        <div class="record">
+          <div class="record-head">
+            <div>
+              <h3 class="record-title">${escapeHtml(head.name)}</h3>
+              <p class="record-meta">${escapeHtml(head.email)} · ${escapeHtml(head.role)} · ${club ? escapeHtml(club.name) : 'Unknown club'}</p>
+            </div>
+            <div class="record-actions">
+              <button type="button" class="danger" data-id="${head.id}">Remove</button>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+      list.querySelectorAll('[data-id]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          if (!confirm('Remove this head?')) return;
+          try {
+            await request(`/api/admin/heads/${btn.dataset.id}`, { method: 'DELETE' });
+            await reloadHeads();
+            setMessage('headMessage', 'Head removed.', false);
+          } catch (error) {
+            setMessage('headMessage', error.message, true);
+          }
+        });
       });
-      card.replaceWith(form);
     }
-    async function deleteHead(head) {
-      if (!window.confirm(`Delete ${head.committee} Head (${head.email}) from ${head.clubName}?`)) return;
-      try { await request(`/api/admin/club-heads/${encodeURIComponent(head.email)}`, { method: 'DELETE' }); setMessage('headMessage', 'Head account deleted. Existing applications remain in the club.'); await reloadHeads(); }
-      catch (error) { setMessage('headMessage', error.message, true); }
+    async function reloadHeads() {
+      const data = await request('/api/admin/heads');
+      heads = Array.isArray(data) ? data : [];
+      renderHeads();
     }
-    function addDetail(container, label, value) {
-      const item = document.createElement('div'); item.className = 'detail-item';
-      const title = document.createElement('strong'); title.textContent = label;
-      const text = document.createElement('span'); text.textContent = value || 'N/A';
-      item.append(title, text); container.append(item);
+    async function reloadApplications() {
+      const clubId = filterValue('applicationClubFilter');
+      const url = clubId ? `/api/admin/applications?club=${clubId}` : '/api/admin/applications';
+      const data = await request(url);
+      applications = Array.isArray(data) ? data : [];
+      renderApplications();
     }
-    function getApplicationStatusLabel(app) { return app.status === 'pending' && app.interviewed ? 'Processing' : app.status || 'pending'; }
-    function getApplicationStatusClass(app) { return `badge ${app.status || 'pending'}${app.status === 'pending' && app.interviewed ? ' processing' : ''}`; }
     function renderApplications() {
-      const selectedClub = filterValue('applicationClubFilter');
-      const records = applications.filter((app) => selectedClub === 'all' || String(app.clubId) === selectedClub);
-      const container = byId('applicationRecords'); container.replaceChildren();
-      if (!records.length) { container.innerHTML = '<div class="empty">No applications for this filter.</div>'; return; }
-      for (const app of records) {
-        const card = document.createElement('article'); card.className = 'record';
-        const top = document.createElement('div'); top.className = 'record-top';
-        const detail = document.createElement('div');
-        const title = document.createElement('div'); title.className = 'record-title'; title.textContent = app.studentName || 'Applicant';
-        const meta = document.createElement('div'); meta.className = 'record-meta';
-        const clubName = clubs.find((club) => club.id === app.clubId)?.name || `Club ${app.clubId}`;
-        for (const value of [clubName, app.committee || 'No committee', app.email || 'No email']) { const item = document.createElement('span'); item.textContent = value; meta.append(item); }
-        detail.append(title, meta); const badge = document.createElement('span'); badge.className = getApplicationStatusClass(app); badge.textContent = getApplicationStatusLabel(app); top.append(detail, badge); card.append(top);
-        const actions = document.createElement('div'); actions.className = 'record-actions';
-        const status = document.createElement('select'); for (const value of ['pending', 'accepted', 'rejected']) status.add(new Option(value[0].toUpperCase() + value.slice(1), value)); status.value = app.status || 'pending';
-        status.setAttribute('aria-label', `Status for ${app.studentName}`);
-        status.addEventListener('change', async () => { try { const updated = await request(`/api/admin/applications/${app.id}/status`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: status.value }) }); Object.assign(app, updated); badge.textContent = getApplicationStatusLabel(app); badge.className = getApplicationStatusClass(app); } catch (error) { window.alert(error.message); status.value = app.status || 'pending'; } });
-        const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'danger'; remove.textContent = 'Delete'; remove.addEventListener('click', async () => { if (!window.confirm(`Delete ${app.studentName}'s application to ${clubName}?`)) return; try { await request(`/api/admin/applications/${app.id}`, { method: 'DELETE' }); applications = applications.filter((item) => item.id !== app.id); renderApplications(); } catch (error) { window.alert(error.message); } });
-        actions.append(status, remove); card.append(actions);
-        const details = document.createElement('details'); const summary = document.createElement('summary'); summary.textContent = 'Application details and interview'; details.append(summary);
-        const grid = document.createElement('div'); grid.className = 'detail-grid';
-        for (const [label, value] of [['University ID', app.universityId], ['Major', app.major], ['Phone', app.phone], ['Age', app.age], ['Interview slot', app.slot], ['Interviewed', app.interviewed ? 'Yes' : 'No']]) addDetail(grid, label, value);
-        details.append(grid);
-        for (const [label, value] of [['Motivation', app.motivation], ['Applicant notes', app.notes]]) { const block = document.createElement('div'); block.className = 'answer'; const name = document.createElement('strong'); name.textContent = label; const text = document.createElement('p'); text.textContent = value || 'N/A'; block.append(name, text); details.append(block); }
-        for (const answer of (Array.isArray(app.answers) ? app.answers : [])) { const block = document.createElement('div'); block.className = 'answer'; const name = document.createElement('strong'); name.textContent = answer.label || answer.key || 'Answer'; const text = document.createElement('p'); text.textContent = answer.value || 'N/A'; block.append(name, text); details.append(block); }
-        const review = document.createElement('div'); review.className = 'form-grid'; review.style.marginTop = '12px';
-        const notesLabel = document.createElement('label'); notesLabel.textContent = 'Interview notes'; const notes = document.createElement('textarea'); notes.value = app.notes || ''; notes.maxLength = 2000; notesLabel.append(notes);
-        const ratingLabel = document.createElement('label'); ratingLabel.textContent = 'Rating'; const rating = document.createElement('select'); for (let i = 1; i <= 5; i += 1) rating.add(new Option(`${i}/5`, String(i))); rating.value = String(app.rating || 4); ratingLabel.append(rating);
-        const saveReview = document.createElement('button'); saveReview.className = 'primary'; saveReview.type = 'button'; saveReview.textContent = 'Save interview'; saveReview.addEventListener('click', async () => { try { const updated = await request(`/api/admin/applications/${app.id}/status`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ notes: notes.value, rating: Number(rating.value) }) }); Object.assign(app, updated); badge.textContent = getApplicationStatusLabel(app); badge.className = getApplicationStatusClass(app); setMessage('applicationMessage', 'Interview saved.'); } catch (error) { setMessage('applicationMessage', error.message, true); } });
-        review.append(notesLabel, ratingLabel, saveReview); details.append(review);
-        if (app.photo) { const photo = document.createElement('img'); photo.className = 'application-photo'; photo.src = app.photo; photo.alt = `${app.studentName} photo`; details.append(photo); }
-        card.append(details); container.append(card);
-      }
+      const list = byId('applicationRecords');
+      if (!applications.length) { list.innerHTML = '<p class="empty">No applications found.</p>'; return; }
+      list.innerHTML = applications.map((app) => `
+        <div class="record">
+          <div class="record-head">
+            <div>
+              <h3 class="record-title">${escapeHtml(app.studentName)}</h3>
+              <p class="record-meta">${escapeHtml(app.email)} · ${escapeHtml(app.clubName)} · <span class="status-pill status-${app.status}">${escapeHtml(app.status)}</span></p>
+            </div>
+            <div class="record-actions">
+              ${app.status === 'pending' ? `<button type="button" class="primary-btn" data-action="accept" data-id="${app.id}">Accept</button>
+              <button type="button" class="secondary-btn" data-action="reject" data-id="${app.id}">Reject</button>` : ''}
+            </div>
+          </div>
+        </div>`).join('');
+      list.querySelectorAll('[data-action]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const action = btn.dataset.action;
+          const id = btn.dataset.id;
+          try {
+            await request(`/api/admin/applications/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: action === 'accept' ? 'accepted' : 'rejected' }) });
+            await reloadApplications();
+            setMessage('applicationMessage', `Application ${action}ed.`, false);
+          } catch (error) {
+            setMessage('applicationMessage', error.message, true);
+          }
+        });
+      });
     }
-    byId('createHeadForm').addEventListener('submit', async (event) => {
-      event.preventDefault(); const form = event.currentTarget; const values = new FormData(form);
-      try { await request('/api/admin/club-heads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clubId: Number(values.get('clubId')), committee: values.get('committee'), email: values.get('email'), password: values.get('password') }) }); form.reset(); setMessage('headMessage', 'Head account created. Share the email and password with the head.'); await reloadHeads(); }
-      catch (error) { setMessage('headMessage', error.message, true); }
+    byId('addHeadBtn').addEventListener('click', async () => {
+      const name = prompt('Head full name:');
+      if (!name) return;
+      const email = prompt('Head email (university):');
+      if (!email) return;
+      const role = prompt('Role (president or head):', 'president');
+      if (!role) return;
+      const clubId = filterValue('headClubFilter');
+      if (!clubId) { alert('Select a club first.'); return; }
+      try {
+        await request('/api/admin/heads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email, role, clubId: Number(clubId) }) });
+        await reloadHeads();
+        setMessage('headMessage', 'Head added.', false);
+      } catch (error) {
+        setMessage('headMessage', error.message, true);
+      }
     });
-    byId('headClubFilter').addEventListener('change', renderHeads);
-    byId('applicationClubFilter').addEventListener('change', renderApplications);
-    byId('logout').addEventListener('click', async () => { await fetch('/api/admin/logout', { method: 'POST' }); window.location.assign('/'); });
+    byId('logoutBtn').addEventListener('click', async () => {
+      await fetch('/api/admin/logout', { method: 'POST' });
+      window.location.assign('/');
+    });
+    byId('headClubFilter').addEventListener('change', reloadHeads);
+    byId('applicationClubFilter').addEventListener('change', reloadApplications);
     async function init() {
       try {
         const [clubData] = await Promise.all([request('/api/clubs'), reloadHeads(), reloadApplications()]);
         clubs.push(...clubData);
-        fillClubSelect(byId('createHeadClub'), false);
-        fillClubSelect(byId('headClubFilter'), true);
+        fillClubSelect(byId('headClubFilter'), false);
         fillClubSelect(byId('applicationClubFilter'), true);
-        renderHeads(); renderApplications();
-      } catch (error) { setMessage('headMessage', error.message, true); setMessage('applicationMessage', error.message, true); }
+      } catch (error) {
+        setMessage('headMessage', error.message, true);
+        setMessage('applicationMessage', error.message, true);
+      }
     }
     init();
   </script>
-  <script src="/assets/js/theme.js?v=20261005e" defer></script>
-    <script src="/assets/js/layout.js?v=5" defer></script>
-  </body>
+</body>
 </html>
