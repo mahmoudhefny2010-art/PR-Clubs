@@ -17,7 +17,33 @@
     "description": "A creative student community focused on innovation, leadership, and real-world problem solving.",
     "requirements": "Curiosity, teamwork, and a passion for creating impact.",
     "applicationIntro": "",
-    "applicationFields": []
+    "applicationFields": [],
+    "events": [
+      {
+        "title": "Welcome Meetup",
+        "date": "2026-10-15",
+        "location": "Main Hall",
+        "description": "Utopia welcome session for new members."
+      },
+      {
+        "title": "Weekly Workshop",
+        "date": "2026-10-22",
+        "location": "Room B12",
+        "description": "Weekly skills workshop organized by Utopia."
+      }
+    ],
+    "posts": [
+      {
+        "author": "Utopia",
+        "date": "2026-10-01",
+        "text": "Welcome to our page! Follow us for upcoming events and updates."
+      },
+      {
+        "author": "Utopia",
+        "date": "2026-09-24",
+        "text": "Had a great session last week. See you at the next event!"
+      }
+    ]
   },
   {
     "id": 6,
@@ -34,7 +60,33 @@
     "description": "Encourages competitive programming, teamwork, and problem-solving through training and events.",
     "requirements": "Analytical thinking and passion for coding challenges.",
     "sortOrder": 2,
-    "pinned": false
+    "pinned": false,
+    "events": [
+      {
+        "title": "Welcome Meetup",
+        "date": "2026-10-15",
+        "location": "Main Hall",
+        "description": "ACPC welcome session for new members."
+      },
+      {
+        "title": "Weekly Workshop",
+        "date": "2026-10-22",
+        "location": "Room B12",
+        "description": "Weekly skills workshop organized by ACPC."
+      }
+    ],
+    "posts": [
+      {
+        "author": "ACPC",
+        "date": "2026-10-01",
+        "text": "Welcome to our page! Follow us for upcoming events and updates."
+      },
+      {
+        "author": "ACPC",
+        "date": "2026-09-24",
+        "text": "Had a great session last week. See you at the next event!"
+      }
+    ]
   },
   {
     "id": 2,
@@ -51,7 +103,33 @@
     "members": 22,
     "applicants": 9,
     "description": "Develop public speaking, diplomacy, and international relations through model UN experiences.",
-    "requirements": "Confidence, research skills, and strong communication."
+    "requirements": "Confidence, research skills, and strong communication.",
+    "events": [
+      {
+        "title": "Welcome Meetup",
+        "date": "2026-10-15",
+        "location": "Main Hall",
+        "description": "MUN welcome session for new members."
+      },
+      {
+        "title": "Weekly Workshop",
+        "date": "2026-10-22",
+        "location": "Room B12",
+        "description": "Weekly skills workshop organized by MUN."
+      }
+    ],
+    "posts": [
+      {
+        "author": "MUN",
+        "date": "2026-10-01",
+        "text": "Welcome to our page! Follow us for upcoming events and updates."
+      },
+      {
+        "author": "MUN",
+        "date": "2026-09-24",
+        "text": "Had a great session last week. See you at the next event!"
+      }
+    ]
   },
   {
     "id": 5,
@@ -68,7 +146,33 @@
     "description": "Connects students with engineering, technology, and innovation through events and projects.",
     "requirements": "Interest in technology, engineering, and collaboration.",
     "sortOrder": 4,
-    "pinned": false
+    "pinned": false,
+    "events": [
+      {
+        "title": "Welcome Meetup",
+        "date": "2026-10-15",
+        "location": "Main Hall",
+        "description": "IEEE welcome session for new members."
+      },
+      {
+        "title": "Weekly Workshop",
+        "date": "2026-10-22",
+        "location": "Room B12",
+        "description": "Weekly skills workshop organized by IEEE."
+      }
+    ],
+    "posts": [
+      {
+        "author": "IEEE",
+        "date": "2026-10-01",
+        "text": "Welcome to our page! Follow us for upcoming events and updates."
+      },
+      {
+        "author": "IEEE",
+        "date": "2026-09-24",
+        "text": "Had a great session last week. See you at the next event!"
+      }
+    ]
   },
   {
     "id": 3,
@@ -85,7 +189,33 @@
     "description": "Helps students build professional skills, career awareness, and future-ready opportunities.",
     "requirements": "Motivation to grow personally and professionally.",
     "sortOrder": 5,
-    "pinned": false
+    "pinned": false,
+    "events": [
+      {
+        "title": "Welcome Meetup",
+        "date": "2026-10-15",
+        "location": "Main Hall",
+        "description": "CDC welcome session for new members."
+      },
+      {
+        "title": "Weekly Workshop",
+        "date": "2026-10-22",
+        "location": "Room B12",
+        "description": "Weekly skills workshop organized by CDC."
+      }
+    ],
+    "posts": [
+      {
+        "author": "CDC",
+        "date": "2026-10-01",
+        "text": "Welcome to our page! Follow us for upcoming events and updates."
+      },
+      {
+        "author": "CDC",
+        "date": "2026-09-24",
+        "text": "Had a great session last week. See you at the next event!"
+      }
+    ]
   },
   {
     "id": 7,
@@ -102,7 +232,33 @@
     "description": "Promotes movement, teamwork, endurance, and active student life through sports activities.",
     "requirements": "Energy, discipline, and willingness to participate.",
     "sortOrder": 6,
-    "pinned": false
+    "pinned": false,
+    "events": [
+      {
+        "title": "Welcome Meetup",
+        "date": "2026-10-15",
+        "location": "Main Hall",
+        "description": "Tunners welcome session for new members."
+      },
+      {
+        "title": "Weekly Workshop",
+        "date": "2026-10-22",
+        "location": "Room B12",
+        "description": "Weekly skills workshop organized by Tunners."
+      }
+    ],
+    "posts": [
+      {
+        "author": "Tunners",
+        "date": "2026-10-01",
+        "text": "Welcome to our page! Follow us for upcoming events and updates."
+      },
+      {
+        "author": "Tunners",
+        "date": "2026-09-24",
+        "text": "Had a great session last week. See you at the next event!"
+      }
+    ]
   },
   {
     "id": 10,
@@ -119,7 +275,33 @@
     "description": "A student gaming community for competitions, events, and connecting players across campus.",
     "requirements": "Team spirit, good sportsmanship, and an interest in gaming.",
     "sortOrder": 7,
-    "pinned": false
+    "pinned": false,
+    "events": [
+      {
+        "title": "Welcome Meetup",
+        "date": "2026-10-15",
+        "location": "Main Hall",
+        "description": "Gamers Legacy welcome session for new members."
+      },
+      {
+        "title": "Weekly Workshop",
+        "date": "2026-10-22",
+        "location": "Room B12",
+        "description": "Weekly skills workshop organized by Gamers Legacy."
+      }
+    ],
+    "posts": [
+      {
+        "author": "Gamers Legacy",
+        "date": "2026-10-01",
+        "text": "Welcome to our page! Follow us for upcoming events and updates."
+      },
+      {
+        "author": "Gamers Legacy",
+        "date": "2026-09-24",
+        "text": "Had a great session last week. See you at the next event!"
+      }
+    ]
   },
   {
     "id": 9,
@@ -136,7 +318,33 @@
     "description": "Supports student engagement, community building, and collaborative campus initiatives.",
     "requirements": "Leadership, initiative, and a service mindset.",
     "sortOrder": 8,
-    "pinned": false
+    "pinned": false,
+    "events": [
+      {
+        "title": "Welcome Meetup",
+        "date": "2026-10-15",
+        "location": "Main Hall",
+        "description": "MSP welcome session for new members."
+      },
+      {
+        "title": "Weekly Workshop",
+        "date": "2026-10-22",
+        "location": "Room B12",
+        "description": "Weekly skills workshop organized by MSP."
+      }
+    ],
+    "posts": [
+      {
+        "author": "MSP",
+        "date": "2026-10-01",
+        "text": "Welcome to our page! Follow us for upcoming events and updates."
+      },
+      {
+        "author": "MSP",
+        "date": "2026-09-24",
+        "text": "Had a great session last week. See you at the next event!"
+      }
+    ]
   },
   {
     "id": 11,
@@ -153,7 +361,33 @@
     "description": "Raises awareness and shares educational information about hepatitis and related health topics.",
     "requirements": "Interest in health awareness, education, and community outreach.",
     "sortOrder": 9,
-    "pinned": false
+    "pinned": false,
+    "events": [
+      {
+        "title": "Welcome Meetup",
+        "date": "2026-10-15",
+        "location": "Main Hall",
+        "description": "IHEPC welcome session for new members."
+      },
+      {
+        "title": "Weekly Workshop",
+        "date": "2026-10-22",
+        "location": "Room B12",
+        "description": "Weekly skills workshop organized by IHEPC."
+      }
+    ],
+    "posts": [
+      {
+        "author": "IHEPC",
+        "date": "2026-10-01",
+        "text": "Welcome to our page! Follow us for upcoming events and updates."
+      },
+      {
+        "author": "IHEPC",
+        "date": "2026-09-24",
+        "text": "Had a great session last week. See you at the next event!"
+      }
+    ]
   },
   {
     "id": 12,
@@ -170,7 +404,33 @@
     "description": "Organizes independently hosted TED-style events to bring ideas and speakers to the MIU community.",
     "requirements": "Creativity, organization, and an interest in sharing ideas.",
     "sortOrder": 11,
-    "pinned": false
+    "pinned": false,
+    "events": [
+      {
+        "title": "Welcome Meetup",
+        "date": "2026-10-15",
+        "location": "Main Hall",
+        "description": "TEDx MIU welcome session for new members."
+      },
+      {
+        "title": "Weekly Workshop",
+        "date": "2026-10-22",
+        "location": "Room B12",
+        "description": "Weekly skills workshop organized by TEDx MIU."
+      }
+    ],
+    "posts": [
+      {
+        "author": "TEDx MIU",
+        "date": "2026-10-01",
+        "text": "Welcome to our page! Follow us for upcoming events and updates."
+      },
+      {
+        "author": "TEDx MIU",
+        "date": "2026-09-24",
+        "text": "Had a great session last week. See you at the next event!"
+      }
+    ]
   },
   {
     "id": 4,
@@ -187,7 +447,33 @@
     "description": "A media-driven club focused on storytelling, digital content, and creative expression.",
     "requirements": "Creativity, design sense, and communication skills.",
     "sortOrder": 12,
-    "pinned": false
+    "pinned": false,
+    "events": [
+      {
+        "title": "Welcome Meetup",
+        "date": "2026-10-15",
+        "location": "Main Hall",
+        "description": "Dimas welcome session for new members."
+      },
+      {
+        "title": "Weekly Workshop",
+        "date": "2026-10-22",
+        "location": "Room B12",
+        "description": "Weekly skills workshop organized by Dimas."
+      }
+    ],
+    "posts": [
+      {
+        "author": "Dimas",
+        "date": "2026-10-01",
+        "text": "Welcome to our page! Follow us for upcoming events and updates."
+      },
+      {
+        "author": "Dimas",
+        "date": "2026-09-24",
+        "text": "Had a great session last week. See you at the next event!"
+      }
+    ]
   },
   {
     "id": 8,
@@ -204,6 +490,32 @@
     "description": "A performance-focused space for acting, expression, stage work, and creative storytelling.",
     "requirements": "Confidence, creativity, and passion for performance.",
     "sortOrder": 13,
-    "pinned": false
+    "pinned": false,
+    "events": [
+      {
+        "title": "Welcome Meetup",
+        "date": "2026-10-15",
+        "location": "Main Hall",
+        "description": "Theater welcome session for new members."
+      },
+      {
+        "title": "Weekly Workshop",
+        "date": "2026-10-22",
+        "location": "Room B12",
+        "description": "Weekly skills workshop organized by Theater."
+      }
+    ],
+    "posts": [
+      {
+        "author": "Theater",
+        "date": "2026-10-01",
+        "text": "Welcome to our page! Follow us for upcoming events and updates."
+      },
+      {
+        "author": "Theater",
+        "date": "2026-09-24",
+        "text": "Had a great session last week. See you at the next event!"
+      }
+    ]
   }
 ]

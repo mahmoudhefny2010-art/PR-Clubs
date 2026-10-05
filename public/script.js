@@ -996,6 +996,41 @@ function openClubDetail(clubId) {
       <p>${escapeHtml(club.requirements)}</p>
     </section>
 
+    ${Array.isArray(club.events) && club.events.length ? `
+    <section class="detail-section detail-events">
+      <h3>Upcoming events</h3>
+      <div class="detail-events-list">
+        ${club.events.map((event) => `
+          <div class="detail-event-card">
+            <span class="detail-event-date">${escapeHtml(event.date || '')}</span>
+            <div>
+              <strong>${escapeHtml(event.title || 'Event')}</strong>
+              ${event.location ? `<p>${escapeHtml(event.location)}</p>` : ''}
+              ${event.description ? `<p>${escapeHtml(event.description)}</p>` : ''}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </section>
+    ` : ''}
+
+    ${Array.isArray(club.posts) && club.posts.length ? `
+    <section class="detail-section detail-feed">
+      <h3>Club feed</h3>
+      <div class="detail-feed-list">
+        ${club.posts.map((post) => `
+          <article class="detail-post">
+            <header>
+              <strong>${escapeHtml(post.author || club.name)}</strong>
+              <span>${escapeHtml(post.date || '')}</span>
+            </header>
+            <p>${escapeHtml(post.text || '')}</p>
+          </article>
+        `).join('')}
+      </div>
+    </section>
+    ` : ''}
+
     <div class="detail-actions">
       <button class="primary-btn" data-action="apply-club" data-id="${club.id}" ${canApply ? '' : 'disabled'}>${canApply ? 'Apply Now' : escapeHtml(getClubActionLabel(club.status))}</button>
       <button class="secondary-btn" data-action="go-home">Back</button>

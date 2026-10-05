@@ -2150,3 +2150,5 @@ textarea {
   .my-form-actions > button { flex: 1 1 130px; }
   .home-form-actions { justify-content: flex-start; }
 }
+
+.detail-event-card{display:flex;gap:14px;padding:14px 16px;border:1px solid #f3d9d9;border-radius:14px;background:#fff;margin-bottom:10px}.detail-event-date{flex-shrink:0;font-weight:700;color:#b71c1c;min-width:90px}.detail-event-card p{margin:4px 0 0;color:#6b7280;font-size:13px}.detail-feed-list{display:flex;flex-direction:column;gap:12px}.detail-post{padding:14px 16px;border:1px solid #f3d9d9;border-radius:14px;background:#fff}.detail-post header{display:flex;justify-content:space-between;margin-bottom:6px}.detail-post header span{color:#9ca3af;font-size:12px}.detail-post p{margin:0;color:#374151;font-size:14px}

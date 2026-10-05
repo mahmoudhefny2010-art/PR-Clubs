@@ -27,7 +27,9 @@ const clubSchema = new mongoose.Schema({
   requirements: { type: String, required: true },
   applicationIntro: { type: String, trim: true, default: '' },
   applicationFields: { type: [applicationFieldSchema], default: [] },
-  interviewForms: { type: [mongoose.Schema.Types.Mixed], default: [] }
+  interviewForms: { type: [mongoose.Schema.Types.Mixed], default: [] },
+  events: { type: [mongoose.Schema.Types.Mixed], default: [] },
+  posts: { type: [mongoose.Schema.Types.Mixed], default: [] }
 }, { timestamps: true });
 
 const applicationSchema = new mongoose.Schema({
