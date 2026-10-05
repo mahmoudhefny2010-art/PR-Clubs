@@ -23,6 +23,9 @@
 .today-event-badge{font-size:.66rem;font-weight:800;color:#b71c1c;background:#fde8e8;padding:3px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:.04em}
 .today-event-title{font-weight:700;font-size:.88rem;white-space:nowrap}
 
+/* Divider under hero actions (matches calendar modal head) */
+.hero-actions-divider{height:0;margin:14px 0 0;border:none;border-top:1px solid rgba(185,27,31,.18)}
+
 /* Event slideshow clickable CTA */
 .event-slide{cursor:pointer}
 .event-slide-cta{display:inline-block;margin-top:10px;font-size:.75rem;font-weight:700;color:#b71c1c;letter-spacing:.03em;text-transform:uppercase;opacity:.85;transition:opacity .2s}

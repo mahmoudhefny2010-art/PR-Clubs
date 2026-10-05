@@ -10,7 +10,7 @@ const pub = path.join(root, 'public');
 
 // Expected content hashes of the concatenated split bundles.
 // If these change, the CSS/JS modules were edited — update the hash on purpose.
-const EXPECTED_CSS_HASH = '99fbd38d74585379cb3c82b58e814adf21c152de4def4ed1f67ef5ff9fc7f99d';
+const EXPECTED_CSS_HASH = 'dcdd9bd8a74ea65814137f154e4edbd4a19fd52c0a6f3e52b7edbbfb6184ff21';
 const EXPECTED_JS_HASH = '0b68ee19ddb70e9db914bcb9c71fd036c19f339f42ad61fa7b16ea457feab7a5';
 
 const CSS_FILES = ['base.css', 'responsive.css', 'dark.css', 'features.css'];
