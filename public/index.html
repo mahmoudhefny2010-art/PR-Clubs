@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Club Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/style.css?v=20261005-form-statuses" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="topbar">
+        <a class="brand-banner brand-home-link" href="/" aria-label="MIU homepage">
+          <img class="brand-mark" src="/logo.svg.png" alt="MIU logo" />
+        </a>
+      </header>
+
+      <main class="app-container">
+        <section id="homeView" class="view active">
+          <div class="welcome-box hero-panel">
+            <h1 id="homePageTitle">University Clubs</h1>
+            <p id="homePageSubtitle">Explore all clubs and apply to the ones that match your interests.</p>
+            <div class="home-form-actions"><button id="myFormsButton" class="secondary-btn" type="button">My Forms</button></div>
+          </div>
+
+          <div class="stats-summary">
+            <div class="summary-card">
+              <span>Total Clubs</span>
+              <strong id="totalClubsStat">0</strong>
+            </div>
+            <div class="summary-card">
+              <span>Open</span>
+              <strong id="openClubsStat">0</strong>
+            </div>
+            <div class="summary-card">
+              <span>Full</span>
+              <strong id="fullClubsStat">0</strong>
+            </div>
+            <div class="summary-card">
+              <span>Opening Soon</span>
+              <strong id="openingSoonClubsStat">0</strong>
+            </div>
+            <div class="summary-card">
+              <span>Applicants</span>
+              <strong id="totalApplicantsStat">0</strong>
+            </div>
+          </div>
+
+          <div id="clubGrid" class="club-grid"></div>
+        </section>
+
+        <section id="adminLoginView" class="view">
+          <div class="admin-login-panel">
+            <span class="admin-eyebrow">PRIVATE ACCESS</span>
+            <h2 id="adminLoginTitle">Admin access</h2>
+            <p id="adminLoginMessage">Enter your email and password to manage the homepage.</p>
+            <form id="adminLoginForm">
+              <div class="field-group">
+                <label for="adminEmailInput">Email</label>
+                <input id="adminEmailInput" name="email" type="email" autocomplete="username" maxlength="254" required />
+              </div>
+              <div class="field-group">
+                <label for="adminPasswordInput">Password</label>
+                <input id="adminPasswordInput" name="password" type="password" autocomplete="current-password" required />
+              </div>
+              <div id="adminConfirmRow" class="field-group hidden">
+                <label for="adminConfirmInput">Confirm password</label>
+                <input id="adminConfirmInput" name="confirmPassword" type="password" autocomplete="new-password" />
+              </div>
+              <button id="adminLoginSubmit" class="primary-btn" type="submit">Unlock dashboard</button>
+            </form>
+            <p id="adminLoginFeedback" class="admin-feedback" aria-live="polite"></p>
+            <button id="adminLoginBackBtn" class="text-button" type="button">Back to homepage</button>
+          </div>
+        </section>
+
+        <section id="clubLoginView" class="view">
+          <div class="club-login-panel">
+            <img class="club-login-miu-logo" src="/logo.svg.png" alt="MIU logo" />
+            <span class="admin-eyebrow">MIU CLUB PORTAL</span>
+            <h2>Club dashboard login</h2>
+            <p>Presidents manage committee heads. Committee heads review applications assigned to their committee.</p>
+            <form id="clubLoginForm">
+              <div class="field-group">
+                <label for="clubLoginEmail">Club email</label>
+                <input id="clubLoginEmail" name="email" type="email" autocomplete="username" required />
+              </div>
+              <div class="field-group">
+                <label for="clubLoginPassword">Password</label>
+                <input id="clubLoginPassword" name="password" type="password" autocomplete="current-password" required />
+              </div>
+              <button class="primary-btn" id="clubLoginSubmit" type="submit">Sign in</button>
+            </form>
+            <p id="clubLoginFeedback" class="admin-feedback" aria-live="polite"></p>
+            <a class="text-button" href="/">Back to clubs</a>
+          </div>
+        </section>
+
+        <section id="adminView" class="view">
+          <div class="admin-panel">
+            <header class="admin-header">
+              <div>
+                <span class="admin-eyebrow">HOMEPAGE MANAGEMENT</span>
+                <h2>Admin dashboard</h2>
+              </div>
+              <div class="admin-session-actions">
+                <a class="secondary-btn" href="/admin/global">All-club access</a>
+                <button class="secondary-btn" id="adminBackBtn" type="button">Back to homepage</button>
+                <button class="delete-btn" id="adminLogoutBtn" type="button">Log out</button>
+              </div>
+            </header>
+
+            <form id="homepageSettingsForm" class="admin-settings-form">
+              <h3>Homepage text</h3>
+              <div class="form-row">
+                <div class="field-group">
+                  <label for="homeTitleInput">Page title</label>
+                  <input id="homeTitleInput" name="title" type="text" maxlength="100" required />
+                </div>
+                <div class="field-group">
+                  <label for="homeSubtitleInput">Short introduction</label>
+                  <input id="homeSubtitleInput" name="subtitle" type="text" maxlength="240" required />
+                </div>
+              </div>
+              <button class="primary-btn" type="submit">Save homepage text</button>
+            </form>
+
+            <div class="admin-grid">
+              <section class="admin-club-section" aria-labelledby="adminClubHeading">
+                <div class="admin-section-heading">
+                  <h3 id="adminClubHeading">Club cards</h3>
+                  <span id="adminClubCount" class="admin-count"></span>
+                </div>
+                <div id="adminClubList" class="admin-club-list"></div>
+              </section>
+
+              <form id="clubEditorForm" class="admin-editor-form">
+                <div class="admin-section-heading">
+                  <h3 id="clubEditorHeading">Add a club card</h3>
+                  <button class="text-button hidden" id="cancelClubEditBtn" type="button">Cancel edit</button>
+                </div>
+                <input id="clubEditorId" name="id" type="hidden" />
+
+                <div class="admin-form-grid">
+                  <div class="field-group">
+                    <label for="clubNameInput">Club name</label>
+                    <input id="clubNameInput" name="name" type="text" maxlength="80" required />
+                  </div>
+                  <div class="field-group">
+                    <label for="clubCommitteeInput">Committee name</label>
+                    <input id="clubCommitteeInput" name="committee" type="text" maxlength="100" required />
+                  </div>
+                  <div class="field-group">
+                    <label for="clubCategoryInput">Category</label>
+                    <input id="clubCategoryInput" name="category" type="text" maxlength="80" required />
+                  </div>
+                  <div class="field-group">
+                    <label for="clubStatusInput">Card status</label>
+                    <select id="clubStatusInput" name="status" required>
+                      <option value="open">Open</option>
+                      <option value="opening-soon">Opening Soon</option>
+                      <option value="full">Full</option>
+                      <option value="closed">Closed</option>
+                    </select>
+                  </div>
+                  <div class="field-group admin-field-full">
+                    <label class="admin-checkbox-field" for="clubPinnedInput">
+                      <input id="clubPinnedInput" name="pinned" type="checkbox" />
+                      <span>Pin this Open club above the other Open clubs</span>
+                    </label>
+                  </div>
+                  <div class="field-group admin-field-full">
+                    <label for="clubTaglineInput">Short card text</label>
+                    <input id="clubTaglineInput" name="tagline" type="text" maxlength="140" required />
+                  </div>
+                  <div class="field-group admin-field-full">
+                    <label for="clubDescriptionInput">Full description shown on View</label>
+                    <textarea id="clubDescriptionInput" name="description" maxlength="1200" required></textarea>
+                  </div>
+                  <div class="field-group admin-field-full">
+                    <label for="clubRequirementsInput">Requirements</label>
+                    <textarea id="clubRequirementsInput" name="requirements" maxlength="600" required></textarea>
+                  </div>
+                  <div class="field-group admin-field-full">
+                    <label for="clubApplicationIntroInput">Application form introduction</label>
+                    <input id="clubApplicationIntroInput" name="applicationIntro" type="text" maxlength="240" placeholder="Intro shown on this club's Apply page" />
+                  </div>
+                  <section class="application-form-builder admin-field-full" aria-labelledby="applicationFieldsHeading">
+                    <div class="admin-section-heading">
+                      <div>
+                        <h3 id="applicationFieldsHeading">Club-specific form questions</h3>
+                        <p id="applicationFieldsClubName" class="admin-form-hint">Select a club with Edit to manage its questions.</p>
+                      </div>
+                      <button id="addApplicationFieldBtn" class="secondary-btn" type="button" disabled>Add question</button>
+                    </div>
+                    <div id="applicationFieldEditorList" class="application-field-editor-list"></div>
+                  </section>
+                  <div class="field-group">
+                    <label for="clubSeatsInput">Seats</label>
+                    <input id="clubSeatsInput" name="seats" type="number" min="0" step="1" required />
+                  </div>
+                  <div class="field-group">
+                    <label for="clubMembersInput">Members</label>
+                    <input id="clubMembersInput" name="members" type="number" min="0" step="1" required />
+                  </div>
+                  <div class="field-group">
+                    <label for="clubApplicantsInput">Applicants</label>
+                    <input id="clubApplicantsInput" name="applicants" type="number" min="0" step="1" required />
+                  </div>
+                  <div class="field-group">
+                    <label for="clubImageFitInput">Logo display</label>
+                    <select id="clubImageFitInput" name="imageFit">
+                      <option value="contain">Show full logo</option>
+                      <option value="cover">Fill the circle</option>
+                    </select>
+                  </div>
+                  <div class="field-group admin-field-full">
+                    <label for="clubImageInput">Club photo or logo</label>
+                    <input id="clubImageInput" name="image" type="file" accept="image/png,image/jpeg,image/webp" />
+                    <img id="clubImagePreview" class="admin-image-preview hidden" alt="Selected club image preview" />
+                  </div>
+                </div>
+
+                <button class="submit-btn" id="saveClubBtn" type="submit">Add club card</button>
+              </form>
+            </div>
+            <p id="adminFeedback" class="admin-feedback" aria-live="polite"></p>
+          </div>
+        </section>
+
+        <section id="clubView" class="view">
+          <div id="clubDetail" class="club-detail-card"></div>
+        </section>
+
+        <section id="myFormsView" class="view">
+          <div class="admin-panel my-forms-panel">
+            <div class="admin-header">
+              <div><span class="admin-eyebrow">APPLICANT PORTAL</span><h2>My Forms</h2><p>Manage your application before the interview starts.</p></div>
+              <button id="myFormsBackHomeBtn" class="secondary-btn" type="button">Back to home</button>
+            </div>
+            <p id="myFormsFeedback" class="admin-feedback" role="status"></p>
+            <div id="myFormsList" class="my-forms-list"></div>
+          </div>
+        </section>
+
+        <section id="applicationView" class="view">
+          <div class="app-form-card">
+            <div class="application-club-heading">
+              <div class="application-club-logo-frame">
+                <img id="applicationClubLogo" class="application-club-logo" src="" alt="Club logo" />
+              </div>
+              <div class="application-club-heading-copy">
+                <div class="form-topline">CLUB APPLICATION</div>
+                <h2 id="applicationTitle">Join a club</h2>
+                <p id="applicationFormIntro" class="application-form-intro"></p>
+                <button id="applicationBackHomeBtn" class="secondary-btn application-back-home" type="button">Back to home</button>
+              </div>
+            </div>
+
+            <form id="applicationForm">
+              <div class="field-group">
+                <label>First Name</label>
+                <input type="text" name="firstName" placeholder="Enter first name" required />
+              </div>
+
+              <div class="field-group">
+                <label>Last Name</label>
+                <input type="text" name="lastName" placeholder="Enter last name" required />
+              </div>
+
+              <div class="field-group">
+                <label>University ID</label>
+                <input type="text" name="universityId" placeholder="e.g. 20/05552" required />
+              </div>
+
+              <div class="field-group">
+                <label>Major</label>
+                <select name="major" required>
+                  <option value="">Choose an option</option>
+                  <option>Computer Science</option>
+                  <option>Business Administration</option>
+                  <option>Electronics and Communication Engineering</option>
+                  <option>Law</option>
+                  <option>Media and Communication</option>
+                </select>
+              </div>
+
+              <div class="field-group">
+                <label>University Email</label>
+                <input type="email" name="email" placeholder="example@miuegypt.edu.eg" required />
+              </div>
+
+              <div class="field-group">
+                <label>Phone Number</label>
+                <input type="text" name="phone" placeholder="012XXXXXXXXX" required />
+              </div>
+
+              <div class="field-group applicant-photo-field">
+                <label for="applicantPhotoInput">Your photo <span class="required-mark">Required</span></label>
+                <div class="applicant-photo-control">
+                  <input id="applicantPhotoInput" name="applicantPhoto" type="file" accept="image/png,image/jpeg,image/webp" required />
+                  <div class="applicant-photo-preview-frame">
+                    <img id="applicantPhotoPreview" class="applicant-photo-preview hidden" alt="Applicant photo preview" />
+                    <span id="applicantPhotoPlaceholder">Photo preview</span>
+                  </div>
+                </div>
+                <small>PNG, JPG, or WebP. Maximum size: 5 MB.</small>
+              </div>
+
+              <div class="field-group">
+                <label>Committee</label>
+                <select id="applicationCommitteeInput" name="committee" required>
+                  <option value="">Choose a committee</option>
+                </select>
+              </div>
+
+              <div class="field-group">
+                <label>Interview Slot</label>
+                <select name="slot" required>
+                  <option value="">Choose a slot</option>
+                  <option>Saturday 1:00 PM - 1:10 PM</option>
+                  <option>Sunday 2:30 PM - 2:40 PM</option>
+                  <option>Tuesday 11:00 AM - 11:10 AM</option>
+                </select>
+              </div>
+
+              <div class="field-group">
+                <label>How old are you</label>
+                <input type="text" name="age" placeholder="Enter your age" />
+              </div>
+
+              <div class="field-group">
+                <label>Why do you want to join this?</label>
+                <textarea name="motivation" rows="4" placeholder="Write your motivation here..."></textarea>
+              </div>
+
+              <div class="field-group">
+                <label>Notes</label>
+                <textarea name="notes" rows="3" placeholder="Optional notes"></textarea>
+              </div>
+
+              <div id="applicationCustomFields" class="application-custom-fields"></div>
+
+              <button class="submit-btn" type="submit">Submit Application</button>
+              <p id="applicationFeedback" class="application-feedback" aria-live="polite"></p>
+            </form>
+          </div>
+        </section>
+
+        <section id="headDashboardView" class="view">
+          <div class="committee-card">
+            <div class="committee-top">
+              <div class="club-dashboard-identity">
+                <img id="clubDashboardLogo" class="club-dashboard-logo" src="" alt="Club logo" />
+                <div>
+                  <div id="clubDashboardRoleLabel" class="committee-label">CLUB APPLICATIONS</div>
+                  <h2 id="clubDashboardName">Club dashboard</h2>
+                </div>
+              </div>
+              <div class="top-actions">
+                <button id="backHomeBtn" class="secondary-btn" type="button">Back to Clubs</button>
+                <button id="logoutBtn" class="logout-btn" type="button">Log out</button>
+              </div>
+            </div>
+
+            <section id="presidentHeadManager" class="committee-head-manager hidden">
+              <div class="admin-section-heading">
+                <div>
+                  <span class="admin-eyebrow">PRESIDENT DASHBOARD</span>
+                  <h3>Committee heads</h3>
+                </div>
+                <span id="committeeHeadCount" class="admin-club-count">0 heads</span>
+              </div>
+              <p>Create one head account for each committee. Applicants choosing that committee will appear in that head's dashboard.</p>
+              <form id="createCommitteeHeadForm" class="committee-head-form">
+                <div class="field-group">
+                  <label for="committeeHeadName">Committee name</label>
+                  <input id="committeeHeadName" name="committee" maxlength="100" required />
+                </div>
+                <div class="field-group">
+                  <label for="committeeHeadEmail">Head email</label>
+                  <input id="committeeHeadEmail" name="email" type="email" autocomplete="username" required />
+                </div>
+                <div class="field-group">
+                  <label for="committeeHeadPassword">Temporary password (12+ characters)</label>
+                  <input id="committeeHeadPassword" name="password" type="password" minlength="12" autocomplete="new-password" required />
+                </div>
+                <button class="primary-btn" type="submit">Create head account</button>
+              </form>
+              <p id="committeeHeadFeedback" class="admin-feedback" aria-live="polite"></p>
+              <div id="committeeHeadList" class="committee-head-list"></div>
+            </section>
+
+            <section id="presidentFormManager" class="committee-head-manager president-form-manager hidden">
+              <div class="admin-section-heading">
+                <div>
+                  <span class="admin-eyebrow">PUBLIC APPLICATION FORM</span>
+                  <h3>Manage your club’s form</h3>
+                </div>
+              </div>
+              <p>Changes here appear on your club’s application page. Add, edit, or remove questions, then save.</p>
+              <form id="presidentFormEditor" class="president-form-editor">
+                <div class="field-group">
+                  <label for="presidentApplicationIntro">Form introduction</label>
+                  <textarea id="presidentApplicationIntro" rows="3" maxlength="500" placeholder="Tell applicants what to expect"></textarea>
+                </div>
+                <div class="admin-section-heading president-questions-heading">
+                  <h3>Questions</h3>
+                  <button id="addPresidentApplicationFieldBtn" class="secondary-btn" type="button">Add question</button>
+                </div>
+                <p class="admin-form-hint">Up to 12 questions. Choose short text, long text, or a list of options.</p>
+                <div id="presidentApplicationFieldList" class="application-field-editor-list"></div>
+                <div class="president-form-actions">
+                  <button id="savePresidentApplicationFormBtn" class="primary-btn" type="submit">Save application form</button>
+                  <p id="presidentFormFeedback" class="admin-feedback" aria-live="polite"></p>
+                </div>
+              </form>
+            </section>
+
+            <button id="toggleInterviewFormBtn" class="secondary-btn interview-form-toggle" type="button" aria-expanded="false" aria-controls="interviewFormManager">
+              Manage interview questions
+            </button>
+            <section id="interviewFormManager" class="committee-head-manager interview-form-panel hidden">
+              <div class="admin-section-heading">
+                <div>
+                  <span class="admin-eyebrow">INTERVIEW EVALUATION</span>
+                  <h3 id="interviewFormHeading">Manage interview questions</h3>
+                </div>
+                <button id="addInterviewSectionBtn" class="secondary-btn" type="button">Add section</button>
+              </div>
+              <p id="interviewFormDescription">Organize your interview into sections and add the questions you need.</p>
+              <div id="interviewSectionList" class="interview-section-list"></div>
+              <div class="president-form-actions">
+                <button id="saveInterviewFormBtn" class="primary-btn" type="button">Save interview form</button>
+                <p id="interviewFormFeedback" class="admin-feedback" aria-live="polite"></p>
+              </div>
+            </section>
+
+            <div class="stats-row">
+              <div class="stat-box">
+                <span>Total</span>
+                <strong id="statTotal">0</strong>
+              </div>
+              <div class="stat-box">
+                <span>Accepted</span>
+                <strong id="statAccepted">0</strong>
+              </div>
+              <div class="stat-box">
+                <span>Rejected</span>
+                <strong id="statRejected">0</strong>
+              </div>
+            </div>
+
+            <div id="applicationsList" class="applications-list"></div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div id="reviewModal" class="modal hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>Interview Evaluation</h3>
+          <button id="closeModalBtn" class="close-btn" type="button">✕</button>
+        </div>
+
+        <img id="modalApplicantPhoto" class="review-applicant-photo hidden" alt="Applicant photo" />
+        <div id="modalApplicantAvatar" class="avatar-box">A</div>
+
+        <div class="form-row">
+          <div class="modal-field">
+            <label>Applicant</label>
+            <div id="modalName" class="field-value"></div>
+          </div>
+          <div class="modal-field">
+            <label>Email</label>
+            <div id="modalEmail" class="field-value"></div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="modal-field">
+            <label>How old are you</label>
+            <input id="modalAge" type="text" />
+          </div>
+          <div class="modal-field">
+            <label>Why do you want to join this?</label>
+            <textarea id="modalMotivation" rows="2"></textarea>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="modal-field">
+            <label>Notes</label>
+            <textarea id="modalNotes"></textarea>
+          </div>
+          <div class="modal-field">
+            <label>Rating</label>
+            <select id="modalRating">
+              <option value="1">1/5</option>
+              <option value="2">2/5</option>
+              <option value="3">3/5</option>
+              <option value="4" selected>4/5</option>
+              <option value="5">5/5</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="modal-field full-width">
+            <label>Photo</label>
+            <div class="photo-box">
+              <input type="file" id="modalPhoto" accept="image/png,image/jpeg,image/webp" />
+              <span id="photoName">No file chosen</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="modalInterviewQuestions" class="modal-interview-questions hidden"></div>
+        <p id="modalInterviewFeedback" class="application-feedback" aria-live="polite"></p>
+        <div id="modalCustomAnswers" class="modal-custom-answers hidden"></div>
+
+        <div class="modal-actions">
+          <button type="button" class="action-btn secondary" id="saveReviewBtn">Save</button>
+          <button type="button" class="action-btn success" id="acceptReviewBtn">Accept</button>
+          <button type="button" class="action-btn danger" id="rejectReviewBtn">Reject</button>
+        </div>
+      </div>
+    </div>
+
+    <footer class="site-footer">
+      <p>Copyright 2026 © Misr International University, All Right Reserved | Made by <a href="https://www.linkedin.com/in/mahmoud-hefny-1264763b0" target="_blank" rel="noopener noreferrer">Mahmoud Hefny</a></p>
+    </footer>
+
+    <script src="/script.js?v=20261005-form-statuses"></script>
+    <script src="/theme.js?v=20261005-global-theme" defer></script>
+  </body>
+</html>

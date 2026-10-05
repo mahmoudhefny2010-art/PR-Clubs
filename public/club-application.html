@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Club Application</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/style.css?v=20261005-my-forms" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="topbar">
+        <a class="brand-wrap brand-home-link" href="/" aria-label="MIU homepage">
+          <img class="brand-mark" src="/logo.svg.png" alt="MIU logo" />
+          <div class="brand-text">MIU</div>
+        </a>
+      </header>
+
+      <main class="app-container">
+        <section class="app-form-card">
+          <div class="form-topline">MIU</div>
+          <h2 id="applicationTitle">Join MIU</h2>
+          <p class="subtitle">Fill out your information below to register for the official committee interviews.</p>
+          <a class="secondary-btn application-back-home" href="/">Back to home</a>
+
+          <form id="applicationForm">
+            <div class="field-group">
+              <label>First Name</label>
+              <input type="text" name="firstName" placeholder="Enter first name" required />
+            </div>
+
+            <div class="field-group">
+              <label>Last Name</label>
+              <input type="text" name="lastName" placeholder="Enter last name" required />
+            </div>
+
+            <div class="field-group">
+              <label>University ID</label>
+              <input type="text" name="universityId" placeholder="e.g. 20/05552" required />
+            </div>
+
+            <div class="field-group">
+              <label>Major</label>
+              <select name="major" required>
+                <option value="">Choose an option</option>
+                <option>Computer Science</option>
+                <option>Business Administration</option>
+                <option>Electronics and Communication Engineering</option>
+                <option>Law</option>
+                <option>Media and Communication</option>
+              </select>
+            </div>
+
+            <div class="field-group">
+              <label>University Email</label>
+              <input type="email" name="email" placeholder="example@miuegypt.edu.eg" required />
+            </div>
+
+            <div class="field-group">
+              <label>Phone Number</label>
+              <input type="text" name="phone" placeholder="012XXXXXXXXX" required />
+            </div>
+
+            <div class="field-group">
+              <label for="standaloneApplicantPhoto">Your photo</label>
+              <input id="standaloneApplicantPhoto" type="file" accept="image/png,image/jpeg,image/webp" required />
+              <small>PNG, JPG, or WebP. Maximum size: 5 MB.</small>
+            </div>
+
+            <div class="field-group">
+              <label>Committee</label>
+              <select name="committee" required>
+                <option value="">Choose a committee</option>
+                <option>Academic Committee</option>
+                <option>Media Committee</option>
+                <option>Innovation and Technology Committee</option>
+                <option>PR Committee</option>
+              </select>
+            </div>
+
+            <div class="field-group">
+              <label>Interview Slot</label>
+              <select name="slot" required>
+                <option value="">Choose a slot</option>
+                <option>Saturday 1:00 PM - 1:10 PM</option>
+                <option>Sunday 2:30 PM - 2:40 PM</option>
+                <option>Tuesday 11:00 AM - 11:10 AM</option>
+              </select>
+            </div>
+
+            <div class="field-group">
+              <label>How old are you</label>
+              <input type="text" name="age" placeholder="Enter your age" />
+            </div>
+
+            <div class="field-group">
+              <label>Why do you want to join this?</label>
+              <textarea name="motivation" rows="4" placeholder="Write your motivation here..."></textarea>
+            </div>
+
+            <div class="field-group">
+              <label>Notes</label>
+              <textarea name="notes" rows="3" placeholder="Optional notes"></textarea>
+            </div>
+
+            <button class="submit-btn" type="submit">Submit Application</button>
+            <p id="standaloneApplicationFeedback" class="application-feedback" aria-live="polite"></p>
+          </form>
+        </section>
+      </main>
+    </div>
+
+    <script src="/theme.js?v=20261005-global-theme" defer></script>
+    <script>
+      const applicationForm = document.getElementById('applicationForm');
+      const applicationTitle = document.getElementById('applicationTitle');
+      const applicantPhotoInput = document.getElementById('standaloneApplicantPhoto');
+      const applicationFeedback = document.getElementById('standaloneApplicationFeedback');
+      const clubId = Number(new URLSearchParams(window.location.search).get('id')) || 1;
+      const clubNames = {
+        1: 'Innovation and Technology',
+        2: 'Media and Design',
+        3: 'Sports and Fitness',
+        4: 'Public Relations'
+      };
+
+      applicationTitle.textContent = `Join ${clubNames[clubId] || 'MIU'}`;
+
+      applicationForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+
+        const formData = new FormData(applicationForm);
+        const photoFile = applicantPhotoInput.files[0];
+        if (!photoFile || !['image/png', 'image/jpeg', 'image/webp'].includes(photoFile.type) || photoFile.size > 5 * 1024 * 1024) {
+          applicationFeedback.textContent = 'Choose a PNG, JPG, or WebP photo up to 5 MB.';
+          applicationFeedback.classList.add('is-error');
+          return;
+        }
+        const photo = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => reject(new Error('Could not read this photo.'));
+          reader.readAsDataURL(photoFile);
+        });
+        const payload = {
+          clubId,
+          committee: formData.get('committee'),
+          firstName: formData.get('firstName'),
+          lastName: formData.get('lastName'),
+          studentName: `${formData.get('firstName')} ${formData.get('lastName')}`,
+          universityId: formData.get('universityId'),
+          major: formData.get('major'),
+          email: formData.get('email'),
+          phone: formData.get('phone'),
+          slot: formData.get('slot'),
+          age: formData.get('age') || '20',
+          motivation: formData.get('motivation') || 'Interested in joining this committee.',
+          notes: formData.get('notes') || '',
+          photo,
+          rating: 4,
+        };
+
+        try {
+          const response = await fetch('/api/applications', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.message || 'Could not submit this application.');
+          if (!result.application?.id || typeof result.managementToken !== 'string') {
+            throw new Error('The server accepted the form but could not link it to My Forms. Check with the club before submitting again to avoid a duplicate application.');
+          }
+          const stored = JSON.parse(localStorage.getItem('miu-my-forms') || '[]');
+          const remaining = stored.filter((item) => Number(item.id) !== Number(result.application.id));
+          remaining.push({ id: result.application.id, token: result.managementToken });
+          localStorage.setItem('miu-my-forms', JSON.stringify(remaining));
+          applicationFeedback.textContent = 'Application submitted. You can find it in My Forms on this device.';
+          applicationFeedback.classList.remove('is-error');
+        } catch (error) {
+          applicationFeedback.textContent = error.message;
+          applicationFeedback.classList.add('is-error');
+        }
+      });
+    </script>
+  </body>
+</html>
