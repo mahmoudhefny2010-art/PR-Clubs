@@ -30,6 +30,18 @@
       eventIndex,
     })));
 
+  const dayLabel = (value) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const day = new Date(value);
+    day.setHours(0, 0, 0, 0);
+    if (day.getTime() === today.getTime()) return 'Today';
+    if (day.getTime() === tomorrow.getTime()) return 'Tomorrow';
+    return '';
+  };
+
   function renderList() {
     const events = allEvents()
       .map((event) => ({ ...event, parsed: parseDate(event.date) }))
@@ -39,16 +51,20 @@
       listEl.innerHTML = '<p class="events-empty">No upcoming events right now.</p>';
       return;
     }
-    listEl.innerHTML = events.map((event) => `
+    listEl.innerHTML = events.map((event) => {
+      const label = dayLabel(event.date);
+      return `
       <button type="button" class="event-tile" data-club="${event.clubId}" data-idx="${event.eventIndex}">
         <img src="${escapeHtml(event.image || event.clubImage)}" alt="${escapeHtml(event.title || 'event')}" />
         <div class="event-tile-body">
           <span class="event-tile-club">${escapeHtml(event.clubName || '')}</span>
           <strong>${escapeHtml(event.title || 'Event')}</strong>
           <span class="event-tile-date">${escapeHtml(event.date || '')}${event.location ? ' • ' + escapeHtml(event.location) : ''}</span>
+          ${label ? `<span class="event-tile-badge">${label}</span>` : ''}
           <p class="event-tile-desc">${escapeHtml(event.description || '')}</p>
         </div>
-      </button>`).join('');
+      </button>`;
+    }).join('');
     listEl.querySelectorAll('.event-tile').forEach((tile) => {
       tile.addEventListener('click', () => openDetail(Number(tile.dataset.club), Number(tile.dataset.idx)));
     });

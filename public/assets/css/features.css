@@ -13,3 +13,13 @@
 .calendar-more{display:block;font-size:.65rem;color:#b71c1c;font-weight:700;padding:2px 4px}.calendar-detail-card{margin-top:14px}#calendarBack{margin-bottom:4px}.calendar-day{min-height:76px}
 
 .calendar-event.extra{display:none}.calendar-more{display:block;width:100%;border:none;background:none;text-align:left;font-size:.65rem;color:#b71c1c;font-weight:700;padding:2px 4px;cursor:pointer}.calendar-more:hover{text-decoration:underline}
+
+/* Today & tomorrow strip (homepage hero, shown first above the actions) */
+.today-events{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:16px 0 0;padding:12px 14px;background:#fff7f7;border:1px solid rgba(201,34,42,.28);border-radius:16px}
+.today-events-label{color:#b71c1c;font-weight:800;font-size:.78rem;text-transform:uppercase;letter-spacing:.07em}
+.today-event-chip{display:inline-flex;align-items:center;gap:8px;padding:5px 14px 5px 5px;background:#fff;border:1px solid rgba(185,27,31,.2);border-radius:999px;text-decoration:none;color:#111;transition:transform .15s ease,box-shadow .15s ease}
+.today-event-chip:hover{transform:translateY(-1px);box-shadow:0 8px 16px rgba(201,34,42,.12)}
+.today-event-chip img{width:28px;height:28px;border-radius:50%;object-fit:cover;background:#fff}
+.today-event-badge{font-size:.66rem;font-weight:800;color:#b71c1c;background:#fde8e8;padding:3px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:.04em}
+.today-event-title{font-weight:700;font-size:.88rem;white-space:nowrap}
+.hero-actions-divider{margin-top:16px;border:none;border-top:1px solid rgba(185,27,31,.16)}

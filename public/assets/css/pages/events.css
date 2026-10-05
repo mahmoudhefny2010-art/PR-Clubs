@@ -24,6 +24,20 @@
   text-transform: uppercase;
 }
 
+.event-tile-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #fde8e8;
+  color: #b71c1c;
+  font-size: 0.66rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+}
+
 .event-detail { margin-top: 22px; }
 
 .event-detail-club {

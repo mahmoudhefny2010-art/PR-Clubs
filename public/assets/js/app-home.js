@@ -360,12 +360,41 @@ function renderClubGrid() {
   });
 
   renderEventsSlideshow();
+  renderTodayEvents();
 }
 
 function getAllEvents() {
   return (state.clubs || []).flatMap((club) =>
     (Array.isArray(club.events) ? club.events : []).map((event, eventIndex) => ({ ...event, clubId: club.id, clubName: club.name, clubImage: club.image, eventIndex }))
   );
+}
+
+function renderTodayEvents() {
+  const strip = document.getElementById('todayEvents');
+  if (!strip) return;
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+  const events = getAllEvents()
+    .map((event) => ({ ...event, parsed: new Date(event.date) }))
+    .filter((event) => !Number.isNaN(event.parsed.getTime()) && event.parsed >= start && event.parsed <= end)
+    .sort((left, right) => left.parsed - right.parsed);
+  if (!events.length) {
+    strip.innerHTML = '';
+    strip.classList.add('hidden');
+    return;
+  }
+  strip.innerHTML = `<span class="today-events-label">Happening today &amp; tomorrow</span>${events.map((event) => {
+    const isToday = event.parsed.getTime() === start.getTime();
+    return `
+      <a class="today-event-chip" href="/pages/events.html?club=${event.clubId}&event=${event.eventIndex}">
+        <span class="today-event-badge">${isToday ? 'Today' : 'Tomorrow'}</span>
+        <img src="${escapeHtml(event.image || event.clubImage)}" alt="" />
+        <span class="today-event-title">${escapeHtml(event.title || 'Event')}</span>
+      </a>`;
+  }).join('')}`;
+  strip.classList.remove('hidden');
 }
 
 let slideIndex = 0;
