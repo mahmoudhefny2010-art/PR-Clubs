@@ -23,25 +23,31 @@
         "title": "Welcome Meetup",
         "date": "2026-10-15",
         "location": "Main Hall",
-        "description": "Utopia welcome session for new members."
+        "description": "Utopia welcome session for new members.",
+        "image": "/pics/Utopia.jpg"
       },
       {
         "title": "Weekly Workshop",
         "date": "2026-10-22",
         "location": "Room B12",
-        "description": "Weekly skills workshop organized by Utopia."
+        "description": "Weekly skills workshop organized by Utopia.",
+        "image": "/pics/Utopia.jpg"
       }
     ],
     "posts": [
       {
         "author": "Utopia",
         "date": "2026-10-01",
-        "text": "Welcome to our page! Follow us for upcoming events and updates."
+        "text": "Welcome to our page! Follow us for upcoming events and updates.",
+        "title": "Utopia",
+        "image": "/pics/Utopia.jpg"
       },
       {
         "author": "Utopia",
         "date": "2026-09-24",
-        "text": "Had a great session last week. See you at the next event!"
+        "text": "Had a great session last week. See you at the next event!",
+        "title": "Utopia",
+        "image": "/pics/Utopia.jpg"
       }
     ]
   },
@@ -66,25 +72,31 @@
         "title": "Welcome Meetup",
         "date": "2026-10-15",
         "location": "Main Hall",
-        "description": "ACPC welcome session for new members."
+        "description": "ACPC welcome session for new members.",
+        "image": "/pics/acpc.jpg"
       },
       {
         "title": "Weekly Workshop",
         "date": "2026-10-22",
         "location": "Room B12",
-        "description": "Weekly skills workshop organized by ACPC."
+        "description": "Weekly skills workshop organized by ACPC.",
+        "image": "/pics/acpc.jpg"
       }
     ],
     "posts": [
       {
         "author": "ACPC",
         "date": "2026-10-01",
-        "text": "Welcome to our page! Follow us for upcoming events and updates."
+        "text": "Welcome to our page! Follow us for upcoming events and updates.",
+        "title": "ACPC",
+        "image": "/pics/acpc.jpg"
       },
       {
         "author": "ACPC",
         "date": "2026-09-24",
-        "text": "Had a great session last week. See you at the next event!"
+        "text": "Had a great session last week. See you at the next event!",
+        "title": "ACPC",
+        "image": "/pics/acpc.jpg"
       }
     ]
   },
@@ -109,25 +121,31 @@
         "title": "Welcome Meetup",
         "date": "2026-10-15",
         "location": "Main Hall",
-        "description": "MUN welcome session for new members."
+        "description": "MUN welcome session for new members.",
+        "image": "/pics/mun.jpg"
       },
       {
         "title": "Weekly Workshop",
         "date": "2026-10-22",
         "location": "Room B12",
-        "description": "Weekly skills workshop organized by MUN."
+        "description": "Weekly skills workshop organized by MUN.",
+        "image": "/pics/mun.jpg"
       }
     ],
     "posts": [
       {
         "author": "MUN",
         "date": "2026-10-01",
-        "text": "Welcome to our page! Follow us for upcoming events and updates."
+        "text": "Welcome to our page! Follow us for upcoming events and updates.",
+        "title": "MUN",
+        "image": "/pics/mun.jpg"
       },
       {
         "author": "MUN",
         "date": "2026-09-24",
-        "text": "Had a great session last week. See you at the next event!"
+        "text": "Had a great session last week. See you at the next event!",
+        "title": "MUN",
+        "image": "/pics/mun.jpg"
       }
     ]
   },
@@ -152,25 +170,31 @@
         "title": "Welcome Meetup",
         "date": "2026-10-15",
         "location": "Main Hall",
-        "description": "IEEE welcome session for new members."
+        "description": "IEEE welcome session for new members.",
+        "image": "/pics/ieee.jpg"
       },
       {
         "title": "Weekly Workshop",
         "date": "2026-10-22",
         "location": "Room B12",
-        "description": "Weekly skills workshop organized by IEEE."
+        "description": "Weekly skills workshop organized by IEEE.",
+        "image": "/pics/ieee.jpg"
       }
     ],
     "posts": [
       {
         "author": "IEEE",
         "date": "2026-10-01",
-        "text": "Welcome to our page! Follow us for upcoming events and updates."
+        "text": "Welcome to our page! Follow us for upcoming events and updates.",
+        "title": "IEEE",
+        "image": "/pics/ieee.jpg"
       },
       {
         "author": "IEEE",
         "date": "2026-09-24",
-        "text": "Had a great session last week. See you at the next event!"
+        "text": "Had a great session last week. See you at the next event!",
+        "title": "IEEE",
+        "image": "/pics/ieee.jpg"
       }
     ]
   },
@@ -195,25 +219,31 @@
         "title": "Welcome Meetup",
         "date": "2026-10-15",
         "location": "Main Hall",
-        "description": "CDC welcome session for new members."
+        "description": "CDC welcome session for new members.",
+        "image": "/pics/cdc.jpg"
       },
       {
         "title": "Weekly Workshop",
         "date": "2026-10-22",
         "location": "Room B12",
-        "description": "Weekly skills workshop organized by CDC."
+        "description": "Weekly skills workshop organized by CDC.",
+        "image": "/pics/cdc.jpg"
       }
     ],
     "posts": [
       {
         "author": "CDC",
         "date": "2026-10-01",
-        "text": "Welcome to our page! Follow us for upcoming events and updates."
+        "text": "Welcome to our page! Follow us for upcoming events and updates.",
+        "title": "CDC",
+        "image": "/pics/cdc.jpg"
       },
       {
         "author": "CDC",
         "date": "2026-09-24",
-        "text": "Had a great session last week. See you at the next event!"
+        "text": "Had a great session last week. See you at the next event!",
+        "title": "CDC",
+        "image": "/pics/cdc.jpg"
       }
     ]
   },
@@ -238,25 +268,31 @@
         "title": "Welcome Meetup",
         "date": "2026-10-15",
         "location": "Main Hall",
-        "description": "Tunners welcome session for new members."
+        "description": "Tunners welcome session for new members.",
+        "image": "/pics/tuners.jpg"
       },
       {
         "title": "Weekly Workshop",
         "date": "2026-10-22",
         "location": "Room B12",
-        "description": "Weekly skills workshop organized by Tunners."
+        "description": "Weekly skills workshop organized by Tunners.",
+        "image": "/pics/tuners.jpg"
       }
     ],
     "posts": [
       {
         "author": "Tunners",
         "date": "2026-10-01",
-        "text": "Welcome to our page! Follow us for upcoming events and updates."
+        "text": "Welcome to our page! Follow us for upcoming events and updates.",
+        "title": "Tunners",
+        "image": "/pics/tuners.jpg"
       },
       {
         "author": "Tunners",
         "date": "2026-09-24",
-        "text": "Had a great session last week. See you at the next event!"
+        "text": "Had a great session last week. See you at the next event!",
+        "title": "Tunners",
+        "image": "/pics/tuners.jpg"
       }
     ]
   },
@@ -281,25 +317,31 @@
         "title": "Welcome Meetup",
         "date": "2026-10-15",
         "location": "Main Hall",
-        "description": "Gamers Legacy welcome session for new members."
+        "description": "Gamers Legacy welcome session for new members.",
+        "image": "/pics/gamerslegacy.jpg"
       },
       {
         "title": "Weekly Workshop",
         "date": "2026-10-22",
         "location": "Room B12",
-        "description": "Weekly skills workshop organized by Gamers Legacy."
+        "description": "Weekly skills workshop organized by Gamers Legacy.",
+        "image": "/pics/gamerslegacy.jpg"
       }
     ],
     "posts": [
       {
         "author": "Gamers Legacy",
         "date": "2026-10-01",
-        "text": "Welcome to our page! Follow us for upcoming events and updates."
+        "text": "Welcome to our page! Follow us for upcoming events and updates.",
+        "title": "Gamers Legacy",
+        "image": "/pics/gamerslegacy.jpg"
       },
       {
         "author": "Gamers Legacy",
         "date": "2026-09-24",
-        "text": "Had a great session last week. See you at the next event!"
+        "text": "Had a great session last week. See you at the next event!",
+        "title": "Gamers Legacy",
+        "image": "/pics/gamerslegacy.jpg"
       }
     ]
   },
@@ -324,25 +366,31 @@
         "title": "Welcome Meetup",
         "date": "2026-10-15",
         "location": "Main Hall",
-        "description": "MSP welcome session for new members."
+        "description": "MSP welcome session for new members.",
+        "image": "/pics/msp.jpg"
       },
       {
         "title": "Weekly Workshop",
         "date": "2026-10-22",
         "location": "Room B12",
-        "description": "Weekly skills workshop organized by MSP."
+        "description": "Weekly skills workshop organized by MSP.",
+        "image": "/pics/msp.jpg"
       }
     ],
     "posts": [
       {
         "author": "MSP",
         "date": "2026-10-01",
-        "text": "Welcome to our page! Follow us for upcoming events and updates."
+        "text": "Welcome to our page! Follow us for upcoming events and updates.",
+        "title": "MSP",
+        "image": "/pics/msp.jpg"
       },
       {
         "author": "MSP",
         "date": "2026-09-24",
-        "text": "Had a great session last week. See you at the next event!"
+        "text": "Had a great session last week. See you at the next event!",
+        "title": "MSP",
+        "image": "/pics/msp.jpg"
       }
     ]
   },
@@ -367,25 +415,31 @@
         "title": "Welcome Meetup",
         "date": "2026-10-15",
         "location": "Main Hall",
-        "description": "IHEPC welcome session for new members."
+        "description": "IHEPC welcome session for new members.",
+        "image": "/pics/ihepc.jpg"
       },
       {
         "title": "Weekly Workshop",
         "date": "2026-10-22",
         "location": "Room B12",
-        "description": "Weekly skills workshop organized by IHEPC."
+        "description": "Weekly skills workshop organized by IHEPC.",
+        "image": "/pics/ihepc.jpg"
       }
     ],
     "posts": [
       {
         "author": "IHEPC",
         "date": "2026-10-01",
-        "text": "Welcome to our page! Follow us for upcoming events and updates."
+        "text": "Welcome to our page! Follow us for upcoming events and updates.",
+        "title": "IHEPC",
+        "image": "/pics/ihepc.jpg"
       },
       {
         "author": "IHEPC",
         "date": "2026-09-24",
-        "text": "Had a great session last week. See you at the next event!"
+        "text": "Had a great session last week. See you at the next event!",
+        "title": "IHEPC",
+        "image": "/pics/ihepc.jpg"
       }
     ]
   },
@@ -410,25 +464,31 @@
         "title": "Welcome Meetup",
         "date": "2026-10-15",
         "location": "Main Hall",
-        "description": "TEDx MIU welcome session for new members."
+        "description": "TEDx MIU welcome session for new members.",
+        "image": "/pics/tedx.jpg"
       },
       {
         "title": "Weekly Workshop",
         "date": "2026-10-22",
         "location": "Room B12",
-        "description": "Weekly skills workshop organized by TEDx MIU."
+        "description": "Weekly skills workshop organized by TEDx MIU.",
+        "image": "/pics/tedx.jpg"
       }
     ],
     "posts": [
       {
         "author": "TEDx MIU",
         "date": "2026-10-01",
-        "text": "Welcome to our page! Follow us for upcoming events and updates."
+        "text": "Welcome to our page! Follow us for upcoming events and updates.",
+        "title": "TEDx MIU",
+        "image": "/pics/tedx.jpg"
       },
       {
         "author": "TEDx MIU",
         "date": "2026-09-24",
-        "text": "Had a great session last week. See you at the next event!"
+        "text": "Had a great session last week. See you at the next event!",
+        "title": "TEDx MIU",
+        "image": "/pics/tedx.jpg"
       }
     ]
   },
@@ -453,25 +513,31 @@
         "title": "Welcome Meetup",
         "date": "2026-10-15",
         "location": "Main Hall",
-        "description": "Dimas welcome session for new members."
+        "description": "Dimas welcome session for new members.",
+        "image": "/pics/dimas.jpg"
       },
       {
         "title": "Weekly Workshop",
         "date": "2026-10-22",
         "location": "Room B12",
-        "description": "Weekly skills workshop organized by Dimas."
+        "description": "Weekly skills workshop organized by Dimas.",
+        "image": "/pics/dimas.jpg"
       }
     ],
     "posts": [
       {
         "author": "Dimas",
         "date": "2026-10-01",
-        "text": "Welcome to our page! Follow us for upcoming events and updates."
+        "text": "Welcome to our page! Follow us for upcoming events and updates.",
+        "title": "Dimas",
+        "image": "/pics/dimas.jpg"
       },
       {
         "author": "Dimas",
         "date": "2026-09-24",
-        "text": "Had a great session last week. See you at the next event!"
+        "text": "Had a great session last week. See you at the next event!",
+        "title": "Dimas",
+        "image": "/pics/dimas.jpg"
       }
     ]
   },
@@ -496,25 +562,31 @@
         "title": "Welcome Meetup",
         "date": "2026-10-15",
         "location": "Main Hall",
-        "description": "Theater welcome session for new members."
+        "description": "Theater welcome session for new members.",
+        "image": "/pics/theater.jpg"
       },
       {
         "title": "Weekly Workshop",
         "date": "2026-10-22",
         "location": "Room B12",
-        "description": "Weekly skills workshop organized by Theater."
+        "description": "Weekly skills workshop organized by Theater.",
+        "image": "/pics/theater.jpg"
       }
     ],
     "posts": [
       {
         "author": "Theater",
         "date": "2026-10-01",
-        "text": "Welcome to our page! Follow us for upcoming events and updates."
+        "text": "Welcome to our page! Follow us for upcoming events and updates.",
+        "title": "Theater",
+        "image": "/pics/theater.jpg"
       },
       {
         "author": "Theater",
         "date": "2026-09-24",
-        "text": "Had a great session last week. See you at the next event!"
+        "text": "Had a great session last week. See you at the next event!",
+        "title": "Theater",
+        "image": "/pics/theater.jpg"
       }
     ]
   }

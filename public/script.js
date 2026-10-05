@@ -997,16 +997,17 @@ function openClubDetail(clubId) {
     </section>
 
     ${Array.isArray(club.events) && club.events.length ? `
-    <section class="detail-section detail-events">
+    <section class="detail-section">
       <h3>Upcoming events</h3>
-      <div class="detail-events-list">
-        ${club.events.map((event) => `
-          <div class="detail-event-card">
-            <span class="detail-event-date">${escapeHtml(event.date || '')}</span>
-            <div>
+      <div class="detail-cards-grid">
+        ${club.events.map((event, index) => `
+          <div class="event-tile">
+            <img src="${escapeHtml(event.image || club.image)}" alt="${escapeHtml(event.title || 'event')}" />
+            <div class="event-tile-body">
               <strong>${escapeHtml(event.title || 'Event')}</strong>
-              ${event.location ? `<p>${escapeHtml(event.location)}</p>` : ''}
-              ${event.description ? `<p>${escapeHtml(event.description)}</p>` : ''}
+              <span class="event-tile-date">${escapeHtml(event.date || '')}${event.location ? ' · ' + escapeHtml(event.location) : ''}</span>
+              <button class="event-info-btn" type="button" data-info="event-${index}">Info</button>
+              <p class="event-tile-desc" id="event-desc-${index}" hidden>${escapeHtml(event.description || '')}</p>
             </div>
           </div>
         `).join('')}
@@ -1015,18 +1016,20 @@ function openClubDetail(clubId) {
     ` : ''}
 
     ${Array.isArray(club.posts) && club.posts.length ? `
-    <section class="detail-section detail-feed">
+    <section class="detail-section">
       <h3>Club feed</h3>
-      <div class="detail-feed-list">
-        ${club.posts.map((post) => `
-          <article class="detail-post">
-            <header>
-              <strong>${escapeHtml(post.author || club.name)}</strong>
-              <span>${escapeHtml(post.date || '')}</span>
-            </header>
-            <p>${escapeHtml(post.text || '')}</p>
-          </article>
+      <div class="detail-cards-grid">
+        ${club.posts.map((post, index) => `
+          <button class="post-tile" type="button" data-post="${index}">
+            <img src="${escapeHtml(post.image || club.image)}" alt="${escapeHtml(post.title || 'post')}" />
+            <span class="post-tile-label">${escapeHtml(post.title || post.date || 'Post')}</span>
+          </button>
         `).join('')}
+      </div>
+      <div class="post-detail" id="postDetail" hidden>
+        <h4 id="postDetailTitle"></h4>
+        <p id="postDetailText"></p>
+        <span id="postDetailMeta"></span>
       </div>
     </section>
     ` : ''}
@@ -1039,6 +1042,29 @@ function openClubDetail(clubId) {
 
   clubDetail.querySelector('[data-action="apply-club"]').addEventListener('click', () => openApplicationForm(clubId));
   clubDetail.querySelector('[data-action="go-home"]').addEventListener('click', () => showView('home'));
+
+  clubDetail.querySelectorAll('.event-info-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const target = clubDetail.querySelector(`#event-desc-${btn.dataset.info.split('-')[1]}`);
+      if (target) target.hidden = !target.hidden;
+    });
+  });
+  clubDetail.querySelectorAll('.post-tile').forEach((tile) => {
+    tile.addEventListener('click', () => {
+      const post = (club.posts || [])[Number(tile.dataset.post)];
+      if (!post) return;
+      const panel = clubDetail.querySelector('#postDetail');
+      const title = clubDetail.querySelector('#postDetailTitle');
+      const text = clubDetail.querySelector('#postDetailText');
+      const meta = clubDetail.querySelector('#postDetailMeta');
+      if (!panel || !title || !text || !meta) return;
+      title.textContent = post.title || post.author || 'Post';
+      text.textContent = post.text || post.description || '';
+      meta.textContent = [post.date, post.location].filter(Boolean).join(' · ');
+      panel.hidden = false;
+      panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  });
 
   showView('club');
 }
