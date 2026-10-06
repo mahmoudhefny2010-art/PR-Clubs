@@ -919,6 +919,18 @@ app.get('/api/club/members', requireClubAuth, requireClubPresident, async (req, 
   }
 });
 
+async function getClubMemberDirectory() {
+  const records = mongoReady
+    ? await Club.find({}).select('id name members memberRoster').sort({ name: 1 }).lean()
+    : clubs;
+  return records.map((club) => ({
+    id: club.id,
+    name: club.name,
+    totalCount: Number(club.members) || 0,
+    members: Array.isArray(club.memberRoster) ? club.memberRoster : []
+  }));
+}
+
 app.post('/api/club/members', requireClubAuth, requireClubPresident, async (req, res) => {
   const name = cleanText(req.body.name, 120);
   const requestedCommittee = cleanText(req.body.committee, 100);
@@ -1180,6 +1192,19 @@ function requireCommitteeRole(req, res, next) {
   }
   next();
 }
+
+app.get('/api/committee/club-members', requireClubAuth, async (req, res) => {
+  if (req.clubAccount?.role !== 'pr') {
+    return res.status(403).json({ message: 'Only PR can view member rosters across clubs.' });
+  }
+  try {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(await getClubMemberDirectory());
+  } catch (error) {
+    console.error('Database operation failed:', error.name);
+    res.status(503).json({ message: 'Could not load club member rosters right now.' });
+  }
+});
 
 const committeeStage = { pr: 'pending_pr', english: 'pending_english', dean: 'pending_dean' };
 const committeeRoleLabels = { pr: 'PR Department', english: 'English Department', dean: 'Dean' };
@@ -1885,6 +1910,16 @@ app.post('/api/admin/logout', (req, res) => {
 });
 
 app.use('/api/admin', requireAdmin);
+
+app.get('/api/admin/club-members', async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(await getClubMemberDirectory());
+  } catch (error) {
+    console.error('Database operation failed:', error.name);
+    res.status(503).json({ message: 'Could not load club member rosters right now.' });
+  }
+});
 
 app.get('/api/admin/applications', async (req, res) => {
   try {

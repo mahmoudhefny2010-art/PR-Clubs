@@ -54,6 +54,8 @@ async function ensureSession() {
       return false;
     }
     currentRole = data.club.role;
+    const memberDirectoryButton = document.getElementById('prMemberDirectoryBtn');
+    if (memberDirectoryButton) memberDirectoryButton.hidden = currentRole !== 'pr';
     const titles = { pr: 'PR Department — Approvals', english: 'English Department — Preview & Approve', dean: 'Dean — Final Approval' };
     document.getElementById('committeeTitle').textContent = titles[currentRole];
     if (currentRole === 'english') document.getElementById('openStatusOverviewBtn').textContent = 'Restart Review';

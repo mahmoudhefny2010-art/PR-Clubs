@@ -415,6 +415,7 @@ async function openClubPortal() {
     presidentSidebar.classList.toggle('hidden', club.role !== 'president');
     presidentDashboardLayout.classList.toggle('is-president', club.role === 'president');
     document.getElementById('approvalCheckpointPanel')?.classList.toggle('hidden', club.role !== 'president');
+    document.getElementById('openMemberManagerBtn')?.classList.toggle('hidden', club.role !== 'president');
     interviewFormManager.classList.add('hidden');
     toggleInterviewFormBtn.classList.remove('hidden');
     toggleInterviewFormBtn.setAttribute('aria-expanded', 'false');

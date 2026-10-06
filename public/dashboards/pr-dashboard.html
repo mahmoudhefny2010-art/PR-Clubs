@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Committee Review</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/assets/css/base.css?v=20261007d" />
+    <link rel="stylesheet" href="/assets/css/base.css?v=20261008l" />
     <link rel="stylesheet" href="/assets/css/responsive.css?v=20261005h" />
     <link rel="stylesheet" href="/assets/css/dark.css?v=20261007b" />
     <link rel="stylesheet" href="/assets/css/features.css?v=20261005h" />
@@ -73,6 +73,7 @@
           </div>
           <div class="top-actions">
             <a class="secondary-btn" href="/">Back</a>
+            <button id="prMemberDirectoryBtn" class="secondary-btn" type="button" data-open-member-directory="pr" hidden>All club members</button>
             <button id="openStatusOverviewBtn" class="secondary-btn" type="button">All Requests</button>
             <button id="logoutBtn" class="logout-btn" type="button">Logout</button>
           </div>
@@ -95,8 +96,25 @@
         <div id="statusOverviewList" class="status-overview-list" aria-live="polite"></div>
       </div>
     </dialog>
+    <dialog id="memberDirectoryDialog" class="member-directory-dialog" aria-labelledby="memberDirectoryTitle">
+      <div class="member-directory-inner">
+        <header class="member-directory-header">
+          <div>
+            <span class="admin-eyebrow">PR DASHBOARD</span>
+            <h2 id="memberDirectoryTitle">Club member directory</h2>
+            <p id="memberDirectoryDescription">Choose a club to view its named member profiles.</p>
+          </div>
+          <button class="request-dialog-close" type="button" data-close-member-directory aria-label="Close member directory">×</button>
+        </header>
+        <label class="member-directory-filter">Choose a club
+          <select id="memberDirectoryClubSelect"><option value="">Choose a club</option></select>
+        </label>
+        <div id="memberDirectoryList" class="member-directory-list" aria-live="polite"></div>
+      </div>
+    </dialog>
     <div id="site-footer"></div>
-    <script src="/assets/js/committee-dashboard.js?v=20261007q"></script>
+    <script src="/assets/js/committee-dashboard.js?v=20261008a"></script>
+    <script src="/assets/js/member-directory.js?v=20261008a"></script>
       <script src="/assets/js/layout.js?v=8" defer></script>
   </body>
 </html>

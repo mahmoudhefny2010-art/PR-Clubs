@@ -888,11 +888,37 @@ button:disabled,
 .member-roster-empty { margin: 0; padding: 24px; border: 1px dashed var(--border-color); border-radius: var(--radius-lg); color: var(--text-muted); text-align: center; }
 :root[data-theme="dark"] .member-manager-dialog { color-scheme: dark; }
 :root[data-theme="dark"] .member-type-pill { background: rgba(153, 27, 27, .25); color: #fecaca; }
+.admin-member-directory-card { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin: 20px 0; padding: 18px 20px; border: 1px solid var(--border-color); border-left: 4px solid var(--primary-700); border-radius: var(--radius-lg); background: var(--bg-soft); }
+.admin-member-directory-card h3 { margin: 3px 0; }
+.admin-member-directory-card p { margin: 0; color: var(--text-muted); }
+.member-directory-dialog { width: min(760px, calc(100% - 28px)); max-height: 88vh; padding: 0; border: 1px solid var(--border-color); border-radius: var(--radius-xl); background: var(--bg-panel); color: var(--text-main); box-shadow: var(--shadow-xl); }
+.member-directory-dialog::backdrop { background: rgba(15, 23, 42, .58); backdrop-filter: blur(4px); }
+.member-directory-inner { max-height: 88vh; overflow: auto; padding: 22px; }
+.member-directory-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border-color); }
+.member-directory-header h2 { margin: 4px 0; }
+.member-directory-header p { margin: 0; color: var(--text-muted); }
+.member-directory-filter { display: grid; gap: 6px; margin: 14px 0; font-weight: 700; }
+.member-directory-filter select { width: 100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-panel); color: var(--text-main); font: inherit; }
+.member-directory-list { display: grid; gap: 12px; max-height: 58vh; overflow: auto; }
+.member-directory-club { padding: 14px; border: 1px solid var(--border-color); border-radius: var(--radius-lg); background: var(--bg-soft); }
+.member-directory-club > header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 9px; }
+.member-directory-club h3 { margin: 0; }
+.member-directory-club > header span { color: var(--text-muted); font-size: .8rem; font-weight: 700; }
+.member-directory-people { display: grid; gap: 7px; }
+.member-directory-person { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-panel); }
+.member-directory-person p { margin: 3px 0 0; color: var(--text-muted); font-size: .88rem; }
+.member-directory-level { flex: 0 0 auto; padding: 4px 8px; border-radius: var(--radius-full); background: var(--primary-50); color: var(--primary-800); font-size: .72rem; font-weight: 800; }
+.member-directory-empty, .member-directory-note { margin: 0; padding: 10px; color: var(--text-muted); font-size: .85rem; }
+.member-directory-empty.is-error { color: var(--danger); }
+:root[data-theme="dark"] .member-directory-dialog { color-scheme: dark; }
+:root[data-theme="dark"] .member-directory-level { background: rgba(153, 27, 27, .25); color: #fecaca; }
 
 @media (max-width: 700px) {
   .president-dashboard-section .stats-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .member-form-grid { grid-template-columns: 1fr; }
   .member-manager-launch, .member-dialog-toolbar, .member-form-actions { align-items: stretch; flex-direction: column; }
+  .admin-member-directory-card { align-items: stretch; flex-direction: column; }
+  .member-directory-person, .member-directory-club > header { align-items: flex-start; flex-direction: column; }
   .approval-checkpoints { padding: 16px; }
   .approval-checkpoints-heading { align-items: flex-start; }
   .member-form-actions > div { justify-content: flex-end; }

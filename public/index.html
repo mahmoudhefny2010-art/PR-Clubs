@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/assets/css/base.css?v=20261008j" />
+    <link rel="stylesheet" href="/assets/css/base.css?v=20261008l" />
     <link rel="stylesheet" href="/assets/css/responsive.css?v=20261006c" />
     <link rel="stylesheet" href="/assets/css/dark.css?v=20261007b" />
     <link rel="stylesheet" href="/assets/css/features.css?v=20261006b" />
@@ -162,6 +162,15 @@
                 <button class="delete-btn" id="adminLogoutBtn" type="button">Log out</button>
               </div>
             </header>
+
+            <section class="admin-member-directory-card" aria-labelledby="adminMemberDirectoryTitle">
+              <div>
+                <span class="admin-eyebrow">CLUB OPERATIONS</span>
+                <h3 id="adminMemberDirectoryTitle">Club member directory</h3>
+                <p>Browse member rosters across every club.</p>
+              </div>
+              <button class="secondary-btn" type="button" data-open-member-directory="admin">View club members</button>
+            </section>
 
             <form id="homepageSettingsForm" class="admin-settings-form">
               <h3>Homepage text</h3>
@@ -411,6 +420,7 @@
                 </div>
               </div>
               <div class="top-actions">
+                <button id="openMemberManagerBtn" class="secondary-btn hidden" type="button">Club members</button>
                 <a class="secondary-btn" href="/pages/club-content.html" target="_blank" rel="noopener noreferrer">Open Content Studio</a>
                 <button id="backHomeBtn" class="secondary-btn" type="button">Back to Clubs</button>
                 <button id="logoutBtn" class="logout-btn" type="button">Log out</button>
@@ -542,10 +552,6 @@
                   <strong id="statRejected">0</strong>
                 </div>
               </div>
-              <div class="member-manager-launch">
-                <p id="clubMemberCountNote">Manage member names, committees, positions, and membership level.</p>
-                <button id="openMemberManagerBtn" class="secondary-btn" type="button">Club members</button>
-              </div>
             </div>
 
             <div id="presidentApplicantsPanel" class="president-applicants-panel">
@@ -585,6 +591,23 @@
           </form>
           <p id="clubMemberFeedback" class="admin-feedback" aria-live="polite"></p>
           <div id="clubMemberList" class="member-roster-list" aria-live="polite"></div>
+        </div>
+      </dialog>
+
+      <dialog id="memberDirectoryDialog" class="member-directory-dialog" aria-labelledby="memberDirectoryTitle">
+        <div class="member-directory-inner">
+          <header class="member-directory-header">
+            <div>
+              <span class="admin-eyebrow">CLUB OPERATIONS</span>
+              <h2 id="memberDirectoryTitle">Club member directory</h2>
+              <p id="memberDirectoryDescription">Browse named member profiles by club.</p>
+            </div>
+            <button class="calendar-close-btn" type="button" data-close-member-directory aria-label="Close member directory">&times;</button>
+          </header>
+          <label class="member-directory-filter">Choose a club
+            <select id="memberDirectoryClubSelect"><option value="all">All clubs</option></select>
+          </label>
+          <div id="memberDirectoryList" class="member-directory-list" aria-live="polite"></div>
         </div>
       </dialog>
 
@@ -700,9 +723,10 @@
     <div id="site-footer"></div>
 
     <script src="/assets/js/event-modal.js?v=1"></script>
-    <script src="/assets/js/app-home.js?v=20261008f"></script>
+    <script src="/assets/js/app-home.js?v=20261008g"></script>
     <script src="/assets/js/app-admin.js?v=20261005h"></script>
     <script src="/assets/js/app-dashboard.js?v=20261008b"></script>
+    <script src="/assets/js/member-directory.js?v=20261008a"></script>
     <script src="/assets/js/layout.js?v=8" defer></script>
     <script src="/assets/js/theme.js?v=20261007a" defer></script>
   </body>
