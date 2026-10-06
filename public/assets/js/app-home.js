@@ -255,63 +255,54 @@ async function loadApplications() {
 }
 
 function renderApprovalCheckpoints(items) {
-  const list = document.getElementById('approvalCheckpointList');
-  const count = document.getElementById('approvalCheckpointCount');
-  if (!list || !count) return;
+  const track = document.getElementById('approvalCheckpointTrack');
+  const requestLabel = document.getElementById('approvalCheckpointRequest');
+  const statusLabel = document.getElementById('approvalCheckpointStatus');
+  if (!track || !requestLabel || !statusLabel) return;
 
-  const roleLabels = { club: 'Club', pr: 'PR team', english: 'English team', dean: 'Dean' };
-  const actionLabels = {
-    submitted: 'Submitted for review',
-    resubmitted: 'Resubmitted for review',
-    approve: 'Approved',
-    reject: 'Rejected',
-    request_edit: 'Edits requested',
-    returned_to_pr: 'Returned to PR team',
-    returned_to_english: 'Returned to English team',
-    restarted_review: 'Review restarted',
-    deleted: 'Deleted',
-    comment: 'Comment added',
-    comment_deleted: 'Comment removed'
+  const latestActivity = (item) => {
+    const history = Array.isArray(item.workflowHistory) ? item.workflowHistory : [];
+    return new Date(history[history.length - 1]?.createdAt || item.updatedAt || item.createdAt || 0).getTime();
   };
-  const checkpoints = items.flatMap((item) => (Array.isArray(item.workflowHistory) ? item.workflowHistory : [])
-    .map((event) => ({ ...event, item })));
-  checkpoints.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-  count.textContent = `${checkpoints.length} ${checkpoints.length === 1 ? 'checkpoint' : 'checkpoints'}`;
-  list.replaceChildren();
-
-  if (!checkpoints.length) {
-    const empty = document.createElement('p');
-    empty.className = 'approval-checkpoint-empty';
-    empty.textContent = 'Approval progress will appear here when a request reaches its first review step.';
-    list.append(empty);
-    return;
+  const request = [...items].sort((a, b) => latestActivity(b) - latestActivity(a))[0];
+  const labels = ['Submitted', 'PR review', 'English review', 'Dean review', 'Published'];
+  let currentIndex = -1;
+  let currentLabel = 'No requests yet';
+  let terminalClass = '';
+  if (request) {
+    const status = String(request.status || 'draft');
+    const stageByRole = { club: 0, pr: 1, english: 2, dean: 3 };
+    const history = Array.isArray(request.workflowHistory) ? request.workflowHistory : [];
+    const lastEvent = history[history.length - 1];
+    const statusIndex = { draft: -1, pending_pr: 1, pending_english: 2, pending_dean: 3, published: 4, rejected: 4, deleted: 4 };
+    currentIndex = statusIndex[status] ?? (status === 'changes_requested' ? stageByRole[request.editRequestedBy] || 1 : -1);
+    currentLabel = status.replaceAll('_', ' ');
+    if (status === 'rejected' || status === 'deleted') {
+      currentIndex = stageByRole[lastEvent?.role] ?? 4;
+      labels[currentIndex] = status === 'rejected' ? 'Rejected' : 'Deleted';
+      terminalClass = 'is-failed';
+    }
+    if (status === 'changes_requested') currentLabel = `Changes requested by ${request.editRequestedBy || 'review team'}`;
+    requestLabel.textContent = request.title || 'Untitled request';
+  } else {
+    requestLabel.textContent = 'A request timeline will appear after the club submits content for review.';
   }
+  statusLabel.textContent = currentLabel;
+  track.replaceChildren();
+  track.style.setProperty('--checkpoint-progress', `${currentIndex < 0 ? 0 : currentIndex / (labels.length - 1) * 100}%`);
 
-  checkpoints.slice(0, 30).forEach((checkpoint) => {
-    const card = document.createElement('article');
-    card.className = 'approval-checkpoint';
+  labels.forEach((label, index) => {
+    const step = document.createElement('div');
+    step.className = 'approval-checkpoint-step';
+    if (index < currentIndex) step.classList.add('is-complete');
+    if (index === currentIndex) step.classList.add('is-current', terminalClass);
     const marker = document.createElement('span');
     marker.className = 'approval-checkpoint-marker';
     marker.setAttribute('aria-hidden', 'true');
-    const content = document.createElement('div');
-    content.className = 'approval-checkpoint-content';
-    const heading = document.createElement('strong');
-    heading.textContent = checkpoint.item.title || 'Untitled request';
-    const description = document.createElement('p');
-    const action = actionLabels[checkpoint.action] || String(checkpoint.action || 'Updated').replaceAll('_', ' ');
-    const role = roleLabels[checkpoint.role] || 'Review team';
-    const stage = String(checkpoint.toStatus || checkpoint.item.status || '').replaceAll('_', ' ');
-    description.textContent = `${role} · ${action}${stage ? ` · ${stage}` : ''}`;
-    const time = document.createElement('time');
-    const date = new Date(checkpoint.createdAt);
-    if (!Number.isNaN(date.getTime())) {
-      time.dateTime = date.toISOString();
-      time.textContent = date.toLocaleString();
-    }
-    content.append(heading, description);
-    if (time.textContent) content.append(time);
-    card.append(marker, content);
-    list.append(card);
+    const title = document.createElement('strong');
+    title.textContent = label;
+    step.append(marker, title);
+    track.append(step);
   });
 }
 
@@ -342,16 +333,10 @@ async function loadClubReviewNotifications() {
     if (dismissBtn) dismissBtn.onclick = () => dialog.close();
   } catch {
     dialog.close();
-    const count = document.getElementById('approvalCheckpointCount');
-    const list = document.getElementById('approvalCheckpointList');
-    if (count) count.textContent = 'Unavailable';
-    if (list) {
-      list.replaceChildren();
-      const message = document.createElement('p');
-      message.className = 'approval-checkpoint-empty';
-      message.textContent = 'Approval checkpoints could not be loaded right now.';
-      list.append(message);
-    }
+    const status = document.getElementById('approvalCheckpointStatus');
+    const request = document.getElementById('approvalCheckpointRequest');
+    if (status) status.textContent = 'Unavailable';
+    if (request) request.textContent = 'Could not load the latest approval progress.';
   }
 }
 
@@ -387,6 +372,7 @@ async function openClubPortal() {
     presidentFormManager.classList.toggle('hidden', club.role !== 'president');
     presidentSidebar.classList.toggle('hidden', club.role !== 'president');
     presidentDashboardLayout.classList.toggle('is-president', club.role === 'president');
+    document.getElementById('approvalCheckpointPanel')?.classList.toggle('hidden', club.role !== 'president');
     interviewFormManager.classList.add('hidden');
     toggleInterviewFormBtn.classList.remove('hidden');
     toggleInterviewFormBtn.setAttribute('aria-expanded', 'false');

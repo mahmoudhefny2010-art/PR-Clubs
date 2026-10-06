@@ -807,30 +807,44 @@ button:disabled,
 .club-review-notice-close:hover { border-color: var(--primary-600); color: var(--primary-700); }
 .member-manager-launch p { margin: 0; color: var(--text-muted); }
 .approval-checkpoints {
-  margin-top: 18px;
-  padding: 20px;
+  margin: 0 0 18px;
+  padding: 20px 24px;
+  overflow-x: auto;
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  background: var(--bg-panel);
-  box-shadow: var(--shadow-sm);
+  border-left: 5px solid var(--primary-700);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(110deg, var(--bg-panel), var(--bg-soft));
+  box-shadow: var(--shadow-md);
 }
-.approval-checkpoints-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
-.approval-checkpoints-heading h3 { margin: 4px 0 0; }
-.approval-checkpoint-list { display: grid; gap: 0; max-height: 420px; overflow: auto; }
-.approval-checkpoint {
+.approval-checkpoints-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.approval-checkpoints-heading h3 { margin: 3px 0; }
+.approval-checkpoint-request { margin: 0; color: var(--text-muted); overflow-wrap: anywhere; }
+.approval-checkpoint-status { flex: 0 0 auto; padding: 7px 12px; border: 1px solid var(--warning-border); border-radius: var(--radius-full); background: var(--warning-bg); color: var(--warning); font-size: .82rem; font-weight: 800; text-transform: capitalize; }
+.approval-checkpoint-track {
+  position: relative;
   display: grid;
-  grid-template-columns: 14px minmax(0, 1fr);
-  gap: 12px;
-  padding: 12px 4px;
-  border-bottom: 1px solid var(--border-color);
+  grid-template-columns: repeat(5, minmax(100px, 1fr));
+  min-width: 560px;
+  padding: 8px 0 2px;
 }
-.approval-checkpoint:last-child { border-bottom: 0; }
-.approval-checkpoint-marker { width: 10px; height: 10px; margin-top: 5px; border: 2px solid var(--primary-700); border-radius: 50%; background: var(--bg-panel); box-shadow: 0 0 0 3px var(--primary-50); }
-.approval-checkpoint-content { min-width: 0; }
-.approval-checkpoint-content strong { display: block; overflow-wrap: anywhere; }
-.approval-checkpoint-content p { margin: 3px 0; color: var(--text-muted); text-transform: capitalize; }
-.approval-checkpoint-content time { color: var(--text-light); font-size: .82rem; }
-.approval-checkpoint-empty { margin: 0; padding: 18px 12px; border: 1px dashed var(--border-color); border-radius: var(--radius-md); color: var(--text-muted); text-align: center; }
+.approval-checkpoint-track::before {
+  position: absolute;
+  top: 20px;
+  left: 10%;
+  width: 80%;
+  height: 4px;
+  border-radius: var(--radius-full);
+  content: "";
+}
+.approval-checkpoint-track::before { background: linear-gradient(to right, var(--primary-700) 0 var(--checkpoint-progress), var(--border-color) var(--checkpoint-progress) 100%); }
+.approval-checkpoint-step { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
+.approval-checkpoint-marker { width: 24px; height: 24px; border: 4px solid var(--bg-panel); border-radius: 50%; background: var(--slate-300); box-shadow: 0 0 0 1px var(--border-color); }
+.approval-checkpoint-step strong { color: var(--text-light); font-size: .82rem; font-weight: 700; }
+.approval-checkpoint-step.is-complete .approval-checkpoint-marker,
+.approval-checkpoint-step.is-current .approval-checkpoint-marker { background: var(--primary-700); box-shadow: 0 0 0 3px var(--primary-100); }
+.approval-checkpoint-step.is-complete strong,
+.approval-checkpoint-step.is-current strong { color: var(--text-main); }
+.approval-checkpoint-step.is-current.is-failed .approval-checkpoint-marker { background: var(--danger); box-shadow: 0 0 0 3px var(--danger-bg); }
 .member-manager-dialog {
   width: min(860px, calc(100% - 28px));
   max-height: 88vh;
@@ -874,6 +888,7 @@ button:disabled,
   .member-form-grid { grid-template-columns: 1fr; }
   .member-manager-launch, .member-dialog-toolbar, .member-form-actions { align-items: stretch; flex-direction: column; }
   .approval-checkpoints { padding: 16px; }
+  .approval-checkpoints-heading { align-items: flex-start; }
   .member-form-actions > div { justify-content: flex-end; }
 }
 @media (max-width: 430px) {
