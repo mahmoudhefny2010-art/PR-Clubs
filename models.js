@@ -65,7 +65,7 @@ const clubAccountSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   salt: { type: String, required: true },
   passwordHash: { type: String, required: true },
-  role: { type: String, enum: ['president', 'head', 'pr', 'english', 'dean', 'religion'], default: 'president' },
+  role: { type: String, enum: ['president', 'head', 'pr', 'english', 'dean'], default: 'president' },
   committee: { type: String, default: '' }
 }, { timestamps: true, autoIndex: false });
 
@@ -73,7 +73,7 @@ const contentRequestSchema = new mongoose.Schema({
   id: { type: Number, required: true, unique: true, index: true },
   clubId: { type: Number, required: true, index: true },
   clubName: { type: String, default: '' },
-  type: { type: String, enum: ['post', 'event', 'sponsor', 'booth'], required: true },
+  type: { type: String, enum: ['post', 'event'], required: true },
   title: { type: String, required: true, trim: true },
   description: { type: String, default: '' },
   date: { type: String, default: '' },
@@ -81,13 +81,13 @@ const contentRequestSchema = new mongoose.Schema({
   location: { type: String, default: '' },
   budget: { type: String, default: '' },
   image: { type: String, default: '' },
-  status: { type: String, enum: ['draft', 'pending_pr', 'pending_english', 'pending_dean', 'pending_religion', 'changes_requested', 'rejected', 'published', 'deleted'], default: 'draft', index: true },
+  status: { type: String, enum: ['draft', 'pending_pr', 'pending_english', 'pending_dean', 'changes_requested', 'rejected', 'published', 'deleted'], default: 'draft', index: true },
   resubmitTo: { type: String, enum: ['pending_pr', 'pending_english'], default: 'pending_pr' },
   editRequestedBy: { type: String, enum: ['', 'pr', 'english'], default: '' },
   skipEnglishOnNextPrApproval: { type: Boolean, default: false },
   clubNotice: { type: String, default: '' },
   workflowHistory: [{
-    role: { type: String, enum: ['club', 'pr', 'english', 'dean', 'religion'], required: true },
+    role: { type: String, enum: ['club', 'pr', 'english', 'dean'], required: true },
     actorRole: { type: String, default: '' },
     actorEmail: { type: String, default: '' },
     action: { type: String, required: true },
@@ -99,11 +99,10 @@ const contentRequestSchema = new mongoose.Schema({
   comments: {
     pr: { type: String, default: '' },
     english: { type: String, default: '' },
-    dean: { type: String, default: '' },
-    religion: { type: String, default: '' }
+    dean: { type: String, default: '' }
   },
   commentHistory: [{
-    role: { type: String, enum: ['pr', 'english', 'dean', 'religion'], required: true },
+    role: { type: String, enum: ['pr', 'english', 'dean'], required: true },
     text: { type: String, required: true },
     createdAt: { type: Date, default: Date.now },
     deletedAt: { type: Date, default: null }

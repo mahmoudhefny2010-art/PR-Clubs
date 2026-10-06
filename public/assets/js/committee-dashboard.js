@@ -28,7 +28,7 @@ async function ensureSession() {
       return false;
     }
     currentRole = data.club.role;
-    const titles = { pr: 'PR Department — Approvals', english: 'English Department — Preview & Approve', dean: 'Dean — Final Approval', religion: 'Religion Committee — Final Approval' };
+    const titles = { pr: 'PR Department — Approvals', english: 'English Department — Preview & Approve', dean: 'Dean — Final Approval' };
     document.getElementById('committeeTitle').textContent = titles[currentRole];
     if (currentRole === 'english') document.getElementById('openStatusOverviewBtn').textContent = 'Restart Review';
     hintText.textContent = currentRole === 'pr'
@@ -98,19 +98,18 @@ function openDetails(item, context = 'pending') {
   activeDetailContext = context;
   const statusContext = context === 'status';
   const canRestart = statusContext && ['pr', 'english'].includes(currentRole) && !['draft', 'changes_requested', ({ pr: 'pending_pr', english: 'pending_english' })[currentRole]].includes(item.status);
-  const canReturn = ((currentRole === 'dean' && ['event', 'post'].includes(item.type)) || (currentRole === 'religion' && ['booth', 'sponsor'].includes(item.type))) && ['pending_dean', 'pending_religion', 'published'].includes(item.status);
+  const canReturn = currentRole === 'dean' && ['pending_dean', 'published'].includes(item.status);
   document.getElementById('dialogApproveBtn').hidden = statusContext;
   document.getElementById('dialogRejectBtn').hidden = statusContext;
-  document.getElementById('requestChangesBtn').hidden = statusContext || !['pr', 'english', 'religion'].includes(currentRole);
+  document.getElementById('requestChangesBtn').hidden = statusContext || !['pr', 'english'].includes(currentRole);
   document.getElementById('requestChangesBtn').textContent = 'Request Edit';
   document.getElementById('requestChangesBtn').dataset.dialogAction = 'request_edit';
   document.getElementById('reopenRequestBtn').hidden = !canRestart;
   document.getElementById('reopenRequestBtn').textContent = `Restart ${currentRole === 'pr' ? 'PR' : 'English'} Review`;
   const deleteRequestButton = document.getElementById('deleteRequestBtn');
   if (deleteRequestButton) {
-    const canDelete = ((currentRole === 'dean' && ['event', 'post'].includes(item.type)) || (currentRole === 'religion' && ['booth', 'sponsor'].includes(item.type)));
-    deleteRequestButton.hidden = !canDelete || item.status === 'deleted';
-    deleteRequestButton.textContent = item.type === 'event' ? 'Delete Event' : item.type === 'post' ? 'Delete Feed' : `Delete ${item.type}`;
+    deleteRequestButton.hidden = currentRole !== 'dean' || item.status === 'deleted';
+    deleteRequestButton.textContent = item.type === 'event' ? 'Delete Event' : 'Delete Feed';
   }
   const returnToPrButton = document.getElementById('returnToPrBtn');
   const returnToEnglishButton = document.getElementById('returnToEnglishBtn');
@@ -182,16 +181,16 @@ function openDetails(item, context = 'pending') {
   const addCommentSection = document.createElement('section');
   addCommentSection.className = 'detail-item detail-wide add-comment';
   const addCommentHeading = document.createElement('h3');
-  addCommentHeading.textContent = canReturn ? 'Note for the committee receiving this event' : 'Add your comment';
+  addCommentHeading.textContent = currentRole === 'dean' && canReturn ? 'Note for the committee receiving this event' : 'Add your comment';
   const commentLabel = document.createElement('label');
   commentLabel.htmlFor = 'dialogComment';
-  commentLabel.textContent = canReturn ? 'Required note' : 'Comment';
+  commentLabel.textContent = currentRole === 'dean' && canReturn ? 'Required note' : 'Comment';
   commentLabel.style.cssText = 'display:block;margin-top:12px;font-weight:700';
   const commentInput = document.createElement('textarea');
   commentInput.id = 'dialogComment';
   commentInput.rows = 3;
   commentInput.maxLength = 2000;
-  commentInput.placeholder = (currentRole === 'dean' || currentRole === 'religion') && canReturn
+  commentInput.placeholder = currentRole === 'dean'
     ? 'Explain what PR or English needs to review. This note goes to that committee; the club only sees a return notification.'
     : 'Write a comment for the club';
   commentInput.style.cssText = 'width:100%;margin-top:6px;padding:10px 12px;border:1px solid #ddd;border-radius:12px;resize:vertical';
@@ -206,12 +205,12 @@ function openDetails(item, context = 'pending') {
   sendCommentButton.className = 'secondary-btn';
   sendCommentButton.textContent = 'Send Comment';
   sendCommentButton.style.marginTop = '8px';
-  sendCommentButton.hidden = statusContext && !['dean', 'religion'].includes(currentRole);
+  sendCommentButton.hidden = statusContext && currentRole !== 'dean';
   sendCommentButton.addEventListener('click', () => act(item, 'comment', true));
-  addCommentSection.hidden = statusContext && !canRestart && !['dean', 'religion'].includes(currentRole);
+  addCommentSection.hidden = statusContext && !canRestart && currentRole !== 'dean';
   addCommentSection.append(addCommentHeading, commentLabel, commentInput, sendCommentButton);
   requestDetails.append(addCommentSection);
-  if (currentRole === 'dean' || currentRole === 'religion') {
+  if (currentRole === 'dean') {
     const approvals = document.createElement('section');
     approvals.className = 'detail-item detail-wide';
     const approvalsHeading = document.createElement('h3');
@@ -310,7 +309,7 @@ async function loadRequests() {
         editButton.addEventListener('click', () => act(item, 'request_edit'));
         actions.append(editButton);
       }
-      if (currentRole === 'dean' || currentRole === 'pr' || currentRole === 'religion') {
+      if (currentRole === 'dean' || currentRole === 'pr') {
         const deleteBtn = document.createElement('button');
         deleteBtn.type = 'button'; deleteBtn.className = 'delete'; deleteBtn.textContent = 'Delete';
         deleteBtn.addEventListener('click', () => {
@@ -464,7 +463,7 @@ async function loadStatusOverview() {
       viewButton.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg><span>View Details</span>';
       viewButton.addEventListener('click', () => loadStatusDetails(item.id));
       actions.append(viewButton);
-      if (currentRole === 'dean' || currentRole === 'religion') {
+      if (currentRole === 'dean') {
         const historyButton = document.createElement('button');
         historyButton.type = 'button';
         historyButton.className = 'view-details';
@@ -472,7 +471,7 @@ async function loadStatusOverview() {
         historyButton.addEventListener('click', () => loadReviewHistory(item.id));
         actions.append(historyButton);
       }
-      if (currentRole === 'dean' || currentRole === 'pr' || currentRole === 'religion') {
+      if (currentRole === 'dean' || currentRole === 'pr') {
         const deleteBtn = document.createElement('button');
         deleteBtn.type = 'button';
         deleteBtn.className = 'delete';
