@@ -15,6 +15,32 @@ let activeDetailContext = 'pending';
 let currentRequests = [];
 let statusOverviewMode = 'all';
 
+const CONTENT_TYPE_LABELS = { event: 'Event', feed: 'Feed', sponsor: 'Sponsor', booth: 'Booth' };
+const CONTENT_ITEM_LABELS = { event: 'event', feed: 'feed post', sponsor: 'sponsor request', booth: 'booth request' };
+
+function contentTypeLabel(type) {
+  return CONTENT_TYPE_LABELS[type] || type || 'Content';
+}
+
+function contentItemLabel(item) {
+  return CONTENT_ITEM_LABELS[item?.type] || 'request';
+}
+
+function contentListDate(item) {
+  if (item?.type === 'booth') return item.boothOpenDate || item.date || '';
+  return item?.date || '';
+}
+
+function contentListMeta(item) {
+  if (item?.type === 'sponsor') {
+    return [item.clubName, contentTypeLabel(item.type), item.sponsorCompany, item.sponsorType, item.sponsorAmount].filter(Boolean).join(' · ');
+  }
+  if (item?.type === 'booth') {
+    return [item.clubName, contentTypeLabel(item.type), contentListDate(item), item.boothLocation].filter(Boolean).join(' · ');
+  }
+  return [item.clubName, contentTypeLabel(item.type), contentListDate(item) || 'no date', item.location].filter(Boolean).join(' · ');
+}
+
 async function ensureSession() {
   try {
     const response = await fetch('/api/club-auth/session');
@@ -109,7 +135,7 @@ function openDetails(item, context = 'pending') {
   const deleteRequestButton = document.getElementById('deleteRequestBtn');
   if (deleteRequestButton) {
     deleteRequestButton.hidden = currentRole !== 'dean' || item.status === 'deleted';
-    deleteRequestButton.textContent = item.type === 'event' ? 'Delete Event' : 'Delete Feed';
+    deleteRequestButton.textContent = `Delete ${contentTypeLabel(item.type)}`;
   }
   const returnToPrButton = document.getElementById('returnToPrBtn');
   const returnToEnglishButton = document.getElementById('returnToEnglishBtn');
@@ -118,20 +144,49 @@ function openDetails(item, context = 'pending') {
   document.getElementById('detailTitle').textContent = item.title || 'Untitled request';
   requestDetails.replaceChildren();
   addDetail('Club', item.clubName);
-  addDetail('Type', item.type);
-  addDetail('Date', item.date);
-  addDetail('Time', item.time);
-  addDetail('Location', item.location);
-  addDetail('Budget', item.budget);
+  addDetail('Type', contentTypeLabel(item.type));
+  if (item.type === 'sponsor') {
+    addDetail('Sponsor Name', item.sponsorName || item.title);
+    addDetail('Company Name', item.sponsorCompany);
+    addDetail('Contact Person', item.sponsorContact);
+    addDetail('Email', item.sponsorEmail);
+    addDetail('Phone Number', item.sponsorPhone);
+    addDetail('Sponsorship Type', item.sponsorType);
+    addDetail('Sponsorship Amount/Value', item.sponsorAmount);
+    addDetail('Sponsorship Benefits', item.sponsorBenefits, true);
+    addDetail('Description', item.sponsorDescription || item.description, true);
+    addDetail('Additional Notes', item.sponsorNotes, true);
+  } else if (item.type === 'booth') {
+    addDetail('Booth Name', item.boothName || item.title);
+    addDetail('Booth Purpose', item.boothPurpose, true);
+    addDetail('Description', item.boothDescription || item.description, true);
+    addDetail('Preferred Location', item.boothLocation);
+    addDetail('Booth Size', item.boothSize);
+    addDetail('Required Equipment', item.boothEquipment, true);
+    addDetail('Setup Date', item.boothSetupDate);
+    addDetail('Opening Date', item.boothOpenDate);
+    addDetail('Closing Date', item.boothCloseDate);
+    addDetail('Contact Person', item.boothContact);
+    addDetail('Additional Notes', item.boothNotes, true);
+  } else {
+    addDetail('Date', item.date);
+    addDetail('Time', item.time);
+    addDetail('Location', item.location);
+    addDetail('Budget', item.budget);
+  }
   addDetail('Status', formatStatus(item.status));
-  addDetail('Description', item.description, true);
+  if (item.type !== 'sponsor' && item.type !== 'booth') {
+    addDetail('Description', item.description, true);
+  }
 
   const attachment = document.createElement('section');
   attachment.className = 'detail-item detail-wide';
   const heading = document.createElement('h3');
   heading.textContent = 'Attachments';
   attachment.append(heading);
+  let hasAttachments = false;
   if (item.image) {
+    hasAttachments = true;
     const link = document.createElement('a');
     link.href = item.image;
     link.target = '_blank';
@@ -142,7 +197,30 @@ function openDetails(item, context = 'pending') {
     image.alt = 'Request attachment';
     image.className = 'detail-attachment';
     attachment.append(link, image);
-  } else {
+  }
+  if (item.type === 'sponsor' && item.sponsorLogo) {
+    hasAttachments = true;
+    const logoLink = document.createElement('a');
+    logoLink.href = item.sponsorLogo;
+    logoLink.target = '_blank';
+    logoLink.rel = 'noopener noreferrer';
+    logoLink.textContent = 'Open company logo';
+    const logo = document.createElement('img');
+    logo.src = item.sponsorLogo;
+    logo.alt = 'Company logo';
+    logo.className = 'detail-attachment';
+    attachment.append(logoLink, logo);
+  }
+  if (item.type === 'sponsor' && item.sponsorAttachment) {
+    hasAttachments = true;
+    const agreement = document.createElement('a');
+    agreement.href = item.sponsorAttachment;
+    agreement.target = '_blank';
+    agreement.rel = 'noopener noreferrer';
+    agreement.textContent = 'Open agreement / attachment';
+    attachment.append(agreement);
+  }
+  if (!hasAttachments) {
     const empty = document.createElement('p');
     empty.textContent = 'No attachments';
     attachment.append(empty);
@@ -181,7 +259,7 @@ function openDetails(item, context = 'pending') {
   const addCommentSection = document.createElement('section');
   addCommentSection.className = 'detail-item detail-wide add-comment';
   const addCommentHeading = document.createElement('h3');
-  addCommentHeading.textContent = currentRole === 'dean' && canReturn ? 'Note for the committee receiving this event' : 'Add your comment';
+  addCommentHeading.textContent = currentRole === 'dean' && canReturn ? 'Note for the committee receiving this request' : 'Add your comment';
   const commentLabel = document.createElement('label');
   commentLabel.htmlFor = 'dialogComment';
   commentLabel.textContent = currentRole === 'dean' && canReturn ? 'Required note' : 'Comment';
@@ -288,7 +366,7 @@ async function loadRequests() {
       title.textContent = item.title || 'Untitled request';
       const meta = document.createElement('div');
       meta.className = 'req-meta';
-      meta.textContent = [item.clubName, item.type, item.date || 'no date', item.location].filter(Boolean).join(' · ');
+      meta.textContent = contentListMeta(item);
       const actions = document.createElement('div');
       actions.className = 'req-actions';
       const comment = document.createElement('input');
@@ -313,7 +391,7 @@ async function loadRequests() {
         const deleteBtn = document.createElement('button');
         deleteBtn.type = 'button'; deleteBtn.className = 'delete'; deleteBtn.textContent = 'Delete';
         deleteBtn.addEventListener('click', () => {
-          if (confirm('Are you sure you want to delete this event? It will be removed from the homepage and events page.')) {
+          if (confirm(`Are you sure you want to delete this ${contentItemLabel(item)}? It will be removed from the published content.`)) {
             act(item, 'delete');
           }
         });
@@ -352,8 +430,8 @@ async function loadRequests() {
 async function showStatusOverview() {
   if (!statusOverviewDialog || !statusOverviewList) return;
   statusOverviewMode = 'all';
-  document.getElementById('statusOverviewTitle').textContent = 'All Events Status';
-  statusOverviewList.textContent = 'Loading event statuses…';
+  document.getElementById('statusOverviewTitle').textContent = 'All Requests Status';
+  statusOverviewList.textContent = 'Loading request statuses…';
   statusOverviewDialog.showModal();
   await loadStatusOverview();
 }
@@ -362,7 +440,7 @@ async function showRestartOverview() {
   if (!statusOverviewDialog || !statusOverviewList) return;
   statusOverviewMode = 'restartable';
   document.getElementById('statusOverviewTitle').textContent = 'Restart Review';
-  statusOverviewList.textContent = 'Loading events…';
+  statusOverviewList.textContent = 'Loading requests…';
   statusOverviewDialog.showModal();
   await loadStatusOverview();
 }
@@ -372,13 +450,13 @@ async function loadStatusOverview() {
   try {
     const response = await fetch('/api/committee/status', { cache: 'no-store' });
     let items = await response.json();
-    if (!response.ok) throw new Error(items.message || 'Could not load event statuses.');
+    if (!response.ok) throw new Error(items.message || 'Could not load request statuses.');
     if (statusOverviewMode === 'restartable') {
       items = items.filter((item) => !['draft', 'changes_requested', 'pending_english'].includes(item.status));
     }
     statusOverviewList.replaceChildren();
     if (!items.length) {
-      statusOverviewList.textContent = statusOverviewMode === 'restartable' ? 'No events are available to restart right now.' : 'No requests yet.';
+      statusOverviewList.textContent = statusOverviewMode === 'restartable' ? 'No requests are available to restart right now.' : 'No requests yet.';
       return;
     }
     const labels = {
@@ -395,9 +473,11 @@ async function loadStatusOverview() {
     for (const item of items) {
       const row = document.createElement('article');
       row.className = 'req-card';
-      if (item.image) {
+      const rowImage = item.image || (item.type === 'sponsor' ? item.sponsorLogo : '');
+      if (!rowImage) row.classList.add('no-image');
+      if (rowImage) {
         const image = document.createElement('img');
-        image.src = item.image;
+        image.src = rowImage;
         image.alt = '';
         row.append(image);
       }
@@ -407,15 +487,12 @@ async function loadStatusOverview() {
       title.textContent = item.title || 'Untitled request';
       const meta = document.createElement('div');
       meta.className = 'status-overview-meta';
-      meta.textContent = [item.clubName, item.type, item.date, item.time].filter(Boolean).join(' · ');
+      meta.textContent = contentListMeta(item);
       details.append(title, meta);
       const status = document.createElement('span');
       status.className = `status-overview-pill ${item.status || ''}`;
       status.textContent = labels[item.status] || formatStatus(item.status);
       details.append(status);
-      if (item.clubNotice) {
-        const notice = document.createElement('p'); notice.className = 'status-overview-meta'; notice.textContent = item.clubNotice; details.append(notice);
-      }
       const activeComment = getActiveComment(item);
       if (activeComment) {
         const note = document.createElement('p');
@@ -477,7 +554,7 @@ async function loadStatusOverview() {
         deleteBtn.className = 'delete';
         deleteBtn.textContent = 'Delete';
         deleteBtn.addEventListener('click', () => {
-          if (confirm('Are you sure you want to delete this event? It will be removed from the homepage and events page.')) {
+          if (confirm(`Are you sure you want to delete this ${contentItemLabel(item)}? It will be removed from the published content.`)) {
             fetch(`/api/committee/requests/${item.id}/action`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -503,25 +580,25 @@ async function loadStatusOverview() {
 
 function displayAction(action) {
   return ({
-    submitted: 'Submitted the event',
-    resubmitted: 'Resubmitted the event',
-    approve: 'Approved the event',
-    reject: 'Rejected the event',
+    submitted: 'Submitted the request',
+    resubmitted: 'Resubmitted the request',
+    approve: 'Approved the request',
+    reject: 'Rejected the request',
     request_edit: 'Requested edits',
     restarted_review: 'Restarted review',
-    returned_to_pr: 'Returned the event to PR review',
-    returned_to_english: 'Returned the event to English review',
+    returned_to_pr: 'Returned the request to PR review',
+    returned_to_english: 'Returned the request to English review',
     comment: 'Added a comment',
     comment_deleted: 'Deleted a comment',
-    deleted: 'Deleted the event or feed post'
-  })[action] || String(action || 'Updated the event').replaceAll('_', ' ');
+    deleted: 'Deleted the request'
+  })[action] || String(action || 'Updated the request').replaceAll('_', ' ');
 }
 
 async function deleteDeanContent() {
   if (!activeRequest) return;
   const item = activeRequest;
-  const itemLabel = item.type === 'event' ? 'event' : 'feed post';
-  if (!confirm(`Delete this ${itemLabel}? It will be removed from the club feed, and its review history will be kept.`)) return;
+  const itemLabel = contentItemLabel(item);
+  if (!confirm(`Delete this ${itemLabel}? It will be removed from the published content, and its review history will be kept.`)) return;
   const button = document.getElementById('deleteRequestBtn');
   button.disabled = true;
   try {
@@ -564,10 +641,10 @@ function openHistoryReturn(role) {
   const targetName = role === 'pr' ? 'PR' : 'English';
   const panel = document.getElementById('historyReturnPanel');
   const available = ['pending_dean', 'published'].includes(activeReviewHistoryItem?.status);
-  document.getElementById('historyReturnTitle').textContent = `Return event to ${targetName}`;
+  document.getElementById('historyReturnTitle').textContent = `Return request to ${targetName}`;
   document.getElementById('historyReturnHelp').textContent = available
-    ? `Write the required note for ${targetName}. The committee will see it; the club will only be notified that the event was returned.`
-    : 'The event can be returned after it reaches Dean review.';
+    ? `Write the required note for ${targetName}. The committee will see it; the club will only be notified that the request was returned.`
+    : 'The request can be returned after it reaches Dean review.';
   document.getElementById('historyReturnComment').value = '';
   document.getElementById('submitHistoryReturnBtn').textContent = `Send back to ${targetName}`;
   document.getElementById('submitHistoryReturnBtn').disabled = !available || !document.getElementById('historyReturnComment').value.trim();
@@ -576,7 +653,7 @@ function openHistoryReturn(role) {
 }
 
 function renderReviewHistory(item) {
-  document.getElementById('reviewHistoryTitle').textContent = `Review All Edits · ${item.title || 'Untitled event'}`;
+  document.getElementById('reviewHistoryTitle').textContent = `Review All Edits · ${item.title || 'Untitled request'}`;
   reviewHistoryList.replaceChildren();
   let events = Array.isArray(item.workflowHistory) ? [...item.workflowHistory] : [];
   if (!events.length && item.submittedAt) {
@@ -588,7 +665,7 @@ function renderReviewHistory(item) {
   }
   events.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
   if (!events.length) {
-    const empty = document.createElement('p'); empty.textContent = 'No review history is recorded for this event yet.'; reviewHistoryList.append(empty); return;
+    const empty = document.createElement('p'); empty.textContent = 'No review history is recorded for this request yet.'; reviewHistoryList.append(empty); return;
   }
   const roles = { club: 'Club', pr: 'PR Committee', english: 'English Committee', dean: 'Religion Committee (Dean)', system: 'Workflow' };
   for (const event of events) {
@@ -608,7 +685,7 @@ function renderReviewHistory(item) {
       for (const [role, label] of [['pr', 'Review PR'], ['english', 'Review English']]) {
         const button = document.createElement('button'); button.type = 'button'; button.textContent = label;
         button.disabled = !['pending_dean', 'published'].includes(item.status);
-        button.title = button.disabled ? 'Available after the event reaches Dean review' : `Return the event to ${label.replace('Review ', '')} with a comment`;
+        button.title = button.disabled ? 'Available after the request reaches Dean review' : `Return the request to ${label.replace('Review ', '')} with a comment`;
         button.addEventListener('click', () => openHistoryReturn(role));
         reviewLinks.append(button);
       }
@@ -660,7 +737,7 @@ async function submitHistoryReturn() {
   const comment = document.getElementById('historyReturnComment')?.value.trim() || '';
   if (!item || !historyReturnTarget) return;
   if (!comment) {
-    alert('Write why the event is being returned to the department.');
+    alert('Write why the request is being returned to the department.');
     return;
   }
   const button = document.getElementById('submitHistoryReturnBtn');
@@ -672,7 +749,7 @@ async function submitHistoryReturn() {
       body: JSON.stringify({ target: historyReturnTarget, comment })
     });
     const result = await response.json();
-    if (!response.ok) throw new Error(result.message || 'Could not return the event.');
+    if (!response.ok) throw new Error(result.message || 'Could not return the request.');
     reviewHistoryDialog.close();
     activeReviewHistoryItem = null;
     historyReturnTarget = '';
@@ -730,7 +807,7 @@ async function returnToCommittee(targetRole, actionButton) {
   if (!activeRequest) return;
   const comment = document.getElementById('dialogComment')?.value.trim() || '';
   if (!comment) {
-    alert('Add a comment explaining why the event is being returned.');
+    alert('Add a comment explaining why the request is being returned.');
     return;
   }
   actionButton.disabled = true;
@@ -741,7 +818,7 @@ async function returnToCommittee(targetRole, actionButton) {
       body: JSON.stringify({ target: targetRole, comment })
     });
     const result = await response.json();
-    if (!response.ok) throw new Error(result.message || 'Could not return the event.');
+    if (!response.ok) throw new Error(result.message || 'Could not return the request.');
     requestDialog.close();
     activeRequest = null;
     await loadRequests();

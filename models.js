@@ -8,6 +8,14 @@ const applicationFieldSchema = new mongoose.Schema({
   options: { type: [String], default: [] }
 }, { _id: false });
 
+const clubMemberSchema = new mongoose.Schema({
+  id: { type: String, required: true },
+  name: { type: String, required: true, trim: true, maxlength: 120 },
+  committee: { type: String, required: true, trim: true, maxlength: 100 },
+  position: { type: String, required: true, trim: true, maxlength: 100 },
+  memberType: { type: String, enum: ['new', 'senior'], required: true }
+}, { _id: false, timestamps: true });
+
 const clubSchema = new mongoose.Schema({
   id: { type: Number, required: true, unique: true, index: true },
   sortOrder: { type: Number, required: true, default: 0, index: true },
@@ -22,6 +30,7 @@ const clubSchema = new mongoose.Schema({
   pinned: { type: Boolean, default: false },
   seats: { type: Number, min: 0, default: 0 },
   members: { type: Number, min: 0, default: 0 },
+  memberRoster: { type: [clubMemberSchema], default: [] },
   applicants: { type: Number, min: 0, default: 0 },
   description: { type: String, required: true },
   requirements: { type: String, required: true },
@@ -29,7 +38,9 @@ const clubSchema = new mongoose.Schema({
   applicationFields: { type: [applicationFieldSchema], default: [] },
   interviewForms: { type: [mongoose.Schema.Types.Mixed], default: [] },
   events: { type: [mongoose.Schema.Types.Mixed], default: [] },
-  posts: { type: [mongoose.Schema.Types.Mixed], default: [] }
+  posts: { type: [mongoose.Schema.Types.Mixed], default: [] },
+  sponsors: { type: [mongoose.Schema.Types.Mixed], default: [] },
+  booths: { type: [mongoose.Schema.Types.Mixed], default: [] }
 }, { timestamps: true });
 
 const applicationSchema = new mongoose.Schema({
@@ -73,7 +84,7 @@ const contentRequestSchema = new mongoose.Schema({
   id: { type: Number, required: true, unique: true, index: true },
   clubId: { type: Number, required: true, index: true },
   clubName: { type: String, default: '' },
-  type: { type: String, enum: ['post', 'event'], required: true },
+  type: { type: String, enum: ['event', 'feed', 'sponsor', 'booth'], required: true },
   title: { type: String, required: true, trim: true },
   description: { type: String, default: '' },
   date: { type: String, default: '' },
@@ -81,6 +92,29 @@ const contentRequestSchema = new mongoose.Schema({
   location: { type: String, default: '' },
   budget: { type: String, default: '' },
   image: { type: String, default: '' },
+  sponsorName: { type: String, default: '' },
+  sponsorCompany: { type: String, default: '' },
+  sponsorContact: { type: String, default: '' },
+  sponsorEmail: { type: String, default: '' },
+  sponsorPhone: { type: String, default: '' },
+  sponsorType: { type: String, default: '' },
+  sponsorAmount: { type: String, default: '' },
+  sponsorBenefits: { type: String, default: '' },
+  sponsorDescription: { type: String, default: '' },
+  sponsorLogo: { type: String, default: '' },
+  sponsorAttachment: { type: String, default: '' },
+  sponsorNotes: { type: String, default: '' },
+  boothName: { type: String, default: '' },
+  boothPurpose: { type: String, default: '' },
+  boothDescription: { type: String, default: '' },
+  boothLocation: { type: String, default: '' },
+  boothSize: { type: String, default: '' },
+  boothEquipment: { type: String, default: '' },
+  boothSetupDate: { type: String, default: '' },
+  boothOpenDate: { type: String, default: '' },
+  boothCloseDate: { type: String, default: '' },
+  boothContact: { type: String, default: '' },
+  boothNotes: { type: String, default: '' },
   status: { type: String, enum: ['draft', 'pending_pr', 'pending_english', 'pending_dean', 'changes_requested', 'rejected', 'published', 'deleted'], default: 'draft', index: true },
   resubmitTo: { type: String, enum: ['pending_pr', 'pending_english'], default: 'pending_pr' },
   editRequestedBy: { type: String, enum: ['', 'pr', 'english'], default: '' },

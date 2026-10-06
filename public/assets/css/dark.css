@@ -1,5 +1,5 @@
 /* Final dark palette overrides, kept after responsive rules. */
-:root[data-theme="dark"] body { background: #111315 !important; color: #f3f4f6; }
+:root[data-theme="dark"] body { background: #111111 !important; color: #f3f4f6; }
 :root[data-theme="dark"] .brand-banner { background: #fff !important; }
 :root[data-theme="dark"] .brand-mark {
   width: 190px !important;
@@ -48,7 +48,7 @@
 :root[data-theme="dark"] .admin-club-row,
 :root[data-theme="dark"] .admin-editor-form,
 :root[data-theme="dark"] .section,
-:root[data-theme="dark"] .record { background: #1b1e21 !important; color: #f3f4f6; border-color: rgba(255,255,255,.15); }
+:root[data-theme="dark"] .record { background: #202020 !important; color: #f3f4f6; border-color: rgba(255,255,255,.15); }
 :root[data-theme="dark"] .field-group input,
 :root[data-theme="dark"] .field-group select,
 :root[data-theme="dark"] .field-group textarea,
@@ -58,8 +58,8 @@
 :root[data-theme="dark"] .committee-head-edit-form input,
 :root[data-theme="dark"] .admin-editor-form input,
 :root[data-theme="dark"] .admin-editor-form select,
-:root[data-theme="dark"] .admin-editor-form textarea { background: #141719 !important; color: #f3f4f6; border-color: rgba(255,255,255,.18); }
-:root[data-theme="dark"] .brand-wrap { background: #1b1e21; color: #f3f4f6; }
+:root[data-theme="dark"] .admin-editor-form textarea { background: #181818 !important; color: #f3f4f6; border-color: rgba(255,255,255,.18); }
+:root[data-theme="dark"] .brand-wrap { background: #202020; color: #f3f4f6; }
 :root[data-theme="dark"] .record-title,
 :root[data-theme="dark"] .applicant-head,
 :root[data-theme="dark"] .field-value,
@@ -73,7 +73,7 @@
 :root[data-theme="dark"] .detail-requirements p,
 :root[data-theme="dark"] .details-section p { color: #c0c4c9; }
 :root[data-theme="dark"] .detail-requirements,
-:root[data-theme="dark"] .details-section { background: #202428 !important; color: #f3f4f6; border-color: rgba(255,255,255,.15); }
+:root[data-theme="dark"] .details-section { background: #292929 !important; color: #f3f4f6; border-color: rgba(255,255,255,.15); }
 :root[data-theme="dark"] .detail-requirements p,
 :root[data-theme="dark"] .details-section p { color: #c0c4c9 !important; }
 

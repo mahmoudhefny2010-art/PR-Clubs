@@ -1,14 +1,136 @@
 document.addEventListener('DOMContentLoaded', () => {
+  const validateDataEntryForm = (form) => {
+    if (!form) return true;
+    let firstInvalid = null;
+    for (const field of form.querySelectorAll('input, select, textarea')) {
+      field.setCustomValidity('');
+      const value = String(field.value || '');
+      const trimmed = value.trim();
+      let message = '';
+      if (field.required && !trimmed && field.type !== 'file') message = 'This field is required.';
+      if (!message && field.required && field.type === 'file' && !field.files.length) message = 'This field is required.';
+      if (!message && trimmed && /(?:phone|tel)/i.test(`${field.name} ${field.id}`)) {
+        const digits = value.replace(/\D/g, '');
+        if (digits.length < 7 || digits.length > 15) message = 'Please enter a valid phone number.';
+      }
+      if (!message && trimmed && /(?:^|[-_ ])age(?:$|[-_ ])/i.test(`${field.name} ${field.id}`)
+        && (!/^\d{1,3}$/.test(trimmed) || Number(trimmed) < 16 || Number(trimmed) > 100)) {
+        message = 'Please enter a valid age between 16 and 100.';
+      }
+      if (!message && trimmed && /(?:first.?name|last.?name|regName|contact)/i.test(`${field.name} ${field.id}`)
+        && !/^[\p{L}\p{M}\s.'’\-]+$/u.test(trimmed)) message = 'Numbers and inappropriate characters are not allowed in this field.';
+      if (!message && trimmed && field.type === 'email' && !field.validity.valid) message = 'Please enter a valid email address.';
+      if (message) {
+        field.setCustomValidity(message);
+        firstInvalid ||= field;
+      }
+    }
+    const setupDate = form.querySelector('#boothSetupDateInput')?.value;
+    const openDate = form.querySelector('#boothOpenDateInput')?.value;
+    const closeDate = form.querySelector('#boothCloseDateInput')?.value;
+    if (openDate && closeDate && closeDate < openDate) {
+      const field = form.querySelector('#boothCloseDateInput');
+      field.setCustomValidity('Closing date must be on or after the opening date.');
+      firstInvalid ||= field;
+    } else if (setupDate && openDate && openDate < setupDate) {
+      const field = form.querySelector('#boothOpenDateInput');
+      field.setCustomValidity('Opening date must be on or after the setup date.');
+      firstInvalid ||= field;
+    }
+    if (firstInvalid) {
+      firstInvalid.reportValidity();
+      const feedback = form.querySelector('[aria-live], #formFeedback, #applicationFeedback');
+      if (feedback) feedback.textContent = firstInvalid.validationMessage;
+      return false;
+    }
+    if (!form.checkValidity()) {
+      form.reportValidity();
+      return false;
+    }
+    return true;
+  };
+  window.validateDataEntryForm = validateDataEntryForm;
+  document.addEventListener('input', (event) => {
+    if (event.target.matches('input, textarea, select')) event.target.setCustomValidity('');
+  }, true);
+  document.addEventListener('submit', (event) => {
+    if (!validateDataEntryForm(event.target)) event.preventDefault();
+  }, true);
+
   const inject = async (id, url) => {
     const el = document.getElementById(id);
     if (!el) return;
     try {
       const res = await fetch(url, { cache: 'no-store' });
-      if (res.ok) el.innerHTML = await res.text();
+      if (res.ok) {
+        el.innerHTML = await res.text();
+        if (id === 'site-header') {
+          initHeader();
+        }
+      }
     } catch (error) {
       // leave placeholder if component cannot be loaded
     }
   };
+
+  const initHeader = () => {
+    // 1. Highlight active navigation link
+    const path = window.location.pathname;
+    const navLinks = document.querySelectorAll('#navLinks .nav-link');
+    navLinks.forEach((link) => {
+      const href = link.getAttribute('href');
+      if (href === '/' && (path === '/' || path === '/index.html')) {
+        link.classList.add('active');
+      } else if (href !== '/' && path.startsWith(href)) {
+        link.classList.add('active');
+      } else {
+        link.classList.remove('active');
+      }
+    });
+
+    // 2. Mobile Menu Toggle
+    const mobileToggle = document.getElementById('mobileMenuToggle');
+    const navMenu = document.getElementById('navLinks');
+    if (mobileToggle && navMenu) {
+      mobileToggle.addEventListener('click', () => {
+        const isOpen = navMenu.classList.toggle('open');
+        mobileToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        const iconMenu = mobileToggle.querySelector('.icon-menu');
+        const iconClose = mobileToggle.querySelector('.icon-close');
+        if (iconMenu && iconClose) {
+          iconMenu.classList.toggle('hidden', isOpen);
+          iconClose.classList.toggle('hidden', !isOpen);
+        }
+      });
+    }
+
+    // 3. Update Auth button if user session cookie is detected
+    const authBtn = document.getElementById('headerAuthBtn');
+    if (authBtn) {
+      // Check if cookies contain club or admin session
+      const cookies = document.cookie || '';
+      if (cookies.includes('miu_club=') || cookies.includes('miu_admin=')) {
+        authBtn.href = cookies.includes('miu_admin=') ? '/#adminView' : '/#headDashboardView';
+        const span = authBtn.querySelector('span');
+        if (span) span.textContent = 'Dashboard';
+      }
+    }
+  };
+
+  // Close open modals on Escape key press
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const activeModal = document.querySelector('.modal:not(.hidden), .calendar-modal:not(.hidden), dialog[open]');
+      if (activeModal) {
+        if (typeof activeModal.close === 'function' && activeModal.tagName === 'DIALOG') {
+          activeModal.close();
+        } else {
+          activeModal.classList.add('hidden');
+        }
+      }
+    }
+  });
+
   inject('site-header', '/components/site-header.html');
   inject('site-footer', '/components/site-footer.html');
 });

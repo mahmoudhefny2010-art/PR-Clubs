@@ -10,8 +10,8 @@ const pub = path.join(root, 'public');
 
 // Expected content hashes of the concatenated split bundles.
 // If these change, the CSS/JS modules were edited — update the hash on purpose.
-const EXPECTED_CSS_HASH = 'a9d81dad3a03c347c41348c41ca60801f97ab54dc56c60a81edb838522ea3ccb';
-const EXPECTED_JS_HASH = 'df366b2a91f3d0e68034fb87c967800b984825bbbe59141ce5b8ba3c4de30c20';
+const EXPECTED_CSS_HASH = 'a5485a40c164a6cdfd3b7b27f5f6f67bd02734b906419c04197d6087d02f1643';
+const EXPECTED_JS_HASH = '793efc4e785967d28501d03c4220279182a8914b40fd854f91d399f50eca1990';
 
 const CSS_FILES = ['base.css', 'responsive.css', 'dark.css', 'features.css'];
 const JS_FILES = ['app-home.js', 'app-admin.js', 'app-dashboard.js'];
@@ -88,11 +88,14 @@ console.log('Header/footer placeholders + layout.js present on every page ✓');
   const checks = [
     '/', '/pages/club-content.html?embed=1', '/pages/applicant-login.html', '/pages/events.html',
     '/pages/events.html?club=2&event=0',
+    '/pages/event-form.html', '/pages/feed-form.html', '/pages/sponsor-form.html', '/pages/booth-form.html',
+    '/pages/sponsors.html', '/pages/booths.html',
     '/dashboards/pr-dashboard.html', '/dashboards/english-dashboard.html', '/dashboards/dean-dashboard.html',
     '/assets/css/base.css', '/assets/css/responsive.css', '/assets/css/dark.css', '/assets/css/features.css',
     '/assets/css/pages/events.css',
     '/assets/js/app-home.js', '/assets/js/app-admin.js', '/assets/js/app-dashboard.js',
-    '/assets/js/pages/events.js',
+    '/assets/js/content-studio.js',
+    '/assets/js/pages/events.js', '/assets/js/pages/sponsors.js', '/assets/js/pages/booths.js',
     '/assets/js/layout.js', '/assets/js/theme.js',
     '/components/site-header.html', '/components/site-footer.html',
     '/assets/img/pics/logo.svg.png', '/assets/img/pics/mun.jpg',

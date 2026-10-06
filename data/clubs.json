@@ -49,7 +49,9 @@
         "title": "Latest updates",
         "image": "/assets/img/pics/Utopia.jpg"
       }
-    ]
+    ],
+    "sponsors": [],
+    "booths": []
   },
   {
     "id": 6,
@@ -98,7 +100,12 @@
         "title": "Latest updates",
         "image": "/assets/img/pics/acpc.jpg"
       }
-    ]
+    ],
+    "imagePublicId": "",
+    "applicationIntro": "",
+    "applicationFields": [],
+    "sponsors": [],
+    "booths": []
   },
   {
     "id": 2,
@@ -147,7 +154,12 @@
         "title": "Latest updates",
         "image": "/assets/img/pics/mun.jpg"
       }
-    ]
+    ],
+    "imagePublicId": "",
+    "applicationIntro": "",
+    "applicationFields": [],
+    "sponsors": [],
+    "booths": []
   },
   {
     "id": 5,
@@ -196,7 +208,12 @@
         "title": "Latest updates",
         "image": "/assets/img/pics/ieee.jpg"
       }
-    ]
+    ],
+    "imagePublicId": "",
+    "applicationIntro": "",
+    "applicationFields": [],
+    "sponsors": [],
+    "booths": []
   },
   {
     "id": 3,
@@ -245,7 +262,12 @@
         "title": "Latest updates",
         "image": "/assets/img/pics/cdc.jpg"
       }
-    ]
+    ],
+    "imagePublicId": "",
+    "applicationIntro": "",
+    "applicationFields": [],
+    "sponsors": [],
+    "booths": []
   },
   {
     "id": 7,
@@ -294,7 +316,12 @@
         "title": "Latest updates",
         "image": "/assets/img/pics/tuners.jpg"
       }
-    ]
+    ],
+    "imagePublicId": "",
+    "applicationIntro": "",
+    "applicationFields": [],
+    "sponsors": [],
+    "booths": []
   },
   {
     "id": 10,
@@ -343,7 +370,12 @@
         "title": "Latest updates",
         "image": "/assets/img/pics/gamerslegacy.jpg"
       }
-    ]
+    ],
+    "imagePublicId": "",
+    "applicationIntro": "",
+    "applicationFields": [],
+    "sponsors": [],
+    "booths": []
   },
   {
     "id": 9,
@@ -392,7 +424,12 @@
         "title": "Latest updates",
         "image": "/assets/img/pics/msp.jpg"
       }
-    ]
+    ],
+    "imagePublicId": "",
+    "applicationIntro": "",
+    "applicationFields": [],
+    "sponsors": [],
+    "booths": []
   },
   {
     "id": 11,
@@ -441,7 +478,12 @@
         "title": "Latest updates",
         "image": "/assets/img/pics/ihepc.jpg"
       }
-    ]
+    ],
+    "imagePublicId": "",
+    "applicationIntro": "",
+    "applicationFields": [],
+    "sponsors": [],
+    "booths": []
   },
   {
     "id": 12,
@@ -490,7 +532,12 @@
         "title": "Latest updates",
         "image": "/assets/img/pics/tedx.jpg"
       }
-    ]
+    ],
+    "imagePublicId": "",
+    "applicationIntro": "",
+    "applicationFields": [],
+    "sponsors": [],
+    "booths": []
   },
   {
     "id": 4,
@@ -539,7 +586,12 @@
         "title": "Latest updates",
         "image": "/assets/img/pics/dimas.jpg"
       }
-    ]
+    ],
+    "imagePublicId": "",
+    "applicationIntro": "",
+    "applicationFields": [],
+    "sponsors": [],
+    "booths": []
   },
   {
     "id": 8,
@@ -588,6 +640,11 @@
         "title": "Latest updates",
         "image": "/assets/img/pics/theater.jpg"
       }
-    ]
+    ],
+    "imagePublicId": "",
+    "applicationIntro": "",
+    "applicationFields": [],
+    "sponsors": [],
+    "booths": []
   }
 ]

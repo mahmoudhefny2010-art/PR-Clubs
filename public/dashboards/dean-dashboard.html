@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Committee Review</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/assets/css/base.css?v=20261005h" />
+    <link rel="stylesheet" href="/assets/css/base.css?v=20261007d" />
     <link rel="stylesheet" href="/assets/css/responsive.css?v=20261005h" />
-    <link rel="stylesheet" href="/assets/css/dark.css?v=20261005h" />
+    <link rel="stylesheet" href="/assets/css/dark.css?v=20261007b" />
     <link rel="stylesheet" href="/assets/css/features.css?v=20261005h" />
     <link rel="icon" href="/assets/img/pics/logo.svg.png" type="image/png">
     <style>
@@ -26,6 +26,8 @@
       .req-actions .view-details { display: inline-flex; align-items: center; gap: 6px; }
       .req-actions .view-details svg { width: 15px; height: 15px; }
       .request-dialog { width: min(680px, calc(100% - 28px)); max-height: min(82vh, 800px); padding: 0; border: 0; border-radius: 20px; box-shadow: 0 24px 80px #0004; }
+      .request-dialog, .status-overview-dialog, .review-history-dialog { color-scheme: light; background: #fff; color: #111827; }
+      :root[data-theme="dark"] .request-dialog, :root[data-theme="dark"] .status-overview-dialog, :root[data-theme="dark"] .review-history-dialog { color-scheme: dark; background: #202020; color: #f3f4f6; }
       .request-dialog::backdrop { background: #1119; backdrop-filter: blur(3px); }
       .request-dialog-inner { padding: 24px; }
       .request-dialog-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
@@ -49,8 +51,11 @@
       .status-overview-dialog::backdrop { background: #1119; backdrop-filter: blur(3px); }
       .status-overview-inner { padding: 24px; }
       .status-overview-list { display: grid; gap: 10px; max-height: 60vh; margin-top: 18px; overflow: auto; }
-      .status-overview-list .req-card { align-items: center; }
-      .status-overview-list .req-actions { flex: 0 0 auto; margin-top: 0; }
+      .status-overview-list .req-card { align-items: center; padding: 11px; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+      .status-overview-list .req-card > img { flex: 0 0 90px; }
+      .status-overview-list .req-card.no-image::before { content: ""; flex: 0 0 90px; width: 90px; height: 90px; }
+      .status-overview-list .req-card > div:not(.req-actions) { min-width: 0; }
+      .status-overview-list .req-actions { flex: 1 0 100%; margin-top: 0; }
       .status-overview-list .req-actions .reopen-review { background: #eef2ff; border-color: #a5b4fc; color: #3730a3; }
       .status-overview-meta { color: #6b7280; font-size: .85rem; margin-top: 4px; }
       .status-overview-pill { display: inline-block; margin-top: 5px; border-radius: 999px; padding: 5px 10px; background: #fff1d5; color: #92400e; font-size: .72rem; font-weight: 800; text-transform: uppercase; }
@@ -97,7 +102,7 @@
           </div>
           <div class="top-actions">
             <a class="secondary-btn" href="/">Back</a>
-            <button id="openStatusOverviewBtn" class="secondary-btn" type="button">All Events Status</button>
+            <button id="openStatusOverviewBtn" class="secondary-btn" type="button">All Requests</button>
             <button id="logoutBtn" class="logout-btn" type="button">Logout</button>
           </div>
         </div>
@@ -108,16 +113,15 @@
     </main>
     <dialog id="requestDialog" class="request-dialog" aria-labelledby="detailTitle">
       <div class="request-dialog-inner">
-        <div class="request-dialog-head"><div><div class="committee-label">REQUEST DETAILS</div><h2 id="detailTitle"></h2></div></div>
+        <div class="request-dialog-head"><div><div class="committee-label">REQUEST DETAILS</div><h2 id="detailTitle"></h2></div><button type="button" id="detailsCancelBtn" class="request-dialog-close" aria-label="Close request details">×</button></div>
         <div id="requestDetails" class="detail-grid"></div>
-        <div class="dialog-actions"><button type="button" id="detailsCancelBtn">Close</button><button id="dialogApproveBtn" class="approve" data-dialog-action="approve">Accept</button><button id="dialogRejectBtn" class="reject" data-dialog-action="reject">Reject</button><button id="requestChangesBtn" class="changes" data-dialog-action="request_edit" hidden>Request Edit</button><button id="reopenRequestBtn" class="reopen-review" type="button" hidden>Restart Review</button><button id="returnToPrBtn" class="return-review" type="button" hidden>Send back to PR</button><button id="returnToEnglishBtn" class="return-review" type="button" hidden>Send back to English</button><button id="deleteRequestBtn" class="delete-request" type="button" hidden>Delete</button></div>
+        <div class="dialog-actions"><button id="dialogApproveBtn" class="approve" data-dialog-action="approve">Accept</button><button id="dialogRejectBtn" class="reject" data-dialog-action="reject">Reject</button><button id="requestChangesBtn" class="changes" data-dialog-action="request_edit" hidden>Request Edit</button><button id="reopenRequestBtn" class="reopen-review" type="button" hidden>Restart Review</button><button id="returnToPrBtn" class="return-review" type="button" hidden>Send back to PR</button><button id="returnToEnglishBtn" class="return-review" type="button" hidden>Send back to English</button><button id="deleteRequestBtn" class="delete-request" type="button" hidden>Delete</button></div>
       </div>
     </dialog>
     <dialog id="statusOverviewDialog" class="status-overview-dialog" aria-labelledby="statusOverviewTitle">
       <div class="status-overview-inner">
-        <div class="request-dialog-head"><div><div class="committee-label">TRACKING</div><h2 id="statusOverviewTitle">All Events Status</h2></div></div>
+        <div class="request-dialog-head"><div><div class="committee-label">TRACKING</div><h2 id="statusOverviewTitle">All Requests Status</h2></div><button type="button" id="closeStatusOverviewBtn" class="request-dialog-close" aria-label="Close request status">×</button></div>
         <div id="statusOverviewList" class="status-overview-list" aria-live="polite"></div>
-        <div class="dialog-actions"><button type="button" id="closeStatusOverviewBtn">Close</button></div>
       </div>
     </dialog>
     <dialog id="reviewHistoryDialog" class="review-history-dialog" aria-labelledby="reviewHistoryTitle">
@@ -130,11 +134,10 @@
           <textarea id="historyReturnComment" maxlength="2000" placeholder="Explain what needs to be reviewed"></textarea>
           <div class="dialog-actions"><button type="button" id="cancelHistoryReturnBtn">Cancel</button><button type="button" id="submitHistoryReturnBtn" class="return-review">Send back</button></div>
         </section>
-        <div class="dialog-actions"><button type="button" id="closeReviewHistoryBtn">Close</button></div>
       </div>
     </dialog>
     <div id="site-footer"></div>
-    <script src="/assets/js/committee-dashboard.js?v=20261007p"></script>
+    <script src="/assets/js/committee-dashboard.js?v=20261007q"></script>
       <script src="/assets/js/layout.js?v=8" defer></script>
   </body>
 </html>

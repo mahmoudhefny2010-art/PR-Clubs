@@ -547,6 +547,97 @@ function readImageFile(file) {
   });
 }
 
+function parseClubContentDate(value) {
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function compareClubUpcoming(left, right) {
+  const leftDate = parseClubContentDate(left.date);
+  const rightDate = parseClubContentDate(right.date);
+  if (leftDate && rightDate && leftDate.getTime() !== rightDate.getTime()) return leftDate - rightDate;
+  if (leftDate && !rightDate) return -1;
+  if (!leftDate && rightDate) return 1;
+  const leftCreated = new Date(left.createdAt || 0).getTime();
+  const rightCreated = new Date(right.createdAt || 0).getTime();
+  if (leftCreated !== rightCreated) return rightCreated - leftCreated;
+  return (Number(right.requestId) || 0) - (Number(left.requestId) || 0);
+}
+
+function compareClubNewest(left, right) {
+  const leftCreated = new Date(left.createdAt || 0).getTime();
+  const rightCreated = new Date(right.createdAt || 0).getTime();
+  if (leftCreated !== rightCreated) return rightCreated - leftCreated;
+  return (Number(right.requestId) || 0) - (Number(left.requestId) || 0);
+}
+
+const CLUB_CONTENT_SECTIONS = [
+  { key: 'events', label: 'Event', type: 'event', order: 'upcoming' },
+  { key: 'posts', label: 'Feed', type: 'feed', order: 'newest' },
+  { key: 'sponsors', label: 'Sponsor', type: 'sponsor', order: 'newest' },
+  { key: 'booths', label: 'Booth', type: 'booth', order: 'upcoming' }
+];
+
+function clubContentMeta(item, type) {
+  if (type === 'sponsor') {
+    return [item.sponsorCompany, item.sponsorType, item.sponsorAmount].filter(Boolean).join(' · ');
+  }
+  if (type === 'booth') {
+    return [item.boothLocation, item.boothSize, item.boothOpenDate].filter(Boolean).join(' · ');
+  }
+  if (type === 'feed') {
+    return [item.date, item.time].filter(Boolean).join(' · ');
+  }
+  return [item.date, item.time, item.location].filter(Boolean).join(' · ');
+}
+
+function clubContentImage(item, type, club) {
+  if (type === 'sponsor') return item.sponsorLogo || '';
+  if (type === 'booth') return '';
+  return item.image || club.image;
+}
+
+function renderClubContentSections(club) {
+  return CLUB_CONTENT_SECTIONS.map((section) => {
+    const items = Array.isArray(club[section.key]) ? [...club[section.key]] : [];
+    if (!items.length) return '';
+    const sorted = section.order === 'upcoming'
+      ? items.sort(compareClubUpcoming)
+      : items.sort(compareClubNewest);
+    const cards = sorted.map((item, index) => {
+      const image = clubContentImage(item, section.type, club);
+      const meta = clubContentMeta(item, section.type);
+      const description = item.text || item.description || '';
+      const imageBlock = image
+        ? `<img class="club-image" src="${escapeHtml(image)}" alt="${escapeHtml(item.title || section.label)}" />`
+        : `<div class="club-image club-image-placeholder" aria-hidden="true">${escapeHtml(section.label)}</div>`;
+      return `
+        <article class="club-card feed-card">
+          <div class="club-image-wrap">
+            ${imageBlock}
+          </div>
+          <div class="club-card-content">
+            <div class="club-card-header">
+              <div class="club-name">${escapeHtml(item.title || section.label)} <span class="content-type-badge ${escapeHtml(section.type)}">${escapeHtml(section.label)}</span></div>
+            </div>
+            <div class="club-tagline">${escapeHtml(meta)}</div>
+            <div class="club-actions">
+              <button class="event-info-btn" type="button" data-info="${escapeHtml(section.key)}-${index}">Info</button>
+            </div>
+            <p class="event-tile-desc" id="${escapeHtml(section.key)}-desc-${index}" hidden>${escapeHtml(description)}</p>
+          </div>
+        </article>`;
+    }).join('');
+    return `
+    <section class="detail-section">
+      <h3>${escapeHtml(section.label)}</h3>
+      <div class="detail-cards-grid detail-club-cards">
+        ${cards}
+      </div>
+    </section>`;
+  }).join('');
+}
+
 function openClubDetail(clubId) {
   const club = state.clubs.find((item) => item.id === clubId);
   if (!club) return;
@@ -592,55 +683,7 @@ function openClubDetail(clubId) {
       <p>${escapeHtml(club.requirements)}</p>
     </section>
 
-    ${Array.isArray(club.events) && club.events.length ? `
-    <section class="detail-section">
-      <h3>Upcoming events</h3>
-      <div class="detail-cards-grid detail-club-cards">
-        ${club.events.map((event, index) => `
-          <article class="club-card feed-card">
-            <div class="club-image-wrap">
-              <img class="club-image" src="${escapeHtml(event.image || club.image)}" alt="${escapeHtml(event.title || 'event')}" />
-            </div>
-            <div class="club-card-content">
-              <div class="club-card-header">
-                <div class="club-name">${escapeHtml(event.title || 'Event')}</div>
-              </div>
-              <div class="club-tagline">${escapeHtml(event.date || '')}${event.location ? ' · ' + escapeHtml(event.location) : ''}</div>
-              <div class="club-actions">
-                <button class="event-info-btn" type="button" data-info="event-${index}">Info</button>
-              </div>
-              <p class="event-tile-desc" id="event-desc-${index}" hidden>${escapeHtml(event.description || '')}</p>
-            </div>
-          </article>
-        `).join('')}
-      </div>
-    </section>
-    ` : ''}
-
-    ${Array.isArray(club.posts) && club.posts.length ? `
-    <section class="detail-section">
-      <h3>Club feed</h3>
-      <div class="detail-cards-grid detail-club-cards">
-        ${club.posts.map((post, index) => `
-          <article class="club-card feed-card">
-            <div class="club-image-wrap">
-              <img class="club-image" src="${escapeHtml(post.image || club.image)}" alt="${escapeHtml(post.title || 'post')}" />
-            </div>
-            <div class="club-card-content">
-              <div class="club-card-header">
-                <div class="club-name">${escapeHtml(post.title || 'Post')}</div>
-              </div>
-              <div class="club-tagline">${escapeHtml(post.date || '')}${post.location ? ' · ' + escapeHtml(post.location) : ''}</div>
-              <div class="club-actions">
-                <button class="event-info-btn" type="button" data-info="post-${index}">Info</button>
-              </div>
-              <p class="event-tile-desc" id="post-desc-${index}" hidden>${escapeHtml(post.text || post.description || '')}</p>
-            </div>
-          </article>
-        `).join('')}
-      </div>
-    </section>
-    ` : ''}
+    ${renderClubContentSections(club)}
 
     <div class="detail-actions">
       <button class="primary-btn" data-action="apply-club" data-id="${club.id}" ${canApply ? '' : 'disabled'}>${canApply ? 'Apply Now' : escapeHtml(getClubActionLabel(club.status))}</button>
@@ -654,7 +697,7 @@ function openClubDetail(clubId) {
   clubDetail.querySelectorAll('.event-info-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       const [kind, rawIndex] = btn.dataset.info.split('-');
-      const target = clubDetail.querySelector(`#${kind === 'post' ? 'post' : 'event'}-desc-${rawIndex}`);
+      const target = clubDetail.querySelector(`#${kind}-desc-${rawIndex}`);
       if (target) target.hidden = !target.hidden;
     });
   });

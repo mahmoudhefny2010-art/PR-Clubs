@@ -14,6 +14,14 @@
 
 .calendar-event.extra{display:none}.calendar-more{display:block;width:100%;border:none;background:none;text-align:left;font-size:.65rem;color:#b71c1c;font-weight:700;padding:2px 4px;cursor:pointer}.calendar-more:hover{text-decoration:underline}
 
+.calendar-head-title{display:flex;align-items:center;gap:10px;min-width:0}.calendar-day.is-selected{border-color:#b71c1c;box-shadow:0 0 0 2px rgba(183,28,28,.15)}
+
+@media(max-width:640px){.calendar-head-title{gap:6px}.calendar-head-title #calendarTitle{font-size:1rem}}
+
+.calendar-month-filter{display:flex;align-items:center;gap:12px;margin:4px 0 14px}.calendar-month-filter label{font-weight:700;color:#111827}.calendar-month-filter select{width:min(260px,100%);padding:10px 36px 10px 12px;border:1px solid #e5cfd0;border-radius:10px;background:#fff;color:#111827;font:inherit;color-scheme:light}.calendar-month-prompt{margin:14px 0;color:#6b7280}.calendar-close-btn{display:grid;width:42px;height:42px;place-items:center;border:1px solid #e5cfd0;border-radius:50%;background:#fff;color:#111827;font:inherit;font-size:1.65rem;line-height:1;cursor:pointer}.calendar-close-btn:hover{background:#fff5f5;border-color:#c9222a;color:#b71c1c}
+
+@media(max-width:640px){.calendar-month-filter{align-items:stretch;flex-direction:column;gap:6px}.calendar-month-filter select{width:100%}}
+
 /* Today & tomorrow strip (homepage hero, shown first above the actions) */
 .today-events{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:16px 0 0;padding:12px 14px;background:#fff7f7;border:1px solid rgba(201,34,42,.28);border-radius:16px}
 .today-events-label{color:#b71c1c;font-weight:800;font-size:.78rem;text-transform:uppercase;letter-spacing:.07em}

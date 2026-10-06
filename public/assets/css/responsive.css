@@ -1,9 +1,102 @@
+/* Responsive Layout & Mobile Drawer Styles */
+
+@media (max-width: 900px) {
+  .topbar-container {
+    height: 64px;
+    padding: 0 16px;
+  }
+
+  .mobile-menu-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .nav-links {
+    position: absolute;
+    top: 64px;
+    left: 0;
+    right: 0;
+    background-color: var(--bg-panel);
+    border-bottom: 1px solid var(--border-color);
+    padding: 16px 20px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    box-shadow: var(--shadow-lg);
+    display: none;
+    animation: slideDown 0.2s ease-out;
+  }
+
+  .nav-links.open {
+    display: flex;
+  }
+
+  .nav-link {
+    padding: 12px 16px;
+    font-size: 1rem;
+    border-radius: var(--radius-md);
+  }
+
+  .brand-text {
+    display: none;
+  }
+
+  .stats-summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .president-dashboard-layout.is-president {
+    grid-template-columns: 1fr;
+  }
+
+  .president-sidebar {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .president-sidebar-title {
+    flex: 0 0 100%;
+    padding-bottom: 4px;
+  }
+
+  .president-sidebar a {
+    flex: 1 1 auto;
+    text-align: center;
+  }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 @media (max-width: 700px) {
+  .app-container {
+    padding: 16px 12px 36px;
+  }
+
   .stats-summary,
   .form-row,
   .stats-row,
   .admin-grid {
     grid-template-columns: 1fr;
+  }
+
+  .welcome-box,
+  .committee-card,
+  .app-form-card,
+  .admin-panel,
+  .admin-login-panel,
+  .club-login-panel {
+    padding: 20px 16px;
+    border-radius: var(--radius-lg);
+  }
+
+  .club-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
   }
 
   .admin-panel {
@@ -39,12 +132,17 @@
 
   .admin-editor-form {
     padding: 22px 0 0;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--border-color);
     border-left: 0;
   }
 
   .admin-club-row {
     grid-template-columns: 44px minmax(0, 1fr);
+  }
+
+  .admin-club-row > img {
+    width: 44px;
+    height: 44px;
   }
 
   .admin-row-actions {
@@ -59,18 +157,32 @@
   .card-actions {
     grid-template-columns: 1fr;
   }
+
+  .application-card {
+    padding: 20px 16px;
+  }
+
+  .applicant-head {
+    font-size: 1.2rem;
+  }
+
+  .application-card .preview-btn,
+  .application-card .delete-btn {
+    min-height: 56px;
+  }
 }
 
 @media (max-width: 480px) {
-  .brand-banner {
-    min-height: 78px;
-    justify-content: flex-start;
-    padding: 8px 12px;
+  .brand-logo {
+    height: 36px;
   }
 
-  .brand-mark {
-    width: 120px;
-    height: 58px;
+  .hero-panel h1 {
+    font-size: 1.75rem;
+  }
+
+  .stats-summary {
+    grid-template-columns: 1fr;
   }
 
   .admin-form-grid {
@@ -94,197 +206,39 @@
     flex-direction: column;
   }
 
-  .admin-login-panel {
-    margin: 32px auto;
-    padding: 22px 18px;
-  }
-
+  .admin-login-panel,
   .club-login-panel {
-    margin: 32px auto;
-    padding: 22px 18px;
+    margin: 20px auto;
+    padding: 20px 16px;
   }
 
   .club-dashboard-identity h2 {
     font-size: 1.35rem;
   }
-}
 
-/* Shared site theme and compact sun/moon switch. */
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --bg-main: #111315;
-  --bg-panel: #1b1e21;
-  --bg-strong: #25292d;
-  --bg-soft: #202428;
-  --border: rgba(255, 255, 255, 0.15);
-  --text: #f3f4f6;
-  --muted: #c0c4c9;
-  --shadow: rgba(0, 0, 0, 0.35);
-}
-:root[data-theme="light"] { color-scheme: light; }
-
-.site-theme-toggle {
-  position: fixed; z-index: 10000; top: 16px; right: 18px;
-  display: grid; width: 46px; height: 46px; place-items: center; padding: 0;
-  border: 1px solid rgba(185,27,31,.24); border-radius: 50%;
-  background: #fff; color: #252525; box-shadow: 0 5px 18px rgba(17,17,17,.16); cursor: pointer;
-}
-.site-theme-toggle svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.site-theme-toggle .theme-moon { display: none; }
-:root[data-theme="dark"] .site-theme-toggle { background: #202428; color: #ffe08a; border-color: rgba(255,255,255,.2); }
-:root[data-theme="dark"] .site-theme-toggle .theme-sun { display: none; }
-:root[data-theme="dark"] .site-theme-toggle .theme-moon { display: block; }
-.site-theme-toggle:focus-visible { outline: 3px solid rgba(201,34,42,.45); outline-offset: 3px; }
-
-:root[data-theme="dark"] body { background: radial-gradient(circle at top, rgba(201,34,42,.12), transparent 28%), linear-gradient(180deg, #191c1f 0%, #121416 32%, #0e1012 100%); color: var(--text); }
-:root[data-theme="dark"] .welcome-box,
-:root[data-theme="dark"] .committee-card,
-:root[data-theme="dark"] .app-form-card,
-:root[data-theme="dark"] .summary-card,
-:root[data-theme="dark"] .club-detail-card,
-:root[data-theme="dark"] .admin-login-panel,
-:root[data-theme="dark"] .club-login-panel,
-:root[data-theme="dark"] .modal-card,
-:root[data-theme="dark"] .application-card,
-:root[data-theme="dark"] .stat-box,
-:root[data-theme="dark"] .detail-box,
-:root[data-theme="dark"] .detail-requirements,
-:root[data-theme="dark"] .details-section,
-:root[data-theme="dark"] .admin-club-section,
-:root[data-theme="dark"] .admin-editor-form,
-:root[data-theme="dark"] .application-question-editor,
-:root[data-theme="dark"] .club-card,
-:root[data-theme="dark"] .admin-panel,
-:root[data-theme="dark"] .interview-section-editor,
-:root[data-theme="dark"] .interview-question-editor,
-:root[data-theme="dark"] .committee-head-row,
-:root[data-theme="dark"] .committee-head-edit-form,
-:root[data-theme="dark"] .committee-head-manager,
-:root[data-theme="dark"] .section,
-:root[data-theme="dark"] .record {
-  background: var(--bg-panel); color: var(--text); border-color: var(--border); box-shadow: 0 12px 26px var(--shadow);
-}
-:root[data-theme="dark"] .committee-head-manager,
-:root[data-theme="dark"] .interview-question-editor,
-:root[data-theme="dark"] .modal-interview-section,
-:root[data-theme="dark"] .application-form-builder,
-:root[data-theme="dark"] .admin-club-row,
-:root[data-theme="dark"] .application-form-builder,
-:root[data-theme="dark"] .answer,
-:root[data-theme="dark"] .detail-info,
-:root[data-theme="dark"] .admin-settings-form,
-:root[data-theme="dark"] .president-form-manager { background: var(--bg-soft); color: var(--text); border-color: var(--border); }
-:root[data-theme="dark"] .brand-banner { background: var(--bg-panel); }
-:root[data-theme="dark"] .brand-mark { padding: 4px 8px; border-radius: 10px; background: #fff; }
-:root[data-theme="dark"] .brand-wrap { color: var(--text); }
-:root[data-theme="dark"] h1,
-:root[data-theme="dark"] h2,
-:root[data-theme="dark"] h3,
-:root[data-theme="dark"] h4,
-:root[data-theme="dark"] .field-group label,
-:root[data-theme="dark"] .modal-field label,
-:root[data-theme="dark"] .admin-eyebrow,
-:root[data-theme="dark"] .detail-meta,
-:root[data-theme="dark"] .applicant-head,
-:root[data-theme="dark"] .application-row,
-:root[data-theme="dark"] .committee-label,
-:root[data-theme="dark"] .record-title,
-:root[data-theme="dark"] summary { color: var(--text); }
-:root[data-theme="dark"] p,
-:root[data-theme="dark"] .subtitle,
-:root[data-theme="dark"] .admin-form-hint,
-:root[data-theme="dark"] .admin-form-empty,
-:root[data-theme="dark"] .applicant-meta,
-:root[data-theme="dark"] .detail-description,
-:root[data-theme="dark"] .detail-item strong,
-:root[data-theme="dark"] .record-meta { color: var(--muted); }
-:root[data-theme="dark"] input,
-:root[data-theme="dark"] select,
-:root[data-theme="dark"] textarea,
-:root[data-theme="dark"] .application-question-editor input,
-:root[data-theme="dark"] .application-question-editor select { background: #16191c; color: var(--text); border-color: var(--border); }
-:root[data-theme="dark"] input::placeholder,
-:root[data-theme="dark"] textarea::placeholder { color: #9ba2aa; }
-:root[data-theme="dark"] .secondary-btn,
-:root[data-theme="dark"] .text-button,
-:root[data-theme="dark"] .close-btn,
-:root[data-theme="dark"] .admin-row-actions .order-btn { background: #24282c; color: var(--text); border-color: var(--border); }
-:root[data-theme="dark"] .admin-row-actions .delete-btn { background: #442528; color: #ff9298; border-color: var(--border); }
-:root[data-theme="dark"] .modal-interview-questions,
-:root[data-theme="dark"] .modal-custom-answers,
-:root[data-theme="dark"] .detail-description { color: var(--text); }
-:root[data-theme="dark"] .detail-logo,
-:root[data-theme="dark"] .club-dashboard-logo,
-:root[data-theme="dark"] .admin-image-preview { background: #fff; }
-:root[data-theme="dark"] .site-footer,
-:root[data-theme="dark"] .site-footer p,
-:root[data-theme="dark"] .site-footer a,
-:root[data-theme="light"] .site-footer,
-:root[data-theme="light"] .site-footer p,
-:root[data-theme="light"] .site-footer a { color: #fff; }
-:root[data-theme="dark"] .table-wrap { background: var(--bg-panel); border-color: var(--border); }
-:root[data-theme="dark"] th,
-:root[data-theme="dark"] td { border-color: var(--border); color: var(--text); }
-:root[data-theme="dark"] tr:nth-child(even) { background: var(--bg-soft); }
-:root[data-theme="light"] body { background: radial-gradient(circle at top, rgba(201,34,42,.12), transparent 24%), linear-gradient(180deg, #fff 0%, #f7f5f4 28%, #f3f0ee 100%); }
-:root[data-theme="light"] .table-wrap { background: #fff; }
-:root[data-theme="light"] th,
-:root[data-theme="light"] td { color: #111; }
-
-@media (max-width: 480px) { .site-theme-toggle { top: 10px; right: 10px; width: 42px; height: 42px; } }
-
-@media (max-width: 560px) {
-  .club-detail-card {
-    padding: 20px 16px;
+  .club-dashboard-logo {
+    width: 58px;
+    height: 58px;
+    flex-basis: 58px;
   }
 
-  .club-detail-hero {
-    grid-template-columns: 88px minmax(0, 1fr);
-    align-items: start;
-    gap: 16px;
-    padding-bottom: 20px;
+  .modal-card, .calendar-panel {
+    padding: 18px 14px;
   }
 
-  .detail-logo-frame {
-    width: 88px;
-    height: 88px;
-  }
-
-  .detail-title {
-    font-size: 1.8rem;
-  }
-
-  .detail-info {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-  }
-
-  .detail-actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .app-form-card {
-    padding: 20px 16px;
+  .modal-actions {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .application-club-heading {
-    gap: 12px;
+    gap: 10px;
   }
 
   .application-club-logo-frame {
-    width: 72px;
-    height: 72px;
-    flex-basis: 72px;
+    width: 54px;
+    height: 54px;
+    flex-basis: 54px;
   }
 
-  .application-club-heading-copy #applicationTitle {
-    font-size: 1.5rem;
-  }
-
-  .applicant-photo-control {
-    align-items: flex-start;
-    flex-direction: column-reverse;
-  }
 }
-

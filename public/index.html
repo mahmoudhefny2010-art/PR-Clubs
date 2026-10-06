@@ -7,11 +7,20 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/assets/css/base.css?v=20261005h" />
-    <link rel="stylesheet" href="/assets/css/responsive.css?v=20261005h" />
-    <link rel="stylesheet" href="/assets/css/dark.css?v=20261005h" />
-    <link rel="stylesheet" href="/assets/css/features.css?v=20261005h" />
+    <link rel="stylesheet" href="/assets/css/base.css?v=20261008g" />
+    <link rel="stylesheet" href="/assets/css/responsive.css?v=20261006c" />
+    <link rel="stylesheet" href="/assets/css/dark.css?v=20261007b" />
+    <link rel="stylesheet" href="/assets/css/features.css?v=20261006b" />
+    <link rel="stylesheet" href="/assets/css/event-modal.css?v=1" />
     <link rel="icon" href="/assets/img/pics/logo.svg.png" type="image/png">
+    <style>
+      .content-type-badge { display: inline-block; margin: 4px 0 0; padding: 2px 9px; border-radius: 999px; font-size: .64rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
+      .content-type-badge.event { background: #dbeafe; color: #1d4ed8; }
+      .content-type-badge.feed { background: #ede9fe; color: #6d28d9; }
+      .content-type-badge.sponsor { background: #fef3c7; color: #92400e; }
+      .content-type-badge.booth { background: #d1fae5; color: #065f46; }
+      .club-image-placeholder { width: 120px; height: 120px; margin: 18px auto 0; background: #f3f4f6; color: #6b7280; font-size: .66rem; font-weight: 800; display: flex; align-items: center; justify-content: center; text-transform: uppercase; letter-spacing: .04em; border-radius: 12px; }
+    </style>
 </head>
   <body>
     <div class="page-shell">
@@ -23,13 +32,11 @@
             <h1 id="homePageTitle">University Clubs</h1>
             <p id="homePageSubtitle">Explore all clubs and apply to the ones that match your interests.</p>
             <div id="todayEvents" class="today-events hidden"></div>
-            <div class="home-form-actions"><a id="myFormsButton" class="secondary-btn" href="/pages/applicant-login.html">Sign In</a> <button id="calendarButton" class="secondary-btn" type="button">Calendar</button> <a class="secondary-btn" href="/pages/events.html">Events</a></div>
-            <div class="hero-actions-divider" aria-hidden="true"></div>
           </div>
 
           <section class="events-slideshow" id="eventsSlideshow">
             <div class="events-slideshow-head">
-              <h2>Upcoming events</h2>
+              <h2>Upcoming</h2>
             </div>
             <div class="events-slideshow-track" id="eventsSlideshowTrack"></div>
             <button class="slide-arrow slide-prev" id="slidePrev" type="button" aria-label="Previous">‹</button>
@@ -60,7 +67,17 @@
             </div>
           </div>
 
+          <div class="search-filter-section" id="searchFilterSection">
+            <div id="categoryChips" class="category-chips"></div>
+          </div>
+
           <div id="clubGrid" class="club-grid"></div>
+          <div id="emptyClubsState" class="empty-state hidden">
+            <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/><path d="M8 11h6"/></svg>
+            <h3>No matching clubs found</h3>
+            <p>Try adjusting your search terms or category filters.</p>
+            <button id="clearFiltersBtn" class="secondary-btn" type="button">Clear filters</button>
+          </div>
         </section>
 
         <section id="signInView" class="view">
@@ -400,11 +417,25 @@
               </div>
             </div>
 
-            <section id="clubReviewNotifications" role="status" hidden style="margin:14px 0;padding:14px 16px;border:1px solid #fcd34d;border-radius:14px;background:#fff7db;color:#78350f">
-              <strong>Review updates from the approval team</strong>
-              <div id="clubReviewNotificationList" style="margin-top:8px"></div>
-            </section>
+            <dialog id="clubReviewNotifications" class="club-review-notice-dialog" aria-labelledby="clubReviewNoticeTitle">
+              <div class="club-review-notice-content">
+                <button id="dismissNotificationBtn" type="button" class="club-review-notice-close" aria-label="Close notifications">×</button>
+                <span class="admin-eyebrow">PRESIDENT DASHBOARD</span>
+                <h2 id="clubReviewNoticeTitle">Review updates from the approval team</h2>
+                <div id="clubReviewNotificationList"></div>
+              </div>
+            </dialog>
 
+            <div id="presidentDashboardLayout" class="president-dashboard-layout">
+              <nav id="presidentSidebar" class="president-sidebar hidden" aria-label="President dashboard sections">
+                <span class="president-sidebar-title">Dashboard</span>
+                <a href="#presidentOverviewPanel" data-dashboard-section="presidentOverviewPanel">Overview</a>
+                <a href="#presidentHeadManager" data-dashboard-section="presidentHeadManager">Committee heads</a>
+                <a href="#presidentFormManager" data-dashboard-section="presidentFormManager">Application form</a>
+                <a href="#interviewFormManager" data-dashboard-section="interviewFormManager">Interview questions</a>
+                <a href="#presidentApplicantsPanel" data-dashboard-section="presidentApplicantsPanel">Applicants</a>
+              </nav>
+              <div class="president-dashboard-main">
             <section id="presidentHeadManager" class="committee-head-manager hidden">
               <div class="admin-section-heading">
                 <div>
@@ -478,35 +509,108 @@
               </div>
             </section>
 
-            <div class="stats-row">
-              <div class="stat-box">
-                <span>Total</span>
-                <strong id="statTotal">0</strong>
+            <div id="presidentOverviewPanel" class="president-dashboard-section">
+              <div class="admin-section-heading president-overview-heading">
+                <div>
+                  <span class="admin-eyebrow">PRESIDENT DASHBOARD</span>
+                  <h3>Overview</h3>
+                </div>
               </div>
-              <div class="stat-box">
-                <span>Accepted</span>
-                <strong id="statAccepted">0</strong>
+              <div class="stats-row">
+                <div class="stat-box">
+                  <span>Total applicants</span>
+                  <strong id="statTotal">0</strong>
+                </div>
+                <div class="stat-box">
+                  <span>Accepted</span>
+                  <strong id="statAccepted">0</strong>
+                </div>
+                <div class="stat-box">
+                  <span>Rejected</span>
+                  <strong id="statRejected">0</strong>
+                </div>
               </div>
-              <div class="stat-box">
-                <span>Rejected</span>
-                <strong id="statRejected">0</strong>
+              <div class="member-manager-launch">
+                <p id="clubMemberCountNote">Manage member names, committees, positions, and membership level.</p>
+                <button id="openMemberManagerBtn" class="secondary-btn" type="button">Club members</button>
               </div>
             </div>
 
+            <div id="presidentApplicantsPanel" class="president-applicants-panel">
             <div id="applicationsList" class="applications-list"></div>
+            </div>
+              </div>
+            </div>
           </div>
 
         </section>
       </main>
 
+      <dialog id="memberManagerDialog" class="member-manager-dialog" aria-labelledby="memberManagerTitle">
+        <div class="member-dialog-inner">
+          <header class="member-dialog-header">
+            <div>
+              <span class="admin-eyebrow">PRESIDENT DASHBOARD</span>
+              <h2 id="memberManagerTitle">Club members</h2>
+              <p>View your roster and assign each member to a committee and position.</p>
+            </div>
+            <button id="closeMemberManagerBtn" class="calendar-close-btn" type="button" aria-label="Close club members">&times;</button>
+          </header>
+          <div class="member-dialog-toolbar">
+            <span id="memberRosterCount">Loading members…</span>
+            <button id="showMemberFormBtn" class="primary-btn" type="button">Add member</button>
+          </div>
+          <form id="clubMemberForm" class="member-add-form hidden">
+            <div class="member-form-grid">
+              <label>Full name<input name="name" maxlength="120" autocomplete="name" required /></label>
+              <label>Committee<select name="committee" id="clubMemberCommittee" required><option value="">Choose a committee</option></select></label>
+              <label>Position in committee<input name="position" id="clubMemberPosition" maxlength="100" placeholder="Enter their committee position" required /></label>
+              <label>Member level<select name="memberType" required><option value="">Choose member level</option><option value="new">New member</option><option value="senior">Senior member</option></select></label>
+            </div>
+            <div class="member-form-actions">
+              <div><button id="cancelMemberFormBtn" class="secondary-btn" type="button">Cancel</button><button class="primary-btn" type="submit">Save member</button></div>
+            </div>
+          </form>
+          <p id="clubMemberFeedback" class="admin-feedback" aria-live="polite"></p>
+          <div id="clubMemberList" class="member-roster-list" aria-live="polite"></div>
+        </div>
+      </dialog>
+
       <div class="calendar-modal hidden" id="calendarModal">
         <div class="calendar-panel">
           <div class="calendar-head">
-            <h2>Events calendar</h2>
-            <button id="calendarClose" class="secondary-btn" type="button">Close</button>
+            <div class="calendar-head-title">
+              <h2 id="calendarTitle">Events calendar</h2>
+            </div>
+            <button id="calendarClose" class="calendar-close-btn" type="button" aria-label="Close calendar">&times;</button>
           </div>
           <div id="calendarGrid" class="calendar-grid"></div>
         </div>
+      </div>
+
+      <div class="event-modal hidden" id="eventModal" role="dialog" aria-modal="true" aria-labelledby="eventModalTitle">
+        <article class="event-modal-panel">
+          <button id="eventModalClose" class="calendar-close-btn event-modal-close" type="button" aria-label="Close event">&times;</button>
+          <img id="eventModalImage" class="event-modal-image" src="" alt="" />
+          <div class="event-modal-copy">
+            <span id="eventModalClub" class="event-modal-club"></span>
+            <h2 id="eventModalTitle"></h2>
+            <p id="eventModalMeta" class="event-modal-meta"></p>
+            <p id="eventModalDescription" class="event-modal-description"></p>
+            <form id="eventModalForm">
+              <div class="field-group">
+                <label for="eventModalName">Your Name</label>
+                <input id="eventModalName" placeholder="Full name" required />
+              </div>
+              <div class="field-group">
+                <label for="eventModalEmail">University Email</label>
+                <input id="eventModalEmail" type="email" placeholder="example@miuegypt.edu.eg" required />
+              </div>
+              <button class="primary-btn" type="submit">Register for event</button>
+            </form>
+            <p id="eventModalFeedback" class="admin-feedback" aria-live="polite"></p>
+          </div>
+        </article>
       </div>
     </div>
 
@@ -583,10 +687,11 @@
 
     <div id="site-footer"></div>
 
-    <script src="/assets/js/app-home.js?v=20261006a"></script>
+    <script src="/assets/js/event-modal.js?v=1"></script>
+    <script src="/assets/js/app-home.js?v=20261008c"></script>
     <script src="/assets/js/app-admin.js?v=20261005h"></script>
-    <script src="/assets/js/app-dashboard.js?v=20261005h"></script>
+    <script src="/assets/js/app-dashboard.js?v=20261008b"></script>
     <script src="/assets/js/layout.js?v=8" defer></script>
-    <script src="/assets/js/theme.js?v=20261005h" defer></script>
+    <script src="/assets/js/theme.js?v=20261007a" defer></script>
   </body>
 </html>

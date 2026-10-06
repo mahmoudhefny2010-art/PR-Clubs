@@ -10,6 +10,8 @@ const state = {
   clubAccount: null,
   myForms: [],
   editingMyForm: null,
+  searchQuery: '',
+  activeCategory: 'All',
 };
 
 const views = {
@@ -37,7 +39,11 @@ const clubDashboardLogo = document.getElementById('clubDashboardLogo');
 const applicationCommitteeInput = document.getElementById('applicationCommitteeInput');
 const presidentHeadManager = document.getElementById('presidentHeadManager');
 const presidentFormManager = document.getElementById('presidentFormManager');
+const presidentOverviewPanel = document.getElementById('presidentOverviewPanel');
+const presidentApplicantsPanel = document.getElementById('presidentApplicantsPanel');
 const interviewFormManager = document.getElementById('interviewFormManager');
+const presidentSidebar = document.getElementById('presidentSidebar');
+const presidentDashboardLayout = document.getElementById('presidentDashboardLayout');
 const toggleInterviewFormBtn = document.getElementById('toggleInterviewFormBtn');
 const committeeHeadList = document.getElementById('committeeHeadList');
 const committeeHeadFeedback = document.getElementById('committeeHeadFeedback');
@@ -249,24 +255,31 @@ async function loadApplications() {
 }
 
 async function loadClubReviewNotifications() {
-  const banner = document.getElementById('clubReviewNotifications');
+  const dialog = document.getElementById('clubReviewNotifications');
   const list = document.getElementById('clubReviewNotificationList');
-  if (!banner || !list) return;
+  const dismissBtn = document.getElementById('dismissNotificationBtn');
+  if (!dialog || !list) return;
   try {
     const response = await fetch('/api/club/content', { cache: 'no-store' });
     const items = await response.json();
     if (!response.ok) return;
     const updates = items.filter((item) => typeof item.clubNotice === 'string' && item.clubNotice.trim());
-    list.replaceChildren();
-    banner.hidden = updates.length === 0;
-    for (const item of updates) {
-      const message = document.createElement('p');
-      message.style.margin = '6px 0 0';
-      message.textContent = `${item.title}: ${item.clubNotice} Current status: ${String(item.status || '').replaceAll('_', ' ')}.`;
-      list.append(message);
+    if (!updates.length) {
+      dialog.close();
+      return;
     }
+    updates.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    const latest = updates[0];
+    
+    list.replaceChildren();
+    const message = document.createElement('p');
+    message.className = 'club-review-notice-message';
+    message.textContent = `${latest.title}: ${latest.clubNotice} Current status: ${String(latest.status || '').replaceAll('_', ' ')}.`;
+    list.append(message);
+    if (!dialog.open) dialog.showModal();
+    if (dismissBtn) dismissBtn.onclick = () => dialog.close();
   } catch {
-    banner.hidden = true;
+    dialog.close();
   }
 }
 
@@ -300,10 +313,18 @@ async function openClubPortal() {
       : `${club.committee} - HEAD DASHBOARD`;
     presidentHeadManager.classList.toggle('hidden', club.role !== 'president');
     presidentFormManager.classList.toggle('hidden', club.role !== 'president');
+    presidentSidebar.classList.toggle('hidden', club.role !== 'president');
+    presidentDashboardLayout.classList.toggle('is-president', club.role === 'president');
     interviewFormManager.classList.add('hidden');
     toggleInterviewFormBtn.classList.remove('hidden');
     toggleInterviewFormBtn.setAttribute('aria-expanded', 'false');
     toggleInterviewFormBtn.textContent = 'Manage interview questions';
+    if (club.role === 'president') {
+      setPresidentDashboardSection('presidentOverviewPanel');
+    } else {
+      presidentOverviewPanel.classList.remove('hidden');
+      presidentApplicantsPanel.classList.remove('hidden');
+    }
     document.getElementById('interviewFormHeading').textContent = club.role === 'president'
       ? 'Club interview questions'
       : `${club.committee} interview questions`;
@@ -315,8 +336,8 @@ async function openClubPortal() {
       ...(club.role === 'president' ? [loadCommitteeHeads(), loadPresidentApplicationForm()] : [])
     ]);
     await loadApplications();
-    await loadClubReviewNotifications();
     showView('head');
+    if (club.role === 'president') await loadClubReviewNotifications();
   } catch (error) {
     const feedback = document.getElementById('clubLoginFeedback');
     feedback.textContent = error.message;
@@ -325,8 +346,67 @@ async function openClubPortal() {
   }
 }
 
+function setPresidentDashboardSection(sectionId) {
+  const sectionIds = ['presidentOverviewPanel', 'presidentHeadManager', 'presidentFormManager', 'interviewFormManager', 'presidentApplicantsPanel'];
+  sectionIds.forEach((id) => document.getElementById(id)?.classList.toggle('hidden', id !== sectionId));
+  toggleInterviewFormBtn.classList.add('hidden');
+  presidentSidebar?.querySelectorAll('[data-dashboard-section]').forEach((item) => {
+    item.classList.toggle('is-active', item.dataset.dashboardSection === sectionId);
+  });
+}
+
+presidentSidebar?.querySelectorAll('[data-dashboard-section]').forEach((link) => {
+  link.addEventListener('click', (event) => {
+    event.preventDefault();
+    setPresidentDashboardSection(link.dataset.dashboardSection);
+  });
+});
+
+function renderCategoryChips() {
+  const container = document.getElementById('categoryChips');
+  if (!container) return;
+  const categories = ['All', ...new Set(state.clubs.map((c) => c.category).filter(Boolean))];
+  container.innerHTML = categories
+    .map(
+      (cat) => `<button type="button" class="category-chip${state.activeCategory === cat ? ' active' : ''}" data-cat="${escapeHtml(cat)}">${escapeHtml(cat)}</button>`
+    )
+    .join('');
+
+  container.querySelectorAll('.category-chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      state.activeCategory = chip.dataset.cat;
+      renderClubGrid();
+    });
+  });
+}
+
+function initSearchAndFilterControls() {
+  const searchInput = document.getElementById('clubSearchInput');
+  const clearBtn = document.getElementById('clearFiltersBtn');
+
+  if (searchInput && !searchInput.dataset.initialized) {
+    searchInput.dataset.initialized = 'true';
+    searchInput.addEventListener('input', (e) => {
+      state.searchQuery = e.target.value.toLowerCase().trim();
+      renderClubGrid();
+    });
+  }
+
+  if (clearBtn && !clearBtn.dataset.initialized) {
+    clearBtn.dataset.initialized = 'true';
+    clearBtn.addEventListener('click', () => {
+      state.searchQuery = '';
+      state.activeCategory = 'All';
+      if (searchInput) searchInput.value = '';
+      renderClubGrid();
+    });
+  }
+}
+
 function renderClubGrid() {
   if (!clubGrid) return;
+  renderCategoryChips();
+  initSearchAndFilterControls();
 
   const openCount = state.clubs.filter((club) => club.status === 'open').length;
   const fullCount = state.clubs.filter((club) => club.status === 'full').length;
@@ -339,7 +419,21 @@ function renderClubGrid() {
   if (openingSoonClubsStat) openingSoonClubsStat.textContent = openingSoonCount;
   if (totalApplicantsStat) totalApplicantsStat.textContent = applicantTotal;
 
-  clubGrid.innerHTML = getOrderedClubs(state.clubs)
+  const filteredClubs = state.clubs.filter((club) => {
+    const matchesCat = state.activeCategory === 'All' || club.category === state.activeCategory;
+    const q = state.searchQuery;
+    const matchesSearch = !q || [
+      club.name, club.tagline, club.category, club.committee, club.description
+    ].some((field) => String(field || '').toLowerCase().includes(q));
+    return matchesCat && matchesSearch;
+  });
+
+  const emptyState = document.getElementById('emptyClubsState');
+  if (emptyState) {
+    emptyState.classList.toggle('hidden', filteredClubs.length > 0);
+  }
+
+  clubGrid.innerHTML = getOrderedClubs(filteredClubs)
     .map(
       (club) => `
         <article class="club-card${club.pinned ? ' is-pinned' : ''}">
@@ -392,6 +486,58 @@ function getAllEvents() {
   );
 }
 
+const CONTENT_TYPE_LABELS = { event: 'Event', feed: 'Feed', sponsor: 'Sponsor', booth: 'Booth' };
+const CONTENT_HOME_LABELS = { event: 'Upcoming Event', feed: 'Latest Feed', sponsor: 'Upcoming Sponsor', booth: 'Booth Opening Soon' };
+
+function parseContentDate(value) {
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+// Upcoming items sort by the nearest date first; equal dates show the most recently created item first.
+function compareUpcoming(left, right) {
+  const leftDate = parseContentDate(left.date);
+  const rightDate = parseContentDate(right.date);
+  if (leftDate && rightDate && leftDate.getTime() !== rightDate.getTime()) return leftDate - rightDate;
+  if (leftDate && !rightDate) return -1;
+  if (!leftDate && rightDate) return 1;
+  const leftCreated = new Date(left.createdAt || 0).getTime();
+  const rightCreated = new Date(right.createdAt || 0).getTime();
+  if (leftCreated !== rightCreated) return rightCreated - leftCreated;
+  return (Number(right.requestId) || 0) - (Number(left.requestId) || 0);
+}
+
+// Regular listings show the newest content first.
+function compareNewest(left, right) {
+  const leftCreated = new Date(left.createdAt || 0).getTime();
+  const rightCreated = new Date(right.createdAt || 0).getTime();
+  if (leftCreated !== rightCreated) return rightCreated - leftCreated;
+  return (Number(right.requestId) || 0) - (Number(left.requestId) || 0);
+}
+
+function collectClubContent(kind) {
+  const typeByKind = { events: 'event', posts: 'feed', sponsors: 'sponsor', booths: 'booth' };
+  return (state.clubs || []).flatMap((club) =>
+    (Array.isArray(club[kind]) ? club[kind] : []).map((item, index) => ({
+      ...item,
+      contentType: item.contentType || typeByKind[kind] || 'event',
+      clubId: club.id,
+      clubName: club.name,
+      clubImage: club.image,
+      index
+    }))
+  );
+}
+
+// The upcoming section shows events, sponsors and booths. Feeds stay in the feed section.
+function getAllUpcomingContent() {
+  return [...collectClubContent('events'), ...collectClubContent('sponsors'), ...collectClubContent('booths')];
+}
+
+function getAllFeeds() {
+  return collectClubContent('posts');
+}
+
 function renderTodayEvents() {
   const strip = document.getElementById('todayEvents');
   if (!strip) return;
@@ -411,13 +557,20 @@ function renderTodayEvents() {
   strip.innerHTML = `<span class="today-events-label">Happening today &amp; tomorrow</span>${events.map((event) => {
     const isToday = event.parsed.getTime() === start.getTime();
     return `
-      <a class="today-event-chip" href="/pages/events.html?club=${event.clubId}&event=${event.eventIndex}">
+      <a class="today-event-chip" href="/pages/event.html?club=${event.clubId}&event=${event.eventIndex}" data-club="${event.clubId}" data-idx="${event.eventIndex}">
         <span class="today-event-badge">${isToday ? 'Today' : 'Tomorrow'}</span>
         <img src="${escapeHtml(event.image || event.clubImage)}" alt="" />
         <span class="today-event-title">${escapeHtml(event.title || 'Event')}</span>
       </a>`;
   }).join('')}`;
   strip.classList.remove('hidden');
+  strip.querySelectorAll('.today-event-chip').forEach((chip) => chip.addEventListener('click', (clickEvent) => {
+    const event = events.find((item) => Number(item.clubId) === Number(chip.dataset.club) && item.eventIndex === Number(chip.dataset.idx));
+    if (event && typeof window.openEventModal === 'function') {
+      clickEvent.preventDefault();
+      window.openEventModal(event);
+    }
+  }));
 }
 
 let slideIndex = 0;
@@ -427,74 +580,101 @@ function renderEventsSlideshow() {
   const track = document.getElementById('eventsSlideshowTrack');
   const dots = document.getElementById('eventsSlideshowDots');
   if (!track || !dots) return;
-  const events = getAllEvents()
-    .map((event) => ({ ...event, parsed: new Date(event.date) }))
-    .filter((event) => !Number.isNaN(event.parsed.getTime()))
-    .sort((left, right) => left.parsed - right.parsed);
-  if (!events.length) {
-    track.innerHTML = '<p class="events-empty">No upcoming events right now.</p>';
+  const items = getAllUpcomingContent().sort(compareUpcoming);
+  if (!items.length) {
+    track.innerHTML = '<p class="events-empty">No upcoming content right now.</p>';
     dots.innerHTML = '';
     return;
   }
-  if (slideIndex >= events.length) slideIndex = 0;
-  track.innerHTML = events.map((event, i) => `
-    <div class="event-slide${i === slideIndex ? ' active' : ''}" data-club="${event.clubId}" data-idx="${event.eventIndex}">
-      <img src="${escapeHtml(event.image || event.clubImage)}" alt="${escapeHtml(event.title || 'event')}" />
+  if (slideIndex >= items.length) slideIndex = 0;
+  track.innerHTML = items.map((item, i) => {
+    const metaLine = item.contentType === 'sponsor'
+      ? [item.sponsorType, item.sponsorAmount].filter(Boolean).join(' · ')
+      : `${item.date || ''}${item.location ? ' · ' + escapeHtml(item.location) : ''}`;
+    return `
+    <div class="event-slide${i === slideIndex ? ' active' : ''}" data-club="${item.clubId}" data-idx="${item.index}" data-type="${item.contentType}">
+      <img src="${escapeHtml(item.image || item.clubImage)}" alt="${escapeHtml(item.title || 'event')}" />
       <div class="event-slide-copy">
-        <span class="event-slide-club">${escapeHtml(event.clubName || '')}</span>
-        <h3>${escapeHtml(event.title || 'Event')}</h3>
-        <p class="event-slide-meta">${escapeHtml(event.date || '')}${event.location ? ' · ' + escapeHtml(event.location) : ''}</p>
-        <p>${escapeHtml(event.description || '')}</p>
+        <span class="event-slide-club">${escapeHtml(item.clubName || '')}</span>
+        <h3>${escapeHtml(item.title || 'Event')}</h3>
+        <span class="content-type-badge ${escapeHtml(item.contentType)}">${escapeHtml(CONTENT_HOME_LABELS[item.contentType] || 'Upcoming')}</span>
+        <p class="event-slide-meta">${escapeHtml(metaLine)}</p>
+        <p>${escapeHtml(item.description || '')}</p>
         <span class="event-slide-cta">View details →</span>
       </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
   track.querySelectorAll('.event-slide').forEach((slide) => {
     slide.addEventListener('click', () => {
-      window.location.href = `/pages/events.html?club=${slide.dataset.club}&event=${slide.dataset.idx}`;
+      const contentType = slide.dataset.type;
+      if (contentType === 'sponsor') { window.location.href = '/pages/sponsors.html'; return; }
+      if (contentType === 'booth') { window.location.href = '/pages/booths.html'; return; }
+      const event = items.find((item) => item.contentType === 'event' && Number(item.clubId) === Number(slide.dataset.club) && item.index === Number(slide.dataset.idx));
+      if (event && typeof window.openEventModal === 'function') window.openEventModal({ ...event, eventIndex: event.index });
     });
   });
-  dots.innerHTML = events.map((_, i) => `<button type="button" class="${i === slideIndex ? 'active' : ''}" data-slide="${i}" aria-label="slide ${i + 1}"></button>`).join('');
+  dots.innerHTML = items.map((_, i) => `<button type="button" class="${i === slideIndex ? 'active' : ''}" data-slide="${i}" aria-label="slide ${i + 1}"></button>`).join('');
   dots.querySelectorAll('button').forEach((dot) => dot.addEventListener('click', () => { slideIndex = Number(dot.dataset.slide); renderEventsSlideshow(); }));
   const prev = document.getElementById('slidePrev');
   const next = document.getElementById('slideNext');
-  if (prev) prev.onclick = () => { slideIndex = (slideIndex - 1 + events.length) % events.length; renderEventsSlideshow(); };
-  if (next) next.onclick = () => { slideIndex = (slideIndex + 1) % events.length; renderEventsSlideshow(); };
+  if (prev) prev.onclick = () => { slideIndex = (slideIndex - 1 + items.length) % items.length; renderEventsSlideshow(); };
+  if (next) next.onclick = () => { slideIndex = (slideIndex + 1) % items.length; renderEventsSlideshow(); };
   if (slideTimer) clearInterval(slideTimer);
-  slideTimer = setInterval(() => { slideIndex = (slideIndex + 1) % events.length; renderEventsSlideshow(); }, 5000);
+  slideTimer = setInterval(() => { slideIndex = (slideIndex + 1) % items.length; renderEventsSlideshow(); }, 5000);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
   const calendarButton = document.getElementById('calendarButton');
   const calendarModal = document.getElementById('calendarModal');
   const calendarClose = document.getElementById('calendarClose');
+  const calendarTitle = document.getElementById('calendarTitle');
   const calendarGrid = document.getElementById('calendarGrid');
+  let selectedCalendarDay = null;
+  const openCalendar = () => {
+    calendarModal.classList.remove('hidden');
+    selectedCalendarDay = null;
+    renderCalendar(new Date().getFullYear(), 0);
+  };
 
   const parseDate = (value) => {
     const d = new Date(value);
     return Number.isNaN(d.getTime()) ? null : d;
   };
 
-  function renderCalendar() {
+  function renderCalendar(year = new Date().getFullYear(), month = null) {
     const events = getAllEvents().map((e) => ({ ...e, parsed: parseDate(e.date) })).filter((e) => e.parsed);
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
+    if (calendarTitle) calendarTitle.textContent = `Events calendar - ${year}`;
+    const monthOptions = `<div class="calendar-month-filter"><label for="calendarMonthSelect">Choose a month</label><select id="calendarMonthSelect"><option value="">Select month</option>${Array.from({ length: 12 }, (_, index) => `<option value="${index}"${month === index ? ' selected' : ''}>${new Date(year, index, 1).toLocaleString('en', { month: 'long' })}</option>`).join('')}</select></div>`;
+    const bindMonthFilter = () => calendarGrid.querySelector('#calendarMonthSelect')?.addEventListener('change', (event) => {
+      selectedCalendarDay = null;
+      renderCalendar(year, event.currentTarget.value === '' ? null : Number(event.currentTarget.value));
+    });
+    if (month === null) {
+      calendarGrid.innerHTML = `${monthOptions}<p class="calendar-month-prompt">Choose a month to view its days and events.</p>`;
+      bindMonthFilter();
+      return;
+    }
+
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const firstDay = new Date(year, month, 1).getDay();
-    let html = `<div class="calendar-month">${now.toLocaleString('en', { month: 'long', year: 'numeric' })}</div><div class="calendar-week">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d) => `<span>${d}</span>`).join('')}</div><div class="calendar-days">`;
+    let html = `<div class="calendar-week">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d) => `<span>${d}</span>`).join('')}</div><div class="calendar-days">`;
     for (let i = 0; i < firstDay; i++) html += '<span></span>';
     for (let day = 1; day <= daysInMonth; day++) {
       const dayEvents = events.filter((e) => e.parsed.getFullYear() === year && e.parsed.getMonth() === month && e.parsed.getDate() === day);
-      html += `<div class="calendar-day" data-day="${day}"><strong>${day}</strong>${dayEvents.map((e, i) => `<button type="button" class="calendar-event${i >= 2 ? ' extra' : ''}" data-idx="${events.indexOf(e)}" title="${escapeHtml(e.title || '')}"><img src="${escapeHtml(e.image || e.clubImage)}" alt="" />${escapeHtml(e.title || '')}</button>`).join('')}${dayEvents.length > 2 ? `<button type="button" class="calendar-more">+${dayEvents.length - 2} more</button>` : ''}</div>`;
+      html += `<div class="calendar-day${selectedCalendarDay === day ? ' is-selected' : ''}" data-day="${day}"><strong>${day}</strong>${dayEvents.map((e, i) => `<button type="button" class="calendar-event${i >= 2 ? ' extra' : ''}" data-idx="${events.indexOf(e)}" data-day="${day}" title="${escapeHtml(e.title || '')}"><img src="${escapeHtml(e.image || e.clubImage)}" alt="" />${escapeHtml(e.title || '')}</button>`).join('')}${dayEvents.length > 2 ? `<button type="button" class="calendar-more">+${dayEvents.length - 2} more</button>` : ''}</div>`;
     }
     html += '</div>';
-    if (calendarGrid) calendarGrid.innerHTML = html;
+    if (calendarGrid) calendarGrid.innerHTML = `${monthOptions}${html}`;
     if (calendarGrid) {
+      bindMonthFilter();
       calendarGrid.querySelectorAll('.calendar-event').forEach((btn) => {
         btn.addEventListener('click', () => {
           const event = events[Number(btn.dataset.idx)];
-          if (event) window.location.href = `/pages/events.html?club=${event.clubId}&event=${event.eventIndex}`;
+          if (event) {
+            selectedCalendarDay = Number(btn.dataset.day);
+            renderCalendar(year, month);
+            if (typeof window.openEventModal === 'function') window.openEventModal(event);
+          }
         });
       });
       calendarGrid.querySelectorAll('.calendar-more').forEach((btn) => {
@@ -508,12 +688,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  if (calendarButton) calendarButton.addEventListener('click', () => {
-    calendarModal.classList.remove('hidden');
-    renderCalendar();
+  if (calendarButton) calendarButton.addEventListener('click', openCalendar);
+  document.addEventListener('click', (event) => {
+    if (event.target.closest('#calendarNavLink') && (location.pathname === '/' || location.pathname === '/index.html')) {
+      event.preventDefault();
+      openCalendar();
+    }
   });
+  if (location.hash === '#calendar') {
+    openCalendar();
+    history.replaceState(null, '', `${location.pathname}${location.search}`);
+  }
   if (calendarClose) calendarClose.addEventListener('click', () => calendarModal.classList.add('hidden'));
   if (calendarModal) calendarModal.addEventListener('click', (event) => { if (event.target === calendarModal) calendarModal.classList.add('hidden'); });
+
+  window.openCalendarAt = (year, month, day) => {
+    calendarModal.classList.remove('hidden');
+    selectedCalendarDay = Number.isInteger(day) ? day : null;
+    renderCalendar(year, month);
+    if (selectedCalendarDay) calendarGrid.querySelector(`[data-day="${selectedCalendarDay}"]`)?.scrollIntoView({ block: 'nearest' });
+  };
 });
 
 function escapeHtml(value) {

@@ -190,6 +190,111 @@ async function loadCommitteeHeads() {
   }
 }
 
+async function loadClubMembers() {
+  const list = document.getElementById('clubMemberList');
+  const count = document.getElementById('memberRosterCount');
+  const committeeSelect = document.getElementById('clubMemberCommittee');
+  if (!list || !count || !committeeSelect) return;
+  list.replaceChildren();
+  count.textContent = 'Loading members…';
+  try {
+    const response = await fetch('/api/club/members');
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Could not load club members.');
+    const members = Array.isArray(data.members) ? data.members : [];
+    const committees = Array.isArray(data.committees) ? data.committees : [];
+    count.textContent = `${members.length} listed · ${Number(data.totalCount) || 0} total club members`;
+    const selectedCommittee = committeeSelect.value;
+    committeeSelect.replaceChildren(new Option('Choose a committee', ''));
+    committees.forEach((committee) => committeeSelect.add(new Option(committee, committee)));
+    if (committees.includes(selectedCommittee)) committeeSelect.value = selectedCommittee;
+    document.getElementById('showMemberFormBtn').disabled = committees.length === 0;
+    if (!committees.length) {
+      const noCommittees = document.createElement('p');
+      noCommittees.className = 'member-roster-empty';
+      noCommittees.textContent = 'Add a committee head before assigning members to committees.';
+      list.append(noCommittees);
+    } else if (!members.length) {
+      const empty = document.createElement('p');
+      empty.className = 'member-roster-empty';
+      empty.textContent = `The club profile tracks ${Number(data.totalCount) || 0} members, but does not have individual names yet. Add a member to start the named roster.`;
+      list.append(empty);
+    }
+    members.forEach((member) => {
+      const card = document.createElement('article');
+      card.className = 'member-roster-card';
+      const details = document.createElement('div');
+      const name = document.createElement('strong');
+      name.textContent = member.name;
+      const meta = document.createElement('p');
+      meta.textContent = `${member.committee} · ${member.position}`;
+      const type = document.createElement('span');
+      type.className = 'member-type-pill';
+      type.textContent = member.memberType === 'senior' ? 'Senior member' : 'New member';
+      details.append(name, meta);
+      card.append(details, type);
+      list.append(card);
+    });
+    const note = document.getElementById('clubMemberCountNote');
+    if (note) note.textContent = `${Number(data.totalCount) || 0} club members · ${members.length} named profiles`;
+  } catch (error) {
+    count.textContent = 'Members could not be loaded';
+    const message = document.createElement('p');
+    message.className = 'member-roster-empty';
+    message.textContent = error.message;
+    list.append(message);
+  }
+}
+
+const memberManagerDialog = document.getElementById('memberManagerDialog');
+document.getElementById('openMemberManagerBtn')?.addEventListener('click', () => {
+  memberManagerDialog?.showModal();
+  loadClubMembers();
+});
+document.getElementById('closeMemberManagerBtn')?.addEventListener('click', () => memberManagerDialog?.close());
+document.getElementById('showMemberFormBtn')?.addEventListener('click', () => {
+  const form = document.getElementById('clubMemberForm');
+  form.classList.toggle('hidden');
+  if (!form.classList.contains('hidden')) form.querySelector('[name="name"]')?.focus();
+});
+document.getElementById('cancelMemberFormBtn')?.addEventListener('click', () => {
+  document.getElementById('clubMemberForm')?.classList.add('hidden');
+});
+document.getElementById('clubMemberCommittee')?.addEventListener('change', (event) => {
+  const position = document.getElementById('clubMemberPosition');
+  position.placeholder = event.currentTarget.value ? `Position in ${event.currentTarget.value}` : 'Enter their committee position';
+});
+document.getElementById('clubMemberForm')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const feedback = document.getElementById('clubMemberFeedback');
+  feedback.textContent = '';
+  feedback.classList.remove('is-error');
+  const formData = new FormData(form);
+  try {
+    const response = await fetch('/api/club/members', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: formData.get('name'),
+        committee: formData.get('committee'),
+        position: formData.get('position'),
+        memberType: formData.get('memberType')
+      })
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Could not add this member.');
+    form.reset();
+    form.classList.add('hidden');
+    document.getElementById('clubMemberPosition').placeholder = 'Enter their committee position';
+    feedback.textContent = `${result.member.name} was added to ${result.member.committee}.`;
+    await loadClubMembers();
+  } catch (error) {
+    feedback.textContent = error.message;
+    feedback.classList.add('is-error');
+  }
+});
+
 function editCommitteeHead(head, row) {
   const form = document.createElement('form');
   form.className = 'committee-head-edit-form';
@@ -306,7 +411,7 @@ document.getElementById('saveReviewBtn').addEventListener('click', async () => {
   await saveInterviewReview();
 });
 
-document.getElementById('myFormsButton').addEventListener('click', () => {});
+document.getElementById('myFormsButton')?.addEventListener('click', () => {});
 document.getElementById('myFormsBackHomeBtn').addEventListener('click', () => showView('home'));
 document.getElementById('applicationBackHomeBtn').addEventListener('click', () => {
   state.editingMyForm = null;
@@ -603,6 +708,16 @@ async function init() {
     await openClubPortal();
   } else {
     const query = new URLSearchParams(window.location.search);
+    if (query.has('calendarYear') && query.has('calendarMonth')) {
+      const year = Number(query.get('calendarYear'));
+      const month = Number(query.get('calendarMonth'));
+      const day = Number(query.get('calendarDay'));
+      showView('home');
+      const reopenCalendar = () => window.openCalendarAt(year, month, Number.isInteger(day) ? day : null);
+      if (typeof window.openCalendarAt === 'function') reopenCalendar();
+      else document.addEventListener('DOMContentLoaded', reopenCalendar, { once: true });
+      return;
+    }
     const requestedApplicationClubId = Number(query.get('apply'));
     if (requestedApplicationClubId && state.clubs.some((club) => club.id === requestedApplicationClubId)) {
       await openApplicationForm(requestedApplicationClubId);

@@ -37,13 +37,18 @@ const defaultClubs = [
     category: 'Innovation',
     tagline: 'Creative projects and student initiatives',
     image: '/assets/img/pics/Utopia.jpg',
+    imagePublicId: '',
     imageFit: 'contain',
     status: 'open',
     seats: 25,
     members: 18,
     applicants: 7,
     description: 'A creative student community focused on innovation, leadership, and real-world problem solving.',
-    requirements: 'Curiosity, teamwork, and a passion for creating impact.'
+    requirements: 'Curiosity, teamwork, and a passion for creating impact.',
+    applicationIntro: '',
+    applicationFields: [],
+    sponsors: [],
+    booths: []
   },
   {
     id: 2,
@@ -52,13 +57,18 @@ const defaultClubs = [
     category: 'Debate & Leadership',
     tagline: 'Diplomacy, debate, and public speaking',
     image: '/assets/img/pics/mun.jpg',
+    imagePublicId: '',
     imageFit: 'contain',
     status: 'open',
     seats: 30,
     members: 22,
     applicants: 9,
     description: 'Develop public speaking, diplomacy, and international relations through model UN experiences.',
-    requirements: 'Confidence, research skills, and strong communication.'
+    requirements: 'Confidence, research skills, and strong communication.',
+    applicationIntro: '',
+    applicationFields: [],
+    sponsors: [],
+    booths: []
   },
   {
     id: 3,
@@ -67,13 +77,18 @@ const defaultClubs = [
     category: 'Career Growth',
     tagline: 'Career skills and professional growth',
     image: '/assets/img/pics/cdc.jpg',
+    imagePublicId: '',
     imageFit: 'contain',
     status: 'open',
     seats: 20,
     members: 16,
     applicants: 6,
     description: 'Helps students build professional skills, career awareness, and future-ready opportunities.',
-    requirements: 'Motivation to grow personally and professionally.'
+    requirements: 'Motivation to grow personally and professionally.',
+    applicationIntro: '',
+    applicationFields: [],
+    sponsors: [],
+    booths: []
   },
   {
     id: 4,
@@ -82,13 +97,18 @@ const defaultClubs = [
     category: 'Media & Content',
     tagline: 'Media production and creative content',
     image: '/assets/img/pics/dimas.jpg',
+    imagePublicId: '',
     imageFit: 'contain',
     status: 'full',
     seats: 18,
     members: 18,
     applicants: 5,
     description: 'A media-driven club focused on storytelling, digital content, and creative expression.',
-    requirements: 'Creativity, design sense, and communication skills.'
+    requirements: 'Creativity, design sense, and communication skills.',
+    applicationIntro: '',
+    applicationFields: [],
+    sponsors: [],
+    booths: []
   },
   {
     id: 5,
@@ -97,13 +117,18 @@ const defaultClubs = [
     category: 'Technology',
     tagline: 'Engineering, technology, and innovation',
     image: '/assets/img/pics/ieee.jpg',
+    imagePublicId: '',
     imageFit: 'contain',
     status: 'open',
     seats: 26,
     members: 19,
     applicants: 8,
     description: 'Connects students with engineering, technology, and innovation through events and projects.',
-    requirements: 'Interest in technology, engineering, and collaboration.'
+    requirements: 'Interest in technology, engineering, and collaboration.',
+    applicationIntro: '',
+    applicationFields: [],
+    sponsors: [],
+    booths: []
   },
   {
     id: 6,
@@ -112,13 +137,18 @@ const defaultClubs = [
     category: 'Programming',
     tagline: 'Competitive programming and problem-solving',
     image: '/assets/img/pics/acpc.jpg',
+    imagePublicId: '',
     imageFit: 'contain',
     status: 'open',
     seats: 24,
     members: 17,
     applicants: 10,
     description: 'Encourages competitive programming, teamwork, and problem-solving through training and events.',
-    requirements: 'Analytical thinking and passion for coding challenges.'
+    requirements: 'Analytical thinking and passion for coding challenges.',
+    applicationIntro: '',
+    applicationFields: [],
+    sponsors: [],
+    booths: []
   },
   {
     id: 7,
@@ -127,13 +157,18 @@ const defaultClubs = [
     category: 'Sports',
     tagline: 'Fitness, sports, and team activities',
     image: '/assets/img/pics/tuners.jpg',
+    imagePublicId: '',
     imageFit: 'contain',
     status: 'open',
     seats: 22,
     members: 14,
     applicants: 4,
     description: 'Promotes movement, teamwork, endurance, and active student life through sports activities.',
-    requirements: 'Energy, discipline, and willingness to participate.'
+    requirements: 'Energy, discipline, and willingness to participate.',
+    applicationIntro: '',
+    applicationFields: [],
+    sponsors: [],
+    booths: []
   },
   {
     id: 8,
@@ -142,13 +177,18 @@ const defaultClubs = [
     category: 'Arts & Performance',
     tagline: 'Acting, stage performance, and storytelling',
     image: '/assets/img/pics/theater.jpg',
+    imagePublicId: '',
     imageFit: 'contain',
     status: 'full',
     seats: 16,
     members: 16,
     applicants: 3,
     description: 'A performance-focused space for acting, expression, stage work, and creative storytelling.',
-    requirements: 'Confidence, creativity, and passion for performance.'
+    requirements: 'Confidence, creativity, and passion for performance.',
+    applicationIntro: '',
+    applicationFields: [],
+    sponsors: [],
+    booths: []
   },
   {
     id: 9,
@@ -157,13 +197,18 @@ const defaultClubs = [
     category: 'Student Life',
     tagline: 'Campus events and student community',
     image: '/assets/img/pics/msp.jpg',
+    imagePublicId: '',
     imageFit: 'contain',
     status: 'open',
     seats: 28,
     members: 20,
     applicants: 7,
     description: 'Supports student engagement, community building, and collaborative campus initiatives.',
-    requirements: 'Leadership, initiative, and a service mindset.'
+    requirements: 'Leadership, initiative, and a service mindset.',
+    applicationIntro: '',
+    applicationFields: [],
+    sponsors: [],
+    booths: []
   },
   {
     id: 10,
@@ -172,13 +217,18 @@ const defaultClubs = [
     category: 'Gaming & Esports',
     tagline: 'Gaming, competition, and community',
     image: '/assets/img/pics/gamerslegacy.jpg',
+    imagePublicId: '',
     imageFit: 'contain',
     status: 'open',
     seats: 24,
     members: 16,
     applicants: 5,
     description: 'A student gaming community for competitions, events, and connecting players across campus.',
-    requirements: 'Team spirit, good sportsmanship, and an interest in gaming.'
+    requirements: 'Team spirit, good sportsmanship, and an interest in gaming.',
+    applicationIntro: '',
+    applicationFields: [],
+    sponsors: [],
+    booths: []
   },
   {
     id: 11,
@@ -187,13 +237,18 @@ const defaultClubs = [
     category: 'Health Awareness',
     tagline: 'Hepatitis awareness and education',
     image: '/assets/img/pics/ihepc.jpg',
+    imagePublicId: '',
     imageFit: 'contain',
     status: 'open',
     seats: 20,
     members: 13,
     applicants: 4,
     description: 'Raises awareness and shares educational information about hepatitis and related health topics.',
-    requirements: 'Interest in health awareness, education, and community outreach.'
+    requirements: 'Interest in health awareness, education, and community outreach.',
+    applicationIntro: '',
+    applicationFields: [],
+    sponsors: [],
+    booths: []
   },
   {
     id: 12,
@@ -202,13 +257,18 @@ const defaultClubs = [
     category: 'Ideas & Events',
     tagline: 'Ideas worth sharing through campus events',
     image: '/assets/img/pics/tedx.jpg',
+    imagePublicId: '',
     imageFit: 'contain',
     status: 'open',
     seats: 24,
     members: 17,
     applicants: 6,
     description: 'Organizes independently hosted TED-style events to bring ideas and speakers to the MIU community.',
-    requirements: 'Creativity, organization, and an interest in sharing ideas.'
+    requirements: 'Creativity, organization, and an interest in sharing ideas.',
+    applicationIntro: '',
+    applicationFields: [],
+    sponsors: [],
+    booths: []
   }
 ];
 
@@ -317,6 +377,7 @@ async function makeClub(payload, existing, id) {
     status,
     seats: positiveNumber(payload.seats),
     members: positiveNumber(payload.members),
+    memberRoster: existing?.memberRoster || [],
     applicants: positiveNumber(payload.applicants),
     description: cleanText(payload.description, 1200),
     requirements: cleanText(payload.requirements, 600),
@@ -721,6 +782,9 @@ async function initializeMongoData() {
   }
   homepageSettings = { title: homepageRecord.title, subtitle: homepageRecord.subtitle };
 
+  // Legacy feed posts used the generic "post" type; normalize them to "feed".
+  await ContentRequest.updateMany({ type: 'post' }, { $set: { type: 'feed' } });
+
   clubs = (await Club.find().sort({ sortOrder: 1, id: 1 }).lean()).map((record, index) => ({
     ...toApiRecord(record),
     sortOrder: Number.isFinite(Number(record.sortOrder)) ? Number(record.sortOrder) : index + 1,
@@ -837,6 +901,58 @@ app.get('/api/club/heads', requireClubAuth, requireClubPresident, (req, res) => 
   res.json(clubAccounts
     .filter((account) => account.clubId === req.clubAccount.clubId && account.role === 'head')
     .map(({ email, committee }) => ({ email, committee })));
+});
+
+app.get('/api/club/members', requireClubAuth, requireClubPresident, async (req, res) => {
+  try {
+    const club = mongoReady
+      ? await Club.findOne({ id: req.clubAccount.clubId }).select('members memberRoster').lean()
+      : clubs.find((item) => item.id === req.clubAccount.clubId);
+    if (!club) return res.status(404).json({ message: 'Club not found.' });
+    const committees = [...new Set(clubAccounts
+      .filter((account) => account.clubId === req.clubAccount.clubId && account.role === 'head' && account.committee)
+      .map((account) => account.committee))];
+    res.json({ members: Array.isArray(club.memberRoster) ? club.memberRoster : [], totalCount: Number(club.members) || 0, committees });
+  } catch (error) {
+    console.error('Database operation failed:', error.name);
+    res.status(503).json({ message: 'Could not load club members right now.' });
+  }
+});
+
+app.post('/api/club/members', requireClubAuth, requireClubPresident, async (req, res) => {
+  const name = cleanText(req.body.name, 120);
+  const requestedCommittee = cleanText(req.body.committee, 100);
+  const position = cleanText(req.body.position, 100);
+  const memberType = req.body.memberType;
+  const committee = clubAccounts.find((account) => account.clubId === req.clubAccount.clubId
+    && account.role === 'head' && account.committee
+    && account.committee.toLowerCase() === requestedCommittee.toLowerCase())?.committee;
+
+  if (!name) return res.status(400).json({ message: 'Enter the member name.' });
+  if (!committee) return res.status(400).json({ message: 'Choose a committee managed by a committee head.' });
+  if (!position) return res.status(400).json({ message: 'Enter the member position.' });
+  if (!['new', 'senior'].includes(memberType)) return res.status(400).json({ message: 'Choose New member or Senior member.' });
+
+  const club = clubs.find((item) => item.id === req.clubAccount.clubId);
+  if (!club) return res.status(404).json({ message: 'Club not found.' });
+  const member = { id: crypto.randomBytes(16).toString('hex'), name, committee, position, memberType, createdAt: new Date().toISOString() };
+  try {
+    if (mongoReady) {
+      const savedClub = await Club.findOneAndUpdate(
+        { id: req.clubAccount.clubId },
+        { $push: { memberRoster: member }, $inc: { members: 1 } },
+        { new: true, runValidators: true }
+      ).select('id');
+      if (!savedClub) return res.status(404).json({ message: 'Club not found.' });
+    }
+    club.members = (Number(club.members) || 0) + 1;
+    club.memberRoster = [...(club.memberRoster || []), member];
+    if (!mongoReady) writeJsonFile(clubsFile, clubs);
+    res.status(201).json({ member, totalCount: club.members });
+  } catch (error) {
+    console.error('Database operation failed:', error.name);
+    res.status(503).json({ message: 'Could not add this member right now.' });
+  }
 });
 
 app.get('/api/club/application-form', requireClubAuth, requireClubPresident, (req, res) => {
@@ -1068,6 +1184,161 @@ function requireCommitteeRole(req, res, next) {
 const committeeStage = { pr: 'pending_pr', english: 'pending_english', dean: 'pending_dean' };
 const committeeRoleLabels = { pr: 'PR Department', english: 'English Department', dean: 'Dean' };
 
+// Dedicated content types. Each module (Event, Feed, Sponsor, Booth) assigns its own type.
+const CONTENT_TYPES = ['event', 'feed', 'sponsor', 'booth'];
+const contentTypeLabels = { event: 'Event', feed: 'Feed', sponsor: 'Sponsor', booth: 'Booth' };
+const contentHomeLabels = {
+  event: 'Upcoming Event',
+  feed: 'Latest Feed',
+  sponsor: 'Upcoming Sponsor',
+  booth: 'Booth Opening Soon'
+};
+const contentSingular = { event: 'event', feed: 'feed post', sponsor: 'sponsor request', booth: 'booth request' };
+const contentClubField = { event: 'events', feed: 'posts', sponsor: 'sponsors', booth: 'booths' };
+
+function isContentType(value) {
+  return CONTENT_TYPES.includes(value);
+}
+
+function contentLabel(type) {
+  return contentTypeLabels[type] || 'Content';
+}
+
+function contentSingularLabel(type) {
+  return contentSingular[type] || 'content';
+}
+
+// The date used for "upcoming" sorting: booths sort by their opening date.
+function contentRequestDate(record) {
+  if (record.type === 'booth') return record.boothOpenDate || record.date || '';
+  return record.date || '';
+}
+
+function extractSponsorFields(body) {
+  return {
+    sponsorName: cleanText(body.sponsorName, 140),
+    sponsorCompany: cleanText(body.sponsorCompany, 140),
+    sponsorContact: cleanText(body.sponsorContact, 100),
+    sponsorEmail: cleanText(body.sponsorEmail, 140),
+    sponsorPhone: cleanText(body.sponsorPhone, 40),
+    sponsorType: cleanText(body.sponsorType, 40),
+    sponsorAmount: cleanText(body.sponsorAmount, 80),
+    sponsorBenefits: cleanText(body.sponsorBenefits, 2000),
+    sponsorDescription: cleanText(body.sponsorDescription, 2000),
+    sponsorLogo: typeof body.sponsorLogo === 'string' ? body.sponsorLogo.slice(0, 4 * 1024 * 1024) : '',
+    sponsorAttachment: typeof body.sponsorAttachment === 'string' ? body.sponsorAttachment.slice(0, 4 * 1024 * 1024) : '',
+    sponsorNotes: cleanText(body.sponsorNotes, 2000)
+  };
+}
+
+function extractBoothFields(body) {
+  return {
+    boothName: cleanText(body.boothName, 140),
+    boothPurpose: cleanText(body.boothPurpose, 2000),
+    boothDescription: cleanText(body.boothDescription, 2000),
+    boothLocation: cleanText(body.boothLocation, 140),
+    boothSize: cleanText(body.boothSize, 60),
+    boothEquipment: cleanText(body.boothEquipment, 2000),
+    boothSetupDate: cleanText(body.boothSetupDate, 40),
+    boothOpenDate: cleanText(body.boothOpenDate, 40),
+    boothCloseDate: cleanText(body.boothCloseDate, 40),
+    boothContact: cleanText(body.boothContact, 100),
+    boothNotes: cleanText(body.boothNotes, 2000)
+  };
+}
+
+// Type-specific fields attached to every content request.
+function extractContentFields(type, body) {
+  if (type === 'sponsor') return extractSponsorFields(body);
+  if (type === 'booth') return extractBoothFields(body);
+  return {};
+}
+
+// The public title of a request: sponsors and booths are titled by their name field.
+function contentTitle(type, body) {
+  const title = cleanText(body.title, 140);
+  if (title) return title;
+  if (type === 'sponsor') return cleanText(body.sponsorName, 140);
+  if (type === 'booth') return cleanText(body.boothName, 140);
+  return '';
+}
+
+function contentRequiresTitle(type) {
+  return type === 'event' || type === 'feed';
+}
+
+// Remove a published item from the club's content list for a request.
+function removePublishedItem(club, record) {
+  const field = contentClubField[record.type];
+  if (!club || !field) return;
+  const matchesRequest = (item) => Number(item.requestId) === Number(record.id)
+    || (!item.requestId && item.title === record.title && item.date === record.date && item.description === record.description);
+  club[field] = (club[field] || []).filter((item) => !matchesRequest(item));
+}
+
+// The published item stored on the club document after the Dean approves.
+function buildPublishedItem(record, club) {
+  const item = {
+    requestId: record.id,
+    contentType: record.type,
+    title: record.title,
+    date: record.date,
+    time: record.time,
+    location: record.location,
+    budget: record.budget,
+    description: record.description,
+    image: record.image || club.image,
+    createdAt: record.createdAt
+  };
+  if (record.type === 'sponsor') {
+    Object.assign(item, {
+      sponsorName: record.sponsorName,
+      sponsorCompany: record.sponsorCompany,
+      sponsorContact: record.sponsorContact,
+      sponsorEmail: record.sponsorEmail,
+      sponsorPhone: record.sponsorPhone,
+      sponsorType: record.sponsorType,
+      sponsorAmount: record.sponsorAmount,
+      sponsorBenefits: record.sponsorBenefits,
+      sponsorDescription: record.sponsorDescription,
+      sponsorLogo: record.sponsorLogo || '',
+      sponsorAttachment: record.sponsorAttachment || '',
+      sponsorNotes: record.sponsorNotes
+    });
+  }
+  if (record.type === 'booth') {
+    Object.assign(item, {
+      boothName: record.boothName,
+      boothPurpose: record.boothPurpose,
+      boothDescription: record.boothDescription,
+      boothLocation: record.boothLocation,
+      boothSize: record.boothSize,
+      boothEquipment: record.boothEquipment,
+      boothSetupDate: record.boothSetupDate,
+      boothOpenDate: record.boothOpenDate,
+      boothCloseDate: record.boothCloseDate,
+      boothContact: record.boothContact,
+      boothNotes: record.boothNotes
+    });
+  }
+  if (record.type === 'feed') {
+    item.author = club.name;
+    item.text = record.description;
+  }
+  return item;
+}
+
+// Shared type-aware notice text for club notifications.
+function contentNotice(roleLabel, action, type, comment) {
+  const label = contentSingularLabel(type);
+  if (action === 'request_edit') return `${roleLabel} requested edits: ${comment}`;
+  if (action === 'reject') return `${roleLabel} rejected the ${label}.`;
+  if (action === 'comment') return `${roleLabel} sent a comment on the ${label}.`;
+  if (action === 'delete') return `${roleLabel} deleted this ${label}.`;
+  if (action === 'restarted_review') return `${roleLabel} restarted review and sent this note: ${comment}`;
+  return `${roleLabel} updated the ${label}.`;
+}
+
 function shapeClubContentRecord(record) {
   const { _id, __v, ...rest } = record;
   const privateReturnEvents = (rest.workflowHistory || []).filter((event) => event.role === 'dean'
@@ -1079,7 +1350,7 @@ function shapeClubContentRecord(record) {
   if (rest.comments?.dean) {
     rest.comments = { ...rest.comments, dean: rest.comments.dean.split('\n').filter((line) => !privateReturnComments.has(line)).join('\n') };
   }
-  rest.clubNotice = String(rest.clubNotice || '').replace(/^(Dean returned the event to .*?) with this comment:.*$/, '$1 for another review.');
+  rest.clubNotice = String(rest.clubNotice || '').replace(/^(Dean returned the .*?) with this comment:.*$/, '$1 for another review.');
   return rest;
 }
 
@@ -1144,12 +1415,34 @@ app.post('/api/club/content', requireClubAuth, async (req, res) => {
   if (!['president', 'head'].includes(req.clubAccount.role)) {
     return res.status(403).json({ message: 'Only club presidents and heads can manage content.' });
   }
+  if (!isContentType(req.body.type)) {
+    return res.status(400).json({ message: 'Choose a valid content type: event, feed, sponsor, or booth.' });
+  }
+  return createContentRequest(req, res, req.body.type);
+});
+
+// Each module assigns its own content type automatically.
+for (const moduleType of CONTENT_TYPES) {
+  app.post(`/api/club/content/${moduleType}`, requireClubAuth, async (req, res) => {
+    if (!['president', 'head'].includes(req.clubAccount.role)) {
+      return res.status(403).json({ message: 'Only club presidents and heads can manage content.' });
+    }
+    return createContentRequest(req, res, moduleType);
+  });
+}
+
+async function createContentRequest(req, res, type) {
   try {
     if (!mongoReady) return res.status(503).json({ message: 'Content storage needs MongoDB.' });
-    const type = req.body.type === 'event' ? 'event' : 'post';
-    const title = cleanText(req.body.title, 140);
-    const description = cleanText(req.body.description, 2000);
-    if (!title) return res.status(400).json({ message: 'Enter a title.' });
+    const title = contentTitle(type, req.body);
+    if (!title) {
+      return res.status(400).json({ message: type === 'event' || type === 'feed'
+        ? 'Enter a title.'
+        : type === 'sponsor' ? 'Enter the sponsor name.' : 'Enter the booth name.' });
+    }
+    const description = cleanText(req.body.description, 2000)
+      || (type === 'sponsor' ? cleanText(req.body.sponsorDescription, 2000) : '')
+      || (type === 'booth' ? cleanText(req.body.boothDescription, 2000) : '');
     const club = clubs.find((item) => item.id === req.clubAccount.clubId);
     const last = await ContentRequest.findOne().sort({ id: -1 }).lean();
     const record = await ContentRequest.create({
@@ -1159,13 +1452,14 @@ app.post('/api/club/content', requireClubAuth, async (req, res) => {
       type,
       title,
       description,
-      date: cleanText(req.body.date, 40),
+      date: type === 'booth' ? (cleanText(req.body.boothOpenDate, 40) || cleanText(req.body.date, 40)) : cleanText(req.body.date, 40),
       time: cleanText(req.body.time, 40),
-      location: cleanText(req.body.location, 120),
+      location: type === 'booth' ? (cleanText(req.body.boothLocation, 140) || cleanText(req.body.location, 120)) : cleanText(req.body.location, 120),
       budget: cleanText(req.body.budget, 80),
       image: typeof req.body.image === 'string' ? req.body.image.slice(0, 4 * 1024 * 1024) : '',
+      ...extractContentFields(type, req.body),
       status: req.body.submit === true ? 'pending_pr' : 'draft',
-      clubNotice: req.body.submit === true ? 'Club submitted a new event for PR review.' : ''
+      clubNotice: req.body.submit === true ? `Club submitted a new ${contentSingularLabel(type)} for PR review.` : ''
     });
     if (req.body.submit === true) appendWorkflowEvent(record, 'club', 'submitted', 'draft', 'pending_pr', '', req.clubAccount);
     if (req.body.submit === true) await record.save();
@@ -1175,7 +1469,7 @@ app.post('/api/club/content', requireClubAuth, async (req, res) => {
     console.error('Database operation failed:', error.name);
     res.status(503).json({ message: 'Could not save content right now.' });
   }
-});
+}
 
 app.put('/api/club/content/:id', requireClubAuth, async (req, res) => {
   if (!['president', 'head'].includes(req.clubAccount.role)) {
@@ -1188,14 +1482,29 @@ app.put('/api/club/content/:id', requireClubAuth, async (req, res) => {
     if (!['draft', 'changes_requested', 'rejected'].includes(record.status)) {
       return res.status(409).json({ message: 'This content is already under review or published.' });
     }
-    if (req.body.type === 'event' || req.body.type === 'post') record.type = req.body.type;
-    record.title = cleanText(req.body.title, 140) || record.title;
-    if (req.body.description !== undefined) record.description = cleanText(req.body.description, 2000);
+    // The content type is fixed by the module that created the request.
+    const type = record.type;
+    const title = contentTitle(type, req.body);
+    if (title && contentRequiresTitle(type)) record.title = title;
+    else if (title && (type === 'sponsor' || type === 'booth')) record.title = title;
+    if (req.body.description !== undefined || type === 'sponsor' || type === 'booth') {
+      const description = cleanText(req.body.description, 2000)
+        || (type === 'sponsor' ? cleanText(req.body.sponsorDescription, 2000) : '')
+        || (type === 'booth' ? cleanText(req.body.boothDescription, 2000) : '');
+      if (req.body.description !== undefined || description) record.description = description;
+    }
     if (req.body.date !== undefined) record.date = cleanText(req.body.date, 40);
     if (req.body.time !== undefined) record.time = cleanText(req.body.time, 40);
     if (req.body.location !== undefined) record.location = cleanText(req.body.location, 120);
     if (req.body.budget !== undefined) record.budget = cleanText(req.body.budget, 80);
     if (typeof req.body.image === 'string') record.image = req.body.image.slice(0, 4 * 1024 * 1024);
+    if (type === 'sponsor') Object.assign(record, extractSponsorFields(req.body));
+    if (type === 'booth') {
+      Object.assign(record, extractBoothFields(req.body));
+      // Booths are tracked by their opening date and preferred location.
+      record.date = record.boothOpenDate || record.date;
+      record.location = record.boothLocation || record.location;
+    }
     if (record.status === 'changes_requested' && !record.editRequestedBy && record.comments?.english) {
       record.resubmitTo = 'pending_english';
     }
@@ -1205,7 +1514,7 @@ app.put('/api/club/content/:id', requireClubAuth, async (req, res) => {
       const isFirstSubmission = !(record.workflowHistory || []).some((event) => ['submitted', 'resubmitted'].includes(event.action));
       record.status = targetStage;
       record.resubmitTo = 'pending_pr';
-      record.clubNotice = `${isFirstSubmission ? 'Club submitted a new event' : 'Club resubmitted the updated event'}. Waiting for ${targetStage === 'pending_pr' ? 'PR Department' : 'English Department'} review.`;
+      record.clubNotice = `${isFirstSubmission ? 'Club submitted a new' : 'Club resubmitted the updated'} ${contentSingularLabel(type)}. Waiting for ${targetStage === 'pending_pr' ? 'PR Department' : 'English Department'} review.`;
       appendWorkflowEvent(record, 'club', isFirstSubmission ? 'submitted' : 'resubmitted', fromStatus, targetStage, '', req.clubAccount);
       record.editRequestedBy = '';
     } else {
@@ -1228,12 +1537,17 @@ app.delete('/api/club/content/:id', requireClubAuth, async (req, res) => {
     if (!mongoReady) return res.status(503).json({ message: 'Content storage needs MongoDB.' });
     const record = await ContentRequest.findOne({ id: Number(req.params.id), clubId: req.clubAccount.clubId });
     if (!record) return res.status(404).json({ message: 'Content not found.' });
-    if (record.status === 'deleted') return res.status(409).json({ message: 'This event was deleted by the Dean and is retained in the review history.' });
+    if (record.status === 'deleted') return res.status(409).json({ message: `This ${contentSingularLabel(record.type)} was deleted by the Dean and is retained in the review history.` });
     await ContentRequest.deleteOne({ _id: record._id });
     if (record.status === 'published') {
-      await Club.updateOne({ id: record.clubId }, record.type === 'event'
-        ? { $pull: { events: { title: record.title, date: record.date } } }
-        : { $pull: { posts: { title: record.title, date: record.date } } });
+      const field = contentClubField[record.type];
+      await Club.updateOne(
+        { id: record.clubId },
+        { $pull: { [field]: { $or: [
+          { requestId: record.id },
+          { title: record.title, date: record.date, description: record.description }
+        ] } } }
+      );
     }
     res.status(204).end();
   } catch (error) {
@@ -1258,13 +1572,13 @@ app.get('/api/committee/status', requireClubAuth, requireCommitteeRole, async (r
   try {
     if (!mongoReady) return res.status(503).json({ message: 'Content storage needs MongoDB.' });
     const records = await ContentRequest.find({})
-      .select('id clubName type title date time status image submittedAt publishedAt clubNotice editRequestedBy comments commentHistory hiddenCommentRoles')
+      .select('id clubName type title date time status image submittedAt publishedAt clubNotice editRequestedBy comments commentHistory hiddenCommentRoles createdAt sponsorName sponsorCompany sponsorContact sponsorEmail sponsorPhone sponsorType sponsorAmount sponsorBenefits sponsorDescription sponsorLogo sponsorAttachment sponsorNotes boothName boothPurpose boothDescription boothLocation boothSize boothEquipment boothSetupDate boothOpenDate boothCloseDate boothContact boothNotes')
       .sort({ id: -1 })
       .lean();
     res.json(records.map((record) => { const { _id, __v, ...rest } = record; return rest; }));
   } catch (error) {
     console.error('Database operation failed:', error.name);
-    res.status(503).json({ message: 'Could not load event statuses right now.' });
+    res.status(503).json({ message: 'Could not load request statuses right now.' });
   }
 });
 
@@ -1301,17 +1615,14 @@ app.post('/api/committee/requests/:id/reopen', requireClubAuth, requireCommittee
     record.resubmitTo = committeeStage[role];
     record.editRequestedBy = '';
     record.skipEnglishOnNextPrApproval = false;
-    record.clubNotice = `${committeeRoleLabels[role]} restarted review and sent this note: ${comment}`;
+    record.clubNotice = contentNotice(committeeRoleLabels[role], 'restarted_review', record.type, comment);
     appendWorkflowEvent(record, role, 'restarted_review', fromStatus, record.status, comment, req.clubAccount);
     record.publishedAt = undefined;
 
     if (wasPublished) {
       const club = await Club.findOne({ id: record.clubId });
       if (club) {
-        const matchesRequest = (item) => Number(item.requestId) === Number(record.id)
-          || (!item.requestId && item.title === record.title && item.date === record.date && item.description === record.description);
-        if (record.type === 'event') club.events = (club.events || []).filter((item) => !matchesRequest(item));
-        else club.posts = (club.posts || []).filter((item) => !matchesRequest(item));
+        removePublishedItem(club, record);
         await club.save();
       }
     }
@@ -1327,15 +1638,15 @@ app.post('/api/committee/requests/:id/reopen', requireClubAuth, requireCommittee
 app.post('/api/committee/requests/:id/return-to-committee', requireClubAuth, requireCommitteeRole, async (req, res) => {
   try {
     if (!mongoReady) return res.status(503).json({ message: 'Content storage needs MongoDB.' });
-    if (req.clubAccount.role !== 'dean') return res.status(403).json({ message: 'Only the Dean can return an event to a committee.' });
+    if (req.clubAccount.role !== 'dean') return res.status(403).json({ message: 'Only the Dean can return a request to a committee.' });
     const targetRole = req.body.target === 'pr' ? 'pr' : req.body.target === 'english' ? 'english' : null;
     if (!targetRole) return res.status(400).json({ message: 'Choose PR or English as the review destination.' });
     const comment = cleanText(req.body.comment, 2000);
-    if (!comment) return res.status(400).json({ message: 'Add a comment explaining why the event is being returned.' });
+    if (!comment) return res.status(400).json({ message: 'Add a comment explaining why the request is being returned.' });
     const record = await ContentRequest.findOne({ id: Number(req.params.id) });
     if (!record) return res.status(404).json({ message: 'Request not found.' });
     if (!['pending_dean', 'published'].includes(record.status)) {
-      return res.status(409).json({ message: 'Only an event waiting for the Dean or already published can be returned.' });
+      return res.status(409).json({ message: 'Only a request waiting for the Dean or already published can be returned.' });
     }
 
     const fromStatus = record.status;
@@ -1347,15 +1658,12 @@ app.post('/api/committee/requests/:id/return-to-committee', requireClubAuth, req
     record.editRequestedBy = '';
     record.skipEnglishOnNextPrApproval = targetRole === 'pr';
     record.publishedAt = undefined;
-    record.clubNotice = `Dean returned the event to ${committeeRoleLabels[targetRole]} for another review.`;
+    record.clubNotice = `Dean returned the ${contentSingularLabel(record.type)} to ${committeeRoleLabels[targetRole]} for another review.`;
 
     if (wasPublished) {
       const club = await Club.findOne({ id: record.clubId });
       if (club) {
-        const matchesRequest = (item) => Number(item.requestId) === Number(record.id)
-          || (!item.requestId && item.title === record.title && item.date === record.date && item.description === record.description);
-        if (record.type === 'event') club.events = (club.events || []).filter((item) => !matchesRequest(item));
-        else club.posts = (club.posts || []).filter((item) => !matchesRequest(item));
+        removePublishedItem(club, record);
         await club.save();
       }
     }
@@ -1364,14 +1672,14 @@ app.post('/api/committee/requests/:id/return-to-committee', requireClubAuth, req
     res.json(rest);
   } catch (error) {
     console.error('Database operation failed:', error.name);
-    res.status(503).json({ message: 'Could not return the event to committee review.' });
+    res.status(503).json({ message: 'Could not return the request to committee review.' });
   }
 });
 
 app.delete('/api/committee/requests/:id', requireClubAuth, requireCommitteeRole, async (req, res) => {
   try {
     if (!mongoReady) return res.status(503).json({ message: 'Content storage needs MongoDB.' });
-    if (req.clubAccount.role !== 'dean') return res.status(403).json({ message: 'Only the Dean can delete an event or feed post.' });
+    if (req.clubAccount.role !== 'dean') return res.status(403).json({ message: 'Only the Dean can delete a request.' });
     const record = await ContentRequest.findOne({ id: Number(req.params.id) });
     if (!record) return res.status(404).json({ message: 'Request not found.' });
     if (record.status === 'deleted') return res.status(409).json({ message: 'This content has already been deleted.' });
@@ -1379,10 +1687,7 @@ app.delete('/api/committee/requests/:id', requireClubAuth, requireCommitteeRole,
     const previousStatus = record.status;
     const club = await Club.findOne({ id: record.clubId });
     if (club) {
-      const matchesRequest = (item) => Number(item.requestId) === Number(record.id)
-        || (!item.requestId && item.title === record.title && item.date === record.date && item.description === record.description);
-      if (record.type === 'event') club.events = (club.events || []).filter((item) => !matchesRequest(item));
-      else club.posts = (club.posts || []).filter((item) => !matchesRequest(item));
+      removePublishedItem(club, record);
       await club.save();
     }
     record.status = 'deleted';
@@ -1390,7 +1695,7 @@ app.delete('/api/committee/requests/:id', requireClubAuth, requireCommitteeRole,
     record.publishedAt = undefined;
     record.editRequestedBy = '';
     record.skipEnglishOnNextPrApproval = false;
-    record.clubNotice = `Dean deleted this ${record.type === 'event' ? 'event' : 'feed post'}.`;
+    record.clubNotice = contentNotice('Dean', 'delete', record.type);
     appendWorkflowEvent(record, 'dean', 'deleted', previousStatus, 'deleted', '', req.clubAccount);
     await record.save();
     res.json({ deleted: true, status: record.status });
@@ -1468,20 +1773,16 @@ app.post('/api/committee/requests/:id/action', requireClubAuth, requireCommittee
     appendWorkflowEvent(record, req.clubAccount.role, action, fromStatus, nextStatus, comment, req.clubAccount);
     if (action === 'approve' && req.clubAccount.role === 'pr') {
       record.clubNotice = skipEnglish
-        ? 'PR approved the event and returned it directly to the Dean.'
-        : 'PR approved the event and sent it to the English Department.';
+        ? `PR approved the ${contentSingularLabel(record.type)} and returned it directly to the Dean.`
+        : `PR approved the ${contentSingularLabel(record.type)} and sent it to the English Department.`;
     }
-    if (action === 'approve' && req.clubAccount.role === 'english') record.clubNotice = 'English Department approved the event and sent it to the Dean.';
-    if (action === 'approve' && req.clubAccount.role === 'dean') record.clubNotice = 'Dean approved the event. It is now published.';
+    if (action === 'approve' && req.clubAccount.role === 'english') record.clubNotice = `English Department approved the ${contentSingularLabel(record.type)} and sent it to the Dean.`;
+    if (action === 'approve' && req.clubAccount.role === 'dean') record.clubNotice = `Dean approved the ${contentSingularLabel(record.type)}. It is now published.`;
     if (action === 'delete') {
-      record.clubNotice = `${roleLabel} deleted this event.`;
+      record.clubNotice = contentNotice(roleLabel, 'delete', record.type);
       const club = await Club.findOne({ id: record.clubId });
       if (club) {
-        if (record.type === 'event') {
-          club.events = (club.events || []).filter((e) => e.requestId !== record.id);
-        } else {
-          club.posts = (club.posts || []).filter((p) => p.requestId !== record.id);
-        }
+        removePublishedItem(club, record);
         await club.save();
       }
     }
@@ -1490,18 +1791,10 @@ app.post('/api/committee/requests/:id/action', requireClubAuth, requireCommittee
       record.publishedAt = new Date();
       const club = await Club.findOne({ id: record.clubId });
       if (club) {
-        const item = {
-          requestId: record.id,
-          title: record.title,
-          date: record.date,
-          time: record.time,
-          location: record.location,
-          budget: record.budget,
-          description: record.description,
-          image: record.image || club.image
-        };
-        if (record.type === 'event') club.events.push(item);
-        else club.posts.push({ ...item, author: club.name, text: record.description });
+        const item = buildPublishedItem(record, club);
+        const field = contentClubField[record.type];
+        club[field] = club[field] || [];
+        club[field].push(item);
         await club.save();
       }
     }
