@@ -7,10 +7,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/assets/css/base.css?v=20261005f" />
-    <link rel="stylesheet" href="/assets/css/responsive.css?v=20261005f" />
-    <link rel="stylesheet" href="/assets/css/dark.css?v=20261005f" />
-    <link rel="stylesheet" href="/assets/css/features.css?v=20261005f" />
+    <link rel="stylesheet" href="/assets/css/base.css?v=20261005g" />
+    <link rel="stylesheet" href="/assets/css/responsive.css?v=20261005g" />
+    <link rel="stylesheet" href="/assets/css/dark.css?v=20261005g" />
+    <link rel="stylesheet" href="/assets/css/features.css?v=20261005g" />
     <link rel="icon" href="/assets/img/pics/logo.svg.png" type="image/png">
 </head>
   <body>
@@ -394,11 +394,16 @@
                 </div>
               </div>
               <div class="top-actions">
-                <a class="secondary-btn" href="/pages/club-content.html">Content Studio</a>
+                <a class="secondary-btn" href="/pages/club-content.html" target="_blank" rel="noopener noreferrer">Open Content Studio</a>
                 <button id="backHomeBtn" class="secondary-btn" type="button">Back to Clubs</button>
                 <button id="logoutBtn" class="logout-btn" type="button">Log out</button>
               </div>
             </div>
+
+            <section id="clubReviewNotifications" role="status" hidden style="margin:14px 0;padding:14px 16px;border:1px solid #fcd34d;border-radius:14px;background:#fff7db;color:#78350f">
+              <strong>Review updates from the approval team</strong>
+              <div id="clubReviewNotificationList" style="margin-top:8px"></div>
+            </section>
 
             <section id="presidentHeadManager" class="committee-head-manager hidden">
               <div class="admin-section-heading">
@@ -491,18 +496,6 @@
             <div id="applicationsList" class="applications-list"></div>
           </div>
 
-          <div class="committee-card" style="margin-top:18px">
-            <div class="committee-top">
-              <div>
-                <div class="committee-label">CONTENT STUDIO</div>
-                <h2>Posts & upcoming events</h2>
-              </div>
-              <div class="top-actions">
-                <a class="secondary-btn" href="/pages/club-content.html" target="_blank">Open full page</a>
-              </div>
-            </div>
-            <iframe src="/pages/club-content.html?embed=1" style="width:100%;min-height:620px;border:1px solid #f0d7d7;border-radius:16px" title="Content Studio"></iframe>
-          </div>
         </section>
       </main>
 
@@ -590,10 +583,10 @@
 
     <div id="site-footer"></div>
 
-    <script src="/assets/js/app-home.js?v=20261005f"></script>
-    <script src="/assets/js/app-admin.js?v=20261005f"></script>
-    <script src="/assets/js/app-dashboard.js?v=20261005f"></script>
-    <script src="/assets/js/layout.js?v=6" defer></script>
-    <script src="/assets/js/theme.js?v=20261005f" defer></script>
+    <script src="/assets/js/app-home.js?v=20261006a"></script>
+    <script src="/assets/js/app-admin.js?v=20261005g"></script>
+    <script src="/assets/js/app-dashboard.js?v=20261005g"></script>
+    <script src="/assets/js/layout.js?v=7" defer></script>
+    <script src="/assets/js/theme.js?v=20261005g" defer></script>
   </body>
 </html>

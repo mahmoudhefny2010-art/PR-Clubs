@@ -1,0 +1,14 @@
+[
+  {
+    "id": 1,
+    "actorEmail": "mahmoud2406700@miuegypt.edu.eg",
+    "actorRole": "admin",
+    "action": "SYSTEM_INIT",
+    "targetType": "system",
+    "targetId": "global",
+    "targetName": "MIU Clubs Portal",
+    "details": "Global Admin portal initialized with full system access.",
+    "ip": "127.0.0.1",
+    "timestamp": "2026-10-05T20:00:00.000Z"
+  }
+]

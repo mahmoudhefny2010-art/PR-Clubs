@@ -404,6 +404,7 @@ h2 {
   border: 1px solid var(--border);
   cursor: pointer;
   transition: opacity 0.2s ease;
+  text-decoration: none;
 }
 
 .primary-btn,

@@ -77,16 +77,53 @@ const contentRequestSchema = new mongoose.Schema({
   title: { type: String, required: true, trim: true },
   description: { type: String, default: '' },
   date: { type: String, default: '' },
+  time: { type: String, default: '' },
   location: { type: String, default: '' },
+  budget: { type: String, default: '' },
   image: { type: String, default: '' },
-  status: { type: String, enum: ['draft', 'pending_pr', 'pending_english', 'pending_dean', 'changes_requested', 'rejected', 'published'], default: 'draft', index: true },
+  status: { type: String, enum: ['draft', 'pending_pr', 'pending_english', 'pending_dean', 'changes_requested', 'rejected', 'published', 'deleted'], default: 'draft', index: true },
+  resubmitTo: { type: String, enum: ['pending_pr', 'pending_english'], default: 'pending_pr' },
+  editRequestedBy: { type: String, enum: ['', 'pr', 'english'], default: '' },
+  skipEnglishOnNextPrApproval: { type: Boolean, default: false },
+  clubNotice: { type: String, default: '' },
+  workflowHistory: [{
+    role: { type: String, enum: ['club', 'pr', 'english', 'dean'], required: true },
+    actorRole: { type: String, default: '' },
+    actorEmail: { type: String, default: '' },
+    action: { type: String, required: true },
+    fromStatus: { type: String, default: '' },
+    toStatus: { type: String, default: '' },
+    comment: { type: String, default: '' },
+    createdAt: { type: Date, default: Date.now }
+  }],
   comments: {
     pr: { type: String, default: '' },
     english: { type: String, default: '' },
     dean: { type: String, default: '' }
   },
+  commentHistory: [{
+    role: { type: String, enum: ['pr', 'english', 'dean'], required: true },
+    text: { type: String, required: true },
+    createdAt: { type: Date, default: Date.now },
+    deletedAt: { type: Date, default: null }
+  }],
+  hiddenCommentRoles: { type: [String], default: [] },
   submittedAt: { type: Date, default: Date.now },
-  publishedAt: { type: Date }
+  publishedAt: { type: Date },
+  deletedAt: { type: Date }
+}, { timestamps: true });
+
+const auditLogSchema = new mongoose.Schema({
+  id: { type: Number, required: true, unique: true, index: true },
+  actorEmail: { type: String, required: true, trim: true, index: true },
+  actorRole: { type: String, default: 'admin' },
+  action: { type: String, required: true, trim: true },
+  targetType: { type: String, default: '' },
+  targetId: { type: String, default: '' },
+  targetName: { type: String, default: '' },
+  details: { type: String, default: '' },
+  ip: { type: String, default: '' },
+  timestamp: { type: Date, default: Date.now, index: true }
 }, { timestamps: true });
 
 const Club = mongoose.models.Club || mongoose.model('Club', clubSchema);
@@ -94,5 +131,6 @@ const Application = mongoose.models.Application || mongoose.model('Application',
 const SiteSetting = mongoose.models.SiteSetting || mongoose.model('SiteSetting', siteSettingSchema);
 const ClubAccount = mongoose.models.ClubAccount || mongoose.model('ClubAccount', clubAccountSchema);
 const ContentRequest = mongoose.models.ContentRequest || mongoose.model('ContentRequest', contentRequestSchema);
+const AuditLog = mongoose.models.AuditLog || mongoose.model('AuditLog', auditLogSchema);
 
-module.exports = { Club, Application, SiteSetting, ClubAccount, ContentRequest };
+module.exports = { Club, Application, SiteSetting, ClubAccount, ContentRequest, AuditLog };

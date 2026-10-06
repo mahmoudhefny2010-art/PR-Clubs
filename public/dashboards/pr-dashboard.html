@@ -5,12 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Committee Review</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/assets/css/base.css?v=20261005f" />
-    <link rel="stylesheet" href="/assets/css/responsive.css?v=20261005f" />
-    <link rel="stylesheet" href="/assets/css/dark.css?v=20261005f" />
-    <link rel="stylesheet" href="/assets/css/features.css?v=20261005f" />
+    <link rel="stylesheet" href="/assets/css/base.css?v=20261005g" />
+    <link rel="stylesheet" href="/assets/css/responsive.css?v=20261005g" />
+    <link rel="stylesheet" href="/assets/css/dark.css?v=20261005g" />
+    <link rel="stylesheet" href="/assets/css/features.css?v=20261005g" />
     <link rel="icon" href="/assets/img/pics/logo.svg.png" type="image/png">
     <style>
+      .app-container { flex: 1 0 auto; width: min(100%, 1192px); padding: 32px 16px 52px; }
       .req-card { border: 1px solid #eee; border-radius: 16px; padding: 14px; display: flex; gap: 14px; margin-bottom: 12px; background: #fff; }
       .req-card img { width: 90px; height: 90px; object-fit: cover; border-radius: 12px; }
       .req-meta { font-size: .82rem; color: #6b7280; }
@@ -20,6 +21,40 @@
       .req-actions .approve { background: #dcfce7; border-color: #86efac; color: #166534; }
       .req-actions .reject { background: #fee2e2; border-color: #fca5a5; color: #991b1b; }
       .req-actions .changes { background: #fff1d5; border-color: #fcd34d; color: #92400e; }
+      .req-actions .delete { background: #fee2e2; border-color: #fca5a5; color: #991b1b; }
+      .req-actions .view-details { display: inline-flex; align-items: center; gap: 6px; }
+      .req-actions .view-details svg { width: 15px; height: 15px; }
+      .request-dialog { width: min(680px, calc(100% - 28px)); max-height: min(82vh, 800px); padding: 0; border: 0; border-radius: 20px; box-shadow: 0 24px 80px #0004; }
+      .request-dialog::backdrop { background: #1119; backdrop-filter: blur(3px); }
+      .request-dialog-inner { padding: 24px; }
+      .request-dialog-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+      .request-dialog-head h2 { margin: 0; }
+      .request-dialog-close { border: 0; border-radius: 50%; width: 38px; height: 38px; background: #f3f4f6; font-size: 1.3rem; cursor: pointer; }
+      .detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 20px 0; }
+      .detail-item { min-width: 0; padding: 12px; border: 1px solid #eee; border-radius: 12px; }
+      .detail-item h3 { margin: 0 0 6px; font-size: .75rem; color: #6b7280; text-transform: uppercase; letter-spacing: .04em; }
+      .detail-item p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+      .detail-wide { grid-column: 1 / -1; }
+      .detail-attachment { display: block; max-width: 100%; max-height: 280px; margin-top: 10px; border-radius: 12px; object-fit: contain; }
+      .dialog-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+      .dialog-actions button { border: 1px solid #ddd; border-radius: 999px; padding: 10px 16px; background: #fff; font-weight: 800; cursor: pointer; }
+      .dialog-actions .approve { background: #dcfce7; border-color: #86efac; color: #166534; }
+      .dialog-actions .reject { background: #fee2e2; border-color: #fca5a5; color: #991b1b; }
+      .dialog-actions .changes { background: #fff1d5; border-color: #fcd34d; color: #92400e; }
+      .dialog-actions .reopen-review { background: #eef2ff; border-color: #a5b4fc; color: #3730a3; }
+      .status-overview-dialog { width: min(960px, calc(100% - 28px)); max-height: 82vh; padding: 0; border: 0; border-radius: 20px; box-shadow: 0 24px 80px #0004; }
+      .status-overview-dialog::backdrop { background: #1119; backdrop-filter: blur(3px); }
+      .status-overview-inner { padding: 24px; }
+      .status-overview-list { display: grid; gap: 10px; max-height: 60vh; margin-top: 18px; overflow: auto; }
+      .status-overview-list .req-card { align-items: center; }
+      .status-overview-list .req-actions { flex: 0 0 auto; margin-top: 0; }
+      .status-overview-list .req-actions .reopen-review { background: #eef2ff; border-color: #a5b4fc; color: #3730a3; }
+      .status-overview-meta { color: #6b7280; font-size: .85rem; margin-top: 4px; }
+      .status-overview-pill { display: inline-block; margin-top: 5px; border-radius: 999px; padding: 5px 10px; background: #fff1d5; color: #92400e; font-size: .72rem; font-weight: 800; text-transform: uppercase; }
+      .status-overview-pill.published { background: #dcfce7; color: #166534; }
+      .status-overview-pill.rejected { background: #fee2e2; color: #991b1b; }
+      .status-overview-pill.draft { background: #f3f4f6; color: #4b5563; }
+      @media (max-width: 560px) { .detail-grid { grid-template-columns: 1fr; } .detail-wide { grid-column: auto; } }
     </style>
   </head>
   <body>
@@ -33,6 +68,7 @@
           </div>
           <div class="top-actions">
             <a class="secondary-btn" href="/">Back</a>
+            <button id="openStatusOverviewBtn" class="secondary-btn" type="button">All Events Status</button>
             <button id="logoutBtn" class="logout-btn" type="button">Logout</button>
           </div>
         </div>
@@ -41,93 +77,22 @@
         <div id="requestsList"></div>
       </section>
     </main>
+    <dialog id="requestDialog" class="request-dialog" aria-labelledby="detailTitle">
+      <div class="request-dialog-inner">
+        <div class="request-dialog-head"><div><div class="committee-label">REQUEST DETAILS</div><h2 id="detailTitle"></h2></div></div>
+        <div id="requestDetails" class="detail-grid"></div>
+        <div class="dialog-actions"><button type="button" id="detailsCancelBtn">Close</button><button id="dialogApproveBtn" class="approve" data-dialog-action="approve">Accept</button><button id="dialogRejectBtn" class="reject" data-dialog-action="reject">Reject</button><button id="requestChangesBtn" class="changes" data-dialog-action="request_edit" hidden>Request Edit</button><button id="reopenRequestBtn" class="reopen-review" type="button" hidden>Restart PR Review</button></div>
+      </div>
+    </dialog>
+    <dialog id="statusOverviewDialog" class="status-overview-dialog" aria-labelledby="statusOverviewTitle">
+      <div class="status-overview-inner">
+        <div class="request-dialog-head"><div><div class="committee-label">TRACKING</div><h2 id="statusOverviewTitle">All Events Status</h2></div></div>
+        <div id="statusOverviewList" class="status-overview-list" aria-live="polite"></div>
+        <div class="dialog-actions"><button type="button" id="closeStatusOverviewBtn">Close</button></div>
+      </div>
+    </dialog>
     <div id="site-footer"></div>
-    <script>
-      const sessionMessage = document.getElementById('sessionMessage');
-      const hintText = document.getElementById('hintText');
-      const requestsList = document.getElementById('requestsList');
-      let currentRole = '';
-
-      async function ensureSession() {
-        try {
-          const res = await fetch('/api/club-auth/session');
-          const data = await res.json();
-          if (!data.authenticated || !data.club) {
-            sessionMessage.textContent = 'Please sign in with a PR / English / Dean account.';
-            return false;
-          }
-          if (!['pr', 'english', 'dean'].includes(data.club.role)) {
-            sessionMessage.textContent = 'This dashboard is for PR, English Department, or the Dean.';
-            return false;
-          }
-          currentRole = data.club.role;
-          const titles = { pr: 'PR Department — Approvals', english: 'English Department — Preview & Approve', dean: 'Dean — Final Approval' };
-          document.getElementById('committeeTitle').textContent = titles[currentRole];
-          hintText.textContent = currentRole === 'pr'
-            ? 'Pending requests from clubs. Approve, reject, or comment.'
-            : currentRole === 'english'
-              ? 'Requests approved by PR. Preview, approve, reject, or request changes.'
-              : 'Requests approved by English Department. Final approve or reject.';
-          return true;
-        } catch {
-          sessionMessage.textContent = 'Could not check your session.';
-          return false;
-        }
-      }
-
-      async function loadRequests() {
-        try {
-          const res = await fetch('/api/committee/requests');
-          const items = await res.json();
-          if (!res.ok) throw new Error(items.message || 'Could not load');
-          requestsList.innerHTML = items.map((item) => `
-            <article class="req-card">
-              ${item.image ? `<img src="${item.image}" alt="" />` : ''}
-              <div style="flex:1">
-                <strong>${item.title}</strong>
-                <div class="req-meta">${item.clubName || ''} · ${item.type} · ${item.date || 'no date'} · ${item.location || ''}</div>
-                <p style="margin:6px 0 0;font-size:.9rem">${item.description || ''}</p>
-                <div class="req-actions">
-                  <input placeholder="Comment (optional)" data-comment="${item.id}" />
-                  <button class="approve" data-action="approve" data-id="${item.id}">Approve</button>
-                  ${currentRole !== 'dean' ? `<button class="reject" data-action="reject" data-id="${item.id}">Reject</button>` : `<button class="reject" data-action="reject" data-id="${item.id}">Reject</button>`}
-                  ${currentRole === 'english' ? `<button class="changes" data-action="changes" data-id="${item.id}">Request changes</button>` : ''}
-                </div>
-              </div>
-            </article>
-          `).join('') || '<p>No pending requests for your stage.</p>';
-          requestsList.querySelectorAll('[data-action]').forEach((btn) => btn.addEventListener('click', () => act(Number(btn.dataset.id), btn.dataset.action)));
-        } catch (error) {
-          requestsList.innerHTML = `<p>${error.message}</p>`;
-        }
-      }
-
-      async function act(id, action) {
-        const input = requestsList.querySelector(`input[data-comment="${id}"]`);
-        const comment = input ? input.value : '';
-        try {
-          const res = await fetch(`/api/committee/requests/${id}/action`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action, comment })
-          });
-          const result = await res.json();
-          if (!res.ok) throw new Error(result.message || 'Action failed');
-          await loadRequests();
-        } catch (error) {
-          alert(error.message);
-        }
-      }
-
-      document.getElementById('logoutBtn').addEventListener('click', async () => {
-        await fetch('/api/club-auth/logout', { method: 'POST' });
-        window.location.href = '/';
-      });
-
-      (async () => {
-        if (await ensureSession()) await loadRequests();
-      })();
-    </script>
-      <script src="/assets/js/layout.js?v=6" defer></script>
+    <script src="/assets/js/committee-dashboard.js?v=20261007m"></script>
+      <script src="/assets/js/layout.js?v=7" defer></script>
   </body>
 </html>

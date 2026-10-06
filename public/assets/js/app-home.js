@@ -248,6 +248,28 @@ async function loadApplications() {
   renderHeadDashboard();
 }
 
+async function loadClubReviewNotifications() {
+  const banner = document.getElementById('clubReviewNotifications');
+  const list = document.getElementById('clubReviewNotificationList');
+  if (!banner || !list) return;
+  try {
+    const response = await fetch('/api/club/content', { cache: 'no-store' });
+    const items = await response.json();
+    if (!response.ok) return;
+    const updates = items.filter((item) => typeof item.clubNotice === 'string' && item.clubNotice.trim());
+    list.replaceChildren();
+    banner.hidden = updates.length === 0;
+    for (const item of updates) {
+      const message = document.createElement('p');
+      message.style.margin = '6px 0 0';
+      message.textContent = `${item.title}: ${item.clubNotice} Current status: ${String(item.status || '').replaceAll('_', ' ')}.`;
+      list.append(message);
+    }
+  } catch {
+    banner.hidden = true;
+  }
+}
+
 async function openClubPortal() {
   try {
     const sessionResponse = await fetch('/api/club-auth/session');
@@ -293,6 +315,7 @@ async function openClubPortal() {
       ...(club.role === 'president' ? [loadCommitteeHeads(), loadPresidentApplicationForm()] : [])
     ]);
     await loadApplications();
+    await loadClubReviewNotifications();
     showView('head');
   } catch (error) {
     const feedback = document.getElementById('clubLoginFeedback');
@@ -404,7 +427,10 @@ function renderEventsSlideshow() {
   const track = document.getElementById('eventsSlideshowTrack');
   const dots = document.getElementById('eventsSlideshowDots');
   if (!track || !dots) return;
-  const events = getAllEvents();
+  const events = getAllEvents()
+    .map((event) => ({ ...event, parsed: new Date(event.date) }))
+    .filter((event) => !Number.isNaN(event.parsed.getTime()))
+    .sort((left, right) => left.parsed - right.parsed);
   if (!events.length) {
     track.innerHTML = '<p class="events-empty">No upcoming events right now.</p>';
     dots.innerHTML = '';

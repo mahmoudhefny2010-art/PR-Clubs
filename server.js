@@ -1066,13 +1066,63 @@ function requireCommitteeRole(req, res, next) {
 }
 
 const committeeStage = { pr: 'pending_pr', english: 'pending_english', dean: 'pending_dean' };
+const committeeRoleLabels = { pr: 'PR Department', english: 'English Department', dean: 'Dean' };
+
+function shapeClubContentRecord(record) {
+  const { _id, __v, ...rest } = record;
+  const privateReturnEvents = (rest.workflowHistory || []).filter((event) => event.role === 'dean'
+    && ['returned_to_pr', 'returned_to_english'].includes(event.action));
+  const privateReturnComments = new Set(privateReturnEvents.map((event) => event.comment).filter(Boolean));
+  rest.workflowHistory = (rest.workflowHistory || []).map((event) => privateReturnComments.has(event.comment)
+    && ['returned_to_pr', 'returned_to_english'].includes(event.action) ? { ...event, comment: '' } : event);
+  rest.commentHistory = (rest.commentHistory || []).filter((entry) => entry.role !== 'dean' || !privateReturnComments.has(entry.text));
+  if (rest.comments?.dean) {
+    rest.comments = { ...rest.comments, dean: rest.comments.dean.split('\n').filter((line) => !privateReturnComments.has(line)).join('\n') };
+  }
+  rest.clubNotice = String(rest.clubNotice || '').replace(/^(Dean returned the event to .*?) with this comment:.*$/, '$1 for another review.');
+  return rest;
+}
+
+function appendCommitteeComment(record, role, text) {
+  if (!text || !['pr', 'english', 'dean'].includes(role)) return;
+  record.comments[role] = [record.comments[role], text].filter(Boolean).join('\n').slice(-10000);
+  record.commentHistory.push({ role, text, createdAt: new Date() });
+  record.hiddenCommentRoles = (record.hiddenCommentRoles || []).filter((hiddenRole) => hiddenRole !== role);
+}
+
+function appendWorkflowEvent(record, role, action, fromStatus, toStatus, comment = '', actor = {}) {
+  if (!Array.isArray(record.workflowHistory)) record.workflowHistory = [];
+  record.workflowHistory.push({
+    role,
+    actorRole: actor.role || role,
+    actorEmail: actor.email || '',
+    action,
+    fromStatus: fromStatus || '',
+    toStatus: toStatus || '',
+    comment,
+    createdAt: new Date()
+  });
+}
+
+function shouldSendPrApprovalToDean(record) {
+  const history = Array.isArray(record.workflowHistory) ? record.workflowHistory : [];
+  let returnedToPrIndex = -1;
+  history.forEach((event, index) => {
+    if (event.role === 'dean' && event.action === 'returned_to_pr') returnedToPrIndex = index;
+  });
+  if (returnedToPrIndex < 0) return Boolean(record.skipEnglishOnNextPrApproval);
+  const invalidated = history.slice(returnedToPrIndex + 1).some((event) =>
+    event.role === 'pr' && ['request_edit', 'restarted_review'].includes(event.action));
+  return !invalidated;
+}
 
 function committeeNextStage(role, action) {
   if (role === 'pr' && action === 'approve') return 'pending_english';
   if (role === 'english' && action === 'approve') return 'pending_dean';
   if (role === 'dean' && action === 'approve') return 'published';
+  if (role === 'dean' && action === 'delete') return 'deleted';
   if (action === 'reject') return 'rejected';
-  if (action === 'changes') return 'changes_requested';
+  if (action === 'request_edit') return 'changes_requested';
   return null;
 }
 
@@ -1083,7 +1133,7 @@ app.get('/api/club/content', requireClubAuth, async (req, res) => {
   try {
     if (!mongoReady) return res.status(503).json({ message: 'Content storage needs MongoDB.' });
     const records = await ContentRequest.find({ clubId: req.clubAccount.clubId }).sort({ id: -1 }).lean();
-    res.json(records.map((record) => { const { _id, __v, ...rest } = record; return rest; }));
+    res.json(records.map(shapeClubContentRecord));
   } catch (error) {
     console.error('Database operation failed:', error.name);
     res.status(503).json({ message: 'Could not load content right now.' });
@@ -1110,10 +1160,15 @@ app.post('/api/club/content', requireClubAuth, async (req, res) => {
       title,
       description,
       date: cleanText(req.body.date, 40),
+      time: cleanText(req.body.time, 40),
       location: cleanText(req.body.location, 120),
+      budget: cleanText(req.body.budget, 80),
       image: typeof req.body.image === 'string' ? req.body.image.slice(0, 4 * 1024 * 1024) : '',
-      status: req.body.submit === true ? 'pending_pr' : 'draft'
+      status: req.body.submit === true ? 'pending_pr' : 'draft',
+      clubNotice: req.body.submit === true ? 'Club submitted a new event for PR review.' : ''
     });
+    if (req.body.submit === true) appendWorkflowEvent(record, 'club', 'submitted', 'draft', 'pending_pr', '', req.clubAccount);
+    if (req.body.submit === true) await record.save();
     const { _id, __v, ...rest } = record.toObject();
     res.status(201).json(rest);
   } catch (error) {
@@ -1135,11 +1190,27 @@ app.put('/api/club/content/:id', requireClubAuth, async (req, res) => {
     }
     if (req.body.type === 'event' || req.body.type === 'post') record.type = req.body.type;
     record.title = cleanText(req.body.title, 140) || record.title;
-    record.description = cleanText(req.body.description, 2000);
-    record.date = cleanText(req.body.date, 40);
-    record.location = cleanText(req.body.location, 120);
+    if (req.body.description !== undefined) record.description = cleanText(req.body.description, 2000);
+    if (req.body.date !== undefined) record.date = cleanText(req.body.date, 40);
+    if (req.body.time !== undefined) record.time = cleanText(req.body.time, 40);
+    if (req.body.location !== undefined) record.location = cleanText(req.body.location, 120);
+    if (req.body.budget !== undefined) record.budget = cleanText(req.body.budget, 80);
     if (typeof req.body.image === 'string') record.image = req.body.image.slice(0, 4 * 1024 * 1024);
-    record.status = req.body.submit === true ? 'pending_pr' : 'draft';
+    if (record.status === 'changes_requested' && !record.editRequestedBy && record.comments?.english) {
+      record.resubmitTo = 'pending_english';
+    }
+    if (req.body.submit === true) {
+      const fromStatus = record.editRequestedBy ? 'changes_requested' : record.status;
+      const targetStage = record.editRequestedBy ? committeeStage[record.editRequestedBy] : (record.resubmitTo || 'pending_pr');
+      const isFirstSubmission = !(record.workflowHistory || []).some((event) => ['submitted', 'resubmitted'].includes(event.action));
+      record.status = targetStage;
+      record.resubmitTo = 'pending_pr';
+      record.clubNotice = `${isFirstSubmission ? 'Club submitted a new event' : 'Club resubmitted the updated event'}. Waiting for ${targetStage === 'pending_pr' ? 'PR Department' : 'English Department'} review.`;
+      appendWorkflowEvent(record, 'club', isFirstSubmission ? 'submitted' : 'resubmitted', fromStatus, targetStage, '', req.clubAccount);
+      record.editRequestedBy = '';
+    } else {
+      record.status = 'draft';
+    }
     await record.save();
     const { _id, __v, ...rest } = record.toObject();
     res.json(rest);
@@ -1155,8 +1226,10 @@ app.delete('/api/club/content/:id', requireClubAuth, async (req, res) => {
   }
   try {
     if (!mongoReady) return res.status(503).json({ message: 'Content storage needs MongoDB.' });
-    const record = await ContentRequest.findOneAndDelete({ id: Number(req.params.id), clubId: req.clubAccount.clubId });
+    const record = await ContentRequest.findOne({ id: Number(req.params.id), clubId: req.clubAccount.clubId });
     if (!record) return res.status(404).json({ message: 'Content not found.' });
+    if (record.status === 'deleted') return res.status(409).json({ message: 'This event was deleted by the Dean and is retained in the review history.' });
+    await ContentRequest.deleteOne({ _id: record._id });
     if (record.status === 'published') {
       await Club.updateOne({ id: record.clubId }, record.type === 'event'
         ? { $pull: { events: { title: record.title, date: record.date } } }
@@ -1181,29 +1254,249 @@ app.get('/api/committee/requests', requireClubAuth, requireCommitteeRole, async 
   }
 });
 
+app.get('/api/committee/status', requireClubAuth, requireCommitteeRole, async (req, res) => {
+  try {
+    if (!mongoReady) return res.status(503).json({ message: 'Content storage needs MongoDB.' });
+    const records = await ContentRequest.find({})
+      .select('id clubName type title date time status image submittedAt publishedAt clubNotice editRequestedBy comments commentHistory hiddenCommentRoles')
+      .sort({ id: -1 })
+      .lean();
+    res.json(records.map((record) => { const { _id, __v, ...rest } = record; return rest; }));
+  } catch (error) {
+    console.error('Database operation failed:', error.name);
+    res.status(503).json({ message: 'Could not load event statuses right now.' });
+  }
+});
+
+app.get('/api/committee/status/:id', requireClubAuth, requireCommitteeRole, async (req, res) => {
+  try {
+    if (!mongoReady) return res.status(503).json({ message: 'Content storage needs MongoDB.' });
+    const record = await ContentRequest.findOne({ id: Number(req.params.id) }).lean();
+    if (!record) return res.status(404).json({ message: 'Request not found.' });
+    const { _id, __v, ...rest } = record;
+    res.json(rest);
+  } catch (error) {
+    console.error('Database operation failed:', error.name);
+    res.status(503).json({ message: 'Could not load request details right now.' });
+  }
+});
+
+app.post('/api/committee/requests/:id/reopen', requireClubAuth, requireCommitteeRole, async (req, res) => {
+  try {
+    if (!mongoReady) return res.status(503).json({ message: 'Content storage needs MongoDB.' });
+    const role = req.clubAccount.role;
+    if (!['pr', 'english'].includes(role)) return res.status(403).json({ message: 'Only PR or English can restart the review process.' });
+    const record = await ContentRequest.findOne({ id: Number(req.params.id) });
+    if (!record) return res.status(404).json({ message: 'Request not found.' });
+    if (record.status === 'draft' || record.status === 'changes_requested' || record.status === committeeStage[role]) {
+      return res.status(409).json({ message: `This request is already in the ${committeeRoleLabels[role]} review process.` });
+    }
+    const comment = cleanText(req.body.comment, 2000);
+    if (!comment) return res.status(400).json({ message: 'Add a comment before restarting review.' });
+
+    const wasPublished = record.status === 'published';
+    const fromStatus = record.status;
+    appendCommitteeComment(record, role, comment);
+    record.status = committeeStage[role];
+    record.resubmitTo = committeeStage[role];
+    record.editRequestedBy = '';
+    record.skipEnglishOnNextPrApproval = false;
+    record.clubNotice = `${committeeRoleLabels[role]} restarted review and sent this note: ${comment}`;
+    appendWorkflowEvent(record, role, 'restarted_review', fromStatus, record.status, comment, req.clubAccount);
+    record.publishedAt = undefined;
+
+    if (wasPublished) {
+      const club = await Club.findOne({ id: record.clubId });
+      if (club) {
+        const matchesRequest = (item) => Number(item.requestId) === Number(record.id)
+          || (!item.requestId && item.title === record.title && item.date === record.date && item.description === record.description);
+        if (record.type === 'event') club.events = (club.events || []).filter((item) => !matchesRequest(item));
+        else club.posts = (club.posts || []).filter((item) => !matchesRequest(item));
+        await club.save();
+      }
+    }
+    await record.save();
+    const { _id, __v, ...rest } = record.toObject();
+    res.json(rest);
+  } catch (error) {
+    console.error('Database operation failed:', error.name);
+    res.status(503).json({ message: 'Could not restart review right now.' });
+  }
+});
+
+app.post('/api/committee/requests/:id/return-to-committee', requireClubAuth, requireCommitteeRole, async (req, res) => {
+  try {
+    if (!mongoReady) return res.status(503).json({ message: 'Content storage needs MongoDB.' });
+    if (req.clubAccount.role !== 'dean') return res.status(403).json({ message: 'Only the Dean can return an event to a committee.' });
+    const targetRole = req.body.target === 'pr' ? 'pr' : req.body.target === 'english' ? 'english' : null;
+    if (!targetRole) return res.status(400).json({ message: 'Choose PR or English as the review destination.' });
+    const comment = cleanText(req.body.comment, 2000);
+    if (!comment) return res.status(400).json({ message: 'Add a comment explaining why the event is being returned.' });
+    const record = await ContentRequest.findOne({ id: Number(req.params.id) });
+    if (!record) return res.status(404).json({ message: 'Request not found.' });
+    if (!['pending_dean', 'published'].includes(record.status)) {
+      return res.status(409).json({ message: 'Only an event waiting for the Dean or already published can be returned.' });
+    }
+
+    const fromStatus = record.status;
+    const wasPublished = fromStatus === 'published';
+    const nextStatus = committeeStage[targetRole];
+    appendWorkflowEvent(record, 'dean', `returned_to_${targetRole}`, fromStatus, nextStatus, comment, req.clubAccount);
+    record.status = nextStatus;
+    record.resubmitTo = nextStatus;
+    record.editRequestedBy = '';
+    record.skipEnglishOnNextPrApproval = targetRole === 'pr';
+    record.publishedAt = undefined;
+    record.clubNotice = `Dean returned the event to ${committeeRoleLabels[targetRole]} for another review.`;
+
+    if (wasPublished) {
+      const club = await Club.findOne({ id: record.clubId });
+      if (club) {
+        const matchesRequest = (item) => Number(item.requestId) === Number(record.id)
+          || (!item.requestId && item.title === record.title && item.date === record.date && item.description === record.description);
+        if (record.type === 'event') club.events = (club.events || []).filter((item) => !matchesRequest(item));
+        else club.posts = (club.posts || []).filter((item) => !matchesRequest(item));
+        await club.save();
+      }
+    }
+    await record.save();
+    const { _id, __v, ...rest } = record.toObject();
+    res.json(rest);
+  } catch (error) {
+    console.error('Database operation failed:', error.name);
+    res.status(503).json({ message: 'Could not return the event to committee review.' });
+  }
+});
+
+app.delete('/api/committee/requests/:id', requireClubAuth, requireCommitteeRole, async (req, res) => {
+  try {
+    if (!mongoReady) return res.status(503).json({ message: 'Content storage needs MongoDB.' });
+    if (req.clubAccount.role !== 'dean') return res.status(403).json({ message: 'Only the Dean can delete an event or feed post.' });
+    const record = await ContentRequest.findOne({ id: Number(req.params.id) });
+    if (!record) return res.status(404).json({ message: 'Request not found.' });
+    if (record.status === 'deleted') return res.status(409).json({ message: 'This content has already been deleted.' });
+
+    const previousStatus = record.status;
+    const club = await Club.findOne({ id: record.clubId });
+    if (club) {
+      const matchesRequest = (item) => Number(item.requestId) === Number(record.id)
+        || (!item.requestId && item.title === record.title && item.date === record.date && item.description === record.description);
+      if (record.type === 'event') club.events = (club.events || []).filter((item) => !matchesRequest(item));
+      else club.posts = (club.posts || []).filter((item) => !matchesRequest(item));
+      await club.save();
+    }
+    record.status = 'deleted';
+    record.deletedAt = new Date();
+    record.publishedAt = undefined;
+    record.editRequestedBy = '';
+    record.skipEnglishOnNextPrApproval = false;
+    record.clubNotice = `Dean deleted this ${record.type === 'event' ? 'event' : 'feed post'}.`;
+    appendWorkflowEvent(record, 'dean', 'deleted', previousStatus, 'deleted', '', req.clubAccount);
+    await record.save();
+    res.json({ deleted: true, status: record.status });
+  } catch (error) {
+    console.error('Database operation failed:', error.name);
+    res.status(503).json({ message: 'Could not delete this content.' });
+  }
+});
+
+app.delete('/api/committee/requests/:id/comment', requireClubAuth, requireCommitteeRole, async (req, res) => {
+  try {
+    if (!mongoReady) return res.status(503).json({ message: 'Content storage needs MongoDB.' });
+    const record = await ContentRequest.findOne({ id: Number(req.params.id) });
+    if (!record) return res.status(404).json({ message: 'Request not found.' });
+    const role = req.clubAccount.role;
+    if (!['pr', 'english', 'dean'].includes(role)) {
+      return res.status(404).json({ message: 'Your comment was not found.' });
+    }
+    const roleHistory = record.commentHistory.filter((entry) => entry.role === role);
+    if (roleHistory.length) {
+      const latest = [...roleHistory].reverse().find((entry) => !entry.deletedAt);
+      if (!latest) return res.status(404).json({ message: 'Your comment was not found.' });
+      latest.deletedAt = new Date();
+      appendWorkflowEvent(record, role, 'comment_deleted', record.status, record.status, latest.text, req.clubAccount);
+      if (record.clubNotice?.includes(latest.text)) {
+        record.clubNotice = record.status === 'changes_requested'
+          ? `${committeeRoleLabels[role]} requested changes. Please review the request.`
+          : `${committeeRoleLabels[role]} updated the request.`;
+      }
+    } else if (record.comments?.[role] && !record.hiddenCommentRoles.includes(role)) {
+      record.hiddenCommentRoles.push(role);
+    } else {
+      return res.status(404).json({ message: 'Your comment was not found.' });
+    }
+    await record.save();
+    res.json({ deleted: true });
+  } catch (error) {
+    console.error('Database operation failed:', error.name);
+    res.status(503).json({ message: 'Could not delete the comment right now.' });
+  }
+});
+
 app.post('/api/committee/requests/:id/action', requireClubAuth, requireCommitteeRole, async (req, res) => {
   try {
     if (!mongoReady) return res.status(503).json({ message: 'Content storage needs MongoDB.' });
     const record = await ContentRequest.findOne({ id: Number(req.params.id) });
     if (!record) return res.status(404).json({ message: 'Request not found.' });
     const expected = committeeStage[req.clubAccount.role];
-    if (record.status !== expected) return res.status(409).json({ message: 'This request is not waiting for your review.' });
-    const action = ['approve', 'reject', 'changes'].includes(req.body.action) ? req.body.action : null;
-    if (!action) return res.status(400).json({ message: 'Choose approve, reject, or changes.' });
+    const action = ['approve', 'reject', 'request_edit', 'comment', 'delete'].includes(req.body.action) ? req.body.action : null;
+    if (!action) return res.status(400).json({ message: 'Choose approve, reject, request edit, comment, or delete.' });
+    if (action !== 'comment' && record.status !== expected) return res.status(409).json({ message: 'This request is not waiting for your review.' });
+    if (action === 'request_edit' && !['pr', 'english'].includes(req.clubAccount.role)) {
+      return res.status(403).json({ message: 'Only PR or English can request edits.' });
+    }
     const comment = cleanText(req.body.comment, 2000);
-    if (req.clubAccount.role === 'pr') record.comments.pr = comment;
-    if (req.clubAccount.role === 'english') record.comments.english = comment;
-    if (req.clubAccount.role === 'dean') record.comments.dean = comment;
-    const nextStatus = committeeNextStage(req.clubAccount.role, action);
+    if (action === 'comment' && !comment) return res.status(400).json({ message: 'Enter a comment before sending.' });
+    if (action === 'request_edit' && !comment) return res.status(400).json({ message: 'Add a comment explaining the requested edits.' });
+    const fromStatus = record.status;
+    if (comment) appendCommitteeComment(record, req.clubAccount.role, comment);
+    let nextStatus = action === 'comment' ? record.status : committeeNextStage(req.clubAccount.role, action);
+    const skipEnglish = req.clubAccount.role === 'pr' && action === 'approve' && shouldSendPrApprovalToDean(record);
+    if (skipEnglish) nextStatus = 'pending_dean';
     record.status = nextStatus;
+    if (action === 'request_edit') {
+      record.resubmitTo = expected;
+      record.editRequestedBy = req.clubAccount.role;
+      record.skipEnglishOnNextPrApproval = false;
+    }
+    if (action === 'reject') { record.resubmitTo = 'pending_pr'; record.editRequestedBy = ''; record.skipEnglishOnNextPrApproval = false; }
+    if (skipEnglish) record.skipEnglishOnNextPrApproval = false;
+    const roleLabel = committeeRoleLabels[req.clubAccount.role];
+    const actionLabel = action === 'request_edit' ? 'requested edits' : action === 'approve' ? 'approved the request' : action === 'reject' ? 'rejected the request' : 'sent a comment';
+    const includeComment = action === 'request_edit' || action === 'reject' || action === 'comment';
+    record.clubNotice = `${roleLabel} ${actionLabel}.${includeComment && comment ? ` Comment: ${comment}` : ''}`;
+    appendWorkflowEvent(record, req.clubAccount.role, action, fromStatus, nextStatus, comment, req.clubAccount);
+    if (action === 'approve' && req.clubAccount.role === 'pr') {
+      record.clubNotice = skipEnglish
+        ? 'PR approved the event and returned it directly to the Dean.'
+        : 'PR approved the event and sent it to the English Department.';
+    }
+    if (action === 'approve' && req.clubAccount.role === 'english') record.clubNotice = 'English Department approved the event and sent it to the Dean.';
+    if (action === 'approve' && req.clubAccount.role === 'dean') record.clubNotice = 'Dean approved the event. It is now published.';
+    if (action === 'delete') {
+      record.clubNotice = 'Dean deleted this event.';
+      const club = await Club.findOne({ id: record.clubId });
+      if (club) {
+        if (record.type === 'event') {
+          club.events = (club.events || []).filter((e) => e.requestId !== record.id);
+        } else {
+          club.posts = (club.posts || []).filter((p) => p.requestId !== record.id);
+        }
+        await club.save();
+      }
+    }
+    if (action === 'request_edit') record.clubNotice = `${roleLabel} requested edits: ${comment}`;
     if (nextStatus === 'published') {
       record.publishedAt = new Date();
       const club = await Club.findOne({ id: record.clubId });
       if (club) {
         const item = {
+          requestId: record.id,
           title: record.title,
           date: record.date,
+          time: record.time,
           location: record.location,
+          budget: record.budget,
           description: record.description,
           image: record.image || club.image
         };
