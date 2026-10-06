@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/assets/css/base.css?v=20261008g" />
+    <link rel="stylesheet" href="/assets/css/base.css?v=20261008h" />
     <link rel="stylesheet" href="/assets/css/responsive.css?v=20261006c" />
     <link rel="stylesheet" href="/assets/css/dark.css?v=20261007b" />
     <link rel="stylesheet" href="/assets/css/features.css?v=20261006b" />
@@ -534,6 +534,16 @@
                 <p id="clubMemberCountNote">Manage member names, committees, positions, and membership level.</p>
                 <button id="openMemberManagerBtn" class="secondary-btn" type="button">Club members</button>
               </div>
+              <section class="approval-checkpoints" aria-labelledby="approvalCheckpointsTitle">
+                <div class="approval-checkpoints-heading">
+                  <div>
+                    <span class="admin-eyebrow">APPLICATION WORKFLOW</span>
+                    <h3 id="approvalCheckpointsTitle">Approval checkpoints</h3>
+                  </div>
+                  <span id="approvalCheckpointCount" class="admin-club-count">Loading</span>
+                </div>
+                <div id="approvalCheckpointList" class="approval-checkpoint-list" aria-live="polite"></div>
+              </section>
             </div>
 
             <div id="presidentApplicantsPanel" class="president-applicants-panel">
@@ -688,7 +698,7 @@
     <div id="site-footer"></div>
 
     <script src="/assets/js/event-modal.js?v=1"></script>
-    <script src="/assets/js/app-home.js?v=20261008c"></script>
+    <script src="/assets/js/app-home.js?v=20261008d"></script>
     <script src="/assets/js/app-admin.js?v=20261005h"></script>
     <script src="/assets/js/app-dashboard.js?v=20261008b"></script>
     <script src="/assets/js/layout.js?v=8" defer></script>

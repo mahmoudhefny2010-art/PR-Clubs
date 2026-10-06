@@ -806,6 +806,31 @@ button:disabled,
 }
 .club-review-notice-close:hover { border-color: var(--primary-600); color: var(--primary-700); }
 .member-manager-launch p { margin: 0; color: var(--text-muted); }
+.approval-checkpoints {
+  margin-top: 18px;
+  padding: 20px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-panel);
+  box-shadow: var(--shadow-sm);
+}
+.approval-checkpoints-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.approval-checkpoints-heading h3 { margin: 4px 0 0; }
+.approval-checkpoint-list { display: grid; gap: 0; max-height: 420px; overflow: auto; }
+.approval-checkpoint {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--border-color);
+}
+.approval-checkpoint:last-child { border-bottom: 0; }
+.approval-checkpoint-marker { width: 10px; height: 10px; margin-top: 5px; border: 2px solid var(--primary-700); border-radius: 50%; background: var(--bg-panel); box-shadow: 0 0 0 3px var(--primary-50); }
+.approval-checkpoint-content { min-width: 0; }
+.approval-checkpoint-content strong { display: block; overflow-wrap: anywhere; }
+.approval-checkpoint-content p { margin: 3px 0; color: var(--text-muted); text-transform: capitalize; }
+.approval-checkpoint-content time { color: var(--text-light); font-size: .82rem; }
+.approval-checkpoint-empty { margin: 0; padding: 18px 12px; border: 1px dashed var(--border-color); border-radius: var(--radius-md); color: var(--text-muted); text-align: center; }
 .member-manager-dialog {
   width: min(860px, calc(100% - 28px));
   max-height: 88vh;
@@ -848,6 +873,7 @@ button:disabled,
   .president-dashboard-section .stats-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .member-form-grid { grid-template-columns: 1fr; }
   .member-manager-launch, .member-dialog-toolbar, .member-form-actions { align-items: stretch; flex-direction: column; }
+  .approval-checkpoints { padding: 16px; }
   .member-form-actions > div { justify-content: flex-end; }
 }
 @media (max-width: 430px) {

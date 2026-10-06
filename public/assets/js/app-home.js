@@ -254,6 +254,67 @@ async function loadApplications() {
   renderHeadDashboard();
 }
 
+function renderApprovalCheckpoints(items) {
+  const list = document.getElementById('approvalCheckpointList');
+  const count = document.getElementById('approvalCheckpointCount');
+  if (!list || !count) return;
+
+  const roleLabels = { club: 'Club', pr: 'PR team', english: 'English team', dean: 'Dean' };
+  const actionLabels = {
+    submitted: 'Submitted for review',
+    resubmitted: 'Resubmitted for review',
+    approve: 'Approved',
+    reject: 'Rejected',
+    request_edit: 'Edits requested',
+    returned_to_pr: 'Returned to PR team',
+    returned_to_english: 'Returned to English team',
+    restarted_review: 'Review restarted',
+    deleted: 'Deleted',
+    comment: 'Comment added',
+    comment_deleted: 'Comment removed'
+  };
+  const checkpoints = items.flatMap((item) => (Array.isArray(item.workflowHistory) ? item.workflowHistory : [])
+    .map((event) => ({ ...event, item })));
+  checkpoints.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  count.textContent = `${checkpoints.length} ${checkpoints.length === 1 ? 'checkpoint' : 'checkpoints'}`;
+  list.replaceChildren();
+
+  if (!checkpoints.length) {
+    const empty = document.createElement('p');
+    empty.className = 'approval-checkpoint-empty';
+    empty.textContent = 'Approval progress will appear here when a request reaches its first review step.';
+    list.append(empty);
+    return;
+  }
+
+  checkpoints.slice(0, 30).forEach((checkpoint) => {
+    const card = document.createElement('article');
+    card.className = 'approval-checkpoint';
+    const marker = document.createElement('span');
+    marker.className = 'approval-checkpoint-marker';
+    marker.setAttribute('aria-hidden', 'true');
+    const content = document.createElement('div');
+    content.className = 'approval-checkpoint-content';
+    const heading = document.createElement('strong');
+    heading.textContent = checkpoint.item.title || 'Untitled request';
+    const description = document.createElement('p');
+    const action = actionLabels[checkpoint.action] || String(checkpoint.action || 'Updated').replaceAll('_', ' ');
+    const role = roleLabels[checkpoint.role] || 'Review team';
+    const stage = String(checkpoint.toStatus || checkpoint.item.status || '').replaceAll('_', ' ');
+    description.textContent = `${role} · ${action}${stage ? ` · ${stage}` : ''}`;
+    const time = document.createElement('time');
+    const date = new Date(checkpoint.createdAt);
+    if (!Number.isNaN(date.getTime())) {
+      time.dateTime = date.toISOString();
+      time.textContent = date.toLocaleString();
+    }
+    content.append(heading, description);
+    if (time.textContent) content.append(time);
+    card.append(marker, content);
+    list.append(card);
+  });
+}
+
 async function loadClubReviewNotifications() {
   const dialog = document.getElementById('clubReviewNotifications');
   const list = document.getElementById('clubReviewNotificationList');
@@ -262,7 +323,8 @@ async function loadClubReviewNotifications() {
   try {
     const response = await fetch('/api/club/content', { cache: 'no-store' });
     const items = await response.json();
-    if (!response.ok) return;
+    if (!response.ok) throw new Error('Could not load approval checkpoints.');
+    renderApprovalCheckpoints(items);
     const updates = items.filter((item) => typeof item.clubNotice === 'string' && item.clubNotice.trim());
     if (!updates.length) {
       dialog.close();
@@ -280,6 +342,16 @@ async function loadClubReviewNotifications() {
     if (dismissBtn) dismissBtn.onclick = () => dialog.close();
   } catch {
     dialog.close();
+    const count = document.getElementById('approvalCheckpointCount');
+    const list = document.getElementById('approvalCheckpointList');
+    if (count) count.textContent = 'Unavailable';
+    if (list) {
+      list.replaceChildren();
+      const message = document.createElement('p');
+      message.className = 'approval-checkpoint-empty';
+      message.textContent = 'Approval checkpoints could not be loaded right now.';
+      list.append(message);
+    }
   }
 }
 
