@@ -1059,14 +1059,14 @@ app.delete('/api/club/heads/:email', requireClubAuth, requireClubPresident, asyn
 
 function requireCommitteeRole(req, res, next) {
   const role = req.clubAccount?.role;
-  if (!['pr', 'english', 'dean'].includes(role)) {
+  if (!['pr', 'english', 'dean', 'religion'].includes(role)) {
     return res.status(403).json({ message: 'Committee access only.' });
   }
   next();
 }
 
-const committeeStage = { pr: 'pending_pr', english: 'pending_english', dean: 'pending_dean' };
-const committeeRoleLabels = { pr: 'PR Department', english: 'English Department', dean: 'Dean' };
+const committeeStage = { pr: 'pending_pr', english: 'pending_english', dean: 'pending_dean', religion: 'pending_religion' };
+const committeeRoleLabels = { pr: 'PR Department', english: 'English Department', dean: 'Dean', religion: 'Religion Committee' };
 
 function shapeClubContentRecord(record) {
   const { _id, __v, ...rest } = record;
@@ -1116,11 +1116,15 @@ function shouldSendPrApprovalToDean(record) {
   return !invalidated;
 }
 
-function committeeNextStage(role, action) {
+function committeeNextStage(role, action, recordType) {
   if (role === 'pr' && action === 'approve') return 'pending_english';
-  if (role === 'english' && action === 'approve') return 'pending_dean';
+  if (role === 'english' && action === 'approve') {
+    if (recordType === 'booth' || recordType === 'sponsor') return 'pending_religion';
+    return 'pending_dean';
+  }
   if (role === 'dean' && action === 'approve') return 'published';
-  if ((role === 'dean' || role === 'pr') && action === 'delete') return 'deleted';
+  if (role === 'religion' && action === 'approve') return 'published';
+  if ((role === 'dean' || role === 'pr' || role === 'religion') && action === 'delete') return 'deleted';
   if (action === 'reject') return 'rejected';
   if (action === 'request_edit') return 'changes_requested';
   return null;
@@ -1442,15 +1446,15 @@ app.post('/api/committee/requests/:id/action', requireClubAuth, requireCommittee
     const action = ['approve', 'reject', 'request_edit', 'comment', 'delete'].includes(req.body.action) ? req.body.action : null;
     if (!action) return res.status(400).json({ message: 'Choose approve, reject, request edit, comment, or delete.' });
     if (action !== 'comment' && action !== 'delete' && record.status !== expected) return res.status(409).json({ message: 'This request is not waiting for your review.' });
-    if (action === 'request_edit' && !['pr', 'english'].includes(req.clubAccount.role)) {
-      return res.status(403).json({ message: 'Only PR or English can request edits.' });
+    if (action === 'request_edit' && !['pr', 'english', 'religion'].includes(req.clubAccount.role)) {
+      return res.status(403).json({ message: 'Only PR, English, or Religion Committee can request edits.' });
     }
     const comment = cleanText(req.body.comment, 2000);
     if (action === 'comment' && !comment) return res.status(400).json({ message: 'Enter a comment before sending.' });
     if (action === 'request_edit' && !comment) return res.status(400).json({ message: 'Add a comment explaining the requested edits.' });
     const fromStatus = record.status;
     if (comment) appendCommitteeComment(record, req.clubAccount.role, comment);
-    let nextStatus = action === 'comment' ? record.status : committeeNextStage(req.clubAccount.role, action);
+    let nextStatus = action === 'comment' ? record.status : committeeNextStage(req.clubAccount.role, action, record.type);
     const skipEnglish = req.clubAccount.role === 'pr' && action === 'approve' && shouldSendPrApprovalToDean(record);
     if (skipEnglish) nextStatus = 'pending_dean';
     record.status = nextStatus;
@@ -1473,6 +1477,7 @@ app.post('/api/committee/requests/:id/action', requireClubAuth, requireCommittee
     }
     if (action === 'approve' && req.clubAccount.role === 'english') record.clubNotice = 'English Department approved the event and sent it to the Dean.';
     if (action === 'approve' && req.clubAccount.role === 'dean') record.clubNotice = 'Dean approved the event. It is now published.';
+    if (action === 'approve' && req.clubAccount.role === 'religion') record.clubNotice = 'Religion Committee approved the event. It is now published.';
     if (action === 'delete') {
       record.clubNotice = `${roleLabel} deleted this event.`;
       const club = await Club.findOne({ id: record.clubId });
@@ -1532,6 +1537,7 @@ app.post('/api/auth/login', (req, res) => {
       pr: '/dashboards/pr-dashboard.html',
       english: '/dashboards/english-dashboard.html',
       dean: '/dashboards/dean-dashboard.html',
+      religion: '/dashboards/religion-dashboard.html',
     };
     return res.json({ authenticated: true, role: account.role, redirect: roleRedirects[account.role] || '/club-login' });
   }
