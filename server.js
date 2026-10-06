@@ -1120,7 +1120,7 @@ function committeeNextStage(role, action) {
   if (role === 'pr' && action === 'approve') return 'pending_english';
   if (role === 'english' && action === 'approve') return 'pending_dean';
   if (role === 'dean' && action === 'approve') return 'published';
-  if (role === 'dean' && action === 'delete') return 'deleted';
+  if ((role === 'dean' || role === 'pr') && action === 'delete') return 'deleted';
   if (action === 'reject') return 'rejected';
   if (action === 'request_edit') return 'changes_requested';
   return null;
@@ -1474,7 +1474,7 @@ app.post('/api/committee/requests/:id/action', requireClubAuth, requireCommittee
     if (action === 'approve' && req.clubAccount.role === 'english') record.clubNotice = 'English Department approved the event and sent it to the Dean.';
     if (action === 'approve' && req.clubAccount.role === 'dean') record.clubNotice = 'Dean approved the event. It is now published.';
     if (action === 'delete') {
-      record.clubNotice = 'Dean deleted this event.';
+      record.clubNotice = `${roleLabel} deleted this event.`;
       const club = await Club.findOne({ id: record.clubId });
       if (club) {
         if (record.type === 'event') {

@@ -309,7 +309,7 @@ async function loadRequests() {
         editButton.addEventListener('click', () => act(item, 'request_edit'));
         actions.append(editButton);
       }
-      if (currentRole === 'dean') {
+      if (currentRole === 'dean' || currentRole === 'pr') {
         const deleteBtn = document.createElement('button');
         deleteBtn.type = 'button'; deleteBtn.className = 'delete'; deleteBtn.textContent = 'Delete';
         deleteBtn.addEventListener('click', () => {
