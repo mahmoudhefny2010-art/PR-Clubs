@@ -925,7 +925,10 @@ app.get('/api/club/members', requireClubAuth, requireClubPresident, async (req, 
 });
 
 async function getClubMemberDirectory() {
-  return [...clubs].sort((a, b) => String(a.name).localeCompare(String(b.name))).map((club) => ({
+  const directoryClubs = mongoReady
+    ? await Club.find().select('id name members memberRoster').sort({ name: 1, id: 1 }).lean()
+    : clubs;
+  return [...directoryClubs].sort((a, b) => String(a.name).localeCompare(String(b.name))).map((club) => ({
     id: club.id,
     name: club.name,
     totalCount: Number(club.members) || 0,
