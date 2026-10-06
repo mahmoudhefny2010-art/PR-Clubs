@@ -807,8 +807,8 @@ button:disabled,
 .club-review-notice-close:hover { border-color: var(--primary-600); color: var(--primary-700); }
 .member-manager-launch p { margin: 0; color: var(--text-muted); }
 .approval-checkpoints {
-  margin: 8px 0 10px;
-  padding: 12px 18px;
+  margin: 5px 0 7px;
+  padding: 8px 14px;
   overflow-x: auto;
   border: 1px solid var(--border-color);
   border-left: 5px solid var(--primary-700);
@@ -816,8 +816,8 @@ button:disabled,
   background: linear-gradient(110deg, var(--bg-panel), var(--bg-soft));
   box-shadow: var(--shadow-sm);
 }
-.approval-checkpoints-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
-.approval-checkpoints-heading h3 { margin: 2px 0; font-size: 1.05rem; }
+.approval-checkpoints-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+.approval-checkpoints-heading h3 { margin: 1px 0; font-size: 1rem; line-height: 1.2; }
 .approval-checkpoint-request { margin: 0; color: var(--text-muted); overflow-wrap: anywhere; }
 .approval-checkpoint-status { flex: 0 0 auto; padding: 5px 9px; border: 1px solid var(--warning-border); border-radius: var(--radius-full); background: var(--warning-bg); color: var(--warning); font-size: .72rem; font-weight: 800; }
 .approval-checkpoint-status.is-live { border-color: var(--success-border); background: var(--success-bg); color: var(--success); }
@@ -827,8 +827,8 @@ button:disabled,
   display: grid;
   gap: 0;
 }
-.approval-request-checkpoint { padding: 8px 10px 5px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-panel); }
-.approval-request-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+.approval-request-checkpoint { padding: 5px 8px 3px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-panel); }
+.approval-request-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
 .approval-request-heading > strong { min-width: 0; overflow: hidden; font-size: .83rem; text-overflow: ellipsis; white-space: nowrap; }
 .approval-request-state { flex: 0 0 auto; color: var(--text-muted); font-size: .69rem; font-weight: 800; text-transform: capitalize; }
 .approval-request-state.is-failed { color: var(--danger); }
@@ -926,7 +926,7 @@ button:disabled,
   .member-manager-launch, .member-dialog-toolbar, .member-form-actions { align-items: stretch; flex-direction: column; }
   .admin-member-directory-card { align-items: stretch; flex-direction: column; }
   .member-directory-person, .member-directory-club > header { align-items: flex-start; flex-direction: column; }
-  .approval-checkpoints { padding: 16px; }
+  .approval-checkpoints { padding: 10px 12px; }
   .approval-checkpoints-heading { align-items: flex-start; }
   .member-form-actions > div { justify-content: flex-end; }
 }
