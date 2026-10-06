@@ -1441,7 +1441,7 @@ app.post('/api/committee/requests/:id/action', requireClubAuth, requireCommittee
     const expected = committeeStage[req.clubAccount.role];
     const action = ['approve', 'reject', 'request_edit', 'comment', 'delete'].includes(req.body.action) ? req.body.action : null;
     if (!action) return res.status(400).json({ message: 'Choose approve, reject, request edit, comment, or delete.' });
-    if (action !== 'comment' && record.status !== expected) return res.status(409).json({ message: 'This request is not waiting for your review.' });
+    if (action !== 'comment' && action !== 'delete' && record.status !== expected) return res.status(409).json({ message: 'This request is not waiting for your review.' });
     if (action === 'request_edit' && !['pr', 'english'].includes(req.clubAccount.role)) {
       return res.status(403).json({ message: 'Only PR or English can request edits.' });
     }
