@@ -478,34 +478,6 @@ async function loadStatusOverview() {
         deleteBtn.textContent = 'Delete';
         deleteBtn.addEventListener('click', () => {
           if (confirm('Are you sure you want to delete this event? It will be removed from the homepage and events page.')) {
-            const fromStatus = item.status;
-            const roleLabel = committeeRoleLabels[currentRole] || currentRole;
-            const comment = '';
-            let nextStatus = 'deleted';
-            const skipEnglish = false;
-            const record = item;
-            const action = 'delete';
-            const expected = committeeStage[currentRole];
-            const actionAllowed = ['approve', 'reject', 'request_edit', 'comment', 'delete'].includes(action) ? action : null;
-            if (!actionAllowed) return;
-            const fromStatusLocal = record.status;
-            if (comment) appendCommitteeComment(record, currentRole, comment);
-            let nextStatusLocal = committeeNextStage(currentRole, action);
-            const skipEnglishLocal = currentRole === 'pr' && action === 'approve' && shouldSendPrApprovalToDean(record);
-            if (skipEnglishLocal) nextStatusLocal = 'pending_dean';
-            record.status = nextStatusLocal;
-            if (action === 'delete') {
-              record.clubNotice = `${roleLabel} deleted this event.`;
-              const club = clubs.find((c) => Number(c.id) === Number(record.clubId));
-              if (club) {
-                if (record.type === 'event') {
-                  club.events = (club.events || []).filter((e) => e.requestId !== record.id);
-                } else {
-                  club.posts = (club.posts || []).filter((p) => p.requestId !== record.id);
-                }
-              }
-            }
-            appendWorkflowEvent(record, currentRole, action, fromStatusLocal, nextStatusLocal, comment, { role: currentRole });
             fetch(`/api/committee/requests/${item.id}/action`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
