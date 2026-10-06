@@ -7,6 +7,13 @@ let memberDirectoryMode = 'admin';
 function renderMemberDirectory() {
   if (!memberDirectoryList || !memberDirectoryClubSelect) return;
   memberDirectoryList.replaceChildren();
+  if (!memberDirectoryClubs.length) {
+    const empty = document.createElement('p');
+    empty.className = 'member-directory-empty';
+    empty.textContent = 'No clubs were returned by the member directory.';
+    memberDirectoryList.append(empty);
+    return;
+  }
   const selectedId = memberDirectoryClubSelect.value;
   if (memberDirectoryMode === 'pr' && !selectedId) {
     const prompt = document.createElement('p');
@@ -94,7 +101,7 @@ async function openMemberDirectory(mode) {
     const response = await fetch(endpoint, { cache: 'no-store' });
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Could not load the member directory.');
-    memberDirectoryClubs = Array.isArray(result) ? result : [];
+    memberDirectoryClubs = Array.isArray(result) ? result : Array.isArray(result.clubs) ? result.clubs : [];
     memberDirectoryClubSelect.replaceChildren();
     if (isPrView) {
       memberDirectoryClubSelect.add(new Option('Choose a club', ''));

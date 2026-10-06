@@ -690,6 +690,11 @@ function toApiRecord(record) {
   return apiRecord;
 }
 
+function toPublicClubRecord(record) {
+  const { memberRoster, ...publicRecord } = toApiRecord(record);
+  return publicRecord;
+}
+
 const MY_FORM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const MY_FORM_CODE_PATTERN = /^[A-HJ-NP-Z2-9]{12}$/i;
 const myFormAccessAttempts = new Map();
@@ -817,8 +822,8 @@ function accountCanReviewApplication(account, application) {
 app.get('/api/clubs', async (req, res) => {
   try {
     const records = mongoReady
-      ? (await Club.find().sort({ sortOrder: 1, id: 1 }).lean()).map(toApiRecord)
-      : clubs;
+      ? (await Club.find().sort({ sortOrder: 1, id: 1 }).lean()).map(toPublicClubRecord)
+      : clubs.map(toPublicClubRecord);
     res.json(records);
   } catch (error) {
     console.error('Database operation failed:', error.name);
@@ -920,10 +925,7 @@ app.get('/api/club/members', requireClubAuth, requireClubPresident, async (req, 
 });
 
 async function getClubMemberDirectory() {
-  const records = mongoReady
-    ? await Club.find({}).select('id name members memberRoster').sort({ name: 1 }).lean()
-    : clubs;
-  return records.map((club) => ({
+  return [...clubs].sort((a, b) => String(a.name).localeCompare(String(b.name))).map((club) => ({
     id: club.id,
     name: club.name,
     totalCount: Number(club.members) || 0,
