@@ -254,24 +254,75 @@ async function loadApplications() {
   renderHeadDashboard();
 }
 
+function createApprovalRequestCheckpoint(request) {
+  const labels = ['Submitted', 'PR review', 'English review', 'Dean review', 'Published'];
+  const stageByRole = { club: 0, pr: 1, english: 2, dean: 3 };
+  const statusIndex = { draft: -1, pending_pr: 1, pending_english: 2, pending_dean: 3, published: 4 };
+  const status = String(request.status || 'draft');
+  const history = Array.isArray(request.workflowHistory) ? request.workflowHistory : [];
+  const lastEvent = history[history.length - 1];
+  let currentIndex = statusIndex[status] ?? (status === 'changes_requested' ? stageByRole[request.editRequestedBy] || 1 : 4);
+  const terminalClass = ['rejected', 'deleted'].includes(status) ? 'is-failed' : '';
+  if (terminalClass) currentIndex = stageByRole[lastEvent?.role] ?? 4;
+
+  const card = document.createElement('article');
+  card.className = 'approval-request-checkpoint';
+  const heading = document.createElement('div');
+  heading.className = 'approval-request-heading';
+  const title = document.createElement('strong');
+  title.textContent = request.title || 'Untitled request';
+  const state = document.createElement('span');
+  state.className = `approval-request-state${terminalClass ? ' is-failed' : ''}`;
+  state.textContent = status === 'changes_requested'
+    ? `Changes requested · ${request.editRequestedBy || 'review team'}`
+    : status.replaceAll('_', ' ');
+  heading.append(title, state);
+
+  const requestTrack = document.createElement('div');
+  requestTrack.className = 'approval-request-track';
+  requestTrack.style.setProperty('--request-progress', `${currentIndex < 0 ? 0 : currentIndex / (labels.length - 1) * 100}%`);
+  labels.forEach((label, index) => {
+    const step = document.createElement('div');
+    step.className = 'approval-request-step';
+    if (index < currentIndex) step.classList.add('is-complete');
+    if (index === currentIndex) {
+      step.classList.add('is-current');
+      if (terminalClass) step.classList.add(terminalClass);
+    }
+    const marker = document.createElement('span');
+    marker.className = 'approval-request-marker';
+    marker.setAttribute('aria-hidden', 'true');
+    const stepTitle = document.createElement('span');
+    stepTitle.textContent = label;
+    step.append(marker, stepTitle);
+    requestTrack.append(step);
+  });
+  card.append(heading, requestTrack);
+  return card;
+}
+
 function renderApprovalCheckpoints(items) {
   const track = document.getElementById('approvalCheckpointTrack');
   const requestLabel = document.getElementById('approvalCheckpointRequest');
   const statusLabel = document.getElementById('approvalCheckpointStatus');
-  if (!track || !requestLabel || !statusLabel) return;
+  const moreButton = document.getElementById('approvalCheckpointMoreBtn');
+  const moreList = document.getElementById('approvalCheckpointMoreList');
+  if (!track || !requestLabel || !statusLabel || !moreButton || !moreList) return;
 
   const latestActivity = (item) => {
     const history = Array.isArray(item.workflowHistory) ? item.workflowHistory : [];
     return new Date(history[history.length - 1]?.createdAt || item.updatedAt || item.createdAt || 0).getTime();
   };
-  const labels = ['Submitted', 'PR review', 'English review', 'Dean review', 'Published'];
-  const stageByRole = { club: 0, pr: 1, english: 2, dean: 3 };
-  const statusIndex = { draft: -1, pending_pr: 1, pending_english: 2, pending_dean: 3, published: 4 };
   const requests = [...items].sort((a, b) => latestActivity(b) - latestActivity(a));
-  requestLabel.textContent = `Live status for ${requests.length} club ${requests.length === 1 ? 'request' : 'requests'}`;
+  requestLabel.textContent = requests.length
+    ? `Latest request${requests.length > 1 ? ` · ${requests.length} total` : ''}`
+    : 'Latest club request';
   statusLabel.textContent = `Live · ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
   statusLabel.classList.add('is-live');
   track.replaceChildren();
+  moreList.replaceChildren();
+  moreButton.classList.toggle('hidden', requests.length < 2);
+  moreButton.textContent = `More · ${Math.max(0, requests.length - 1)}`;
   if (!requests.length) {
     const empty = document.createElement('p');
     empty.className = 'approval-checkpoint-empty';
@@ -280,50 +331,18 @@ function renderApprovalCheckpoints(items) {
     return;
   }
 
-  requests.forEach((request) => {
-    const status = String(request.status || 'draft');
-    const history = Array.isArray(request.workflowHistory) ? request.workflowHistory : [];
-    const lastEvent = history[history.length - 1];
-    let currentIndex = statusIndex[status] ?? (status === 'changes_requested' ? stageByRole[request.editRequestedBy] || 1 : 4);
-    const terminalClass = ['rejected', 'deleted'].includes(status) ? 'is-failed' : '';
-    if (terminalClass) currentIndex = stageByRole[lastEvent?.role] ?? 4;
-
-    const card = document.createElement('article');
-    card.className = 'approval-request-checkpoint';
-    const heading = document.createElement('div');
-    heading.className = 'approval-request-heading';
-    const title = document.createElement('strong');
-    title.textContent = request.title || 'Untitled request';
-    const state = document.createElement('span');
-    state.className = `approval-request-state${terminalClass ? ' is-failed' : ''}`;
-    state.textContent = status === 'changes_requested'
-      ? `Changes requested · ${request.editRequestedBy || 'review team'}`
-      : status.replaceAll('_', ' ');
-    heading.append(title, state);
-
-    const requestTrack = document.createElement('div');
-    requestTrack.className = 'approval-request-track';
-    requestTrack.style.setProperty('--request-progress', `${currentIndex < 0 ? 0 : currentIndex / (labels.length - 1) * 100}%`);
-    labels.forEach((label, index) => {
-      const step = document.createElement('div');
-      step.className = 'approval-request-step';
-      if (index < currentIndex) step.classList.add('is-complete');
-      if (index === currentIndex) {
-        step.classList.add('is-current');
-        if (terminalClass) step.classList.add(terminalClass);
-      }
-      const marker = document.createElement('span');
-      marker.className = 'approval-request-marker';
-      marker.setAttribute('aria-hidden', 'true');
-      const stepTitle = document.createElement('span');
-      stepTitle.textContent = label;
-      step.append(marker, stepTitle);
-      requestTrack.append(step);
-    });
-    card.append(heading, requestTrack);
-    track.append(card);
+  track.append(createApprovalRequestCheckpoint(requests[0]));
+  requests.slice(1).forEach((request) => {
+    moreList.append(createApprovalRequestCheckpoint(request));
   });
 }
+
+document.getElementById('approvalCheckpointMoreBtn')?.addEventListener('click', () => {
+  document.getElementById('approvalCheckpointMoreDialog')?.showModal();
+});
+document.getElementById('closeApprovalCheckpointMoreBtn')?.addEventListener('click', () => {
+  document.getElementById('approvalCheckpointMoreDialog')?.close();
+});
 
 let approvalCheckpointRefreshTimer = null;
 let approvalCheckpointRefreshInProgress = false;

@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/assets/css/base.css?v=20261008l" />
+    <link rel="stylesheet" href="/assets/css/base.css?v=20261008m" />
     <link rel="stylesheet" href="/assets/css/responsive.css?v=20261006c" />
     <link rel="stylesheet" href="/assets/css/dark.css?v=20261007b" />
     <link rel="stylesheet" href="/assets/css/features.css?v=20261006b" />
@@ -441,12 +441,24 @@
                 <div>
                   <span class="admin-eyebrow">APPLICATION WORKFLOW</span>
                   <h3 id="approvalCheckpointsTitle">Approval checkpoints</h3>
-                  <p id="approvalCheckpointRequest" class="approval-checkpoint-request">Live status for all club requests</p>
+                  <p id="approvalCheckpointRequest" class="approval-checkpoint-request">Latest club request</p>
                 </div>
-                <span id="approvalCheckpointStatus" class="approval-checkpoint-status is-live">Connecting…</span>
+                <div class="approval-checkpoints-actions">
+                  <button id="approvalCheckpointMoreBtn" class="secondary-btn approval-checkpoint-more hidden" type="button">More</button>
+                  <span id="approvalCheckpointStatus" class="approval-checkpoint-status is-live">Connecting…</span>
+                </div>
               </div>
               <div id="approvalCheckpointTrack" class="approval-checkpoint-track" aria-live="polite"></div>
             </section>
+            <dialog id="approvalCheckpointMoreDialog" class="approval-checkpoint-more-dialog" aria-labelledby="approvalCheckpointMoreTitle">
+              <div class="approval-checkpoint-more-inner">
+                <header class="approval-checkpoint-more-header">
+                  <div><span class="admin-eyebrow">APPLICATION WORKFLOW</span><h2 id="approvalCheckpointMoreTitle">Other club requests</h2></div>
+                  <button id="closeApprovalCheckpointMoreBtn" class="calendar-close-btn" type="button" aria-label="Close requests">&times;</button>
+                </header>
+                <div id="approvalCheckpointMoreList" class="approval-checkpoint-more-list"></div>
+              </div>
+            </dialog>
 
             <div id="presidentDashboardLayout" class="president-dashboard-layout">
               <nav id="presidentSidebar" class="president-sidebar hidden" aria-label="President dashboard sections">
@@ -723,7 +735,7 @@
     <div id="site-footer"></div>
 
     <script src="/assets/js/event-modal.js?v=1"></script>
-    <script src="/assets/js/app-home.js?v=20261008g"></script>
+    <script src="/assets/js/app-home.js?v=20261008h"></script>
     <script src="/assets/js/app-admin.js?v=20261005h"></script>
     <script src="/assets/js/app-dashboard.js?v=20261008b"></script>
     <script src="/assets/js/member-directory.js?v=20261008a"></script>

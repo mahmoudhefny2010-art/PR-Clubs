@@ -821,11 +821,11 @@ button:disabled,
 .approval-checkpoint-request { margin: 0; color: var(--text-muted); overflow-wrap: anywhere; }
 .approval-checkpoint-status { flex: 0 0 auto; padding: 5px 9px; border: 1px solid var(--warning-border); border-radius: var(--radius-full); background: var(--warning-bg); color: var(--warning); font-size: .72rem; font-weight: 800; }
 .approval-checkpoint-status.is-live { border-color: var(--success-border); background: var(--success-bg); color: var(--success); }
+.approval-checkpoints-actions { display: flex; align-items: center; gap: 8px; }
+.approval-checkpoint-more { min-height: 0; padding: 5px 10px; font-size: .78rem; }
 .approval-checkpoint-track {
   display: grid;
-  gap: 6px;
-  max-height: 300px;
-  overflow: auto;
+  gap: 0;
 }
 .approval-request-checkpoint { padding: 8px 10px 5px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-panel); }
 .approval-request-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
@@ -851,6 +851,13 @@ button:disabled,
 .approval-request-step.is-current { color: var(--text-main); font-weight: 700; }
 .approval-request-step.is-current.is-failed .approval-request-marker { background: var(--danger); box-shadow: 0 0 0 2px var(--danger-bg); }
 .approval-checkpoint-empty { margin: 0; padding: 10px; color: var(--text-muted); font-size: .82rem; }
+.approval-checkpoint-more-dialog { width: min(820px, calc(100% - 28px)); max-height: 86vh; padding: 0; border: 1px solid var(--border-color); border-radius: var(--radius-xl); background: var(--bg-panel); color: var(--text-main); box-shadow: var(--shadow-xl); }
+.approval-checkpoint-more-dialog::backdrop { background: rgba(15, 23, 42, .58); backdrop-filter: blur(4px); }
+.approval-checkpoint-more-inner { max-height: 86vh; overflow: auto; padding: 20px; }
+.approval-checkpoint-more-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color); }
+.approval-checkpoint-more-header h2 { margin: 3px 0; font-size: 1.2rem; }
+.approval-checkpoint-more-list { display: grid; gap: 8px; max-height: 66vh; margin-top: 12px; overflow: auto; }
+:root[data-theme="dark"] .approval-checkpoint-more-dialog { color-scheme: dark; }
 .member-manager-dialog {
   width: min(860px, calc(100% - 28px));
   max-height: 88vh;
