@@ -40,9 +40,9 @@ const ContentStudio = (() => {
       return [item.boothLocation, item.boothSize, item.boothOpenDate].filter(Boolean).join(' · ');
     }
     if (item.type === 'feed') {
-      return [item.date, item.time].filter(Boolean).join(' · ');
+      return [item.date, window.formatSiteTime(item.time)].filter(Boolean).join(' · ');
     }
-    return [item.date, item.time, item.location].filter(Boolean).join(' · ');
+    return [item.date, window.formatSiteTime(item.time), item.location].filter(Boolean).join(' · ');
   }
 
   function contentImage(item) {
@@ -83,6 +83,17 @@ const ContentStudio = (() => {
       resetExtras = null,
       onSave = null
     } = config;
+
+    document.querySelectorAll('[data-history-back]').forEach((link) => {
+      link.addEventListener('click', (event) => {
+        let sameSiteReferrer = false;
+        try { sameSiteReferrer = Boolean(document.referrer) && new URL(document.referrer).origin === window.location.origin; } catch (_) { /* Keep the safe home-page fallback. */ }
+        if (sameSiteReferrer && window.history.length > 1) {
+          event.preventDefault();
+          window.history.back();
+        }
+      });
+    });
 
     const sessionMessage = document.getElementById('sessionMessage');
     const contentLayout = document.getElementById('contentLayout');
@@ -130,35 +141,56 @@ const ContentStudio = (() => {
     }
 
     async function startEdit(id) {
-      const res = await fetch('/api/club/content');
-      const items = await res.json();
-      const item = items.find((entry) => entry.id === id);
-      if (!item) return;
-      editingId = id;
-      document.getElementById('formTitle').textContent = `Edit ${typeLabels[item.type] || 'content'}`;
-      if (fill) fill(item);
-      if (contentForm) contentForm.querySelectorAll('[data-image-reset]').forEach((input) => { input.value = ''; });
+      try {
+        const res = await fetch('/api/club/content');
+        const items = await res.json();
+        if (!res.ok) throw new Error(items.message || 'Could not load this content.');
+        const item = items.find((entry) => entry.id === id);
+        if (!item) throw new Error('This content could not be found.');
+        editingId = id;
+        document.getElementById('formTitle').textContent = `Edit ${typeLabels[item.type] || 'content'}`;
+        if (fill) fill(item);
+        if (contentForm) contentForm.querySelectorAll('[data-image-reset]').forEach((input) => { input.value = ''; });
+        formFeedback.textContent = '';
+      } catch (error) {
+        formFeedback.textContent = error.message;
+      }
     }
 
     async function deleteContent(id) {
       if (!confirm('Delete this content?')) return;
-      await fetch(`/api/club/content/${id}`, { method: 'DELETE' });
-      await loadContent();
+      formFeedback.textContent = '';
+      try {
+        const response = await fetch(`/api/club/content/${id}`, { method: 'DELETE' });
+        const result = response.status === 204 ? {} : await response.json();
+        if (!response.ok) throw new Error(result.message || 'Could not delete this content.');
+        formFeedback.textContent = 'Deleted successfully.';
+        await loadContent();
+      } catch (error) {
+        formFeedback.textContent = error.message;
+      }
     }
 
     async function submitExisting(id) {
-      const res = await fetch('/api/club/content');
-      const items = await res.json();
-      const item = items.find((entry) => entry.id === id);
-      if (!item) return;
-      const response = await fetch(`/api/club/content/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...item, submit: true })
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message || 'Could not submit for review.');
-      await loadContent();
+      formFeedback.textContent = '';
+      try {
+        const res = await fetch('/api/club/content');
+        const items = await res.json();
+        if (!res.ok) throw new Error(items.message || 'Could not load this content.');
+        const item = items.find((entry) => entry.id === id);
+        if (!item) throw new Error('This content could not be found.');
+        const response = await fetch(`/api/club/content/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...item, submit: true })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message || 'Could not submit for review.');
+        formFeedback.textContent = 'Submitted for review.';
+        await loadContent();
+      } catch (error) {
+        formFeedback.textContent = error.message;
+      }
     }
 
     function resetForm() {

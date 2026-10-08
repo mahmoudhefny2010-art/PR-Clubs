@@ -4,10 +4,28 @@ function renderHeadDashboard() {
   const total = clubApplications.length;
   const accepted = clubApplications.filter((app) => app.status === 'accepted').length;
   const rejected = clubApplications.filter((app) => app.status === 'rejected').length;
+  const needsReview = clubApplications.filter((app) => app.status === 'pending' && !app.interviewed).length;
 
   statTotal.textContent = total;
   statAccepted.textContent = accepted;
   statRejected.textContent = rejected;
+  const needsReviewStat = document.getElementById('statNeedsReview');
+  if (needsReviewStat) needsReviewStat.textContent = needsReview;
+
+  const recentSection = document.getElementById('presidentRecentApplicants');
+  const recentList = document.getElementById('presidentRecentApplicantsList');
+  if (recentSection && recentList) {
+    const recent = [...clubApplications]
+      .sort((left, right) => (new Date(right.updatedAt || right.createdAt || 0) - new Date(left.updatedAt || left.createdAt || 0)) || Number(right.id) - Number(left.id))
+      .slice(0, 3);
+    recentList.innerHTML = recent.length ? recent.map((app) => {
+      const status = app.status === 'pending' && app.interviewed ? 'Interviewed · pending' : app.status;
+      return `<article class="president-recent-applicant"><div><strong>${escapeHtml(app.studentName || 'Applicant')}</strong><span>${escapeHtml([app.committee || state.clubAccount?.committee || 'Unassigned committee', app.major].filter(Boolean).join(' · '))}</span></div><span class="badge ${escapeHtml(app.status)}${app.interviewed && app.status === 'pending' ? ' processing' : ''}">${escapeHtml(status)}</span><button class="secondary-btn" type="button" data-overview-review="${Number(app.id)}">Review</button></article>`;
+    }).join('') : '<p class="president-recent-empty">No applicants yet. New submissions will appear here.</p>';
+    recentList.querySelectorAll('[data-overview-review]').forEach((button) => {
+      button.addEventListener('click', () => openReviewModal(Number(button.dataset.overviewReview)));
+    });
+  }
 
   clubDashboardName.textContent = state.clubAccount?.name || 'Club dashboard';
 
@@ -34,7 +52,7 @@ function renderHeadDashboard() {
           </div>
 
           <div class="card-actions">
-            <button class="preview-btn" data-action="preview" data-id="${app.id}">${app.interviewed ? 'Preview' : 'Interview Now'}</button>
+            <button class="preview-btn${app.interviewed ? ' is-preview' : ' is-interview'}" data-action="preview" data-id="${app.id}">${app.interviewed ? 'Preview' : 'Interview Now'}</button>
             <button class="delete-btn" data-action="delete" data-id="${app.id}">Delete</button>
           </div>
         </article>
@@ -66,6 +84,8 @@ function openReviewModal(appId) {
   if (!app) return;
 
   state.selectedApplication = app;
+  reviewModal.dataset.reviewMode = app.interviewed ? 'preview' : 'interview';
+  reviewModal.querySelector('.modal-header h3').textContent = app.interviewed ? 'Interview Preview' : 'Applicant Interview';
   state.pendingInterviewPhoto = '';
   document.getElementById('modalPhoto').value = '';
   modalName.textContent = app.studentName;
@@ -153,6 +173,8 @@ async function loadCommitteeHeads() {
   const response = await fetch('/api/club/heads');
   if (!response.ok) throw new Error('Could not load committee heads.');
   const heads = await response.json();
+  window.dashboardUnread?.update('committeeHeads', heads.map((head) => `${head.committee}:${head.email}`));
+  await loadCommitteeAvailability();
   document.getElementById('committeeHeadCount').textContent = `${heads.length} ${heads.length === 1 ? 'head' : 'heads'}`;
   committeeHeadList.replaceChildren();
   if (!heads.length) {
@@ -190,6 +212,68 @@ async function loadCommitteeHeads() {
   }
 }
 
+async function loadCommitteeAvailability() {
+  const list = document.getElementById('presidentCommitteeAvailability');
+  const feedback = document.getElementById('committeeAvailabilityFeedback');
+  if (!list || !feedback) return;
+  list.replaceChildren();
+  feedback.textContent = 'Loading committee availability…';
+  feedback.classList.remove('is-error');
+  try {
+    const response = await fetch('/api/club/committee-availability', { cache: 'no-store' });
+    const committees = await response.json();
+    if (!response.ok) throw new Error(committees.message || 'Could not load committee availability.');
+    if (!committees.length) {
+      const empty = document.createElement('p');
+      empty.className = 'committee-head-empty';
+      empty.textContent = 'Create a committee head to add a committee to the application form.';
+      list.append(empty);
+    }
+    committees.forEach(({ committee, status }) => {
+      const row = document.createElement('label');
+      row.className = 'committee-availability-row';
+      const name = document.createElement('strong');
+      name.textContent = committee;
+      const select = document.createElement('select');
+      select.dataset.committee = committee;
+      [['open', 'Open'], ['full', 'Full'], ['closed', 'Closed']].forEach(([value, label]) => {
+        select.add(new Option(label, value, false, value === status));
+      });
+      row.append(name, select);
+      list.append(row);
+    });
+    feedback.textContent = '';
+  } catch (error) {
+    feedback.textContent = error.message;
+    feedback.classList.add('is-error');
+  }
+}
+
+document.getElementById('saveCommitteeAvailabilityBtn')?.addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  const feedback = document.getElementById('committeeAvailabilityFeedback');
+  button.disabled = true;
+  feedback.textContent = '';
+  feedback.classList.remove('is-error');
+  try {
+    const committees = [...document.querySelectorAll('#presidentCommitteeAvailability select[data-committee]')]
+      .map((select) => ({ committee: select.dataset.committee, status: select.value }));
+    const response = await fetch('/api/club/committee-availability', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ committees })
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Could not save committee availability.');
+    feedback.textContent = 'Committee availability saved.';
+  } catch (error) {
+    feedback.textContent = error.message;
+    feedback.classList.add('is-error');
+  } finally {
+    button.disabled = false;
+  }
+});
+
 async function loadClubMembers() {
   const list = document.getElementById('clubMemberList');
   const count = document.getElementById('memberRosterCount');
@@ -202,6 +286,7 @@ async function loadClubMembers() {
     const data = await response.json();
     if (!response.ok) throw new Error(data.message || 'Could not load club members.');
     const members = Array.isArray(data.members) ? data.members : [];
+    window.dashboardUnread?.update('clubMembers', members.map((member) => `${member.createdAt || `${member.name}:${member.committee}:${member.position}`}`));
     const committees = Array.isArray(data.committees) ? data.committees : [];
     count.textContent = `${members.length} listed · ${Number(data.totalCount) || 0} total club members`;
     const selectedCommittee = committeeSelect.value;
@@ -383,17 +468,23 @@ async function loadApplicationCommittees(clubId) {
   applicationCommitteeInput.disabled = true;
   applicationForm.querySelector('[type="submit"]').disabled = true;
   try {
-    const response = await fetch(`/api/clubs/${clubId}/committees`);
+    const response = await fetch(`/api/clubs/${clubId}/application-committees`, { cache: 'no-store' });
     const committees = await response.json();
     if (!response.ok) throw new Error(committees.message || 'Could not load this club’s committees.');
     applicationCommitteeInput.replaceChildren(new Option('Choose a committee', ''));
     for (const committee of committees) {
-      applicationCommitteeInput.add(new Option(committee, committee));
+      const option = new Option(committee.label || committee.committee, committee.committee);
+      option.disabled = committee.selectable !== true;
+      applicationCommitteeInput.add(option);
     }
+    const hasOpenCommittees = committees.some((committee) => committee.selectable === true);
     applicationCommitteeInput.disabled = committees.length === 0;
-    applicationForm.querySelector('[type="submit"]').disabled = committees.length === 0;
+    applicationForm.querySelector('[type="submit"]').disabled = !hasOpenCommittees;
     if (!committees.length) {
       applicationFeedback.textContent = 'This club has not added committee heads yet, so applications are not open.';
+      applicationFeedback.classList.add('is-error');
+    } else if (!hasOpenCommittees) {
+      applicationFeedback.textContent = 'All committees are currently full or closed.';
       applicationFeedback.classList.add('is-error');
     }
   } catch (error) {
@@ -490,10 +581,10 @@ document.getElementById('adminLoginForm').addEventListener('submit', async (even
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Admin login failed.');
 
-    await Promise.all([loadClubs(), loadHomepageSettings()]);
     resetClubEditor();
     setAdminFeedback('');
     showView('admin');
+    await Promise.all([loadClubs(), loadHomepageSettings(), loadArchivedClubs()]);
   } catch (error) {
     setAdminLoginFeedback(error.message, true);
   }
@@ -502,6 +593,10 @@ document.getElementById('adminLoginForm').addEventListener('submit', async (even
 document.getElementById('clubLoginForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   const feedback = document.getElementById('clubLoginFeedback');
+  const submitButton = document.getElementById('clubLoginSubmit');
+  const originalLabel = submitButton.textContent;
+  submitButton.disabled = true;
+  submitButton.textContent = 'Signing in…';
   feedback.textContent = '';
   feedback.classList.remove('is-error');
 
@@ -519,10 +614,14 @@ document.getElementById('clubLoginForm').addEventListener('submit', async (event
     }
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Club login failed.');
-    await openClubPortal();
+    if (!result.authenticated || !result.club) throw new Error('Login succeeded, but the dashboard account could not be loaded.');
+    await openClubPortal(result);
   } catch (error) {
     feedback.textContent = error.message;
     feedback.classList.add('is-error');
+  } finally {
+    submitButton.disabled = false;
+    submitButton.textContent = originalLabel;
   }
 });
 
@@ -618,6 +717,10 @@ clubEditorForm.addEventListener('submit', async (event) => {
     imageFit: document.getElementById('clubImageFitInput').value,
     pinned: clubPinnedInput.checked,
   };
+  if (!clubId) {
+    payload.clubLoginEmail = document.getElementById('clubLoginEmailInput').value.trim();
+    payload.clubInitialPassword = document.getElementById('clubInitialPasswordInput').value;
+  }
 
   const invalidQuestion = state.editingApplicationFields.find((field) => (
     !field.label.trim() || (field.type === 'select' && field.options.length < 2)
@@ -698,15 +801,24 @@ function showView(viewName) {
   Object.entries(views).forEach(([key, view]) => {
     view.classList.toggle('active', key === viewName);
   });
+  if (viewName !== 'authLoading') document.documentElement.classList.remove('auth-route-pending');
 }
 
 async function init() {
-  await Promise.all([loadClubs(), loadHomepageSettings()]);
-  if (window.location.pathname === '/admin') {
+  const pathname = window.location.pathname;
+  if (pathname === '/admin') {
+    showView('authLoading');
     await openAdminAccess();
-  } else if (window.location.pathname === '/club-login' || window.location.pathname === '/club-dashboard') {
+    return;
+  }
+  if (pathname === '/club-login' || pathname === '/club-dashboard') {
+    showView('authLoading');
     await openClubPortal();
-  } else {
+    return;
+  }
+
+  await Promise.all([loadClubs(), loadHomepageSettings()]);
+  {
     const query = new URLSearchParams(window.location.search);
     if (query.has('calendarYear') && query.has('calendarMonth')) {
       const year = Number(query.get('calendarYear'));

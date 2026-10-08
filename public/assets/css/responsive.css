@@ -61,8 +61,18 @@
     padding-bottom: 4px;
   }
 
+  .president-sidebar-group-title { flex: 0 0 100%; }
+
+  .president-sidebar-group-title { flex: 0 0 100%; }
+
   .president-sidebar a {
     flex: 1 1 auto;
+    text-align: center;
+  }
+
+  .president-sidebar .president-sidebar-action {
+    flex: 1 1 auto;
+    width: auto;
     text-align: center;
   }
 }

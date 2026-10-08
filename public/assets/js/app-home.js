@@ -13,8 +13,11 @@ const state = {
   searchQuery: '',
   activeCategory: 'All',
 };
+let clubsLoaded = false;
+let clubsLoadPromise = null;
 
 const views = {
+  authLoading: document.getElementById('authLoadingView'),
   home: document.getElementById('homeView'),
   signIn: document.getElementById('signInView'),
   myForms: document.getElementById('myFormsView'),
@@ -186,6 +189,13 @@ async function startEditingMyForm(item) {
   const app = item.application;
   await openApplicationForm(app.clubId, true);
   state.editingMyForm = item;
+  const currentCommitteeOption = [...applicationCommitteeInput.options]
+    .find((option) => option.value === app.committee);
+  if (currentCommitteeOption) {
+    currentCommitteeOption.disabled = false;
+    applicationCommitteeInput.disabled = false;
+    applicationForm.querySelector('[type="submit"]').disabled = false;
+  }
   const nameParts = String(app.studentName || '').trim().split(/\s+/);
   applicationForm.elements.namedItem('firstName').value = nameParts.shift() || '';
   applicationForm.elements.namedItem('lastName').value = nameParts.join(' ');
@@ -230,8 +240,20 @@ async function removeMyForm(item) {
 }
 
 async function loadClubs() {
-  const response = await fetch('/api/clubs');
-  state.clubs = await response.json();
+  if (!clubsLoadPromise) {
+    clubsLoadPromise = (async () => {
+      const response = await fetch('/api/clubs', { cache: 'no-store' });
+      if (!response.ok) throw new Error('Could not load club events.');
+      const records = await response.json();
+      state.clubs = Array.isArray(records) ? records : [];
+      clubsLoaded = true;
+    })();
+  }
+  try {
+    await clubsLoadPromise;
+  } finally {
+    clubsLoadPromise = null;
+  }
   renderClubGrid();
   renderAdminClubList();
 }
@@ -251,6 +273,7 @@ async function loadApplications() {
   const response = await fetch('/api/club/applications');
   if (!response.ok) throw new Error('Club login required to view applications.');
   state.applications = await response.json();
+  window.dashboardUnread?.update('applicants', state.applications.filter((item) => item.status === 'pending').map((item) => `${item.id}:${item.updatedAt || item.status || ''}`));
   renderHeadDashboard();
 }
 
@@ -307,17 +330,19 @@ function renderApprovalCheckpoints(items) {
   const statusLabel = document.getElementById('approvalCheckpointStatus');
   const moreButton = document.getElementById('approvalCheckpointMoreBtn');
   const moreList = document.getElementById('approvalCheckpointMoreList');
-  if (!track || !requestLabel || !statusLabel || !moreButton || !moreList) return;
+  if (!track || !statusLabel || !moreButton || !moreList) return;
 
   const latestActivity = (item) => {
     const history = Array.isArray(item.workflowHistory) ? item.workflowHistory : [];
     return new Date(history[history.length - 1]?.createdAt || item.updatedAt || item.createdAt || 0).getTime();
   };
   const requests = [...items].sort((a, b) => latestActivity(b) - latestActivity(a));
-  requestLabel.textContent = requests.length
-    ? `Latest request${requests.length > 1 ? ` · ${requests.length} total` : ''}`
-    : 'Latest club request';
-  statusLabel.textContent = `Live · ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  if (requestLabel) {
+    requestLabel.textContent = requests.length
+      ? `Latest request${requests.length > 1 ? ` · ${requests.length} total` : ''}`
+      : 'Latest club request';
+  }
+  statusLabel.textContent = `Live · ${window.formatSiteTime(new Date())}`;
   statusLabel.classList.add('is-live');
   track.replaceChildren();
   moreList.replaceChildren();
@@ -347,7 +372,21 @@ document.getElementById('closeApprovalCheckpointMoreBtn')?.addEventListener('cli
 let approvalCheckpointRefreshTimer = null;
 let approvalCheckpointRefreshInProgress = false;
 
-async function loadClubReviewNotifications(showPopup = true) {
+async function refreshPresidentSidebarUnread() {
+  if (state.clubAccount?.role !== 'president') return;
+  try {
+    const endpoints = ['/api/club/applications', '/api/club/heads', '/api/club/members', '/api/club/attendance-records'];
+    const responses = await Promise.all(endpoints.map((url) => fetch(url, { cache: 'no-store' })));
+    const values = await Promise.all(responses.map((response) => response.ok ? response.json() : null));
+    const [applications, heads, memberData, attendance] = values;
+    if (Array.isArray(applications)) window.dashboardUnread?.update('applicants', applications.filter((item) => item.status === 'pending').map((item) => `${item.id}:${item.updatedAt || item.status || ''}`));
+    if (Array.isArray(heads)) window.dashboardUnread?.update('committeeHeads', heads.map((head) => `${head.committee}:${head.email}`));
+    if (memberData && Array.isArray(memberData.members)) window.dashboardUnread?.update('clubMembers', memberData.members.map((member) => `${member.createdAt || `${member.name}:${member.committee}:${member.position}`}`));
+    if (Array.isArray(attendance)) window.dashboardUnread?.update('eventAttendance', attendance.map((record) => `${record.itemType}:${record.eventRequestId}:${record.email}:${record.attendedAt}`));
+  } catch { /* Keep the last known section counts until the database reconnects. */ }
+}
+
+async function loadClubReviewNotifications() {
   const dialog = document.getElementById('clubReviewNotifications');
   const list = document.getElementById('clubReviewNotificationList');
   const dismissBtn = document.getElementById('dismissNotificationBtn');
@@ -359,21 +398,71 @@ async function loadClubReviewNotifications(showPopup = true) {
     const items = await response.json();
     if (!response.ok) throw new Error('Could not load approval checkpoints.');
     renderApprovalCheckpoints(items);
-    const updates = items.filter((item) => typeof item.clubNotice === 'string' && item.clubNotice.trim());
-    if (!updates.length) {
-      dialog.close();
-      return;
+    const actionableUpdates = items.flatMap((item) => (Array.isArray(item.workflowHistory) ? item.workflowHistory : [])
+      .filter((event) => ['request_edit', 'reject', 'comment', 'returned_to_pr', 'returned_to_english'].includes(event.action)
+        && ['pr', 'english', 'dean'].includes(event.role))
+      .map((event) => ({
+        item,
+        event,
+        key: `${item.id}:${event.action}:${new Date(event.createdAt || 0).getTime()}`
+      })))
+      .sort((left, right) => new Date(right.event.createdAt || 0) - new Date(left.event.createdAt || 0));
+    const storageKey = `miu-club-notifications-seen:${state.clubAccount?.id || 'unknown'}`;
+    let seenThrough = 0;
+    let seenKeys = [];
+    try {
+      const savedState = JSON.parse(localStorage.getItem(storageKey) || 'null');
+      if (Array.isArray(savedState)) {
+        seenKeys = savedState;
+      } else if (savedState && typeof savedState === 'object') {
+        seenThrough = Number(savedState.seenThrough) || 0;
+        seenKeys = Array.isArray(savedState.keys) ? savedState.keys : [];
+      }
+    } catch {
+      seenKeys = [];
     }
-    updates.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-    const latest = updates[0];
-    
+    const seenSet = new Set(seenKeys);
+    const latestUpdate = actionableUpdates[0];
+    if (!latestUpdate || seenSet.has(latestUpdate.key) || new Date(latestUpdate.event.createdAt || 0).getTime() <= seenThrough) return;
+
+    const roleLabels = { pr: 'PR', english: 'English Department', dean: 'Dean' };
+    const actionLabels = {
+      request_edit: 'requested changes',
+      reject: 'rejected the request',
+      comment: 'left a comment',
+      returned_to_pr: 'returned the request to PR for another review',
+      returned_to_english: 'returned the request to English for another review'
+    };
     list.replaceChildren();
+    const { item, event } = latestUpdate;
     const message = document.createElement('p');
     message.className = 'club-review-notice-message';
-    message.textContent = `${latest.title}: ${latest.clubNotice} Current status: ${String(latest.status || '').replaceAll('_', ' ')}.`;
+    const role = roleLabels[event.role] || 'Approval team';
+    const note = String(event.comment || '').trim();
+    message.textContent = `${item.title || 'Club request'}: ${role} ${actionLabels[event.action] || 'updated the request'}${note ? `. Comment: ${note}` : '.'}`;
     list.append(message);
-    if (showPopup && !dialog.open) dialog.showModal();
-    if (dismissBtn) dismissBtn.onclick = () => dialog.close();
+    dialog.dataset.pendingNotificationKeys = JSON.stringify([latestUpdate.key]);
+    dialog.dataset.pendingNotificationTimestamp = String(new Date(event.createdAt || 0).getTime());
+    if (!dialog.open) dialog.showModal();
+    const markPendingNotificationsSeen = () => {
+      try {
+        const pendingKeys = JSON.parse(dialog.dataset.pendingNotificationKeys || '[]');
+        const savedState = JSON.parse(localStorage.getItem(storageKey) || 'null');
+        const savedKeys = Array.isArray(savedState) ? savedState : (Array.isArray(savedState?.keys) ? savedState.keys : []);
+        const nextSeenThrough = Math.max(
+          Number(savedState?.seenThrough) || 0,
+          Number(dialog.dataset.pendingNotificationTimestamp) || 0
+        );
+        const nextSeenKeys = [...new Set([...savedKeys, ...pendingKeys])].slice(-100);
+        localStorage.setItem(storageKey, JSON.stringify({ seenThrough: nextSeenThrough, keys: nextSeenKeys }));
+      } catch { /* Keep the dialog usable if browser storage is unavailable. */ }
+      dialog.close();
+    };
+    if (dismissBtn) dismissBtn.onclick = markPendingNotificationsSeen;
+    dialog.oncancel = (event) => {
+      event.preventDefault();
+      markPendingNotificationsSeen();
+    };
   } catch {
     dialog.close();
     const status = document.getElementById('approvalCheckpointStatus');
@@ -391,6 +480,7 @@ function startApprovalCheckpointLiveUpdates() {
   approvalCheckpointRefreshTimer = setInterval(() => {
     if (document.visibilityState === 'visible' && state.clubAccount?.role === 'president') {
       loadClubReviewNotifications(false);
+      refreshPresidentSidebarUnread();
     }
   }, 10000);
 }
@@ -398,29 +488,33 @@ function startApprovalCheckpointLiveUpdates() {
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && state.clubAccount?.role === 'president') {
     loadClubReviewNotifications(false);
+    refreshPresidentSidebarUnread();
   }
 });
 
-async function openClubPortal() {
+async function openClubPortal(initialSession = null) {
   try {
-    const sessionResponse = await fetch('/api/club-auth/session');
-    const session = await sessionResponse.json();
+    let session = initialSession;
+    if (!session) {
+      const sessionResponse = await fetch('/api/club-auth/session');
+      session = await sessionResponse.json();
+    }
     if (!session.authenticated) {
+      document.documentElement.classList.remove('auth-route-pending');
       state.clubAccount = null;
       state.applications = [];
       showView('clubLogin');
       return;
     }
 
-    if (session.club && ['pr', 'english', 'dean'].includes(session.club.role)) {
-      const routes = { pr: '/dashboards/pr-dashboard.html', english: '/dashboards/english-dashboard.html', dean: '/dashboards/dean-dashboard.html' };
+    if (session.club && ['pr', 'english', 'sso', 'dean'].includes(session.club.role)) {
+      const routes = { pr: '/dashboards/pr-dashboard.html', english: '/dashboards/english-dashboard.html', sso: '/dashboards/sso-dashboard.html', dean: '/dashboards/dean-dashboard.html' };
       window.location.assign(routes[session.club.role]);
       return;
     }
 
-    const dashboardResponse = await fetch('/api/club/dashboard');
-    const club = await dashboardResponse.json();
-    if (!dashboardResponse.ok) throw new Error(club.message || 'Could not load club dashboard.');
+    const club = session.club;
+    if (!club) throw new Error('Could not load club dashboard.');
 
     state.clubAccount = club;
     clubDashboardName.textContent = club.name;
@@ -429,12 +523,18 @@ async function openClubPortal() {
     document.getElementById('clubDashboardRoleLabel').textContent = club.role === 'president'
       ? 'PRESIDENT DASHBOARD - ALL COMMITTEES'
       : `${club.committee} - HEAD DASHBOARD`;
+    const isPresident = club.role === 'president';
+    const attendanceCommittee = String(club.committee || '').trim().toLowerCase();
+    const canViewAttendance = isPresident
+      || (club.role === 'head' && (/(^|[^a-z])it([^a-z]|$)/.test(attendanceCommittee) || attendanceCommittee.includes('information technology')));
     presidentHeadManager.classList.toggle('hidden', club.role !== 'president');
     presidentFormManager.classList.toggle('hidden', club.role !== 'president');
-    presidentSidebar.classList.toggle('hidden', club.role !== 'president');
-    presidentDashboardLayout.classList.toggle('is-president', club.role === 'president');
+    presidentSidebar.classList.toggle('hidden', !canViewAttendance);
+    presidentDashboardLayout.classList.toggle('is-president', canViewAttendance);
+    presidentSidebar.querySelectorAll('[data-president-only]').forEach((item) => item.classList.toggle('hidden', !isPresident));
     document.getElementById('approvalCheckpointPanel')?.classList.toggle('hidden', club.role !== 'president');
     document.getElementById('openMemberManagerBtn')?.classList.toggle('hidden', club.role !== 'president');
+    document.getElementById('openAttendanceManagerBtn')?.classList.toggle('hidden', !canViewAttendance);
     interviewFormManager.classList.add('hidden');
     toggleInterviewFormBtn.classList.remove('hidden');
     toggleInterviewFormBtn.setAttribute('aria-expanded', 'false');
@@ -451,17 +551,20 @@ async function openClubPortal() {
     document.getElementById('interviewFormDescription').textContent = club.role === 'president'
       ? 'These questions are used when you review applicants in your club dashboard.'
       : 'These questions are used when you review applicants assigned to your committee.';
+    showView('head');
+    document.documentElement.classList.remove('auth-route-pending');
     await Promise.all([
       loadInterviewForm(),
       ...(club.role === 'president' ? [loadCommitteeHeads(), loadPresidentApplicationForm()] : [])
     ]);
     await loadApplications();
-    showView('head');
     if (club.role === 'president') {
       await loadClubReviewNotifications();
+      await refreshPresidentSidebarUnread();
       startApprovalCheckpointLiveUpdates();
     }
   } catch (error) {
+    document.documentElement.classList.remove('auth-route-pending');
     const feedback = document.getElementById('clubLoginFeedback');
     feedback.textContent = error.message;
     feedback.classList.add('is-error');
@@ -476,7 +579,14 @@ function setPresidentDashboardSection(sectionId) {
   presidentSidebar?.querySelectorAll('[data-dashboard-section]').forEach((item) => {
     item.classList.toggle('is-active', item.dataset.dashboardSection === sectionId);
   });
+  const unreadSection = ({ presidentHeadManager: 'committeeHeads', presidentApplicantsPanel: 'applicants' })[sectionId];
+  window.dashboardUnread?.activate(unreadSection || '');
 }
+
+document.getElementById('presidentOverviewApplicantsBtn')?.addEventListener('click', () => {
+  if (state.clubAccount?.role === 'president') setPresidentDashboardSection('presidentApplicantsPanel');
+  else document.getElementById('applicationsList')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
 
 presidentSidebar?.querySelectorAll('[data-dashboard-section]').forEach((link) => {
   link.addEventListener('click', (event) => {
@@ -609,6 +719,18 @@ function getAllEvents() {
   );
 }
 
+function parseEventDate(value) {
+  const text = String(value || '').trim();
+  const parsed = /^\d{4}-\d{2}-\d{2}$/.test(text) ? new Date(`${text}T00:00:00`) : new Date(text);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function startOfLocalDay(value) {
+  const day = new Date(value);
+  day.setHours(0, 0, 0, 0);
+  return day;
+}
+
 const CONTENT_TYPE_LABELS = { event: 'Event', feed: 'Feed', sponsor: 'Sponsor', booth: 'Booth' };
 const CONTENT_HOME_LABELS = { event: 'Upcoming Event', feed: 'Latest Feed', sponsor: 'Upcoming Sponsor', booth: 'Booth Opening Soon' };
 
@@ -664,24 +786,22 @@ function getAllFeeds() {
 function renderTodayEvents() {
   const strip = document.getElementById('todayEvents');
   if (!strip) return;
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
+  const start = startOfLocalDay(new Date());
   const end = new Date(start);
   end.setDate(end.getDate() + 1);
   const events = getAllEvents()
-    .map((event) => ({ ...event, parsed: new Date(event.date) }))
-    .filter((event) => !Number.isNaN(event.parsed.getTime()) && event.parsed >= start && event.parsed <= end)
+    .map((event) => ({ ...event, parsed: parseEventDate(event.date) }))
+    .filter((event) => event.parsed && event.parsed >= start && event.parsed < end)
     .sort((left, right) => left.parsed - right.parsed);
   if (!events.length) {
     strip.innerHTML = '';
     strip.classList.add('hidden');
     return;
   }
-  strip.innerHTML = `<span class="today-events-label">Happening today &amp; tomorrow</span>${events.map((event) => {
-    const isToday = event.parsed.getTime() === start.getTime();
+  strip.innerHTML = `<span class="today-events-label">Happening today</span>${events.map((event) => {
     return `
       <a class="today-event-chip" href="/pages/event.html?club=${event.clubId}&event=${event.eventIndex}" data-club="${event.clubId}" data-idx="${event.eventIndex}">
-        <span class="today-event-badge">${isToday ? 'Today' : 'Tomorrow'}</span>
+        <span class="today-event-badge">Today · New</span>
         <img src="${escapeHtml(event.image || event.clubImage)}" alt="" />
         <span class="today-event-title">${escapeHtml(event.title || 'Event')}</span>
       </a>`;
@@ -703,14 +823,31 @@ function renderEventsSlideshow() {
   const track = document.getElementById('eventsSlideshowTrack');
   const dots = document.getElementById('eventsSlideshowDots');
   if (!track || !dots) return;
-  const items = getAllUpcomingContent().sort(compareUpcoming);
+  const todayStart = startOfLocalDay(new Date());
+  const tomorrowStart = new Date(todayStart);
+  tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+  const items = getAllEvents()
+    .map((event) => ({ ...event, contentType: 'event', index: event.eventIndex, parsedDate: parseEventDate(event.date) }))
+    .filter((event) => event.parsedDate && event.parsedDate < tomorrowStart)
+    .sort((left, right) => {
+      const leftDay = startOfLocalDay(left.parsedDate);
+      const rightDay = startOfLocalDay(right.parsedDate);
+      if (leftDay.getTime() !== rightDay.getTime()) return rightDay - leftDay;
+      return left.parsedDate - right.parsedDate;
+    });
   if (!items.length) {
-    track.innerHTML = '<p class="events-empty">No upcoming content right now.</p>';
+    track.innerHTML = '<p class="events-empty">No events today or earlier.</p>';
     dots.innerHTML = '';
+    dots.hidden = true;
+    document.getElementById('slidePrev')?.setAttribute('hidden', '');
+    document.getElementById('slideNext')?.setAttribute('hidden', '');
+    if (slideTimer) clearInterval(slideTimer);
+    slideTimer = null;
     return;
   }
   if (slideIndex >= items.length) slideIndex = 0;
   track.innerHTML = items.map((item, i) => {
+    const isToday = startOfLocalDay(item.parsedDate).getTime() === todayStart.getTime();
     const metaLine = item.contentType === 'sponsor'
       ? [item.sponsorType, item.sponsorAmount].filter(Boolean).join(' · ')
       : `${item.date || ''}${item.location ? ' · ' + escapeHtml(item.location) : ''}`;
@@ -720,7 +857,7 @@ function renderEventsSlideshow() {
       <div class="event-slide-copy">
         <span class="event-slide-club">${escapeHtml(item.clubName || '')}</span>
         <h3>${escapeHtml(item.title || 'Event')}</h3>
-        <span class="content-type-badge ${escapeHtml(item.contentType)}">${escapeHtml(CONTENT_HOME_LABELS[item.contentType] || 'Upcoming')}</span>
+        <span class="content-type-badge ${escapeHtml(item.contentType)}">${isToday ? 'TODAY · NEW' : 'PAST EVENT'}</span>
         <p class="event-slide-meta">${escapeHtml(metaLine)}</p>
         <p>${escapeHtml(item.description || '')}</p>
         <span class="event-slide-cta">View details →</span>
@@ -736,14 +873,17 @@ function renderEventsSlideshow() {
       if (event && typeof window.openEventModal === 'function') window.openEventModal({ ...event, eventIndex: event.index });
     });
   });
-  dots.innerHTML = items.map((_, i) => `<button type="button" class="${i === slideIndex ? 'active' : ''}" data-slide="${i}" aria-label="slide ${i + 1}"></button>`).join('');
+  dots.hidden = items.length < 2;
+  dots.innerHTML = items.length > 1 ? items.map((_, i) => `<button type="button" class="${i === slideIndex ? 'active' : ''}" data-slide="${i}" aria-label="slide ${i + 1}"></button>`).join('') : '';
   dots.querySelectorAll('button').forEach((dot) => dot.addEventListener('click', () => { slideIndex = Number(dot.dataset.slide); renderEventsSlideshow(); }));
   const prev = document.getElementById('slidePrev');
   const next = document.getElementById('slideNext');
+  if (prev) prev.hidden = items.length < 2;
+  if (next) next.hidden = items.length < 2;
   if (prev) prev.onclick = () => { slideIndex = (slideIndex - 1 + items.length) % items.length; renderEventsSlideshow(); };
   if (next) next.onclick = () => { slideIndex = (slideIndex + 1) % items.length; renderEventsSlideshow(); };
   if (slideTimer) clearInterval(slideTimer);
-  slideTimer = setInterval(() => { slideIndex = (slideIndex + 1) % items.length; renderEventsSlideshow(); }, 5000);
+  slideTimer = items.length > 1 ? setInterval(() => { slideIndex = (slideIndex + 1) % items.length; renderEventsSlideshow(); }, 5000) : null;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -752,11 +892,23 @@ document.addEventListener('DOMContentLoaded', () => {
   const calendarClose = document.getElementById('calendarClose');
   const calendarTitle = document.getElementById('calendarTitle');
   const calendarGrid = document.getElementById('calendarGrid');
+  const dayEventsModal = document.getElementById('calendarDayEventsModal');
+  const dayEventsTitle = document.getElementById('calendarDayEventsTitle');
+  const dayEventsList = document.getElementById('calendarDayEventsList');
+  const dayEventsClose = document.getElementById('calendarDayEventsClose');
   let selectedCalendarDay = null;
-  const openCalendar = () => {
+  const openCalendar = async () => {
     calendarModal.classList.remove('hidden');
     selectedCalendarDay = null;
-    renderCalendar(new Date().getFullYear(), 0);
+    calendarGrid.innerHTML = '<p class="calendar-month-prompt">Loading events...</p>';
+    try {
+      if (clubsLoadPromise) await clubsLoadPromise;
+      else if (!clubsLoaded) await loadClubs();
+      const today = new Date();
+      renderCalendar(today.getFullYear(), today.getMonth());
+    } catch {
+      calendarGrid.innerHTML = '<p class="calendar-month-prompt" role="status">Events could not be loaded. Close the calendar and try again.</p>';
+    }
   };
 
   const parseDate = (value) => {
@@ -764,19 +916,61 @@ document.addEventListener('DOMContentLoaded', () => {
     return Number.isNaN(d.getTime()) ? null : d;
   };
 
-  function renderCalendar(year = new Date().getFullYear(), month = null) {
-    const events = getAllEvents().map((e) => ({ ...e, parsed: parseDate(e.date) })).filter((e) => e.parsed);
-    if (calendarTitle) calendarTitle.textContent = `Events calendar - ${year}`;
-    const monthOptions = `<div class="calendar-month-filter"><label for="calendarMonthSelect">Choose a month</label><select id="calendarMonthSelect"><option value="">Select month</option>${Array.from({ length: 12 }, (_, index) => `<option value="${index}"${month === index ? ' selected' : ''}>${new Date(year, index, 1).toLocaleString('en', { month: 'long' })}</option>`).join('')}</select></div>`;
-    const bindMonthFilter = () => calendarGrid.querySelector('#calendarMonthSelect')?.addEventListener('change', (event) => {
-      selectedCalendarDay = null;
-      renderCalendar(year, event.currentTarget.value === '' ? null : Number(event.currentTarget.value));
+  function closeDayEventsModal() {
+    dayEventsModal?.classList.add('hidden');
+    document.body.classList.remove('modal-open');
+  }
+
+  function openDayEventsModal(dayEvents, year, month, day) {
+    if (!dayEventsModal || !dayEventsTitle || !dayEventsList) return;
+    const date = new Date(year, month, day);
+    dayEventsTitle.textContent = date.toLocaleDateString('en-US', {
+      weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
     });
-    if (month === null) {
-      calendarGrid.innerHTML = `${monthOptions}<p class="calendar-month-prompt">Choose a month to view its days and events.</p>`;
-      bindMonthFilter();
-      return;
-    }
+    dayEventsList.replaceChildren();
+
+    dayEvents.forEach((event) => {
+      const option = document.createElement('button');
+      option.type = 'button';
+      option.className = 'calendar-day-event-option';
+
+      const imagePath = event.image || event.clubImage;
+      if (imagePath) {
+        const image = document.createElement('img');
+        image.src = imagePath;
+        image.alt = '';
+        image.addEventListener('error', () => image.remove(), { once: true });
+        option.append(image);
+      }
+
+      const copy = document.createElement('span');
+      copy.className = 'calendar-day-event-copy';
+      const title = document.createElement('strong');
+      title.textContent = event.title || 'Event';
+      const meta = document.createElement('span');
+      meta.textContent = [event.clubName, window.formatSiteTime(event.time), event.location].filter(Boolean).join(' · ');
+      copy.append(title, meta);
+      option.append(copy);
+      option.addEventListener('click', () => {
+        closeDayEventsModal();
+        if (typeof window.openEventModal === 'function') window.openEventModal(event);
+      });
+      dayEventsList.append(option);
+    });
+
+    dayEventsModal.classList.remove('hidden');
+    document.body.classList.add('modal-open');
+    dayEventsClose?.focus();
+  }
+
+  function renderCalendar(year = new Date().getFullYear(), month = new Date().getMonth()) {
+    const events = getAllEvents().map((e) => ({ ...e, parsed: parseDate(e.date) })).filter((e) => e.parsed);
+    const monthDate = new Date(year, month, 1);
+    year = monthDate.getFullYear();
+    month = monthDate.getMonth();
+    const monthLabel = monthDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    if (calendarTitle) calendarTitle.textContent = 'Events calendar';
+    const monthNavigation = `<div class="calendar-month-filter"><button type="button" data-calendar-shift="-1" aria-label="Previous month">&lsaquo;</button><strong aria-live="polite">${monthLabel}</strong><button type="button" data-calendar-shift="1" aria-label="Next month">&rsaquo;</button></div>`;
 
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const firstDay = new Date(year, month, 1).getDay();
@@ -784,12 +978,18 @@ document.addEventListener('DOMContentLoaded', () => {
     for (let i = 0; i < firstDay; i++) html += '<span></span>';
     for (let day = 1; day <= daysInMonth; day++) {
       const dayEvents = events.filter((e) => e.parsed.getFullYear() === year && e.parsed.getMonth() === month && e.parsed.getDate() === day);
-      html += `<div class="calendar-day${selectedCalendarDay === day ? ' is-selected' : ''}" data-day="${day}"><strong>${day}</strong>${dayEvents.map((e, i) => `<button type="button" class="calendar-event${i >= 2 ? ' extra' : ''}" data-idx="${events.indexOf(e)}" data-day="${day}" title="${escapeHtml(e.title || '')}"><img src="${escapeHtml(e.image || e.clubImage)}" alt="" />${escapeHtml(e.title || '')}</button>`).join('')}${dayEvents.length > 2 ? `<button type="button" class="calendar-more">+${dayEvents.length - 2} more</button>` : ''}</div>`;
+      html += `<div class="calendar-day${selectedCalendarDay === day ? ' is-selected' : ''}" data-day="${day}"><strong>${day}</strong>${dayEvents.map((e, i) => `<button type="button" class="calendar-event${i >= 1 ? ' extra' : ''}" data-idx="${events.indexOf(e)}" data-day="${day}" title="${escapeHtml(e.title || '')}"><img src="${escapeHtml(e.image || e.clubImage)}" alt="" />${escapeHtml(e.title || '')}</button>`).join('')}${dayEvents.length > 1 ? `<button type="button" class="calendar-more" aria-expanded="false">See ${dayEvents.length - 1} more</button>` : ''}</div>`;
     }
     html += '</div>';
-    if (calendarGrid) calendarGrid.innerHTML = `${monthOptions}${html}`;
+    if (calendarGrid) calendarGrid.innerHTML = `${monthNavigation}${html}`;
     if (calendarGrid) {
-      bindMonthFilter();
+      calendarGrid.querySelectorAll('[data-calendar-shift]').forEach((button) => {
+        button.addEventListener('click', () => {
+          selectedCalendarDay = null;
+          const nextMonth = new Date(year, month + Number(button.dataset.calendarShift), 1);
+          renderCalendar(nextMonth.getFullYear(), nextMonth.getMonth());
+        });
+      });
       calendarGrid.querySelectorAll('.calendar-event').forEach((btn) => {
         btn.addEventListener('click', () => {
           const event = events[Number(btn.dataset.idx)];
@@ -804,8 +1004,11 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.addEventListener('click', () => {
           const cell = btn.closest('.calendar-day');
           if (!cell) return;
-          cell.querySelectorAll('.calendar-event.extra').forEach((ev) => ev.classList.remove('extra'));
-          btn.remove();
+          const day = Number(cell.dataset.day);
+          const dayEvents = events.filter((event) => event.parsed.getFullYear() === year
+            && event.parsed.getMonth() === month
+            && event.parsed.getDate() === day);
+          openDayEventsModal(dayEvents, year, month, day);
         });
       });
     }
@@ -824,6 +1027,15 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   if (calendarClose) calendarClose.addEventListener('click', () => calendarModal.classList.add('hidden'));
   if (calendarModal) calendarModal.addEventListener('click', (event) => { if (event.target === calendarModal) calendarModal.classList.add('hidden'); });
+  if (dayEventsClose) dayEventsClose.addEventListener('click', closeDayEventsModal);
+  if (dayEventsModal) {
+    dayEventsModal.addEventListener('click', (event) => {
+      if (event.target === dayEventsModal) closeDayEventsModal();
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !dayEventsModal.classList.contains('hidden')) closeDayEventsModal();
+    });
+  }
 
   window.openCalendarAt = (year, month, day) => {
     calendarModal.classList.remove('hidden');

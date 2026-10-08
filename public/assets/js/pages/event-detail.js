@@ -44,11 +44,12 @@
         statusEl.textContent = 'This event could not be found.';
         return;
       }
+      fetch(`/api/events/${encodeURIComponent(clubId)}/${encodeURIComponent(eventIndex)}/view`, { method: 'POST', cache: 'no-store' }).catch(() => {});
       imageEl.src = event.image || club.image || '';
       imageEl.alt = event.title || 'Event';
       clubEl.textContent = club.name || '';
       titleEl.textContent = event.title || 'Event';
-      metaEl.textContent = [formatDate(event.date), event.time, event.location].filter(Boolean).join(' · ');
+      metaEl.textContent = [formatDate(event.date), window.formatSiteTime(event.time), event.location].filter(Boolean).join(' · ');
       descriptionEl.textContent = event.description || '';
       statusEl.hidden = true;
       contentEl.hidden = false;
@@ -58,10 +59,25 @@
       statusEl.textContent = 'Could not load this event right now.';
     });
 
-  registrationForm.addEventListener('submit', (event) => {
+  registrationForm.addEventListener('submit', async (event) => {
     event.preventDefault();
-    feedbackEl.textContent = 'Thanks! You are registered for this event.';
+    const name = document.getElementById('regName').value.trim();
+    const email = document.getElementById('regEmail').value.trim();
+    feedbackEl.textContent = '';
     feedbackEl.classList.remove('is-error');
-    registrationForm.reset();
+    try {
+      const response = await fetch(`/api/events/${clubId}/${eventIndex}/registrations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.message || 'This form was not saved. Please try again.');
+      feedbackEl.textContent = result.message || 'You are registered for this event.';
+      registrationForm.reset();
+    } catch (error) {
+      feedbackEl.textContent = error.message || 'This form was not saved. Please try again.';
+      feedbackEl.classList.add('is-error');
+    }
   });
 })();

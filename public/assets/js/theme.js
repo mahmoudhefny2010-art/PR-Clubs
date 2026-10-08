@@ -1,13 +1,14 @@
 (() => {
   const storageKey = 'miu-site-theme';
-  const savedTheme = localStorage.getItem(storageKey);
+  let savedTheme = null;
+  try { savedTheme = localStorage.getItem(storageKey); } catch (_) { /* Continue with the light theme when storage is blocked. */ }
   const theme = savedTheme === 'dark' ? 'dark' : 'light';
   const root = document.documentElement;
   root.dataset.theme = theme;
 
   const stylesheet = document.createElement('link');
   stylesheet.rel = 'stylesheet';
-  stylesheet.href = '/assets/css/theme-toggle.css?v=1';
+  stylesheet.href = '/assets/css/theme-toggle.css?v=20261009c';
   document.head.append(stylesheet);
 
   const button = document.createElement('button');
@@ -19,6 +20,7 @@
 
   function updateButton(nextTheme) {
     button.setAttribute('aria-label', nextTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
+    button.setAttribute('aria-pressed', String(nextTheme === 'dark'));
     button.title = nextTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
     button.innerHTML = nextTheme === 'dark' ? sunIcon : moonIcon;
   }
@@ -27,19 +29,23 @@
   button.addEventListener('click', () => {
     const nextTheme = root.dataset.theme === 'dark' ? 'light' : 'dark';
     root.dataset.theme = nextTheme;
-    localStorage.setItem(storageKey, nextTheme);
+    try { localStorage.setItem(storageKey, nextTheme); } catch (_) { /* The current page still changes theme. */ }
     updateButton(nextTheme);
   });
 
   function mountButton() {
     const navActions = document.querySelector('.topbar-container .nav-right');
     if (!navActions) return false;
+    button.classList.remove('is-floating');
     navActions.prepend(button);
     return true;
   }
 
   document.addEventListener('DOMContentLoaded', () => {
     if (mountButton()) return;
+    button.classList.add('is-floating');
+    document.body.append(button);
+    if (!document.getElementById('site-header')) return;
     const observer = new MutationObserver(() => {
       if (mountButton()) observer.disconnect();
     });

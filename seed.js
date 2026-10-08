@@ -239,7 +239,7 @@ async function seedMongo() {
           filter: { clubId: account.clubId, email: account.email },
           update: { $setOnInsert: {
             ...account,
-            role: ['head', 'pr', 'english', 'dean'].includes(account.role) ? account.role : 'president',
+            role: ['head', 'pr', 'english', 'sso', 'dean'].includes(account.role) ? account.role : 'president',
             committee: account.committee || ''
           } },
           upsert: true
@@ -270,9 +270,7 @@ function readJson(filePath, fallback) {
 function seedClubAccounts(dataDirectory) {
   const clubs = readJson(path.join(dataDirectory, 'clubs.json'), defaultClubsWithOrder);
   const accountsFile = path.join(dataDirectory, 'club-accounts.json');
-  const credentialsFile = path.join(dataDirectory, 'club-logins.generated.json');
   const accounts = readJson(accountsFile, []);
-  const credentials = readJson(credentialsFile, []);
   const knownClubIds = new Set(accounts.map((account) => account.clubId));
   const newCredentials = [];
 
@@ -298,6 +296,7 @@ function seedClubAccounts(dataDirectory) {
   const committeeAccounts = [
     { clubId: 0, email: 'pr@miu.local', role: 'pr' },
     { clubId: 0, email: 'english@miu.local', role: 'english' },
+    { clubId: 0, email: 'sso@miu.local', role: 'sso' },
     { clubId: 0, email: 'dean@miu.local', role: 'dean' }
   ];
   for (const committee of committeeAccounts) {
@@ -317,8 +316,12 @@ function seedClubAccounts(dataDirectory) {
 
   if (newCredentials.length) {
     writeJsonFile(accountsFile, accounts);
-    writeJsonFile(credentialsFile, [...credentials, ...newCredentials]);
-    console.log(`Generated ${newCredentials.length} club logins. Credentials are in data/club-logins.generated.json; keep that file private.`);
+    // Show the generated passwords exactly once at seed time. They are never
+    // persisted in plaintext, so they cannot be viewed later.
+    console.log('Generated new club logins (shown once, not stored):');
+    for (const credential of newCredentials) {
+      console.log(`  ${credential.clubName || ''} <${credential.email}>  password: ${credential.password}`);
+    }
   } else {
     console.log(`Preserved all ${accounts.length} existing club logins.`);
   }

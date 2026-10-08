@@ -7,8 +7,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/assets/css/base.css?v=20261007d" />
     <link rel="stylesheet" href="/assets/css/responsive.css?v=20261005h" />
-    <link rel="stylesheet" href="/assets/css/dark.css?v=20261007b" />
-    <link rel="stylesheet" href="/assets/css/features.css?v=20261005h" />
+    <link rel="stylesheet" href="/assets/css/dark.css?v=20261009c" />
+    <link rel="stylesheet" href="/assets/css/features.css?v=20261009au" />
     <link rel="icon" href="/assets/img/pics/logo.svg.png" type="image/png">
     <style>
       .app-container { flex: 1 0 auto; width: min(100%, 1192px); padding: 32px 16px 52px; }
@@ -65,8 +65,12 @@
   </head>
   <body>
     <div id="site-header"></div>
-    <main class="app-container">
-      <section class="committee-card">
+    <main class="app-container committee-dashboard-layout">
+      <aside class="committee-sidebar" data-unread-scope="english" aria-label="English Department dashboard navigation">
+        <h2>DASHBOARD</h2><a class="committee-sidebar-link is-active" href="#committeeOverviewPanel" data-dashboard-panel="committeeOverviewPanel">Overview</a><a class="committee-sidebar-link" href="#pendingRequestsSection" data-dashboard-panel="pendingRequestsSection">Pending requests <span class="sidebar-unread-badge" data-unread-badge="requests" hidden></span></a>
+        <h3>REVIEWS</h3><button id="openStatusOverviewBtn" class="committee-sidebar-link" data-dashboard-panel="statusOverviewDialog" type="button">Restart review <span class="sidebar-unread-badge" data-unread-badge="allRequests" hidden></span></button>
+      </aside>
+      <section id="committee-overview" class="committee-card">
         <div class="committee-top">
           <div>
             <div class="committee-label">APPROVALS COMMITTEE</div>
@@ -74,30 +78,37 @@
           </div>
           <div class="top-actions">
             <a class="secondary-btn" href="/">Back</a>
-            <button id="openStatusOverviewBtn" class="secondary-btn" type="button">Restart Review</button>
             <button id="logoutBtn" class="logout-btn" type="button">Logout</button>
           </div>
         </div>
         <p id="sessionMessage"></p>
-        <p id="hintText"></p>
-        <div id="requestsList"></div>
+        <section id="committeeOverviewPanel" class="committee-overview-panel"><span class="committee-label">ENGLISH DEPARTMENT</span><h2>Overview</h2><p>Requests ready for English Department review.</p><div class="committee-overview-stats overview-grid-2"><button class="overview-stat-card" type="button" data-dashboard-panel="pendingRequestsSection"><span>Requests to review</span><strong data-overview-count="requests">—</strong><small>Open English review queue</small></button><button class="overview-stat-card" type="button" id="overviewRestartsBtn"><span>Restart review</span><strong data-overview-count="allRequests">—</strong><small>Requests returned for review</small></button></div></section>
+        <section id="pendingRequestsSection" class="committee-requests-section" hidden><h2>Pending requests</h2><p id="hintText"></p><div id="requestsList"></div></section>
       </section>
     </main>
     <dialog id="requestDialog" class="request-dialog" aria-labelledby="detailTitle">
       <div class="request-dialog-inner">
-        <div class="request-dialog-head"><div><div class="committee-label">REQUEST DETAILS</div><h2 id="detailTitle"></h2></div><button type="button" id="detailsCancelBtn" class="request-dialog-close" aria-label="Close request details">×</button></div>
+        <div class="request-details-hero">
+          <div id="requestDetailImageWrap" class="request-detail-image-wrap" hidden><img id="requestDetailImage" class="request-detail-image" alt="Club request image" /></div>
+          <div class="request-dialog-head request-details-head"><div><div class="committee-label">REQUEST DETAILS</div><h2 id="detailTitle"></h2></div><button type="button" id="detailsCancelBtn" class="request-dialog-close" aria-label="Close request details">&times;</button></div>
+        </div>
         <div id="requestDetails" class="detail-grid"></div>
         <div class="dialog-actions"><button id="dialogApproveBtn" class="approve" data-dialog-action="approve">Accept</button><button id="dialogRejectBtn" class="reject" data-dialog-action="reject">Reject</button><button id="requestChangesBtn" class="changes" data-dialog-action="request_edit" hidden>Request Edit</button><button id="reopenRequestBtn" class="reopen-review" type="button" hidden>Restart Review</button></div>
       </div>
     </dialog>
+    <dialog id="attachmentPreviewDialog" class="attachment-preview-dialog" aria-label="Attachment preview">
+      <div class="attachment-preview-panel"><button type="button" class="attachment-preview-close" aria-label="Close attachment preview" onclick="this.closest('dialog').close()">&times;</button><img id="attachmentPreviewImage" alt="Request attachment"></div>
+    </dialog>
     <dialog id="statusOverviewDialog" class="status-overview-dialog" aria-labelledby="statusOverviewTitle">
       <div class="status-overview-inner">
-        <div class="request-dialog-head"><div><div class="committee-label">REVIEW RESTARTS</div><h2 id="statusOverviewTitle">Restart Review</h2></div><button type="button" id="closeStatusOverviewBtn" class="request-dialog-close" aria-label="Close request status">×</button></div>
+        <div class="request-dialog-head"><div><div class="committee-label">REVIEW RESTARTS</div><h2 id="statusOverviewTitle">Restart Review</h2></div><button type="button" id="closeStatusOverviewBtn" class="request-dialog-close" aria-label="Close request status">&times;</button></div>
         <div id="statusOverviewList" class="status-overview-list" aria-live="polite"></div>
       </div>
     </dialog>
     <div id="site-footer"></div>
-    <script src="/assets/js/committee-dashboard.js?v=20261007q"></script>
-      <script src="/assets/js/layout.js?v=8" defer></script>
+    <script src="/assets/js/committee-sidebar.js?v=13"></script>
+    <script src="/assets/js/committee-dashboard.js?v=20261009ac"></script>
+      <script src="/assets/js/layout.js?v=11" defer></script>
+      <script src="/assets/js/theme.js?v=20261009c" defer></script>
   </body>
 </html>

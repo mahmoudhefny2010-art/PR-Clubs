@@ -3,6 +3,8 @@ const hintText = document.getElementById('hintText');
 const requestsList = document.getElementById('requestsList');
 const requestDialog = document.getElementById('requestDialog');
 const requestDetails = document.getElementById('requestDetails');
+const attachmentPreviewDialog = document.getElementById('attachmentPreviewDialog');
+const attachmentPreviewImage = document.getElementById('attachmentPreviewImage');
 const statusOverviewDialog = document.getElementById('statusOverviewDialog');
 const statusOverviewList = document.getElementById('statusOverviewList');
 const reviewHistoryDialog = document.getElementById('reviewHistoryDialog');
@@ -47,10 +49,14 @@ async function ensureSession() {
     const data = await response.json();
     if (!data.authenticated || !data.club) {
       sessionMessage.textContent = 'Please sign in with a PR / English / Dean account.';
+      window.dashboardSync?.report('requests', 'error', 'Sign in required');
+      window.dashboardSync?.report('allRequests', 'error', 'Sign in required');
       return false;
     }
     if (!['pr', 'english', 'dean'].includes(data.club.role)) {
       sessionMessage.textContent = 'This dashboard is for PR, English Department, or the Dean.';
+      window.dashboardSync?.report('requests', 'error', 'Access denied');
+      window.dashboardSync?.report('allRequests', 'error', 'Access denied');
       return false;
     }
     currentRole = data.club.role;
@@ -68,6 +74,8 @@ async function ensureSession() {
     return true;
   } catch {
     sessionMessage.textContent = 'Could not check your session.';
+    window.dashboardSync?.report('requests', 'error', 'Could not check session');
+    window.dashboardSync?.report('allRequests', 'error', 'Could not check session');
     return false;
   }
 }
@@ -85,6 +93,13 @@ function addDetail(label, value, wide = false) {
 
 function formatStatus(status) {
   return String(status || 'unknown').replaceAll('_', ' ');
+}
+
+function openAttachmentPreview(src, altText) {
+  if (!attachmentPreviewDialog || !attachmentPreviewImage || !src) return;
+  attachmentPreviewImage.src = src;
+  attachmentPreviewImage.alt = altText || 'Request attachment';
+  attachmentPreviewDialog.showModal();
 }
 
 function hasCurrentApproval(item, role) {
@@ -145,6 +160,15 @@ function openDetails(item, context = 'pending') {
   if (returnToEnglishButton) { returnToEnglishButton.hidden = !canReturn; returnToEnglishButton.disabled = canReturn; }
   document.getElementById('detailTitle').textContent = item.title || 'Untitled request';
   requestDetails.replaceChildren();
+  const requestDetailsHero = requestDialog.querySelector('.request-details-hero');
+  const requestDetailImageWrap = document.getElementById('requestDetailImageWrap');
+  const requestDetailImage = document.getElementById('requestDetailImage');
+  requestDetailsHero?.classList.toggle('no-image', !item.image);
+  if (requestDetailImageWrap && requestDetailImage) {
+    requestDetailImageWrap.hidden = !item.image;
+    requestDetailImage.alt = `${item.clubName || 'Club'} request image`;
+    if (item.image) requestDetailImage.src = item.image;
+  }
   addDetail('Club', item.clubName);
   addDetail('Type', contentTypeLabel(item.type));
   if (item.type === 'sponsor') {
@@ -172,7 +196,7 @@ function openDetails(item, context = 'pending') {
     addDetail('Additional Notes', item.boothNotes, true);
   } else {
     addDetail('Date', item.date);
-    addDetail('Time', item.time);
+    addDetail('Time', window.formatSiteTime(item.time));
     addDetail('Location', item.location);
     addDetail('Budget', item.budget);
   }
@@ -191,22 +215,22 @@ function openDetails(item, context = 'pending') {
     hasAttachments = true;
     const link = document.createElement('a');
     link.href = item.image;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
     link.textContent = 'Open attachment';
-    const image = document.createElement('img');
-    image.src = item.image;
-    image.alt = 'Request attachment';
-    image.className = 'detail-attachment';
-    attachment.append(link, image);
+    link.addEventListener('click', (event) => {
+      event.preventDefault();
+      openAttachmentPreview(item.image, `${item.clubName || 'Club'} request attachment`);
+    });
+    attachment.append(link);
   }
   if (item.type === 'sponsor' && item.sponsorLogo) {
     hasAttachments = true;
     const logoLink = document.createElement('a');
     logoLink.href = item.sponsorLogo;
-    logoLink.target = '_blank';
-    logoLink.rel = 'noopener noreferrer';
     logoLink.textContent = 'Open company logo';
+    logoLink.addEventListener('click', (event) => {
+      event.preventDefault();
+      openAttachmentPreview(item.sponsorLogo, 'Company logo');
+    });
     const logo = document.createElement('img');
     logo.src = item.sponsorLogo;
     logo.alt = 'Company logo';
@@ -296,26 +320,55 @@ function openDetails(item, context = 'pending') {
     const approvalsHeading = document.createElement('h3');
     approvalsHeading.textContent = 'Committee approvals';
     approvals.append(approvalsHeading);
+    const approvalList = document.createElement('div');
+    approvalList.className = 'committee-approval-list';
     for (const role of ['pr', 'english', 'dean']) {
       const approved = hasCurrentApproval(item, role);
-      const line = document.createElement('p');
-      line.textContent = `${({ pr: 'PR Department', english: 'English Department', dean: 'Dean' })[role]}: ${approved ? 'Approved' : 'Not approved yet'}`;
-      approvals.append(line);
+      const line = document.createElement('div');
+      line.className = 'committee-approval-row';
+      const name = document.createElement('span');
+      name.textContent = ({ pr: 'PR Department', english: 'English Department', dean: 'Dean' })[role];
+      const state = document.createElement('strong');
+      state.className = approved ? 'is-approved' : 'is-pending';
+      state.textContent = approved ? 'Approved' : 'Not approved yet';
+      line.append(name, state);
+      approvalList.append(line);
     }
+    approvals.append(approvalList);
     const timelineHeading = document.createElement('h3');
     timelineHeading.textContent = 'Timeline';
+    timelineHeading.className = 'committee-timeline-heading';
     approvals.append(timelineHeading);
     const timeline = Array.isArray(item.workflowHistory) ? [...item.workflowHistory].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)) : [];
+    const timelineList = document.createElement('div');
+    timelineList.className = 'committee-workflow-timeline';
     if (!timeline.length) {
-      const empty = document.createElement('p'); empty.textContent = 'No workflow history recorded yet.'; approvals.append(empty);
+      const empty = document.createElement('p');
+      empty.className = 'committee-timeline-empty';
+      empty.textContent = 'No workflow history recorded yet.';
+      timelineList.append(empty);
     }
     for (const event of timeline) {
-      const line = document.createElement('p');
+      const line = document.createElement('article');
+      line.className = 'committee-timeline-event';
       const actor = ({ club: 'Club', pr: 'PR Department', english: 'English Department', dean: 'Dean' })[event.role] || event.role;
-      const when = event.createdAt ? new Date(event.createdAt).toLocaleString() : '';
-      line.textContent = `${when} · ${actor} ${String(event.action || '').replaceAll('_', ' ')}${event.comment ? `: ${event.comment}` : ''}`;
-      approvals.append(line);
+      const timestamp = event.createdAt ? new Date(event.createdAt) : null;
+      const validTimestamp = timestamp && !Number.isNaN(timestamp.getTime());
+      const time = document.createElement('time');
+      time.className = 'committee-timeline-date';
+      if (validTimestamp) time.dateTime = timestamp.toISOString();
+      time.textContent = validTimestamp
+        ? timestamp.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })
+        : 'Date unavailable';
+      const description = document.createElement('p');
+      description.className = 'committee-timeline-description';
+      const action = String(event.action || '').replaceAll('_', ' ');
+      const actionLabel = action ? `${action[0].toUpperCase()}${action.slice(1)}` : '';
+      description.textContent = `${actor}${actionLabel ? ` ${actionLabel}` : ''}${event.comment ? `: ${event.comment}` : ''}`;
+      line.append(time, description);
+      timelineList.append(line);
     }
+    approvals.append(timelineList);
     requestDetails.append(approvals);
   }
   requestDialog.showModal();
@@ -343,11 +396,16 @@ async function deleteOwnComment(item) {
 }
 
 async function loadRequests() {
+  window.dashboardSync?.report('requests', 'loading');
   try {
     const response = await fetch('/api/committee/requests');
     const items = await response.json();
     if (!response.ok) throw new Error(items.message || 'Could not load requests.');
+    if (!Array.isArray(items)) throw new Error('Unexpected pending requests response.');
     currentRequests = items;
+    window.dashboardSync?.report('requests', 'success');
+    window.dashboardUnread?.update('requests', items.map((item) => `${item.id}:${item.updatedAt || item.status || ''}`));
+    window.dashboardUnread?.setOverview('requests', items.length);
     requestsList.replaceChildren();
     if (!items.length) {
       requestsList.textContent = 'No pending requests for your stage.';
@@ -425,7 +483,36 @@ async function loadRequests() {
       requestsList.append(card);
     }
   } catch (error) {
+    window.dashboardSync?.report('requests', 'error', error.message);
     requestsList.textContent = error.message;
+  }
+}
+
+async function refreshUnreadRequestBadges() {
+  window.dashboardSync?.report('requests', 'loading');
+  window.dashboardSync?.report('allRequests', 'loading');
+  try {
+    const [pendingResponse, statusResponse] = await Promise.all([
+      fetch('/api/committee/requests', { cache: 'no-store' }),
+      fetch('/api/committee/status', { cache: 'no-store' })
+    ]);
+    const pending = await pendingResponse.json();
+    const statuses = await statusResponse.json();
+    if (!pendingResponse.ok) throw new Error(pending.message || 'Could not sync pending requests.');
+    if (!statusResponse.ok) throw new Error(statuses.message || 'Could not sync request status.');
+    if (!Array.isArray(pending)) throw new Error('Unexpected pending requests response.');
+    if (!Array.isArray(statuses)) throw new Error('Unexpected request status response.');
+    window.dashboardSync?.report('requests', 'success');
+    window.dashboardUnread?.update('requests', pending.map((item) => `${item.id}:${item.updatedAt || item.status || ''}`));
+    window.dashboardUnread?.setOverview('requests', pending.length);
+    window.dashboardSync?.report('allRequests', 'success');
+    const relevantStatuses = currentRole === 'english'
+      ? statuses.filter((item) => !['draft', 'changes_requested', 'pending_english'].includes(item.status))
+      : statuses;
+    window.dashboardUnread?.update('allRequests', relevantStatuses.map((item) => `${item.id}:${item.updatedAt || item.status || ''}`));
+  } catch (error) {
+    window.dashboardSync?.report('requests', 'error', error.message);
+    window.dashboardSync?.report('allRequests', 'error', error.message);
   }
 }
 
@@ -434,7 +521,7 @@ async function showStatusOverview() {
   statusOverviewMode = 'all';
   document.getElementById('statusOverviewTitle').textContent = 'All Requests Status';
   statusOverviewList.textContent = 'Loading request statuses…';
-  statusOverviewDialog.showModal();
+  window.dashboardPanels?.show('statusOverviewDialog');
   await loadStatusOverview();
 }
 
@@ -443,7 +530,7 @@ async function showRestartOverview() {
   statusOverviewMode = 'restartable';
   document.getElementById('statusOverviewTitle').textContent = 'Restart Review';
   statusOverviewList.textContent = 'Loading requests…';
-  statusOverviewDialog.showModal();
+  window.dashboardPanels?.show('statusOverviewDialog');
   await loadStatusOverview();
 }
 
@@ -455,6 +542,9 @@ async function loadStatusOverview() {
     if (!response.ok) throw new Error(items.message || 'Could not load request statuses.');
     if (statusOverviewMode === 'restartable') {
       items = items.filter((item) => !['draft', 'changes_requested', 'pending_english'].includes(item.status));
+    }
+    if (statusOverviewMode === 'all') {
+      window.dashboardUnread?.update('allRequests', items.map((item) => `${item.id}:${item.updatedAt || item.status || ''}`));
     }
     statusOverviewList.replaceChildren();
     if (!items.length) {
@@ -710,7 +800,7 @@ function renderReviewHistory(item) {
     const date = document.createElement('p');
     date.textContent = `Date: ${moment && !Number.isNaN(moment.getTime()) ? moment.toLocaleDateString('en-GB') : 'Not recorded'}`;
     const time = document.createElement('p');
-    time.textContent = `Time: ${moment && !Number.isNaN(moment.getTime()) ? moment.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'Not recorded'}`;
+    time.textContent = `Time: ${moment && !Number.isNaN(moment.getTime()) ? window.formatSiteTime(moment) : 'Not recorded'}`;
     entry.append(date, time);
     if (reviewLinks) entry.append(reviewLinks);
     reviewHistoryList.append(entry);
@@ -876,7 +966,10 @@ async function act(item, action, fromDialog = false, source = 'queue') {
   }
 }
 
-document.getElementById('detailsCancelBtn').addEventListener('click', () => requestDialog.close());
+  document.getElementById('detailsCancelBtn').addEventListener('click', () => requestDialog.close());
+  attachmentPreviewDialog?.addEventListener('click', (event) => {
+    if (event.target === attachmentPreviewDialog) attachmentPreviewDialog.close();
+  });
 requestDialog.querySelectorAll('[data-dialog-action]').forEach((button) => button.addEventListener('click', () => {
   if (activeRequest) act(activeRequest, button.dataset.dialogAction, true);
 }));
@@ -885,7 +978,8 @@ document.getElementById('returnToPrBtn')?.addEventListener('click', (event) => r
 document.getElementById('returnToEnglishBtn')?.addEventListener('click', (event) => returnToCommittee('english', event.currentTarget));
 document.getElementById('deleteRequestBtn')?.addEventListener('click', deleteDeanContent);
 document.getElementById('openStatusOverviewBtn')?.addEventListener('click', () => currentRole === 'english' ? showRestartOverview() : showStatusOverview());
-document.getElementById('closeStatusOverviewBtn')?.addEventListener('click', () => statusOverviewDialog?.close());
+document.getElementById('overviewRestartsBtn')?.addEventListener('click', () => document.getElementById('openStatusOverviewBtn')?.click());
+document.getElementById('closeStatusOverviewBtn')?.addEventListener('click', () => window.dashboardPanels?.showOverview());
 document.getElementById('closeReviewHistoryBtn')?.addEventListener('click', () => reviewHistoryDialog?.close());
 document.getElementById('closeReviewHistoryXBtn')?.addEventListener('click', () => reviewHistoryDialog?.close());
 document.getElementById('cancelHistoryReturnBtn')?.addEventListener('click', () => {
@@ -903,5 +997,14 @@ document.getElementById('logoutBtn').addEventListener('click', async () => {
 });
 
 (async () => {
-  if (await ensureSession()) await loadRequests();
+if (await ensureSession()) {
+  await loadRequests();
+  refreshUnreadRequestBadges();
+  window.setInterval(() => {
+    if (document.visibilityState === 'visible') refreshUnreadRequestBadges();
+  }, 10000);
+}
 })();
+window.addEventListener('dashboard:refresh', () => {
+  if (currentRole) refreshUnreadRequestBadges();
+});

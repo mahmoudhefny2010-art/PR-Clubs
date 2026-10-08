@@ -1,4 +1,30 @@
+window.formatSiteTime = (value) => {
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? '' : value.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  }
+  const text = String(value ?? '').trim();
+  const match = text.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?$/i);
+  if (!match) return value ?? '';
+
+  let hours = Number(match[1]);
+  const minutes = match[2];
+  const meridiem = match[3]?.toUpperCase();
+  if (minutes > 59 || hours > (meridiem ? 12 : 23) || (meridiem && hours < 1)) return value;
+  const suffix = meridiem || (hours >= 12 ? 'PM' : 'AM');
+  if (meridiem) hours %= 12;
+  hours = hours % 12 || 12;
+  return `${hours}:${minutes} ${suffix}`;
+};
+
 document.addEventListener('DOMContentLoaded', () => {
+  const pingSiteVisitor = () => {
+    if (document.visibilityState !== 'visible') return;
+    fetch('/api/site/visitor-ping', { method: 'POST', credentials: 'same-origin', keepalive: true }).catch(() => {});
+  };
+  pingSiteVisitor();
+  window.setInterval(pingSiteVisitor, 60_000);
+  document.addEventListener('visibilitychange', pingSiteVisitor);
+
   const validateDataEntryForm = (form) => {
     if (!form) return true;
     let firstInvalid = null;

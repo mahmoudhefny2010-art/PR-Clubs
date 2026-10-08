@@ -3,10 +3,10 @@ async function openAdminAccess() {
     const response = await fetch('/api/admin/session');
     const session = await response.json();
     if (session.authenticated) {
-      await Promise.all([loadClubs(), loadHomepageSettings()]);
       resetClubEditor();
       setAdminFeedback('');
       showView('admin');
+      await Promise.all([loadClubs(), loadHomepageSettings(), loadArchivedClubs()]);
       return;
     }
 
@@ -48,7 +48,7 @@ function renderAdminClubList() {
           <button class="order-btn" type="button" data-action="move-club" data-id="${Number(club.id)}" data-direction="-1" aria-label="Move ${escapeHtml(club.name)} up" title="Move up" ${index === 0 || !clubsShareOrderGroup(club, orderedClubs[index - 1]) ? 'disabled' : ''}>&#8593;</button>
           <button class="order-btn" type="button" data-action="move-club" data-id="${Number(club.id)}" data-direction="1" aria-label="Move ${escapeHtml(club.name)} down" title="Move down" ${index === orderedClubs.length - 1 || !clubsShareOrderGroup(club, orderedClubs[index + 1]) ? 'disabled' : ''}>&#8595;</button>
         <button class="secondary-btn" type="button" data-action="edit-club" data-id="${Number(club.id)}">Edit</button>
-        <button class="delete-btn" type="button" data-action="delete-club" data-id="${Number(club.id)}">Delete</button>
+        <button class="delete-btn" type="button" data-action="archive-club" data-id="${Number(club.id)}">Archive</button>
       </div>
     </article>
   `).join('');
@@ -59,8 +59,35 @@ function renderAdminClubList() {
   adminClubList.querySelectorAll('[data-action="move-club"]').forEach((button) => {
     button.addEventListener('click', () => moveClubOrder(Number(button.dataset.id), Number(button.dataset.direction)));
   });
-  adminClubList.querySelectorAll('[data-action="delete-club"]').forEach((button) => {
-    button.addEventListener('click', () => deleteClub(Number(button.dataset.id)));
+  adminClubList.querySelectorAll('[data-action="archive-club"]').forEach((button) => {
+    button.addEventListener('click', () => archiveClub(Number(button.dataset.id)));
+  });
+}
+
+async function loadArchivedClubs() {
+  const list = document.getElementById('archivedClubList');
+  const count = document.getElementById('archivedClubCount');
+  if (!list || !count) return;
+
+  const response = await fetch('/api/admin/clubs/archived', { cache: 'no-store' });
+  if (!response.ok) throw new Error('Could not load archived clubs.');
+  const archivedClubs = await response.json();
+  count.textContent = `${archivedClubs.length} clubs`;
+  list.innerHTML = archivedClubs.length ? archivedClubs.map((club) => `
+    <article class="admin-club-row">
+      <img src="${escapeHtml(club.image)}" alt="" />
+      <div class="admin-club-info">
+        <strong>${escapeHtml(club.name)}</strong>
+        <span>${escapeHtml(club.category)} · Archived${club.archivedAt ? ` · ${escapeHtml(new Date(club.archivedAt).toLocaleDateString())}` : ''}</span>
+      </div>
+      <div class="admin-row-actions">
+        <button class="secondary-btn" type="button" data-action="restore-club" data-id="${Number(club.id)}">Restore</button>
+      </div>
+    </article>
+  `).join('') : '<p class="empty-state">No archived clubs.</p>';
+
+  list.querySelectorAll('[data-action="restore-club"]').forEach((button) => {
+    button.addEventListener('click', () => restoreClub(Number(button.dataset.id)));
   });
 }
 
@@ -103,6 +130,12 @@ function resetClubEditor() {
 
   clubEditorForm.reset();
   document.getElementById('clubEditorId').value = '';
+  const credentialsFields = document.getElementById('clubLoginCredentialsFields');
+  credentialsFields?.classList.remove('hidden');
+  const clubLoginEmailInput = document.getElementById('clubLoginEmailInput');
+  const clubInitialPasswordInput = document.getElementById('clubInitialPasswordInput');
+  if (clubLoginEmailInput) clubLoginEmailInput.required = true;
+  if (clubInitialPasswordInput) clubInitialPasswordInput.required = true;
   document.getElementById('clubStatusInput').value = 'open';
   clubPinnedInput.checked = false;
   syncPinnedControl();
@@ -133,6 +166,9 @@ function editClub(clubId) {
   if (!club) return;
 
   document.getElementById('clubEditorId').value = club.id;
+  document.getElementById('clubLoginCredentialsFields')?.classList.add('hidden');
+  document.getElementById('clubLoginEmailInput').required = false;
+  document.getElementById('clubInitialPasswordInput').required = false;
   document.getElementById('clubNameInput').value = club.name;
   document.getElementById('clubCommitteeInput').value = club.committee;
   document.getElementById('clubCategoryInput').value = club.category;
@@ -523,19 +559,33 @@ document.getElementById('addApplicationFieldBtn').addEventListener('click', () =
   lastQuestion?.querySelector('[data-question-property="label"]')?.focus();
 });
 
-async function deleteClub(clubId) {
+async function archiveClub(clubId) {
   const club = state.clubs.find((item) => item.id === clubId);
-  if (!club || !window.confirm(`Delete the ${club.name} card?`)) return;
+  if (!club || !window.confirm(`Archive ${club.name}? It will be hidden from students, and its records will be kept.`)) return;
 
-  const response = await fetch(`/api/admin/clubs/${clubId}`, { method: 'DELETE' });
+  const response = await fetch(`/api/admin/clubs/${clubId}/archive`, { method: 'POST' });
   if (!response.ok) {
-    setAdminFeedback('Could not delete this club card.', true);
+    setAdminFeedback('Could not archive this club.', true);
     return;
   }
 
   if (Number(document.getElementById('clubEditorId').value) === clubId) resetClubEditor();
-  await loadClubs();
-  setAdminFeedback(`${club.name} card deleted.`);
+  await Promise.all([loadClubs(), loadArchivedClubs()]);
+  setAdminFeedback(`${club.name} archived. Its applications and other records were kept.`);
+}
+
+async function restoreClub(clubId) {
+  const archived = await fetch('/api/admin/clubs/archived', { cache: 'no-store' }).then((response) => response.ok ? response.json() : []);
+  const club = archived.find((item) => item.id === clubId);
+  if (!club) return;
+  const response = await fetch(`/api/admin/clubs/${clubId}/restore`, { method: 'POST' });
+  if (!response.ok) {
+    setAdminFeedback('Could not restore this club.', true);
+    return;
+  }
+
+  await Promise.all([loadClubs(), loadArchivedClubs()]);
+  setAdminFeedback(`${club.name} restored to active clubs.`);
 }
 
 function readImageFile(file) {
@@ -586,9 +636,9 @@ function clubContentMeta(item, type) {
     return [item.boothLocation, item.boothSize, item.boothOpenDate].filter(Boolean).join(' · ');
   }
   if (type === 'feed') {
-    return [item.date, item.time].filter(Boolean).join(' · ');
+    return [item.date, window.formatSiteTime(item.time)].filter(Boolean).join(' · ');
   }
-  return [item.date, item.time, item.location].filter(Boolean).join(' · ');
+  return [item.date, window.formatSiteTime(item.time), item.location].filter(Boolean).join(' · ');
 }
 
 function clubContentImage(item, type, club) {
@@ -641,6 +691,7 @@ function renderClubContentSections(club) {
 function openClubDetail(clubId) {
   const club = state.clubs.find((item) => item.id === clubId);
   if (!club) return;
+  fetch(`/api/clubs/${clubId}/view`, { method: 'POST', cache: 'no-store' }).catch(() => {});
   const canApply = club.status === 'open';
 
   state.selectedClub = club;
@@ -870,3 +921,27 @@ applicationForm.addEventListener('submit', async (event) => {
   }
 });
 
+
+// Archived clubs pop-up
+const openArchivedClubsBtn = document.getElementById('openArchivedClubsBtn');
+const archivedClubsModal = document.getElementById('archivedClubsModal');
+const archivedClubsModalClose = document.getElementById('archivedClubsModalClose');
+if (openArchivedClubsBtn && archivedClubsModal) {
+  openArchivedClubsBtn.addEventListener('click', async () => {
+    archivedClubsModal.classList.remove('hidden');
+    document.body.classList.add('modal-open');
+    try { await loadArchivedClubs(); } catch { /* keep the last loaded list */ }
+  });
+}
+if (archivedClubsModal && archivedClubsModalClose) {
+  archivedClubsModalClose.addEventListener('click', () => {
+    archivedClubsModal.classList.add('hidden');
+    document.body.classList.remove('modal-open');
+  });
+  archivedClubsModal.addEventListener('click', (event) => {
+    if (event.target === archivedClubsModal) {
+      archivedClubsModal.classList.add('hidden');
+      document.body.classList.remove('modal-open');
+    }
+  });
+}

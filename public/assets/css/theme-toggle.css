@@ -14,6 +14,18 @@
   transition: background-color .15s ease, color .15s ease, border-color .15s ease;
 }
 
+.site-theme-toggle.is-floating {
+  position: fixed;
+  z-index: 150;
+  top: max(16px, env(safe-area-inset-top));
+  right: max(16px, env(safe-area-inset-right));
+  width: 42px;
+  height: 42px;
+  flex-basis: 42px;
+  background: var(--bg-panel);
+  box-shadow: var(--shadow-md);
+}
+
 .site-theme-toggle:hover {
   border-color: var(--primary-200);
   background: var(--primary-50);

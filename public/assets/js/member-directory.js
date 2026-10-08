@@ -89,7 +89,8 @@ async function openMemberDirectory(mode) {
   if (description) description.textContent = isPrView
     ? 'Choose a club to view its member roster.'
     : 'Browse member rosters across every club.';
-  memberDirectoryDialog.showModal();
+  if (window.dashboardPanels) window.dashboardPanels.show('memberDirectoryDialog');
+  else memberDirectoryDialog.showModal();
   memberDirectoryList.replaceChildren();
   const loading = document.createElement('p');
   loading.className = 'member-directory-empty';
@@ -97,14 +98,36 @@ async function openMemberDirectory(mode) {
   memberDirectoryList.append(loading);
 
   try {
-    const endpoint = isPrView ? '/api/committee/club-members' : '/api/admin/club-members';
-    const response = await fetch(endpoint, { cache: 'no-store' });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.message || 'Could not load the member directory.');
-    memberDirectoryClubs = Array.isArray(result) ? result : Array.isArray(result.clubs) ? result.clubs : [];
+    if (isPrView) {
+      const [publicResponse, rosterResponse] = await Promise.all([
+        fetch('/api/clubs', { cache: 'no-store' }),
+        fetch('/api/committee/club-members', { cache: 'no-store', credentials: 'same-origin' })
+      ]);
+      const publicClubs = await publicResponse.json();
+      const rosterResult = await rosterResponse.json();
+      if (!publicResponse.ok) throw new Error(publicClubs.message || 'Could not load the clubs list.');
+      if (!rosterResponse.ok) throw new Error(rosterResult.message || 'Could not load club members.');
+      const rosterClubs = Array.isArray(rosterResult) ? rosterResult : Array.isArray(rosterResult.clubs) ? rosterResult.clubs : [];
+      const rosterById = new Map(rosterClubs.map((club) => [Number(club.id), club]));
+      memberDirectoryClubs = (Array.isArray(publicClubs) ? publicClubs : []).map((club) => {
+        const roster = rosterById.get(Number(club.id));
+        return {
+          ...club,
+          totalCount: Number.isFinite(Number(roster?.totalCount)) ? Number(roster.totalCount) : Number(club.members) || 0,
+          members: Array.isArray(roster?.members) ? roster.members : []
+        };
+      });
+    } else {
+      const response = await fetch('/api/admin/club-members', { cache: 'no-store' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Could not load the member directory.');
+      memberDirectoryClubs = Array.isArray(result) ? result : Array.isArray(result.clubs) ? result.clubs : [];
+    }
+    if (isPrView) updateClubMemberUnreadCount(memberDirectoryClubs);
     memberDirectoryClubSelect.replaceChildren();
     if (isPrView) {
       memberDirectoryClubSelect.add(new Option('Choose a club', ''));
+      memberDirectoryClubs.forEach((club) => memberDirectoryClubSelect.add(new Option(club.name, String(club.id))));
       memberDirectoryClubSelect.value = '';
     } else {
       memberDirectoryClubSelect.add(new Option('All clubs', 'all'));
@@ -121,10 +144,40 @@ async function openMemberDirectory(mode) {
   }
 }
 
+function updateClubMemberUnreadCount(clubs) {
+  const keys = [];
+  (Array.isArray(clubs) ? clubs : []).forEach((club) => {
+    (Array.isArray(club.members) ? club.members : []).forEach((member) => {
+      keys.push(`${club.id}:${member.createdAt || `${member.name || ''}:${member.committee || ''}:${member.position || ''}`}`);
+    });
+  });
+  window.dashboardUnread?.update('clubMembers', keys);
+}
+
+async function refreshClubMemberUnreadCount() {
+  if (!document.getElementById('prMemberDirectoryBtn')) return;
+  window.dashboardSync?.report('clubMembers', 'loading');
+  try {
+    const response = await fetch('/api/committee/club-members', { cache: 'no-store' });
+    const clubs = await response.json();
+    if (!response.ok) throw new Error(clubs.message || 'Could not load club members.');
+    if (!Array.isArray(clubs)) throw new Error('Unexpected club members response.');
+    updateClubMemberUnreadCount(clubs);
+    window.dashboardSync?.report('clubMembers', 'success');
+  } catch (error) {
+    window.dashboardSync?.report('clubMembers', 'error', error.message);
+  }
+}
+
 document.querySelectorAll('[data-open-member-directory]').forEach((button) => {
   button.addEventListener('click', () => openMemberDirectory(button.dataset.openMemberDirectory));
 });
 document.querySelectorAll('[data-close-member-directory]').forEach((button) => {
-  button.addEventListener('click', () => memberDirectoryDialog?.close());
+  button.addEventListener('click', () => window.dashboardPanels ? window.dashboardPanels.showOverview() : memberDirectoryDialog?.close());
 });
 memberDirectoryClubSelect?.addEventListener('change', renderMemberDirectory);
+refreshClubMemberUnreadCount();
+window.addEventListener('dashboard:refresh', refreshClubMemberUnreadCount);
+window.setInterval(() => {
+  if (document.visibilityState === 'visible') refreshClubMemberUnreadCount();
+}, 15000);
