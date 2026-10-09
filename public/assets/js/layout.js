@@ -138,16 +138,33 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
-    // 3. Update Auth button if user session cookie is detected
+    // 3. Replace Sign In with the right account destination for an active session.
     const authBtn = document.getElementById('headerAuthBtn');
     if (authBtn) {
-      // Check if cookies contain club or admin session
-      const cookies = document.cookie || '';
-      if (cookies.includes('miu_club=') || cookies.includes('miu_admin=')) {
-        authBtn.href = cookies.includes('miu_admin=') ? '/#adminView' : '/#headDashboardView';
-        const span = authBtn.querySelector('span');
-        if (span) span.textContent = 'Dashboard';
-      }
+      fetch('/api/site/account-session', { cache: 'no-store' })
+        .then((response) => response.ok ? response.json() : null)
+        .then((session) => {
+          if (!session?.authenticated) return;
+          const destinations = {
+            admin: { label: 'Dashboard', href: '/admin' },
+            president: { label: 'Dashboard', href: '/club-dashboard' },
+            head: { label: 'Dashboard', href: '/club-dashboard' },
+            pr: { label: 'Dashboard', href: '/dashboards/pr-dashboard.html' },
+            english: { label: 'Dashboard', href: '/dashboards/english-dashboard.html' },
+            security: { label: 'Dashboard', href: '/dashboards/security-dashboard.html' },
+            sso: { label: 'Dashboard', href: '/dashboards/sso-dashboard.html' },
+            dean: { label: 'Dashboard', href: '/dashboards/dean-dashboard.html' },
+            student: { label: 'My Forms', href: '/?myForms=1' }
+          };
+          const account = destinations[session.type === 'club' ? session.role : session.type];
+          if (!account) return;
+          authBtn.href = account.href;
+          authBtn.title = session.name ? `Signed in as ${session.name}` : account.label;
+          authBtn.setAttribute('aria-label', account.label);
+          const span = authBtn.querySelector('span');
+          if (span) span.textContent = account.label;
+        })
+        .catch(() => {});
     }
   };
 

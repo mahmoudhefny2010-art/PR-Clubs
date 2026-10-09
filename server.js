@@ -1199,6 +1199,31 @@ app.get('/api/admin/session', async (req, res) => {
   }
 });
 
+app.get('/api/site/account-session', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    if (await isAdminSessionValid(req)) return res.json({ authenticated: true, type: 'admin' });
+    const clubAccount = await getClubAccountFromRequest(req);
+    if (clubAccount) {
+      const club = clubs.find((item) => Number(item.id) === Number(clubAccount.clubId));
+      return res.json({
+        authenticated: true,
+        type: 'club',
+        role: clubAccount.role,
+        name: ['pr', 'english', 'security', 'sso', 'dean'].includes(clubAccount.role)
+          ? `${committeeRoleLabels[clubAccount.role] || clubAccount.role} Dashboard`
+          : club?.name || ''
+      });
+    }
+    const studentAccount = await getStudentAccountFromRequest(req);
+    if (studentAccount) return res.json({ authenticated: true, type: 'student', name: studentAccount.name || '' });
+    return res.json({ authenticated: false });
+  } catch (error) {
+    console.error('Site account session check failed:', error.name);
+    return res.status(503).json({ authenticated: false, message: 'Account status is temporarily unavailable.' });
+  }
+});
+
 // Count an event detail open as an interest signal (not a unique visitor count).
 app.post('/api/events/:clubId/:eventIndex/view', async (req, res) => {
   const clubId = Number(req.params.clubId);
