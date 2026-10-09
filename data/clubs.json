@@ -7,7 +7,7 @@
     "committee": "Utopia Club",
     "category": "Innovation",
     "tagline": "Creative projects and student initiatives",
-    "image": "/pics/Utopia.jpg",
+    "image": "/assets/img/pics/Utopia.jpg",
     "imagePublicId": "",
     "imageFit": "cover",
     "status": "open",
@@ -24,14 +24,14 @@
         "date": "2026-10-15",
         "location": "Main Hall",
         "description": "Utopia welcome session for new members.",
-        "image": "/pics/Utopia.jpg"
+        "image": "/assets/img/pics/Utopia.jpg"
       },
       {
         "title": "Weekly Workshop",
         "date": "2026-10-22",
         "location": "Room B12",
         "description": "Weekly skills workshop organized by Utopia.",
-        "image": "/pics/Utopia.jpg"
+        "image": "/assets/img/pics/Utopia.jpg"
       }
     ],
     "posts": [
@@ -40,16 +40,18 @@
         "date": "2026-10-01",
         "text": "Welcome to our page! Follow us for upcoming events and updates.",
         "title": "Welcome to Utopia",
-        "image": "/pics/Utopia.jpg"
+        "image": "/assets/img/pics/Utopia.jpg"
       },
       {
         "author": "Utopia",
         "date": "2026-09-24",
         "text": "Had a great session last week. See you at the next event!",
         "title": "Latest updates",
-        "image": "/pics/Utopia.jpg"
+        "image": "/assets/img/pics/Utopia.jpg"
       }
-    ]
+    ],
+    "sponsors": [],
+    "booths": []
   },
   {
     "id": 6,
@@ -57,7 +59,7 @@
     "committee": "ACPC Club",
     "category": "Programming",
     "tagline": "Competitive programming and problem-solving",
-    "image": "/pics/acpc.jpg",
+    "image": "/assets/img/pics/acpc.jpg",
     "imageFit": "contain",
     "status": "open",
     "seats": 24,
@@ -73,14 +75,14 @@
         "date": "2026-10-15",
         "location": "Main Hall",
         "description": "ACPC welcome session for new members.",
-        "image": "/pics/acpc.jpg"
+        "image": "/assets/img/pics/acpc.jpg"
       },
       {
         "title": "Weekly Workshop",
         "date": "2026-10-22",
         "location": "Room B12",
         "description": "Weekly skills workshop organized by ACPC.",
-        "image": "/pics/acpc.jpg"
+        "image": "/assets/img/pics/acpc.jpg"
       }
     ],
     "posts": [
@@ -89,16 +91,21 @@
         "date": "2026-10-01",
         "text": "Welcome to our page! Follow us for upcoming events and updates.",
         "title": "Welcome to ACPC",
-        "image": "/pics/acpc.jpg"
+        "image": "/assets/img/pics/acpc.jpg"
       },
       {
         "author": "ACPC",
         "date": "2026-09-24",
         "text": "Had a great session last week. See you at the next event!",
         "title": "Latest updates",
-        "image": "/pics/acpc.jpg"
+        "image": "/assets/img/pics/acpc.jpg"
       }
-    ]
+    ],
+    "imagePublicId": "",
+    "applicationIntro": "",
+    "applicationFields": [],
+    "sponsors": [],
+    "booths": []
   },
   {
     "id": 2,
@@ -108,7 +115,7 @@
     "committee": "Model United Nations",
     "category": "Debate & Leadership",
     "tagline": "Diplomacy, debate, and public speaking",
-    "image": "/pics/mun.jpg",
+    "image": "/assets/img/pics/mun.jpg",
     "imageFit": "contain",
     "status": "open",
     "seats": 30,
@@ -122,14 +129,14 @@
         "date": "2026-10-15",
         "location": "Main Hall",
         "description": "MUN welcome session for new members.",
-        "image": "/pics/mun.jpg"
+        "image": "/assets/img/pics/mun.jpg"
       },
       {
         "title": "Weekly Workshop",
         "date": "2026-10-22",
         "location": "Room B12",
         "description": "Weekly skills workshop organized by MUN.",
-        "image": "/pics/mun.jpg"
+        "image": "/assets/img/pics/mun.jpg"
       }
     ],
     "posts": [
@@ -138,16 +145,21 @@
         "date": "2026-10-01",
         "text": "Welcome to our page! Follow us for upcoming events and updates.",
         "title": "Welcome to MUN",
-        "image": "/pics/mun.jpg"
+        "image": "/assets/img/pics/mun.jpg"
       },
       {
         "author": "MUN",
         "date": "2026-09-24",
         "text": "Had a great session last week. See you at the next event!",
         "title": "Latest updates",
-        "image": "/pics/mun.jpg"
+        "image": "/assets/img/pics/mun.jpg"
       }
-    ]
+    ],
+    "imagePublicId": "",
+    "applicationIntro": "",
+    "applicationFields": [],
+    "sponsors": [],
+    "booths": []
   },
   {
     "id": 5,
@@ -155,7 +167,7 @@
     "committee": "IEEE Student Chapter",
     "category": "Technology",
     "tagline": "Engineering, technology, and innovation",
-    "image": "/pics/ieee.jpg",
+    "image": "/assets/img/pics/ieee.jpg",
     "imageFit": "contain",
     "status": "open",
     "seats": 26,
@@ -171,14 +183,14 @@
         "date": "2026-10-15",
         "location": "Main Hall",
         "description": "IEEE welcome session for new members.",
-        "image": "/pics/ieee.jpg"
+        "image": "/assets/img/pics/ieee.jpg"
       },
       {
         "title": "Weekly Workshop",
         "date": "2026-10-22",
         "location": "Room B12",
         "description": "Weekly skills workshop organized by IEEE.",
-        "image": "/pics/ieee.jpg"
+        "image": "/assets/img/pics/ieee.jpg"
       }
     ],
     "posts": [
@@ -187,16 +199,21 @@
         "date": "2026-10-01",
         "text": "Welcome to our page! Follow us for upcoming events and updates.",
         "title": "Welcome to IEEE",
-        "image": "/pics/ieee.jpg"
+        "image": "/assets/img/pics/ieee.jpg"
       },
       {
         "author": "IEEE",
         "date": "2026-09-24",
         "text": "Had a great session last week. See you at the next event!",
         "title": "Latest updates",
-        "image": "/pics/ieee.jpg"
+        "image": "/assets/img/pics/ieee.jpg"
       }
-    ]
+    ],
+    "imagePublicId": "",
+    "applicationIntro": "",
+    "applicationFields": [],
+    "sponsors": [],
+    "booths": []
   },
   {
     "id": 3,
@@ -204,7 +221,7 @@
     "committee": "Career Development Club",
     "category": "Career Growth",
     "tagline": "Career skills and professional growth",
-    "image": "/pics/cdc.jpg",
+    "image": "/assets/img/pics/cdc.jpg",
     "imageFit": "contain",
     "status": "open",
     "seats": 20,
@@ -220,14 +237,14 @@
         "date": "2026-10-15",
         "location": "Main Hall",
         "description": "CDC welcome session for new members.",
-        "image": "/pics/cdc.jpg"
+        "image": "/assets/img/pics/cdc.jpg"
       },
       {
         "title": "Weekly Workshop",
         "date": "2026-10-22",
         "location": "Room B12",
         "description": "Weekly skills workshop organized by CDC.",
-        "image": "/pics/cdc.jpg"
+        "image": "/assets/img/pics/cdc.jpg"
       }
     ],
     "posts": [
@@ -236,16 +253,21 @@
         "date": "2026-10-01",
         "text": "Welcome to our page! Follow us for upcoming events and updates.",
         "title": "Welcome to CDC",
-        "image": "/pics/cdc.jpg"
+        "image": "/assets/img/pics/cdc.jpg"
       },
       {
         "author": "CDC",
         "date": "2026-09-24",
         "text": "Had a great session last week. See you at the next event!",
         "title": "Latest updates",
-        "image": "/pics/cdc.jpg"
+        "image": "/assets/img/pics/cdc.jpg"
       }
-    ]
+    ],
+    "imagePublicId": "",
+    "applicationIntro": "",
+    "applicationFields": [],
+    "sponsors": [],
+    "booths": []
   },
   {
     "id": 7,
@@ -253,7 +275,7 @@
     "committee": "Tunners Club",
     "category": "Sports",
     "tagline": "Fitness, sports, and team activities",
-    "image": "/pics/tuners.jpg",
+    "image": "/assets/img/pics/tuners.jpg",
     "imageFit": "contain",
     "status": "open",
     "seats": 22,
@@ -269,14 +291,14 @@
         "date": "2026-10-15",
         "location": "Main Hall",
         "description": "Tunners welcome session for new members.",
-        "image": "/pics/tuners.jpg"
+        "image": "/assets/img/pics/tuners.jpg"
       },
       {
         "title": "Weekly Workshop",
         "date": "2026-10-22",
         "location": "Room B12",
         "description": "Weekly skills workshop organized by Tunners.",
-        "image": "/pics/tuners.jpg"
+        "image": "/assets/img/pics/tuners.jpg"
       }
     ],
     "posts": [
@@ -285,16 +307,21 @@
         "date": "2026-10-01",
         "text": "Welcome to our page! Follow us for upcoming events and updates.",
         "title": "Welcome to Tunners",
-        "image": "/pics/tuners.jpg"
+        "image": "/assets/img/pics/tuners.jpg"
       },
       {
         "author": "Tunners",
         "date": "2026-09-24",
         "text": "Had a great session last week. See you at the next event!",
         "title": "Latest updates",
-        "image": "/pics/tuners.jpg"
+        "image": "/assets/img/pics/tuners.jpg"
       }
-    ]
+    ],
+    "imagePublicId": "",
+    "applicationIntro": "",
+    "applicationFields": [],
+    "sponsors": [],
+    "booths": []
   },
   {
     "id": 10,
@@ -302,7 +329,7 @@
     "committee": "Gamers Legacy Club",
     "category": "Gaming & Esports",
     "tagline": "Gaming, competition, and community",
-    "image": "/pics/gamerslegacy.jpg",
+    "image": "/assets/img/pics/gamerslegacy.jpg",
     "imageFit": "contain",
     "status": "open",
     "seats": 24,
@@ -318,14 +345,14 @@
         "date": "2026-10-15",
         "location": "Main Hall",
         "description": "Gamers Legacy welcome session for new members.",
-        "image": "/pics/gamerslegacy.jpg"
+        "image": "/assets/img/pics/gamerslegacy.jpg"
       },
       {
         "title": "Weekly Workshop",
         "date": "2026-10-22",
         "location": "Room B12",
         "description": "Weekly skills workshop organized by Gamers Legacy.",
-        "image": "/pics/gamerslegacy.jpg"
+        "image": "/assets/img/pics/gamerslegacy.jpg"
       }
     ],
     "posts": [
@@ -334,16 +361,21 @@
         "date": "2026-10-01",
         "text": "Welcome to our page! Follow us for upcoming events and updates.",
         "title": "Welcome to Gamers Legacy",
-        "image": "/pics/gamerslegacy.jpg"
+        "image": "/assets/img/pics/gamerslegacy.jpg"
       },
       {
         "author": "Gamers Legacy",
         "date": "2026-09-24",
         "text": "Had a great session last week. See you at the next event!",
         "title": "Latest updates",
-        "image": "/pics/gamerslegacy.jpg"
+        "image": "/assets/img/pics/gamerslegacy.jpg"
       }
-    ]
+    ],
+    "imagePublicId": "",
+    "applicationIntro": "",
+    "applicationFields": [],
+    "sponsors": [],
+    "booths": []
   },
   {
     "id": 9,
@@ -351,7 +383,7 @@
     "committee": "MSP Club",
     "category": "Student Life",
     "tagline": "Campus events and student community",
-    "image": "/pics/msp.jpg",
+    "image": "/assets/img/pics/msp.jpg",
     "imageFit": "contain",
     "status": "open",
     "seats": 28,
@@ -367,14 +399,14 @@
         "date": "2026-10-15",
         "location": "Main Hall",
         "description": "MSP welcome session for new members.",
-        "image": "/pics/msp.jpg"
+        "image": "/assets/img/pics/msp.jpg"
       },
       {
         "title": "Weekly Workshop",
         "date": "2026-10-22",
         "location": "Room B12",
         "description": "Weekly skills workshop organized by MSP.",
-        "image": "/pics/msp.jpg"
+        "image": "/assets/img/pics/msp.jpg"
       }
     ],
     "posts": [
@@ -383,16 +415,21 @@
         "date": "2026-10-01",
         "text": "Welcome to our page! Follow us for upcoming events and updates.",
         "title": "Welcome to MSP",
-        "image": "/pics/msp.jpg"
+        "image": "/assets/img/pics/msp.jpg"
       },
       {
         "author": "MSP",
         "date": "2026-09-24",
         "text": "Had a great session last week. See you at the next event!",
         "title": "Latest updates",
-        "image": "/pics/msp.jpg"
+        "image": "/assets/img/pics/msp.jpg"
       }
-    ]
+    ],
+    "imagePublicId": "",
+    "applicationIntro": "",
+    "applicationFields": [],
+    "sponsors": [],
+    "booths": []
   },
   {
     "id": 11,
@@ -400,7 +437,7 @@
     "committee": "International Hepatitis Club",
     "category": "Health Awareness",
     "tagline": "Hepatitis awareness and education",
-    "image": "/pics/ihepc.jpg",
+    "image": "/assets/img/pics/ihepc.jpg",
     "imageFit": "contain",
     "status": "open",
     "seats": 20,
@@ -416,14 +453,14 @@
         "date": "2026-10-15",
         "location": "Main Hall",
         "description": "IHEPC welcome session for new members.",
-        "image": "/pics/ihepc.jpg"
+        "image": "/assets/img/pics/ihepc.jpg"
       },
       {
         "title": "Weekly Workshop",
         "date": "2026-10-22",
         "location": "Room B12",
         "description": "Weekly skills workshop organized by IHEPC.",
-        "image": "/pics/ihepc.jpg"
+        "image": "/assets/img/pics/ihepc.jpg"
       }
     ],
     "posts": [
@@ -432,16 +469,21 @@
         "date": "2026-10-01",
         "text": "Welcome to our page! Follow us for upcoming events and updates.",
         "title": "Welcome to IHEPC",
-        "image": "/pics/ihepc.jpg"
+        "image": "/assets/img/pics/ihepc.jpg"
       },
       {
         "author": "IHEPC",
         "date": "2026-09-24",
         "text": "Had a great session last week. See you at the next event!",
         "title": "Latest updates",
-        "image": "/pics/ihepc.jpg"
+        "image": "/assets/img/pics/ihepc.jpg"
       }
-    ]
+    ],
+    "imagePublicId": "",
+    "applicationIntro": "",
+    "applicationFields": [],
+    "sponsors": [],
+    "booths": []
   },
   {
     "id": 12,
@@ -449,7 +491,7 @@
     "committee": "TEDx MIU",
     "category": "Ideas & Events",
     "tagline": "Ideas worth sharing through campus events",
-    "image": "/pics/tedx.jpg",
+    "image": "/assets/img/pics/tedx.jpg",
     "imageFit": "contain",
     "status": "open",
     "seats": 24,
@@ -465,14 +507,14 @@
         "date": "2026-10-15",
         "location": "Main Hall",
         "description": "TEDx MIU welcome session for new members.",
-        "image": "/pics/tedx.jpg"
+        "image": "/assets/img/pics/tedx.jpg"
       },
       {
         "title": "Weekly Workshop",
         "date": "2026-10-22",
         "location": "Room B12",
         "description": "Weekly skills workshop organized by TEDx MIU.",
-        "image": "/pics/tedx.jpg"
+        "image": "/assets/img/pics/tedx.jpg"
       }
     ],
     "posts": [
@@ -481,16 +523,21 @@
         "date": "2026-10-01",
         "text": "Welcome to our page! Follow us for upcoming events and updates.",
         "title": "Welcome to TEDx MIU",
-        "image": "/pics/tedx.jpg"
+        "image": "/assets/img/pics/tedx.jpg"
       },
       {
         "author": "TEDx MIU",
         "date": "2026-09-24",
         "text": "Had a great session last week. See you at the next event!",
         "title": "Latest updates",
-        "image": "/pics/tedx.jpg"
+        "image": "/assets/img/pics/tedx.jpg"
       }
-    ]
+    ],
+    "imagePublicId": "",
+    "applicationIntro": "",
+    "applicationFields": [],
+    "sponsors": [],
+    "booths": []
   },
   {
     "id": 4,
@@ -498,7 +545,7 @@
     "committee": "Dimas Club",
     "category": "Media & Content",
     "tagline": "Media production and creative content",
-    "image": "/pics/dimas.jpg",
+    "image": "/assets/img/pics/dimas.jpg",
     "imageFit": "contain",
     "status": "full",
     "seats": 18,
@@ -514,14 +561,14 @@
         "date": "2026-10-15",
         "location": "Main Hall",
         "description": "Dimas welcome session for new members.",
-        "image": "/pics/dimas.jpg"
+        "image": "/assets/img/pics/dimas.jpg"
       },
       {
         "title": "Weekly Workshop",
         "date": "2026-10-22",
         "location": "Room B12",
         "description": "Weekly skills workshop organized by Dimas.",
-        "image": "/pics/dimas.jpg"
+        "image": "/assets/img/pics/dimas.jpg"
       }
     ],
     "posts": [
@@ -530,16 +577,21 @@
         "date": "2026-10-01",
         "text": "Welcome to our page! Follow us for upcoming events and updates.",
         "title": "Welcome to Dimas",
-        "image": "/pics/dimas.jpg"
+        "image": "/assets/img/pics/dimas.jpg"
       },
       {
         "author": "Dimas",
         "date": "2026-09-24",
         "text": "Had a great session last week. See you at the next event!",
         "title": "Latest updates",
-        "image": "/pics/dimas.jpg"
+        "image": "/assets/img/pics/dimas.jpg"
       }
-    ]
+    ],
+    "imagePublicId": "",
+    "applicationIntro": "",
+    "applicationFields": [],
+    "sponsors": [],
+    "booths": []
   },
   {
     "id": 8,
@@ -547,7 +599,7 @@
     "committee": "Theater Club",
     "category": "Arts & Performance",
     "tagline": "Acting, stage performance, and storytelling",
-    "image": "/pics/theater.jpg",
+    "image": "/assets/img/pics/theater.jpg",
     "imageFit": "contain",
     "status": "full",
     "seats": 16,
@@ -563,14 +615,14 @@
         "date": "2026-10-15",
         "location": "Main Hall",
         "description": "Theater welcome session for new members.",
-        "image": "/pics/theater.jpg"
+        "image": "/assets/img/pics/theater.jpg"
       },
       {
         "title": "Weekly Workshop",
         "date": "2026-10-22",
         "location": "Room B12",
         "description": "Weekly skills workshop organized by Theater.",
-        "image": "/pics/theater.jpg"
+        "image": "/assets/img/pics/theater.jpg"
       }
     ],
     "posts": [
@@ -579,15 +631,20 @@
         "date": "2026-10-01",
         "text": "Welcome to our page! Follow us for upcoming events and updates.",
         "title": "Welcome to Theater",
-        "image": "/pics/theater.jpg"
+        "image": "/assets/img/pics/theater.jpg"
       },
       {
         "author": "Theater",
         "date": "2026-09-24",
         "text": "Had a great session last week. See you at the next event!",
         "title": "Latest updates",
-        "image": "/pics/theater.jpg"
+        "image": "/assets/img/pics/theater.jpg"
       }
-    ]
+    ],
+    "imagePublicId": "",
+    "applicationIntro": "",
+    "applicationFields": [],
+    "sponsors": [],
+    "booths": []
   }
 ]

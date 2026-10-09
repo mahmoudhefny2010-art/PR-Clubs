@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Event - MIU Clubs</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/assets/css/base.css?v=20261007d" />
+    <link rel="stylesheet" href="/assets/css/responsive.css?v=20261006a" />
+    <link rel="stylesheet" href="/assets/css/dark.css?v=20261009c" />
+    <link rel="stylesheet" href="/assets/css/features.css?v=20261005h" />
+    <link rel="stylesheet" href="/assets/css/pages/events.css?v=12" />
+    <link rel="icon" href="/assets/img/pics/logo.svg.png" type="image/png" />
+  </head>
+  <body class="dedicated-event-body">
+    <div class="page-shell">
+      <div id="site-header"></div>
+      <main class="app-container dedicated-event-page">
+        <a id="eventBackLink" class="secondary-btn event-back-link" href="/pages/events.html">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+          <span>Back to events</span>
+        </a>
+        <p id="eventPageStatus" class="event-page-status" role="status">Loading event…</p>
+        <article id="eventPageContent" class="event-page-content" hidden>
+          <img id="eventPageImage" class="event-page-image" src="" alt="" />
+          <div class="event-page-copy">
+            <span id="eventPageClub" class="event-detail-club"></span>
+            <h1 id="eventPageTitle"></h1>
+            <p id="eventPageMeta" class="event-detail-meta"></p>
+            <p id="eventPageDescription" class="event-page-description"></p>
+            <form id="regForm">
+              <div class="field-group">
+                <label for="regName">Your Name</label>
+                <input id="regName" placeholder="Full name" required />
+              </div>
+              <div class="field-group">
+                <label for="regEmail">University Email</label>
+                <input id="regEmail" type="email" placeholder="example@miuegypt.edu.eg" required />
+              </div>
+              <button class="primary-btn" type="submit">Register for event</button>
+            </form>
+            <p id="regFeedback" class="admin-feedback" aria-live="polite"></p>
+          </div>
+        </article>
+      </main>
+    </div>
+    <div id="site-footer"></div>
+    <script src="/assets/js/pages/event-detail.js?v=2"></script>
+    <script src="/assets/js/layout.js?v=11" defer></script>
+    <script src="/assets/js/theme.js?v=20261009c" defer></script>
+  </body>
+</html>

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="referrer" content="no-referrer" />
+  <title>Event attendance</title>
+  <link rel="stylesheet" href="/assets/css/base.css?v=20261009h" />
+  <link rel="stylesheet" href="/assets/css/responsive.css?v=20261006e" />
+  <link rel="stylesheet" href="/assets/css/dark.css?v=20261009c" />
+  <style>
+    body { display: grid; place-items: center; padding: 24px; }
+    .attendance-checkin { width: min(100%, 460px); margin: 0; padding: 30px; text-align: center; }
+    .attendance-checkin h1 { margin: 0 0 8px; font-size: 1.55rem; }
+    .attendance-checkin p { color: var(--text-muted); }
+    .attendance-checkin form { display: grid; gap: 16px; margin-top: 24px; }
+    .attendance-checkin label { display: grid; gap: 7px; font-weight: 700; }
+    .attendance-checkin input, .attendance-checkin textarea { width: 100%; padding: 12px 14px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: #fff; color: #111827; }
+    .attendance-checkin textarea { min-height: 90px; resize: vertical; }
+    .attendance-checkin .admin-feedback { min-height: 1.5em; }
+    .attendance-checkin .admin-feedback.is-error { color: var(--danger); }
+  </style>
+</head>
+<body>
+  <main class="club-login-panel attendance-checkin">
+    <img class="club-login-miu-logo" src="/assets/img/pics/logo.svg.png" alt="MIU logo" />
+    <span class="admin-eyebrow">EVENT CHECK-IN</span>
+    <h1 id="attendanceTitle">Confirm your attendance</h1>
+    <p id="attendanceEventDetails">Loading attendance details...</p>
+    <p id="attendanceAccountDetails" class="hidden"></p>
+    <a id="attendanceSignInLink" class="primary-btn hidden" href="/pages/applicant-login.html">Sign in to check in</a>
+    <form id="attendanceCheckinForm" class="hidden">
+      <label>Note (optional)<textarea name="note" maxlength="500" placeholder="Add a note if needed"></textarea></label>
+      <button id="attendanceSubmitButton" class="primary-btn" type="submit">Attend</button>
+    </form>
+    <p id="attendanceCheckinFeedback" class="admin-feedback" role="status" aria-live="polite"></p>
+  </main>
+  <script src="/assets/js/layout.js?v=11" defer></script>
+  <script src="/assets/js/attendance-checkin.js?v=7" defer></script>
+  <script src="/assets/js/theme.js?v=20261009c" defer></script>
+</body>
+</html>

@@ -8,6 +8,19 @@ const applicationFieldSchema = new mongoose.Schema({
   options: { type: [String], default: [] }
 }, { _id: false });
 
+const clubMemberSchema = new mongoose.Schema({
+  id: { type: String, required: true },
+  name: { type: String, required: true, trim: true, maxlength: 120 },
+  committee: { type: String, required: true, trim: true, maxlength: 100 },
+  position: { type: String, required: true, trim: true, maxlength: 100 },
+  memberType: { type: String, enum: ['new', 'senior'], required: true }
+}, { _id: false, timestamps: true });
+
+const committeeAvailabilitySchema = new mongoose.Schema({
+  committee: { type: String, required: true, trim: true, maxlength: 100 },
+  status: { type: String, enum: ['open', 'full', 'closed'], default: 'open' }
+}, { _id: false });
+
 const clubSchema = new mongoose.Schema({
   id: { type: Number, required: true, unique: true, index: true },
   sortOrder: { type: Number, required: true, default: 0, index: true },
@@ -19,9 +32,12 @@ const clubSchema = new mongoose.Schema({
   imagePublicId: { type: String, default: '' },
   imageFit: { type: String, enum: ['contain', 'cover'], default: 'contain' },
   status: { type: String, enum: ['open', 'opening-soon', 'full', 'closed'], default: 'open' },
+  archivedAt: { type: Date, default: null, index: true },
   pinned: { type: Boolean, default: false },
   seats: { type: Number, min: 0, default: 0 },
   members: { type: Number, min: 0, default: 0 },
+  memberRoster: { type: [clubMemberSchema], default: [] },
+  committeeAvailability: { type: [committeeAvailabilitySchema], default: [] },
   applicants: { type: Number, min: 0, default: 0 },
   description: { type: String, required: true },
   requirements: { type: String, required: true },
@@ -29,7 +45,9 @@ const clubSchema = new mongoose.Schema({
   applicationFields: { type: [applicationFieldSchema], default: [] },
   interviewForms: { type: [mongoose.Schema.Types.Mixed], default: [] },
   events: { type: [mongoose.Schema.Types.Mixed], default: [] },
-  posts: { type: [mongoose.Schema.Types.Mixed], default: [] }
+  posts: { type: [mongoose.Schema.Types.Mixed], default: [] },
+  sponsors: { type: [mongoose.Schema.Types.Mixed], default: [] },
+  booths: { type: [mongoose.Schema.Types.Mixed], default: [] }
 }, { timestamps: true });
 
 const applicationSchema = new mongoose.Schema({
@@ -60,18 +78,251 @@ const siteSettingSchema = new mongoose.Schema({
   subtitle: { type: String, required: true }
 }, { timestamps: true });
 
+const siteVisitorSchema = new mongoose.Schema({
+  visitorId: { type: String, required: true, unique: true, index: true },
+  deviceType: { type: String, enum: ['mobile', 'tablet', 'desktop', 'unknown'], default: 'unknown', index: true },
+  accountType: { type: String, enum: ['guest', 'admin', 'club', 'student'], default: 'guest', index: true },
+  accountEmail: { type: String, default: '', lowercase: true, trim: true, index: true },
+  accountName: { type: String, default: '' },
+  accountLabel: { type: String, default: '' },
+  firstSeenAt: { type: Date, required: true },
+  lastSeenAt: { type: Date, required: true, index: true }
+}, { versionKey: false });
+
+const siteNetworkSchema = new mongoose.Schema({
+  ipHash: { type: String, required: true, unique: true, index: true },
+  firstSeenAt: { type: Date, required: true },
+  lastSeenAt: { type: Date, required: true }
+}, { versionKey: false });
+
 const clubAccountSchema = new mongoose.Schema({
   clubId: { type: Number, required: true, index: true },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   salt: { type: String, required: true },
   passwordHash: { type: String, required: true },
-  role: { type: String, enum: ['president', 'head'], default: 'president' },
+  sessionVersion: { type: Number, default: 0 },
+  passwordChangedAt: { type: Date, default: null },
+  lastLoginAt: { type: Date, default: null },
+  role: { type: String, enum: ['president', 'head', 'pr', 'english', 'sso', 'dean'], default: 'president' },
   committee: { type: String, default: '' }
 }, { timestamps: true, autoIndex: false });
+
+const contentRequestSchema = new mongoose.Schema({
+  id: { type: Number, required: true, unique: true, index: true },
+  clubId: { type: Number, required: true, index: true },
+  clubName: { type: String, default: '' },
+  type: { type: String, enum: ['event', 'feed', 'sponsor', 'booth'], required: true },
+  title: { type: String, required: true, trim: true },
+  description: { type: String, default: '' },
+  date: { type: String, default: '' },
+  time: { type: String, default: '' },
+  location: { type: String, default: '' },
+  budget: { type: String, default: '' },
+  image: { type: String, default: '' },
+  sponsorName: { type: String, default: '' },
+  sponsorCompany: { type: String, default: '' },
+  sponsorContact: { type: String, default: '' },
+  sponsorEmail: { type: String, default: '' },
+  sponsorPhone: { type: String, default: '' },
+  sponsorType: { type: String, default: '' },
+  sponsorAmount: { type: String, default: '' },
+  sponsorBenefits: { type: String, default: '' },
+  sponsorDescription: { type: String, default: '' },
+  sponsorLogo: { type: String, default: '' },
+  sponsorAttachment: { type: String, default: '' },
+  sponsorNotes: { type: String, default: '' },
+  boothName: { type: String, default: '' },
+  boothPurpose: { type: String, default: '' },
+  boothDescription: { type: String, default: '' },
+  boothLocation: { type: String, default: '' },
+  boothSize: { type: String, default: '' },
+  boothEquipment: { type: String, default: '' },
+  boothSetupDate: { type: String, default: '' },
+  boothOpenDate: { type: String, default: '' },
+  boothCloseDate: { type: String, default: '' },
+  boothContact: { type: String, default: '' },
+  boothNotes: { type: String, default: '' },
+  status: { type: String, enum: ['draft', 'pending_pr', 'pending_english', 'pending_dean', 'changes_requested', 'rejected', 'published', 'deleted'], default: 'draft', index: true },
+  resubmitTo: { type: String, enum: ['pending_pr', 'pending_english'], default: 'pending_pr' },
+  editRequestedBy: { type: String, enum: ['', 'pr', 'english'], default: '' },
+  skipEnglishOnNextPrApproval: { type: Boolean, default: false },
+  clubNotice: { type: String, default: '' },
+  workflowHistory: [{
+    role: { type: String, enum: ['club', 'pr', 'english', 'dean'], required: true },
+    actorRole: { type: String, default: '' },
+    actorEmail: { type: String, default: '' },
+    action: { type: String, required: true },
+    fromStatus: { type: String, default: '' },
+    toStatus: { type: String, default: '' },
+    comment: { type: String, default: '' },
+    createdAt: { type: Date, default: Date.now }
+  }],
+  comments: {
+    pr: { type: String, default: '' },
+    english: { type: String, default: '' },
+    dean: { type: String, default: '' }
+  },
+  commentHistory: [{
+    role: { type: String, enum: ['pr', 'english', 'dean'], required: true },
+    text: { type: String, required: true },
+    createdAt: { type: Date, default: Date.now },
+    deletedAt: { type: Date, default: null }
+  }],
+  hiddenCommentRoles: { type: [String], default: [] },
+  submittedAt: { type: Date, default: Date.now },
+  publishedAt: { type: Date },
+  deletedAt: { type: Date }
+}, { timestamps: true });
+
+const auditLogSchema = new mongoose.Schema({
+  id: { type: Number, required: true, unique: true, index: true },
+  actorEmail: { type: String, required: true, trim: true, index: true },
+  actorRole: { type: String, default: 'admin' },
+  action: { type: String, required: true, trim: true },
+  targetType: { type: String, default: '' },
+  targetId: { type: String, default: '' },
+  targetName: { type: String, default: '' },
+  details: { type: String, default: '' },
+  ip: { type: String, default: '' },
+  timestamp: { type: Date, default: Date.now, index: true }
+}, { timestamps: true });
+
+const eventRegistrationSchema = new mongoose.Schema({
+  id: { type: Number, required: true, unique: true, index: true },
+  clubId: { type: Number, required: true, index: true },
+  eventIndex: { type: Number, required: true },
+  eventTitle: { type: String, default: '' },
+  name: { type: String, required: true, trim: true, maxlength: 160 },
+  email: { type: String, required: true, trim: true, lowercase: true, maxlength: 254 }
+}, { timestamps: true });
+eventRegistrationSchema.index({ clubId: 1, eventIndex: 1, email: 1 }, { unique: true });
+
+const attendanceSessionSchema = new mongoose.Schema({
+  clubId: { type: Number, required: true, index: true },
+  itemType: { type: String, enum: ['event', 'booth'], default: 'event', index: true },
+  eventRequestId: { type: Number, required: true },
+  eventTitle: { type: String, required: true, trim: true },
+  eventDate: { type: String, default: '' },
+  eventTime: { type: String, default: '' },
+  tokenHash: { type: String, required: true, unique: true },
+  active: { type: Boolean, default: true, index: true },
+  createdBy: { type: String, required: true, lowercase: true, trim: true }
+}, { timestamps: true });
+attendanceSessionSchema.index({ clubId: 1, itemType: 1, eventRequestId: 1, active: 1 });
+
+const attendanceRecordSchema = new mongoose.Schema({
+  sessionId: { type: mongoose.Schema.Types.ObjectId, required: true, index: true },
+  clubId: { type: Number, required: true, index: true },
+  itemType: { type: String, enum: ['event', 'booth'], default: 'event', index: true },
+  eventRequestId: { type: Number, required: true },
+  eventTitle: { type: String, required: true },
+  eventDate: { type: String, default: '' },
+  eventTime: { type: String, default: '' },
+  name: { type: String, required: true, trim: true, maxlength: 160 },
+  email: { type: String, required: true, trim: true, lowercase: true, maxlength: 254 },
+  note: { type: String, default: '', trim: true, maxlength: 500 },
+  approvalStatus: { type: String, enum: ['pending_pr', 'pending_sso', 'pending_dean', 'approved'], default: 'pending_pr', index: true },
+  approvalHistory: [{
+    role: { type: String, enum: ['pr', 'sso', 'dean'], required: true },
+    email: { type: String, default: '', lowercase: true, trim: true },
+    action: { type: String, enum: ['approved'], required: true },
+    createdAt: { type: Date, default: Date.now }
+  }],
+  attendedAt: { type: Date, required: true, default: Date.now }
+}, { timestamps: true });
+attendanceRecordSchema.index({ clubId: 1, itemType: 1, eventRequestId: 1, email: 1 }, { unique: true });
+
+const studentAccountSchema = new mongoose.Schema({
+  email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+  name: { type: String, required: true, trim: true, maxlength: 160 },
+  salt: { type: String, default: '' },
+  passwordHash: { type: String, default: '' },
+  googleSub: { type: String, unique: true, sparse: true },
+  sessionVersion: { type: Number, default: 0 },
+  lastLoginAt: { type: Date, default: null }
+}, { timestamps: true });
+
+const studentEmailCodeSchema = new mongoose.Schema({
+  email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+  name: { type: String, required: true, trim: true, maxlength: 160 },
+  salt: { type: String, required: true },
+  passwordHash: { type: String, required: true },
+  codeHash: { type: String, required: true },
+  attempts: { type: Number, default: 0 },
+  expiresAt: { type: Date, required: true }
+}, { timestamps: true });
+studentEmailCodeSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
+const loginAttemptSchema = new mongoose.Schema({
+  sourceHash: { type: String, required: true, unique: true },
+  windowStart: { type: Date, required: true },
+  failures: { type: Number, required: true, default: 0 },
+  lockedUntil: { type: Date, default: null },
+  expiresAt: { type: Date, required: true }
+}, { timestamps: true });
+loginAttemptSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
+const passwordResetTokenSchema = new mongoose.Schema({
+  accountType: { type: String, enum: ['admin', 'club', 'student'], required: true },
+  email: { type: String, required: true, lowercase: true, trim: true },
+  tokenHash: { type: String, required: true, unique: true },
+  expiresAt: { type: Date, required: true }
+}, { timestamps: true });
+passwordResetTokenSchema.index({ accountType: 1, email: 1 }, { unique: true });
+passwordResetTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
+const passwordRecoveryRateLimitSchema = new mongoose.Schema({
+  sourceHash: { type: String, required: true, unique: true },
+  windowStart: { type: Date, required: true },
+  count: { type: Number, required: true, default: 0 },
+  expiresAt: { type: Date, required: true }
+}, { timestamps: true });
+passwordRecoveryRateLimitSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
+const adminAuthStateSchema = new mongoose.Schema({
+  email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+  salt: { type: String, required: true },
+  passwordHash: { type: String, required: true },
+  sessionVersion: { type: Number, default: 0 },
+  passwordChangedAt: { type: Date, default: Date.now },
+  lastLoginAt: { type: Date, default: null }
+}, { timestamps: true });
+
+const EventRegistration = mongoose.models.EventRegistration || mongoose.model('EventRegistration', eventRegistrationSchema);
+const AttendanceSession = mongoose.models.AttendanceSession || mongoose.model('AttendanceSession', attendanceSessionSchema);
+const AttendanceRecord = mongoose.models.AttendanceRecord || mongoose.model('AttendanceRecord', attendanceRecordSchema);
+const StudentAccount = mongoose.models.StudentAccount || mongoose.model('StudentAccount', studentAccountSchema);
+const StudentEmailCode = mongoose.models.StudentEmailCode || mongoose.model('StudentEmailCode', studentEmailCodeSchema);
+const LoginAttempt = mongoose.models.LoginAttempt || mongoose.model('LoginAttempt', loginAttemptSchema);
+const PasswordResetToken = mongoose.models.PasswordResetToken || mongoose.model('PasswordResetToken', passwordResetTokenSchema);
+const PasswordRecoveryRateLimit = mongoose.models.PasswordRecoveryRateLimit || mongoose.model('PasswordRecoveryRateLimit', passwordRecoveryRateLimitSchema);
+const AdminAuthState = mongoose.models.AdminAuthState || mongoose.model('AdminAuthState', adminAuthStateSchema);
 
 const Club = mongoose.models.Club || mongoose.model('Club', clubSchema);
 const Application = mongoose.models.Application || mongoose.model('Application', applicationSchema);
 const SiteSetting = mongoose.models.SiteSetting || mongoose.model('SiteSetting', siteSettingSchema);
+const SiteVisitor = mongoose.models.SiteVisitor || mongoose.model('SiteVisitor', siteVisitorSchema);
+const SiteNetwork = mongoose.models.SiteNetwork || mongoose.model('SiteNetwork', siteNetworkSchema);
 const ClubAccount = mongoose.models.ClubAccount || mongoose.model('ClubAccount', clubAccountSchema);
+const ContentRequest = mongoose.models.ContentRequest || mongoose.model('ContentRequest', contentRequestSchema);
+const AuditLog = mongoose.models.AuditLog || mongoose.model('AuditLog', auditLogSchema);
 
-module.exports = { Club, Application, SiteSetting, ClubAccount };
+module.exports = {
+  Club,
+  Application,
+  SiteSetting,
+  SiteVisitor,
+  SiteNetwork,
+  ClubAccount,
+  ContentRequest,
+  AuditLog,
+  EventRegistration,
+  AttendanceSession,
+  AttendanceRecord,
+  StudentAccount,
+  StudentEmailCode,
+  LoginAttempt,
+  PasswordResetToken,
+  PasswordRecoveryRateLimit,
+  AdminAuthState
+};

@@ -1,143 +1,303 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow, noarchive">
-  <title>Global administrator dashboard</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=20261005-my-forms">
+  <title>Global Admin</title>
+  <link rel="stylesheet" href="/assets/css/base.css?v=20261009e" />
+  <link rel="stylesheet" href="/assets/css/responsive.css?v=20261009b" />
+  <link rel="stylesheet" href="/assets/css/dark.css?v=20261009c" />
+  <link rel="stylesheet" href="/assets/css/features.css?v=20261009b" />
+  <link rel="icon" href="/assets/img/pics/logo.svg.png" type="image/png">
   <style>
-    :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, sans-serif; color: var(--text); background: var(--bg-main); }
-    :root[data-theme="dark"] { color-scheme: dark; --bg-main: #111315; --bg-panel: #1b1e21; --bg-strong: #25292d; --bg-soft: #202428; --border: rgba(255,255,255,.14); --text: #f3f4f6; --muted: #c0c4c9; --shadow: rgba(0,0,0,.35); }
-    * { box-sizing: border-box; }
-    body { margin: 0; padding: 0; background: radial-gradient(circle at top, rgba(201,34,42,.12), transparent 24%), linear-gradient(180deg, #fff 0%, #f7f5f4 28%, #f3f0ee 100%); color: var(--text); }
-    :root[data-theme="dark"] body { background: radial-gradient(circle at top, rgba(201,34,42,.12), transparent 28%), linear-gradient(180deg, #191c1f 0%, #121416 32%, #0e1012 100%); }
-    .page-shell { flex: 1 0 auto; min-height: 0; padding: 0 16px 48px; }
-    .topbar { flex: 0 0 auto; }
-    main { width: min(1180px, calc(100% - 36px)); flex: 1; margin: 0 auto; padding: 28px 0 42px; }
-    .page-heading, .section-heading, .record-top, .record-actions { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
-    .page-heading { margin-bottom: 24px; flex-wrap: wrap; }
-    .site-footer p, .site-footer a { color: #fff; }
-    :root[data-theme="dark"] .section, :root[data-theme="dark"] .record { background: var(--bg-panel); border-color: var(--border); box-shadow: 0 10px 24px var(--shadow); }
-    :root[data-theme="dark"] h1, :root[data-theme="dark"] h2, :root[data-theme="dark"] h3, :root[data-theme="dark"] .record-title, :root[data-theme="dark"] summary { color: var(--text); }
-    :root[data-theme="dark"] p, :root[data-theme="dark"] label, :root[data-theme="dark"] .record-meta, :root[data-theme="dark"] .detail-item strong { color: var(--muted); }
-    :root[data-theme="dark"] input, :root[data-theme="dark"] select, :root[data-theme="dark"] textarea { background: var(--bg-panel); color: var(--text); border-color: var(--border); }
-    :root[data-theme="dark"] .empty { color: var(--muted); border-color: var(--border); }
-    :root[data-theme="dark"] .answer { background: var(--bg-soft); color: var(--text); }
-    :root[data-theme="dark"] .answer p { color: var(--text); }
-    :root[data-theme="dark"] .badge.accepted { background: #173b2e; color: #72d5a9; }
-    :root[data-theme="dark"] .badge.rejected { background: #442528; color: #ff9298; }
-    :root[data-theme="dark"] .badge.pending { background: #45381e; color: #ffd071; }
-    :root[data-theme="dark"] .badge.processing { background: #19354a; color: #8bcaff; }
-    :root[data-theme="dark"] .answer { border-left-color: #e25359; }
-    :root[data-theme="dark"] .site-footer p, :root[data-theme="dark"] .site-footer a { color: #fff; }
-    h1 { margin: 0; font-size: clamp(1.6rem, 4vw, 2.2rem); }
-    h2 { margin: 0; font-size: 1.3rem; }
-    h3 { margin: 0; font-size: 1.08rem; }
-    p { color: #555; }
-    .section { margin-top: 22px; padding: 22px; border: 1px solid rgba(185,27,31,.18); border-radius: 16px; background: #fff; box-shadow: 0 10px 24px rgba(17,17,17,.04); }
-    .section-heading { margin-bottom: 14px; flex-wrap: wrap; }
-    .toolbar, .form-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 14px; align-items: end; }
-    label { display: grid; gap: 7px; color: #555; font-size: .9rem; }
-    input, select, textarea { width: 100%; min-width: 0; padding: 11px 12px; border: 1px solid rgba(17,17,17,.16); border-radius: 9px; background: #fff; color: #111; font: inherit; }
-    button, .link-button { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 9px 13px; border: 1px solid rgba(185,27,31,.22); border-radius: 9px; background: #fff; color: #111; font: inherit; font-weight: 700; text-decoration: none; cursor: pointer; }
-    button.primary { background: #b51d23; color: #fff; border-color: #b51d23; }
-    button.danger { background: #151515; color: #fff; border-color: #151515; }
-    .form-grid button { grid-column: 1 / -1; }
-    .records { display: grid; gap: 12px; margin-top: 16px; }
-    .record { padding: 16px; border: 1px solid rgba(185,27,31,.16); border-radius: 12px; background: #fffdfd; }
-    .record-top { align-items: flex-start; }
-    .record-title { font-weight: 800; font-size: 1.04rem; }
-    .record-meta { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 8px; color: #555; overflow-wrap: anywhere; }
-    .record-actions { margin-top: 14px; justify-content: flex-start; flex-wrap: wrap; }
-    .badge { flex: 0 0 auto; padding: 6px 10px; border-radius: 999px; background: #f0f0f0; text-transform: capitalize; }
-    .badge.accepted { background: #d9f0e7; color: #25845e; }
-    .badge.rejected { background: #f7dddd; color: #b51d23; }
-    .badge.pending { background: #fff5e4; color: #b51d23; }
-    .badge.processing { background: #e6f4ff; color: #4d9bd4; }
-    details { margin-top: 14px; border-top: 1px solid #eee; padding-top: 12px; }
-    summary { cursor: pointer; font-weight: 700; }
-    .detail-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px 18px; margin-top: 12px; }
-    .detail-item { overflow-wrap: anywhere; }
-    .detail-item strong { display: block; margin-bottom: 4px; color: #555; font-size: .85rem; }
-    .answer { margin: 10px 0; padding: 10px 12px; border-left: 3px solid #c9222a; background: #faf4f3; }
-    .answer p { margin: 5px 0 0; white-space: pre-wrap; }
-    .application-photo { display: block; width: 110px; height: 110px; margin-top: 12px; border-radius: 12px; object-fit: cover; }
-    .edit-form { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; align-items: end; }
-    .edit-form .record-actions { grid-column: 1 / -1; margin-top: 0; }
-    .message { min-height: 1.4em; margin: 10px 0 0; color: #176b3e; font-weight: 700; }
-    .message.error { color: #a51d27; }
-    .empty { padding: 18px; text-align: center; color: #666; border: 1px dashed #ddd; border-radius: 10px; }
-    @media (max-width: 760px) {
-      .page-shell { padding: 0 12px 24px; }
-      .toolbar, .form-grid, .edit-form, .detail-grid { grid-template-columns: 1fr; }
-      .form-grid button, .edit-form .record-actions { grid-column: auto; }
-      .section { padding: 16px; }
-      main { width: 100%; padding: 20px 0 28px; }
-      .page-heading { align-items: flex-start; }
-      .page-heading > div:first-child { width: 100%; }
-      .page-heading .record-actions { display: grid; width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-      .page-heading .record-actions > * { min-width: 0; }
-      .record-top { gap: 8px; }
-    }
-    @media (max-width: 420px) {
-      .page-shell { padding-right: 10px; padding-left: 10px; }
-      .page-heading .record-actions { grid-template-columns: 1fr; }
-      .record { padding: 13px; }
-      .record-actions > select { width: 100%; }
-    }
+    .section { margin-bottom: 28px; }
+    .section-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
+    .section-heading h2 { margin: 0; font-size: clamp(1.2rem, 3vw, 1.6rem); }
+    .section-heading p { margin: 4px 0 0; color: var(--text-muted); font-size: .92rem; }
+    .toolbar { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+    .toolbar label { display: flex; align-items: center; gap: 8px; font-size: .88rem; color: var(--text-muted); }
+    .toolbar select { padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-panel); color: var(--text-main); font: inherit; }
+    .records { display: grid; gap: 10px; }
+    .record { background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 14px; padding: 16px 18px; }
+    .record-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+    .record-title { margin: 0; font-size: 1.05rem; font-weight: 700; }
+    .record-meta { color: var(--text-muted); font-size: .82rem; }
+    .record-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .record-actions button { padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-panel); color: var(--text-main); cursor: pointer; font-weight: 600; }
+    .record-actions button.danger { border-color: var(--primary-700); color: var(--primary-700); }
+    .empty { color: var(--text-muted); text-align: center; padding: 24px; }
+    .message { min-height: 1.5em; margin-top: 10px; font-size: .9rem; }
+    .message.error { color: var(--primary-700); }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; }
+    .stat-card { background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px 16px; text-align: center; }
+    .stat-card strong { display: block; font-size: 1.5rem; font-weight: 800; }
+    .stat-card span { color: var(--text-muted); font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; }
+    .stat-card small { display: block; margin-top: 5px; color: var(--text-muted); font-size: .7rem; line-height: 1.35; }
+    .website-activity { margin-top: 22px; padding: 20px; border: 1px solid var(--border-color); border-radius: 18px; background: var(--bg-soft); }
+    .website-activity-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 15px; flex-wrap: wrap; }
+    .website-activity-heading h2 { margin: 0; font-size: 1.08rem; }
+    .website-activity-heading p { margin: 4px 0 0; color: var(--text-muted); font-size: .84rem; }
+    .activity-live { display: inline-flex; align-items: center; gap: 8px; padding: 7px 11px; border: 1px solid color-mix(in srgb, #16a34a 28%, var(--border-color)); border-radius: 999px; background: color-mix(in srgb, #16a34a 9%, var(--bg-panel)); color: #15803d; font-size: .75rem; font-weight: 750; white-space: nowrap; }
+    :root[data-theme="dark"] .activity-live { color: #86efac; }
+    .activity-live::before { width: 8px; height: 8px; border-radius: 50%; background: #16a34a; content: ""; box-shadow: 0 0 0 3px color-mix(in srgb, #16a34a 18%, transparent); }
+    .activity-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .activity-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-content: center; align-items: center; gap: 7px 12px; min-height: 106px; padding: 15px 17px; border: 1px solid var(--border-color); border-top: 3px solid var(--activity-accent, #2563eb); border-radius: 14px; background: var(--bg-panel); box-shadow: 0 5px 16px rgba(15, 23, 42, .045); }
+    .activity-card-label { color: var(--text-muted); font-size: .74rem; font-weight: 750; letter-spacing: .055em; text-transform: uppercase; }
+    .activity-card strong { grid-column: 2; grid-row: 1 / span 2; color: var(--text-main); font-size: clamp(1.55rem, 2.2vw, 2rem); font-weight: 850; font-variant-numeric: tabular-nums; }
+    .activity-card small { grid-column: 1; color: var(--text-muted); font-size: .72rem; line-height: 1.4; }
+    .activity-card.blue { --activity-accent: #3b82f6; }
+    .activity-card.green { --activity-accent: #16a34a; }
+    .activity-card.amber { --activity-accent: #d97706; }
+    .activity-card.red { --activity-accent: var(--primary-700); }
+    .activity-privacy-note { margin: 12px 2px 0; color: var(--text-muted); font-size: .72rem; line-height: 1.5; }
+    .active-people-panel { margin-top: 14px; padding: 14px; border: 1px solid var(--border-color); border-radius: 14px; background: var(--bg-panel); }
+    .active-people-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 9px; }
+    .active-people-heading h3 { margin: 0; font-size: .92rem; }
+    .active-people-heading span { color: var(--text-muted); font-size: .72rem; }
+    .active-people-list { display: grid; gap: 7px; max-height: 210px; overflow: auto; overscroll-behavior: contain; }
+    .active-person { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 10px; border: 1px solid var(--border-color); border-radius: 11px; background: var(--bg-soft); }
+    .active-person-avatar { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 50%; background: var(--primary-50); color: var(--primary-700); font-size: .72rem; font-weight: 850; }
+    .active-person-details { display: grid; min-width: 0; gap: 2px; }
+    .active-person-details strong { overflow: hidden; color: var(--text-main); font-size: .8rem; text-overflow: ellipsis; white-space: nowrap; }
+    .active-person-details span, .active-person-seen { color: var(--text-muted); font-size: .68rem; }
+    .active-person-seen { white-space: nowrap; }
+    .activity-history { margin-top: 12px; border-top: 1px solid var(--border-color); padding-top: 10px; }
+    .activity-history summary { width: fit-content; color: var(--text-muted); font-size: .73rem; font-weight: 700; cursor: pointer; }
+    .activity-history-content { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 9px; }
+    .activity-history-content span { padding: 6px 9px; border: 1px solid var(--border-color); border-radius: 9px; color: var(--text-muted); font-size: .7rem; }
+    .activity-history-content b { color: var(--text-main); }
+    @media (max-width: 920px) { .activity-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    @media (max-width: 520px) { .website-activity { padding: 15px; } .activity-grid { grid-template-columns: 1fr; } .activity-card { min-height: 88px; } }
+    @media (max-width: 520px) { .active-person { grid-template-columns: 34px minmax(0, 1fr); } .active-person-seen { grid-column: 2; } }
+    .app-details { margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 10px; font-size: .85rem; color: var(--text-muted); display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; }
+    .app-details b { color: var(--text-main); font-weight: 700; }
+    .committee-label { color: var(--primary-700); font-weight: 800; font-size: .7rem; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 4px; display: block; }
+    .section-heading p, .section > p { color: var(--text-muted); }
+    .welcome-box { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .welcome-box h1 { margin: 0; }
+    .welcome-box p { margin: 6px 0 0; color: var(--text-muted); }
+    .status-pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; background: var(--bg-soft); color: var(--text-muted); }
+    .status-pill.status-pending { background: #fef3c7; color: #92400e; }
+    .status-pill.status-accepted { background: #d1fae5; color: #065f46; }
+    .status-pill.status-rejected { background: #fee2e2; color: #991b1b; }
+
+    /* Tabs */
+    .tab-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 22px; }
+    .tab-btn { padding: 10px 18px; border: 1px solid var(--border-color); border-radius: 999px; background: var(--bg-panel); color: var(--text-muted); font-weight: 700; cursor: pointer; transition: all .15s ease; }
+    .tab-btn:hover { border-color: var(--primary-700); color: var(--primary-700); }
+    .tab-btn.active { background: var(--primary-800); color: #fff; border-color: var(--primary-800); }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; animation: fadeIn .25s ease; }
+
+    /* Analysis */
+    .analysis-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 26px; }
+    .analysis-summary .stat-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 12px; min-height: 76px; padding: 12px 16px; text-align: left; }
+    .analysis-summary .stat-card strong { grid-column: 2; grid-row: 1; justify-self: end; }
+    .analysis-summary .stat-card span { grid-column: 1; grid-row: 1; }
+    .stat-card.accent-blue { border-top: 3px solid #2563eb; }
+    .stat-card.accent-green { border-top: 3px solid #16a34a; }
+    .stat-card.accent-amber { border-top: 3px solid #d97706; }
+    .stat-card.accent-red { border-top: 3px solid #dc2626; }
+    .stat-card.accent-purple { border-top: 3px solid #7c3aed; }
+    .analysis-title { margin: 26px 0 4px; font-size: 1.05rem; font-weight: 800; }
+    .analysis-sub { margin: 0 0 14px; color: var(--text-muted); font-size: .85rem; }
+    .analysis-list { display: grid; gap: 10px; }
+    .analysis-row { background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px 16px; }
+    .analysis-row-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+    .analysis-row-head strong { font-size: .95rem; }
+    .analysis-row-head span { color: var(--text-muted); font-size: .78rem; font-weight: 700; }
+    .bar-track { height: 8px; border-radius: 999px; background: var(--bg-soft); overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 999px; min-width: 2px; transition: width .4s ease; }
+    .bar-fill.blue { background: #2563eb; }
+    .bar-fill.green { background: #16a34a; }
+    .bar-fill.amber { background: #d97706; }
+    .bar-fill.red { background: #dc2626; }
+    .analysis-legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 8px; font-size: .75rem; color: var(--text-muted); }
+    .analysis-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: middle; }
+    .analysis-empty { color: var(--text-muted); text-align: center; padding: 20px; }
+    .analysis-refresh-button { white-space: nowrap; }
+    .analysis-row.view-analysis-row { border-left: 3px solid #7c3aed; }
+    .event-analysis-heading { align-items: center; margin: 30px 0 8px; }
+    .event-analysis-heading .analysis-title { margin: 0; }
+    .event-analysis-summary { margin: 12px 0; }
+    .event-analysis-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+    .event-analysis-actions button { white-space: nowrap; }
+    .event-performance-row { display: grid; grid-template-columns: minmax(170px, .9fr) minmax(330px, 1.5fr); align-items: center; gap: 14px; padding: 10px 12px; border-left: 3px solid #2563eb; }
+    .event-performance-info { display: grid; min-width: 0; gap: 3px; }
+    .event-performance-info strong { overflow-wrap: anywhere; font-size: .92rem; }
+    .event-performance-info span { overflow-wrap: anywhere; color: var(--text-muted); font-size: .73rem; font-weight: 650; }
+    .event-performance-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+    .event-performance-metrics div { display: flex; align-items: baseline; justify-content: space-between; gap: 7px; min-width: 0; padding: 8px 10px; border-radius: 9px; background: var(--bg-soft); color: var(--text-muted); font-size: .72rem; white-space: nowrap; }
+    .event-performance-metrics b { color: var(--text-main); font-size: .88rem; font-variant-numeric: tabular-nums; }
+    @media (max-width: 820px) { .event-performance-row { grid-template-columns: 1fr; gap: 8px; } }
+    @media (max-width: 540px) { .event-performance-metrics { gap: 5px; } .event-performance-metrics div { align-items: flex-start; flex-direction: column; gap: 1px; padding: 7px; font-size: .66rem; white-space: normal; } }
+    .committee-availability-dialog { width: min(560px, calc(100% - 32px)); max-height: 85vh; padding: 24px; border: 1px solid var(--border-color); border-radius: 18px; background: var(--bg-panel); color: var(--text-main); box-shadow: var(--shadow-xl); }
+    .committee-availability-dialog::backdrop { background: rgba(15, 23, 42, .55); }
+    .committee-availability-dialog header, .committee-availability-dialog footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .committee-availability-dialog h2 { margin: 0; font-size: 1.25rem; }
+    .committee-availability-dialog > p { color: var(--text-muted); }
+    .committee-availability-list { display: grid; gap: 10px; }
+    .committee-availability-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border: 1px solid var(--border-color); border-radius: 12px; }
+    .committee-availability-row strong { overflow-wrap: anywhere; }
+    .committee-availability-row select { min-width: 130px; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 9px; background: var(--bg-panel); color: var(--text-main); font: inherit; }
+    .committee-availability-dialog footer { justify-content: flex-end; margin-top: 16px; }
+    @media (max-width: 480px) { .committee-availability-row { align-items: stretch; flex-direction: column; } }
   </style>
-  <link rel="icon" href="/logo.svg.png" type="image/png">
 </head>
 <body>
   <div class="page-shell">
-    <header class="topbar">
-      <a class="brand-banner brand-home-link" href="/" aria-label="MIU homepage">
-        <img class="brand-mark" src="/logo.svg.png" alt="MIU logo">
-      </a>
-    </header>
-  <main>
-    <div class="page-heading">
-      <div><h1>Global administrator</h1><p>Manage applications and committee heads across every club.</p></div>
-      <div class="record-actions">
-        <a class="link-button" href="/admin">Website settings</a>
-        <a class="link-button" href="/admin/club-credentials">Club credentials</a>
-        <button id="logout" class="danger" type="button">Log out</button>
-      </div>
-    </div>
+    <div id="site-header"></div>
 
-    <section class="section">
-      <div class="section-heading"><div><h2>Committee heads</h2><p>Create, edit, or remove a head account for any club.</p></div></div>
-      <form id="createHeadForm" class="form-grid">
-        <label>Club<select name="clubId" id="createHeadClub" required></select></label>
-        <label>Committee<input name="committee" maxlength="100" required></label>
-        <label>Head email<input name="email" type="email" autocomplete="username" required></label>
-        <label>Password (12+ characters)<input name="password" type="password" minlength="12" autocomplete="new-password" required></label>
-        <button class="primary" type="submit">Create head</button>
-      </form>
-      <p id="headMessage" class="message" role="status"></p>
-      <div class="toolbar">
-        <label>Filter heads by club<select id="headClubFilter"></select></label>
-      </div>
-      <div id="headRecords" class="records"></div>
-    </section>
+    <main class="app-container">
+      <section class="welcome-box hero-panel">
+        <div>
+          <span class="committee-label">GLOBAL ADMIN</span>
+          <h1 id="adminTitle">Admin Dashboard</h1>
+          <p id="adminSubtitle">Manage clubs, heads, and applications globally.</p>
+        </div>
+        <div class="top-actions">
+          <button id="logoutBtn" class="secondary-btn" type="button">Sign out</button>
+        </div>
+      </section>
 
-    <section class="section">
-      <div class="section-heading"><div><h2>Applications</h2><p>View and manage applications submitted to any club.</p></div></div>
-      <div class="toolbar">
-        <label>Filter applications by club<select id="applicationClubFilter"></select></label>
+      <div class="tab-bar" id="adminTabs">
+        <button class="tab-btn active" data-tab="overview" type="button">Overview</button>
+        <button class="tab-btn" data-tab="heads" type="button">Club Heads</button>
+        <button class="tab-btn" data-tab="clubs" type="button">Clubs</button>
+        <button class="tab-btn" data-tab="analysis" type="button">Analysis</button>
+        <button class="tab-btn" data-tab="applications" type="button">Applications</button>
       </div>
-      <p id="applicationMessage" class="message" role="status"></p>
-      <div id="applicationRecords" class="records"></div>
-    </section>
-  </main>
+
+      <section class="section tab-panel active" id="tab-overview">
+        <div class="stats-grid">
+          <div class="stat-card"><strong id="statTotalClubs">0</strong><span>Clubs</span></div>
+          <div class="stat-card"><strong id="statTotalHeads">0</strong><span>Committee heads</span></div>
+          <div class="stat-card"><strong id="statPending">0</strong><span>Pending applications</span></div>
+          <div class="stat-card"><strong id="statAccepted">0</strong><span>Accepted</span></div>
+          <div class="stat-card"><strong id="statRejected">0</strong><span>Rejected</span></div>
+        </div>
+        <section class="website-activity" aria-labelledby="websiteActivityTitle">
+          <div class="website-activity-heading">
+            <div><h2 id="websiteActivityTitle">Website activity</h2><p>Visitor traffic and account sign-ins</p></div>
+            <span class="activity-live">Live · updates every minute</span>
+          </div>
+          <div class="activity-grid">
+            <article class="activity-card blue"><span class="activity-card-label">People online now</span><strong id="statActiveVisitors" aria-live="polite">—</strong><small>Unique accounts and anonymous browsers · last 5 min</small></article>
+            <article class="activity-card green"><span class="activity-card-label">Signed-in accounts</span><strong id="statActiveAccounts" aria-live="polite">—</strong><small>People identified by a valid account session</small></article>
+            <article class="activity-card amber"><span class="activity-card-label">Guest browsers</span><strong id="statGuestVisitors" aria-live="polite">—</strong><small>Visitors not signed in · last 5 min</small></article>
+          </div>
+          <div class="active-people-panel">
+            <div class="active-people-heading"><h3>Who is online</h3><span id="activePeopleCount">Checking activity…</span></div>
+            <div class="active-people-list" id="activePeopleList" aria-live="polite"></div>
+            <p class="activity-privacy-note">Signed-in users show their account name and email. Guests remain anonymous; browser type is only an estimate.</p>
+          </div>
+          <details class="activity-history">
+            <summary>Historical traffic totals · these count browsers and networks, not people</summary>
+            <div class="activity-history-content">
+              <span><b id="statUniqueVisitors">—</b> browser tokens</span>
+              <span><b id="statUniqueIpAddresses">—</b> hashed IP addresses</span>
+            </div>
+          </details>
+        </section>
+      </section>
+
+      <section class="section tab-panel" id="tab-clubs">
+        <div class="section-heading">
+          <div><h2>Clubs</h2><p>All clubs registered on the portal.</p></div>
+          <a class="secondary-btn" href="/admin">Manage from /admin</a>
+        </div>
+        <div id="clubRecords" class="records"></div>
+      </section>
+
+      <section class="section tab-panel" id="tab-analysis">
+        <div class="section-heading">
+          <div><h2>Analysis</h2><p>Per-club performance, capacity, applications and visitor interest.</p></div>
+          <button class="secondary-btn analysis-refresh-button" id="refreshClubViewsBtn" type="button">Refresh view counts</button>
+        </div>
+        <div class="analysis-summary">
+          <div class="stat-card accent-blue"><strong id="statTotalApplications">0</strong><span>Total applications</span></div>
+          <div class="stat-card accent-green"><strong id="statAcceptance">0%</strong><span>Acceptance rate</span></div>
+          <div class="stat-card accent-amber"><strong id="statFullClubs">0</strong><span>Full clubs</span></div>
+          <div class="stat-card accent-red"><strong id="statArchived">0</strong><span>Archived clubs</span></div>
+          <div class="stat-card accent-purple"><strong id="statTotalClubViews">0</strong><span>Total club views</span></div>
+        </div>
+
+        <h3 class="analysis-title">Most viewed clubs</h3>
+        <p class="analysis-sub">Views are counted whenever a visitor opens a club with the View button.</p>
+        <p id="clubViewsMessage" class="analysis-sub" role="status" aria-live="polite"></p>
+        <div id="topViewedClubs" class="analysis-list"></div>
+
+        <div class="section-heading event-analysis-heading">
+          <div><h3 class="analysis-title">Event interest &amp; attendance</h3><p class="analysis-sub">Event detail opens, registrations, and QR check-ins across active clubs.</p></div>
+          <div class="event-analysis-actions">
+            <button class="secondary-btn" id="toggleEventAnalyticsBtn" type="button" hidden>Show all events</button>
+            <button class="secondary-btn analysis-refresh-button" id="refreshEventAnalyticsBtn" type="button">Refresh event analytics</button>
+          </div>
+        </div>
+        <p id="eventAnalyticsMessage" class="analysis-sub" role="status" aria-live="polite"></p>
+        <div class="analysis-summary event-analysis-summary">
+          <div class="stat-card accent-purple"><strong id="statEventViews">0</strong><span>Event detail views</span></div>
+          <div class="stat-card accent-blue"><strong id="statEventRegistrations">0</strong><span>Registrations</span></div>
+          <div class="stat-card accent-green"><strong id="statEventCheckIns">0</strong><span>QR check-ins</span></div>
+        </div>
+        <div id="eventAnalyticsList" class="analysis-list"></div>
+
+        <h3 class="analysis-title">Capacity &amp; demand per club</h3>
+        <p class="analysis-sub">How many applied, how many are members, and how many seats each club has.</p>
+        <div id="clubAnalysis" class="analysis-list"></div>
+
+        <h3 class="analysis-title">Acceptance by club</h3>
+        <p class="analysis-sub">Percentage of applications accepted per club.</p>
+        <div id="clubAcceptance" class="analysis-list"></div>
+
+        <h3 class="analysis-title">Top clubs by applicants</h3>
+        <p class="analysis-sub">The clubs with the most applications.</p>
+        <div id="topClubs" class="analysis-list"></div>
+      </section>
+
+      <section class="section tab-panel" id="tab-heads">
+        <div class="section-heading">
+          <div><h2>Club Heads</h2><p>Add or remove club heads (president/head).</p></div>
+          <div class="top-actions">
+            <button id="addHeadBtn" class="primary-btn" type="button">Add head</button>
+          </div>
+        </div>
+        <div class="toolbar">
+          <label>Filter heads by club<select id="headClubFilter"></select></label>
+        </div>
+        <p id="headMessage" class="message" role="status"></p>
+        <div id="headRecords" class="records"></div>
+      </section>
+
+      <section class="section tab-panel" id="tab-applications">
+        <div class="section-heading">
+          <div><h2>Applications</h2><p>View and manage applications submitted to any club.</p></div>
+        </div>
+        <div class="toolbar">
+          <label>Filter applications by club<select id="applicationClubFilter"></select></label>
+        </div>
+        <p id="applicationMessage" class="message" role="status"></p>
+        <div id="applicationRecords" class="records"></div>
+      </section>
+    </main>
   </div>
-  <footer class="site-footer">
-    <p>Copyright 2026 &copy; Misr International University, All Right Reserved | Made by <a href="https://www.linkedin.com/in/mahmoud-hefny-1264763b0" target="_blank" rel="noopener noreferrer">Mahmoud Hefny</a></p>
-  </footer>
+
+  <dialog id="committeeAvailabilityDialog" class="committee-availability-dialog" aria-labelledby="committeeAvailabilityDialogTitle">
+    <header>
+      <div><span class="admin-eyebrow">GLOBAL ADMIN</span><h2 id="committeeAvailabilityDialogTitle">Committee availability</h2></div>
+      <button id="closeCommitteeAvailabilityDialog" class="calendar-close-btn" type="button" aria-label="Close committee availability">&times;</button>
+    </header>
+    <p>Open committees accept applications. Full and closed committees remain visible in the form but cannot be selected.</p>
+    <div id="adminCommitteeAvailabilityList" class="committee-availability-list"></div>
+    <p id="adminCommitteeAvailabilityMessage" class="message" role="status"></p>
+    <footer><button id="saveAdminCommitteeAvailabilityBtn" class="primary-btn" type="button">Save availability</button></footer>
+  </dialog>
+
+  <div id="site-footer"></div>
+
+  <script src="/assets/js/layout.js?v=11" defer></script>
+  <script src="/assets/js/theme.js?v=20261009c" defer></script>
   <script>
     const clubs = [];
     let heads = [];
@@ -153,125 +313,514 @@
       if (!response.ok) throw new Error(result.message || 'Request failed.');
       return result;
     }
+    function renderActivePeople(people) {
+      const list = byId('activePeopleList');
+      list.replaceChildren();
+      if (!people.length) {
+        const empty = document.createElement('p');
+        empty.className = 'analysis-empty';
+        empty.textContent = 'No visitors have sent an activity ping in the last 5 minutes.';
+        list.appendChild(empty);
+        return;
+      }
+      for (const person of people) {
+        const row = document.createElement('div');
+        row.className = 'active-person';
+        const avatar = document.createElement('span');
+        avatar.className = 'active-person-avatar';
+        avatar.textContent = person.accountType === 'admin' ? 'AD' : String(person.name || 'G').trim().slice(0, 1).toUpperCase();
+        const details = document.createElement('div');
+        details.className = 'active-person-details';
+        const name = document.createElement('strong');
+        name.textContent = person.accountType === 'admin' ? `You · ${person.name}` : person.name;
+        const identity = document.createElement('span');
+        identity.textContent = person.email
+          ? `${person.email} · ${person.label}`
+          : `Anonymous guest · ${person.deviceType || 'unknown'} browser`;
+        details.append(name, identity);
+        const seen = document.createElement('span');
+        seen.className = 'active-person-seen';
+        const lastSeen = new Date(person.lastSeenAt);
+        const seenTime = Number.isNaN(lastSeen.getTime()) ? '' : lastSeen.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        seen.textContent = seenTime ? `Seen ${seenTime}` : 'Active now';
+        row.append(avatar, details, seen);
+        list.appendChild(row);
+      }
+    }
+    let visitorPingConfirmed = false;
+    async function refreshVisitorAnalytics() {
+      try {
+        if (!visitorPingConfirmed) {
+          const ping = await fetch('/api/site/visitor-ping', { method: 'POST', credentials: 'same-origin', keepalive: true });
+          visitorPingConfirmed = ping.ok;
+        }
+        const data = await request('/api/admin/visitor-analytics');
+        byId('statUniqueVisitors').textContent = Number(data.uniqueVisitors).toLocaleString();
+        byId('statUniqueIpAddresses').textContent = Number(data.uniqueIpAddresses).toLocaleString();
+        byId('statActiveVisitors').textContent = Number(data.activeVisitors).toLocaleString();
+        byId('statActiveAccounts').textContent = Number(data.activeSignedInAccounts).toLocaleString();
+        byId('statGuestVisitors').textContent = Number(data.activeGuestVisitors).toLocaleString();
+        const peopleOnline = Number(data.activeVisitors) || 0;
+        byId('activePeopleCount').textContent = `${peopleOnline} person${peopleOnline === 1 ? '' : 's'} online now`;
+        renderActivePeople(Array.isArray(data.activePeople) ? data.activePeople : []);
+      } catch (error) {
+        byId('statUniqueVisitors').textContent = '—';
+        byId('statActiveVisitors').textContent = '—';
+        byId('statActiveAccounts').textContent = '—';
+        byId('statGuestVisitors').textContent = '—';
+        byId('statUniqueIpAddresses').textContent = '—';
+        byId('activePeopleCount').textContent = 'Activity unavailable';
+        renderActivePeople([]);
+      }
+    }
+    refreshVisitorAnalytics();
+    window.setInterval(refreshVisitorAnalytics, 60_000);
     function fillClubSelect(select, includeAll) {
       select.replaceChildren();
-      if (includeAll) select.add(new Option('All clubs', 'all'));
-      for (const club of clubs) select.add(new Option(club.name, String(club.id)));
+      if (includeAll) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = 'All clubs';
+        select.appendChild(opt);
+      }
+      for (const club of clubs) {
+        const opt = document.createElement('option');
+        opt.value = club.id;
+        opt.textContent = club.name;
+        select.appendChild(opt);
+      }
     }
-    async function reloadHeads() { heads = await request('/api/admin/club-heads'); renderHeads(); }
-    async function reloadApplications() { applications = await request('/api/admin/applications'); renderApplications(); }
+    function updateStats() {
+      byId('statTotalClubs').textContent = clubs.length;
+      byId('statTotalHeads').textContent = heads.length;
+      byId('statPending').textContent = applications.filter((a) => a.status === 'pending').length;
+      byId('statAccepted').textContent = applications.filter((a) => a.status === 'accepted').length;
+      byId('statRejected').textContent = applications.filter((a) => a.status === 'rejected').length;
+    }
     function renderHeads() {
-      const selectedClub = filterValue('headClubFilter');
-      const records = heads.filter((head) => selectedClub === 'all' || String(head.clubId) === selectedClub);
-      const container = byId('headRecords');
-      container.replaceChildren();
-      if (!records.length) { container.innerHTML = '<div class="empty">No committee heads for this filter.</div>'; return; }
-      for (const head of records) {
-        const card = document.createElement('article');
-        card.className = 'record';
-        const top = document.createElement('div'); top.className = 'record-top';
-        const detail = document.createElement('div');
-        const title = document.createElement('div'); title.className = 'record-title'; title.textContent = `${head.clubName} - ${head.committee} Head`;
-        const meta = document.createElement('div'); meta.className = 'record-meta'; meta.textContent = head.email;
-        detail.append(title, meta); top.append(detail); card.append(top);
-        const actions = document.createElement('div'); actions.className = 'record-actions';
-        const edit = document.createElement('button'); edit.type = 'button'; edit.textContent = 'Edit'; edit.addEventListener('click', () => editHead(head, card));
-        const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'danger'; remove.textContent = 'Delete'; remove.addEventListener('click', () => deleteHead(head));
-        actions.append(edit, remove); card.append(actions); container.append(card);
-      }
-    }
-    function editHead(head, card) {
-      const form = document.createElement('form'); form.className = 'edit-form';
-      for (const [labelText, name, type, value] of [['Committee', 'committee', 'text', head.committee], ['Head email', 'email', 'email', head.email], ['New password (optional)', 'password', 'password', '']]) {
-        const label = document.createElement('label'); label.textContent = labelText;
-        const input = document.createElement('input'); input.name = name; input.type = type; input.value = value;
-        if (name !== 'password') input.required = true;
-        if (name === 'committee') input.maxLength = 100;
-        if (name === 'password') { input.minLength = 12; input.placeholder = 'Leave blank to keep current password'; }
-        label.append(input); form.append(label);
-      }
-      const actions = document.createElement('div'); actions.className = 'record-actions';
-      const save = document.createElement('button'); save.className = 'primary'; save.type = 'submit'; save.textContent = 'Save changes';
-      const cancel = document.createElement('button'); cancel.type = 'button'; cancel.textContent = 'Cancel'; cancel.addEventListener('click', renderHeads);
-      actions.append(save, cancel); form.append(actions);
-      form.addEventListener('submit', async (event) => {
-        event.preventDefault(); const values = new FormData(form);
-        try {
-          await request(`/api/admin/club-heads/${encodeURIComponent(head.email)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ committee: values.get('committee'), email: values.get('email'), password: values.get('password') }) });
-          setMessage('headMessage', 'Head account updated. Existing applications moved with the committee if it changed.');
-          await reloadHeads(); await reloadApplications();
-        } catch (error) { setMessage('headMessage', error.message, true); }
+      updateStats();
+      const list = byId('headRecords');
+      const filter = filterValue('headClubFilter');
+      const visible = filter ? heads.filter((head) => Number(head.clubId) === Number(filter)) : heads;
+      if (!visible.length) { list.innerHTML = '<p class="empty">No heads added yet.</p>'; return; }
+      list.innerHTML = visible.map((head) => {
+        return `
+        <div class="record">
+          <div class="record-head">
+            <div>
+              <h3 class="record-title">${escapeHtml(head.email)}</h3>
+              <p class="record-meta">${escapeHtml(head.committee)} · ${escapeHtml(head.clubName)}</p>
+            </div>
+            <div class="record-actions">
+              <button type="button" class="danger" data-email="${escapeHtml(head.email)}">Remove</button>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+      list.querySelectorAll('[data-email]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          if (!confirm('Remove this head?')) return;
+          try {
+            await request(`/api/admin/club-heads/${encodeURIComponent(btn.dataset.email)}`, { method: 'DELETE' });
+            await reloadHeads();
+            setMessage('headMessage', 'Head removed.', false);
+          } catch (error) {
+            setMessage('headMessage', error.message, true);
+          }
+        });
       });
-      card.replaceWith(form);
+      updateStats();
     }
-    async function deleteHead(head) {
-      if (!window.confirm(`Delete ${head.committee} Head (${head.email}) from ${head.clubName}?`)) return;
-      try { await request(`/api/admin/club-heads/${encodeURIComponent(head.email)}`, { method: 'DELETE' }); setMessage('headMessage', 'Head account deleted. Existing applications remain in the club.'); await reloadHeads(); }
-      catch (error) { setMessage('headMessage', error.message, true); }
+    async function reloadHeads() {
+      const data = await request('/api/admin/club-heads');
+      heads = Array.isArray(data) ? data : [];
+      renderHeads();
     }
-    function addDetail(container, label, value) {
-      const item = document.createElement('div'); item.className = 'detail-item';
-      const title = document.createElement('strong'); title.textContent = label;
-      const text = document.createElement('span'); text.textContent = value || 'N/A';
-      item.append(title, text); container.append(item);
-    }
-    function getApplicationStatusLabel(app) { return app.status === 'pending' && app.interviewed ? 'Processing' : app.status || 'pending'; }
-    function getApplicationStatusClass(app) { return `badge ${app.status || 'pending'}${app.status === 'pending' && app.interviewed ? ' processing' : ''}`; }
-    function renderApplications() {
-      const selectedClub = filterValue('applicationClubFilter');
-      const records = applications.filter((app) => selectedClub === 'all' || String(app.clubId) === selectedClub);
-      const container = byId('applicationRecords'); container.replaceChildren();
-      if (!records.length) { container.innerHTML = '<div class="empty">No applications for this filter.</div>'; return; }
-      for (const app of records) {
-        const card = document.createElement('article'); card.className = 'record';
-        const top = document.createElement('div'); top.className = 'record-top';
-        const detail = document.createElement('div');
-        const title = document.createElement('div'); title.className = 'record-title'; title.textContent = app.studentName || 'Applicant';
-        const meta = document.createElement('div'); meta.className = 'record-meta';
-        const clubName = clubs.find((club) => club.id === app.clubId)?.name || `Club ${app.clubId}`;
-        for (const value of [clubName, app.committee || 'No committee', app.email || 'No email']) { const item = document.createElement('span'); item.textContent = value; meta.append(item); }
-        detail.append(title, meta); const badge = document.createElement('span'); badge.className = getApplicationStatusClass(app); badge.textContent = getApplicationStatusLabel(app); top.append(detail, badge); card.append(top);
-        const actions = document.createElement('div'); actions.className = 'record-actions';
-        const status = document.createElement('select'); for (const value of ['pending', 'accepted', 'rejected']) status.add(new Option(value[0].toUpperCase() + value.slice(1), value)); status.value = app.status || 'pending';
-        status.setAttribute('aria-label', `Status for ${app.studentName}`);
-        status.addEventListener('change', async () => { try { const updated = await request(`/api/admin/applications/${app.id}/status`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: status.value }) }); Object.assign(app, updated); badge.textContent = getApplicationStatusLabel(app); badge.className = getApplicationStatusClass(app); } catch (error) { window.alert(error.message); status.value = app.status || 'pending'; } });
-        const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'danger'; remove.textContent = 'Delete'; remove.addEventListener('click', async () => { if (!window.confirm(`Delete ${app.studentName}'s application to ${clubName}?`)) return; try { await request(`/api/admin/applications/${app.id}`, { method: 'DELETE' }); applications = applications.filter((item) => item.id !== app.id); renderApplications(); } catch (error) { window.alert(error.message); } });
-        actions.append(status, remove); card.append(actions);
-        const details = document.createElement('details'); const summary = document.createElement('summary'); summary.textContent = 'Application details and interview'; details.append(summary);
-        const grid = document.createElement('div'); grid.className = 'detail-grid';
-        for (const [label, value] of [['University ID', app.universityId], ['Major', app.major], ['Phone', app.phone], ['Age', app.age], ['Interview slot', app.slot], ['Interviewed', app.interviewed ? 'Yes' : 'No']]) addDetail(grid, label, value);
-        details.append(grid);
-        for (const [label, value] of [['Motivation', app.motivation], ['Applicant notes', app.notes]]) { const block = document.createElement('div'); block.className = 'answer'; const name = document.createElement('strong'); name.textContent = label; const text = document.createElement('p'); text.textContent = value || 'N/A'; block.append(name, text); details.append(block); }
-        for (const answer of (Array.isArray(app.answers) ? app.answers : [])) { const block = document.createElement('div'); block.className = 'answer'; const name = document.createElement('strong'); name.textContent = answer.label || answer.key || 'Answer'; const text = document.createElement('p'); text.textContent = answer.value || 'N/A'; block.append(name, text); details.append(block); }
-        const review = document.createElement('div'); review.className = 'form-grid'; review.style.marginTop = '12px';
-        const notesLabel = document.createElement('label'); notesLabel.textContent = 'Interview notes'; const notes = document.createElement('textarea'); notes.value = app.notes || ''; notes.maxLength = 2000; notesLabel.append(notes);
-        const ratingLabel = document.createElement('label'); ratingLabel.textContent = 'Rating'; const rating = document.createElement('select'); for (let i = 1; i <= 5; i += 1) rating.add(new Option(`${i}/5`, String(i))); rating.value = String(app.rating || 4); ratingLabel.append(rating);
-        const saveReview = document.createElement('button'); saveReview.className = 'primary'; saveReview.type = 'button'; saveReview.textContent = 'Save interview'; saveReview.addEventListener('click', async () => { try { const updated = await request(`/api/admin/applications/${app.id}/status`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ notes: notes.value, rating: Number(rating.value) }) }); Object.assign(app, updated); badge.textContent = getApplicationStatusLabel(app); badge.className = getApplicationStatusClass(app); setMessage('applicationMessage', 'Interview saved.'); } catch (error) { setMessage('applicationMessage', error.message, true); } });
-        review.append(notesLabel, ratingLabel, saveReview); details.append(review);
-        if (app.photo) { const photo = document.createElement('img'); photo.className = 'application-photo'; photo.src = app.photo; photo.alt = `${app.studentName} photo`; details.append(photo); }
-        card.append(details); container.append(card);
+    /* ---- Tabs ---- */
+    const tabButtons = document.querySelectorAll('#adminTabs .tab-btn');
+    tabButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        tabButtons.forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.querySelectorAll('.tab-panel').forEach((p) => p.classList.remove('active'));
+        document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+        if (btn.dataset.tab === 'analysis') {
+          renderClubViews();
+          renderEventAnalytics();
+        }
+      });
+    });
+
+    /* ---- Analysis ---- */
+    async function renderClubViews() {
+      const list = byId('topViewedClubs');
+      const message = byId('clubViewsMessage');
+      const refreshButton = byId('refreshClubViewsBtn');
+      refreshButton.disabled = true;
+      message.textContent = 'Loading club views...';
+      list.replaceChildren();
+      try {
+        const data = await request('/api/admin/club-views');
+        const viewedClubs = Array.isArray(data) ? data.map((item) => ({
+          name: String(item.name || 'Unnamed club'),
+          views: Math.max(0, Number(item.views) || 0)
+        })).sort((a, b) => b.views - a.views || a.name.localeCompare(b.name)) : [];
+        byId('statTotalClubViews').textContent = viewedClubs.reduce((total, club) => total + club.views, 0).toLocaleString();
+        const top = viewedClubs.filter((club) => club.views > 0).slice(0, 5);
+        if (!top.length) {
+          message.textContent = '';
+          list.innerHTML = '<p class="analysis-empty">No club views recorded yet. Views start counting the next time someone opens a club.</p>';
+          return;
+        }
+        message.textContent = `Showing the ${top.length} most-viewed club${top.length === 1 ? '' : 's'} out of ${viewedClubs.length}.`;
+        const maxViews = top[0].views;
+        list.innerHTML = top.map((club, index) => `
+          <div class="analysis-row view-analysis-row">
+            <div class="analysis-row-head">
+              <strong>#${index + 1} ${escapeHtml(club.name)}</strong>
+              <span>${club.views.toLocaleString()} ${club.views === 1 ? 'view' : 'views'}</span>
+            </div>
+            <div class="bar-track" role="img" aria-label="${escapeHtml(club.name)}: ${club.views} ${club.views === 1 ? 'view' : 'views'}">
+              <div class="bar-fill" style="width:${Math.round((club.views / maxViews) * 100)}%;background:#7c3aed"></div>
+            </div>
+          </div>`).join('');
+      } catch (error) {
+        message.textContent = error.message || 'Could not load club view counts.';
+        list.innerHTML = '<p class="analysis-empty">Refresh the view counts to try again.</p>';
+      } finally {
+        refreshButton.disabled = false;
       }
     }
-    byId('createHeadForm').addEventListener('submit', async (event) => {
-      event.preventDefault(); const form = event.currentTarget; const values = new FormData(form);
-      try { await request('/api/admin/club-heads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clubId: Number(values.get('clubId')), committee: values.get('committee'), email: values.get('email'), password: values.get('password') }) }); form.reset(); setMessage('headMessage', 'Head account created. Share the email and password with the head.'); await reloadHeads(); }
-      catch (error) { setMessage('headMessage', error.message, true); }
+
+    byId('refreshClubViewsBtn').addEventListener('click', renderClubViews);
+    let eventAnalyticsEvents = [];
+    let eventAnalyticsExpanded = false;
+    const eventAnalyticsPreviewCount = 6;
+    function renderEventAnalyticsRows() {
+      const list = byId('eventAnalyticsList');
+      const message = byId('eventAnalyticsMessage');
+      const toggle = byId('toggleEventAnalyticsBtn');
+      const activity = (event) => Number(event.views || 0) + Number(event.registrations || 0) + Number(event.checkIns || 0);
+      const rankedEvents = [...eventAnalyticsEvents].sort((a, b) => activity(b) - activity(a) || String(a.title).localeCompare(String(b.title)));
+      const visibleEvents = eventAnalyticsExpanded ? rankedEvents : rankedEvents.slice(0, eventAnalyticsPreviewCount);
+      toggle.hidden = rankedEvents.length <= eventAnalyticsPreviewCount;
+      toggle.textContent = eventAnalyticsExpanded ? 'Show fewer events' : `Show all ${rankedEvents.length} events`;
+      message.textContent = rankedEvents.length > eventAnalyticsPreviewCount
+        ? `${rankedEvents.length} active events · showing the ${visibleEvents.length} with the most activity.`
+        : `${rankedEvents.length} active event${rankedEvents.length === 1 ? '' : 's'} across the clubs.`;
+      list.innerHTML = visibleEvents.map((event) => `
+        <article class="analysis-row event-performance-row">
+          <div class="event-performance-info">
+            <strong>${escapeHtml(event.title)}</strong>
+            <span>${escapeHtml(event.clubName)}${event.date ? ` · ${escapeHtml(event.date)}` : ''}</span>
+          </div>
+          <div class="event-performance-metrics">
+            <div><b>${Number(event.views).toLocaleString()}</b><span>Views</span></div>
+            <div><b>${Number(event.registrations).toLocaleString()}</b><span>Registrations</span></div>
+            <div><b>${Number(event.checkIns).toLocaleString()}</b><span>QR check-ins</span></div>
+          </div>
+        </article>`).join('');
+    }
+    byId('toggleEventAnalyticsBtn').addEventListener('click', () => {
+      eventAnalyticsExpanded = !eventAnalyticsExpanded;
+      renderEventAnalyticsRows();
+    });
+    async function renderEventAnalytics() {
+      const button = byId('refreshEventAnalyticsBtn');
+      const message = byId('eventAnalyticsMessage');
+      const list = byId('eventAnalyticsList');
+      button.disabled = true;
+      message.textContent = 'Loading event analytics...';
+      list.replaceChildren();
+      try {
+        const data = await request('/api/admin/event-analytics');
+        const totals = data?.totals || {};
+        eventAnalyticsEvents = Array.isArray(data?.events) ? data.events : [];
+        eventAnalyticsExpanded = false;
+        byId('statEventViews').textContent = (Number(totals.views) || 0).toLocaleString();
+        byId('statEventRegistrations').textContent = (Number(totals.registrations) || 0).toLocaleString();
+        byId('statEventCheckIns').textContent = (Number(totals.checkIns) || 0).toLocaleString();
+        if (!eventAnalyticsEvents.length) {
+          byId('toggleEventAnalyticsBtn').hidden = true;
+          message.textContent = '';
+          list.innerHTML = '<p class="analysis-empty">No active events to analyse yet.</p>';
+          return;
+        }
+        renderEventAnalyticsRows();
+      } catch (error) {
+        message.textContent = error.message || 'Could not load event analytics.';
+        list.innerHTML = '<p class="analysis-empty">Refresh event analytics to try again.</p>';
+        byId('toggleEventAnalyticsBtn').hidden = true;
+      } finally {
+        button.disabled = false;
+      }
+    }
+    byId('refreshEventAnalyticsBtn').addEventListener('click', renderEventAnalytics);
+    function clubStats() {
+      const appliedByClub = new Map();
+      const acceptedByClub = new Map();
+      for (const app of applications) {
+        const id = Number(app.clubId);
+        appliedByClub.set(id, (appliedByClub.get(id) || 0) + 1);
+        if (app.status === 'accepted') acceptedByClub.set(id, (acceptedByClub.get(id) || 0) + 1);
+      }
+      return clubs.map((club) => {
+        const id = Number(club.id);
+        const applied = appliedByClub.get(id) || 0;
+        const accepted = acceptedByClub.get(id) || 0;
+        const members = Number(club.members) || 0;
+        const seats = Number(club.seats) || 0;
+        const rate = applied ? Math.round((accepted / applied) * 100) : 0;
+        return { id, name: club.name, applied, accepted, members, seats, rate, status: club.status, archived: Boolean(club.archivedAt) };
+      });
+    }
+    function renderAnalysis() {
+      const stats = clubStats();
+      const totalApplied = stats.reduce((sum, s) => sum + s.applied, 0);
+      const totalAccepted = stats.reduce((sum, s) => sum + s.accepted, 0);
+      const acceptance = totalApplied ? Math.round((totalAccepted / totalApplied) * 100) : 0;
+      const fullClubs = stats.filter((s) => s.seats > 0 && s.members >= s.seats).length;
+      const archivedClubs = stats.filter((s) => s.archived).length;
+      byId('statTotalApplications').textContent = totalApplied;
+      byId('statAcceptance').textContent = `${acceptance}%`;
+      byId('statFullClubs').textContent = fullClubs;
+      byId('statArchived').textContent = archivedClubs;
+
+      const maxApplied = Math.max(1, ...stats.map((s) => s.applied));
+      const capacityList = byId('clubAnalysis');
+      if (!stats.length) { capacityList.innerHTML = '<p class="analysis-empty">No clubs to analyse.</p>'; }
+      else {
+        capacityList.innerHTML = stats.map((s) => `
+          <div class="analysis-row">
+            <div class="analysis-row-head">
+              <strong>${escapeHtml(s.name)}</strong>
+              <span>${s.applied} applied · ${s.members} members · ${s.seats} seats</span>
+            </div>
+            <div class="bar-track"><div class="bar-fill blue" style="width:${Math.round((s.applied / maxApplied) * 100)}%"></div></div>
+          </div>`).join('');
+      }
+
+      const acceptanceList = byId('clubAcceptance');
+      if (!stats.length) { acceptanceList.innerHTML = '<p class="analysis-empty">No clubs to analyse.</p>'; }
+      else {
+        acceptanceList.innerHTML = stats.map((s) => `
+          <div class="analysis-row">
+            <div class="analysis-row-head">
+              <strong>${escapeHtml(s.name)}</strong>
+              <span>${s.accepted}/${s.applied} accepted · ${s.rate}%</span>
+            </div>
+            <div class="bar-track"><div class="bar-fill ${s.rate >= 60 ? 'green' : s.rate >= 30 ? 'amber' : 'red'}" style="width:${s.rate}%"></div></div>
+          </div>`).join('');
+      }
+
+      const top = [...stats].sort((a, b) => b.applied - a.applied).filter((s) => s.applied > 0).slice(0, 5);
+      const topList = byId('topClubs');
+      if (!top.length) { topList.innerHTML = '<p class="analysis-empty">No applications yet.</p>'; }
+      else {
+        topList.innerHTML = top.map((s, index) => `
+          <div class="analysis-row">
+            <div class="analysis-row-head">
+              <strong>#${index + 1} ${escapeHtml(s.name)}</strong>
+              <span>${s.applied} applications</span>
+            </div>
+            <div class="bar-track"><div class="bar-fill amber" style="width:${Math.round((s.applied / maxApplied) * 100)}%"></div></div>
+          </div>`).join('');
+      }
+    }
+
+    /* ---- Clubs list ---- */
+    let activeCommitteeClubId = null;
+    function renderCommitteeAvailabilityRows(availability) {
+      const list = byId('adminCommitteeAvailabilityList');
+      list.replaceChildren();
+      if (!availability.length) {
+        const empty = document.createElement('p');
+        empty.className = 'empty';
+        empty.textContent = 'No committee heads have been added for this club yet.';
+        list.append(empty);
+        return;
+      }
+      availability.forEach(({ committee, status }) => {
+        const row = document.createElement('label');
+        row.className = 'committee-availability-row';
+        const name = document.createElement('strong');
+        name.textContent = committee;
+        const select = document.createElement('select');
+        select.dataset.committee = committee;
+        [['open', 'Open'], ['full', 'Full'], ['closed', 'Closed']].forEach(([value, label]) => {
+          select.add(new Option(label, value, false, value === status));
+        });
+        row.append(name, select);
+        list.append(row);
+      });
+    }
+    async function openCommitteeAvailability(club) {
+      activeCommitteeClubId = Number(club.id);
+      byId('committeeAvailabilityDialogTitle').textContent = `${club.name} committee availability`;
+      byId('adminCommitteeAvailabilityMessage').textContent = 'Loading committees…';
+      byId('adminCommitteeAvailabilityMessage').classList.remove('error');
+      byId('adminCommitteeAvailabilityList').replaceChildren();
+      byId('committeeAvailabilityDialog').showModal();
+      try {
+        const availability = await request(`/api/admin/clubs/${activeCommitteeClubId}/committee-availability`);
+        renderCommitteeAvailabilityRows(Array.isArray(availability) ? availability : []);
+        byId('adminCommitteeAvailabilityMessage').textContent = '';
+      } catch (error) {
+        setMessage('adminCommitteeAvailabilityMessage', error.message, true);
+      }
+    }
+
+    function renderClubs() {
+      const list = byId('clubRecords');
+      if (!clubs.length) { list.innerHTML = '<p class="empty">No clubs found.</p>'; return; }
+      list.innerHTML = clubs.map((club) => {
+        const status = club.status ? String(club.status).replace(/-/g, ' ') : '—';
+        return `<div class="record">
+          <div class="record-head">
+            <div>
+              <h3 class="record-title">${escapeHtml(club.name)}</h3>
+              <p class="record-meta">${escapeHtml(club.category || '')} · ${escapeHtml(status)}${Number.isFinite(club.openSlots) ? ` · ${escapeHtml(String(club.openSlots))} slots left` : ''}</p>
+            </div>
+            <div class="record-actions">
+              <button type="button" class="secondary-btn" data-committee-availability="${club.id}">Committees</button>
+              <a class="secondary-btn" href="/admin/club-credentials">Accounts</a>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+      list.querySelectorAll('[data-committee-availability]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const club = clubs.find((item) => Number(item.id) === Number(button.dataset.committeeAvailability));
+          if (club) openCommitteeAvailability(club);
+        });
+      });
+    }
+
+    byId('closeCommitteeAvailabilityDialog').addEventListener('click', () => byId('committeeAvailabilityDialog').close());
+    byId('committeeAvailabilityDialog').addEventListener('click', (event) => {
+      if (event.target === byId('committeeAvailabilityDialog')) byId('committeeAvailabilityDialog').close();
+    });
+    byId('saveAdminCommitteeAvailabilityBtn').addEventListener('click', async () => {
+      const button = byId('saveAdminCommitteeAvailabilityBtn');
+      button.disabled = true;
+      try {
+        const committees = [...byId('adminCommitteeAvailabilityList').querySelectorAll('select[data-committee]')]
+          .map((select) => ({ committee: select.dataset.committee, status: select.value }));
+        await request(`/api/admin/clubs/${activeCommitteeClubId}/committee-availability`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ committees })
+        });
+        setMessage('adminCommitteeAvailabilityMessage', 'Committee availability saved.', false);
+      } catch (error) {
+        setMessage('adminCommitteeAvailabilityMessage', error.message, true);
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    async function reloadApplications() {
+      const data = await request('/api/admin/applications');
+      applications = Array.isArray(data) ? data : [];
+      const filter = filterValue('applicationClubFilter');
+      renderApplications(filter ? applications.filter((app) => Number(app.clubId) === Number(filter)) : applications);
+      renderAnalysis();
+    }
+    function renderApplications(records) {
+      const list = byId('applicationRecords');
+      if (!records.length) { list.innerHTML = '<p class="empty">No applications found.</p>'; return; }
+      list.innerHTML = records.map((app) => `
+        <div class="record">
+          <div class="record-head">
+            <div>
+              <h3 class="record-title">${escapeHtml(app.studentName)}</h3>
+              <p class="record-meta">${escapeHtml(app.email)} · ${escapeHtml(app.clubName)} · <span class="status-pill status-${app.status}">${escapeHtml(app.status)}</span></p>
+            </div>
+            <div class="record-actions">
+              <button type="button" class="secondary-btn" data-action="details" data-id="${app.id}">Details</button>
+              ${app.status === 'pending' ? `<button type="button" class="primary-btn" data-action="accept" data-id="${app.id}">Accept</button>
+              <button type="button" class="secondary-btn" data-action="reject" data-id="${app.id}">Reject</button>` : ''}
+              <button type="button" class="danger" data-action="delete" data-id="${app.id}">Delete</button>
+            </div>
+          </div>
+          <div class="app-details hidden" data-details="${app.id}">
+            <span><b>University ID:</b> ${escapeHtml(app.universityId || '—')}</span>
+            <span><b>Major:</b> ${escapeHtml(app.major || '—')}</span>
+            <span><b>Phone:</b> ${escapeHtml(app.phone || '—')}</span>
+            <span><b>Age:</b> ${escapeHtml(app.age || '—')}</span>
+            <span><b>Committee:</b> ${escapeHtml(app.committee || '—')}</span>
+            <span><b>Slot:</b> ${escapeHtml(app.slot || '—')}</span>
+            <span><b>Motivation:</b> ${escapeHtml(app.motivation || '—')}</span>
+            <span><b>Notes:</b> ${escapeHtml(app.notes || '—')}</span>
+          </div>
+        </div>`).join('');
+      list.querySelectorAll('[data-action]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const action = btn.dataset.action;
+          const id = btn.dataset.id;
+          try {
+            if (action === 'details') {
+              const panel = list.querySelector(`[data-details="${id}"]`);
+              if (panel) panel.classList.toggle('hidden');
+              return;
+            }
+            if (action === 'delete') {
+              if (!confirm('Delete this application permanently?')) return;
+              await request(`/api/admin/applications/${id}`, { method: 'DELETE' });
+              await reloadApplications();
+              setMessage('applicationMessage', 'Application deleted.', false);
+              return;
+            }
+            await request(`/api/admin/applications/${id}/status`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: action === 'accept' ? 'accepted' : 'rejected' }) });
+            await reloadApplications();
+            setMessage('applicationMessage', `Application ${action}ed.`, false);
+          } catch (error) {
+            setMessage('applicationMessage', error.message, true);
+          }
+        });
+      });
+      updateStats();
+    }
+    byId('addHeadBtn').addEventListener('click', async () => {
+      const email = prompt('Head email (university):');
+      if (!email) return;
+      const clubId = filterValue('headClubFilter') || (clubs[0] && clubs[0].id);
+      if (!clubId) { alert('No clubs available.'); return; }
+      const committee = prompt('Committee name:');
+      if (!committee) return;
+      const password = prompt('Temporary password (12-200 chars):');
+      if (!password) return;
+      try {
+        await request('/api/admin/club-heads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clubId: Number(clubId), email, committee, password }) });
+        await reloadHeads();
+        setMessage('headMessage', 'Head added.', false);
+      } catch (error) {
+        setMessage('headMessage', error.message, true);
+      }
+    });
+    byId('logoutBtn').addEventListener('click', async () => {
+      await fetch('/api/admin/logout', { method: 'POST' });
+      window.location.assign('/');
     });
     byId('headClubFilter').addEventListener('change', renderHeads);
-    byId('applicationClubFilter').addEventListener('change', renderApplications);
-    byId('logout').addEventListener('click', async () => { await fetch('/api/admin/logout', { method: 'POST' }); window.location.assign('/'); });
+    byId('applicationClubFilter').addEventListener('change', () => {
+      const filter = filterValue('applicationClubFilter');
+      renderApplications(filter ? applications.filter((app) => Number(app.clubId) === Number(filter)) : applications);
+    });
     async function init() {
       try {
-        const [clubData] = await Promise.all([request('/api/clubs'), reloadHeads(), reloadApplications()]);
+        const clubData = await request('/api/clubs');
         clubs.push(...clubData);
-        fillClubSelect(byId('createHeadClub'), false);
-        fillClubSelect(byId('headClubFilter'), true);
+        renderClubs();
+        fillClubSelect(byId('headClubFilter'), false);
         fillClubSelect(byId('applicationClubFilter'), true);
-        renderHeads(); renderApplications();
-      } catch (error) { setMessage('headMessage', error.message, true); setMessage('applicationMessage', error.message, true); }
+        await Promise.all([reloadHeads(), reloadApplications()]);
+      } catch (error) {
+        setMessage('headMessage', error.message, true);
+        setMessage('applicationMessage', error.message, true);
+      }
     }
     init();
   </script>
-  <script src="/theme.js?v=20261005-global-theme" defer></script>
 </body>
 </html>

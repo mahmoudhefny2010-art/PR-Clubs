@@ -1,0 +1,254 @@
+/* Responsive Layout & Mobile Drawer Styles */
+
+@media (max-width: 900px) {
+  .topbar-container {
+    height: 64px;
+    padding: 0 16px;
+  }
+
+  .mobile-menu-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .nav-links {
+    position: absolute;
+    top: 64px;
+    left: 0;
+    right: 0;
+    background-color: var(--bg-panel);
+    border-bottom: 1px solid var(--border-color);
+    padding: 16px 20px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    box-shadow: var(--shadow-lg);
+    display: none;
+    animation: slideDown 0.2s ease-out;
+  }
+
+  .nav-links.open {
+    display: flex;
+  }
+
+  .nav-link {
+    padding: 12px 16px;
+    font-size: 1rem;
+    border-radius: var(--radius-md);
+  }
+
+  .brand-text {
+    display: none;
+  }
+
+  .stats-summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .president-dashboard-layout.is-president {
+    grid-template-columns: 1fr;
+  }
+
+  .president-sidebar {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .president-sidebar-title {
+    flex: 0 0 100%;
+    padding-bottom: 4px;
+  }
+
+  .president-sidebar-group-title { flex: 0 0 100%; }
+
+  .president-sidebar-group-title { flex: 0 0 100%; }
+
+  .president-sidebar a {
+    flex: 1 1 auto;
+    text-align: center;
+  }
+
+  .president-sidebar .president-sidebar-action {
+    flex: 1 1 auto;
+    width: auto;
+    text-align: center;
+  }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 700px) {
+  .app-container {
+    padding: 16px 12px 36px;
+  }
+
+  .stats-summary,
+  .form-row,
+  .stats-row,
+  .admin-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .welcome-box,
+  .committee-card,
+  .app-form-card,
+  .admin-panel,
+  .admin-login-panel,
+  .club-login-panel {
+    padding: 20px 16px;
+    border-radius: var(--radius-lg);
+  }
+
+  .club-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .admin-panel {
+    padding: 18px 14px;
+  }
+
+  .committee-head-form {
+    grid-template-columns: 1fr;
+  }
+
+  .interview-section-heading {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .committee-head-form .primary-btn {
+    grid-column: auto;
+  }
+
+  .committee-head-row {
+    grid-template-columns: 1fr;
+    align-items: flex-start;
+  }
+
+  .committee-head-edit-form {
+    grid-template-columns: 1fr;
+  }
+
+  .committee-head-edit-actions {
+    grid-column: auto;
+    justify-content: flex-start;
+  }
+
+  .admin-editor-form {
+    padding: 22px 0 0;
+    border-top: 1px solid var(--border-color);
+    border-left: 0;
+  }
+
+  .admin-club-row {
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+
+  .admin-club-row > img {
+    width: 44px;
+    height: 44px;
+  }
+
+  .admin-row-actions {
+    grid-column: 2;
+  }
+
+  .committee-top,
+  .application-row {
+    align-items: flex-start;
+  }
+
+  .card-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .application-card {
+    padding: 20px 16px;
+  }
+
+  .applicant-head {
+    font-size: 1.2rem;
+  }
+
+  .application-card .preview-btn,
+  .application-card .delete-btn {
+    min-height: 56px;
+  }
+}
+
+@media (max-width: 480px) {
+  .brand-logo {
+    height: 36px;
+  }
+
+  .hero-panel h1 {
+    font-size: 1.75rem;
+  }
+
+  .stats-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .application-question-controls {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .application-question-required {
+    margin: 0;
+  }
+
+  .admin-field-full {
+    grid-column: auto;
+  }
+
+  .admin-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-login-panel,
+  .club-login-panel {
+    margin: 20px auto;
+    padding: 20px 16px;
+  }
+
+  .club-dashboard-identity h2 {
+    font-size: 1.35rem;
+  }
+
+  .club-dashboard-logo {
+    width: 58px;
+    height: 58px;
+    flex-basis: 58px;
+  }
+
+  .modal-card, .calendar-panel {
+    padding: 18px 14px;
+  }
+
+  .modal-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .application-club-heading {
+    gap: 10px;
+  }
+
+  .application-club-logo-frame {
+    width: 54px;
+    height: 54px;
+    flex-basis: 54px;
+  }
+
+}

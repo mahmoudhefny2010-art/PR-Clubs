@@ -1,0 +1,99 @@
+{
+  "info": {
+    "id": "ses_ef1f566b3ffeoIDtt4PcCcgRzg",
+    "projectID": "019ca9d7bf3981124cde5d5a1edd5d6417c49f7c",
+    "agent": "build",
+    "model": {
+      "id": "fledge-alpha-free",
+      "providerID": "opencode",
+      "variant": "max"
+    },
+    "cost": 0,
+    "tokens": {
+      "input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cache": {
+        "read": 0,
+        "write": 0
+      }
+    },
+    "outcome": "failed",
+    "time": {
+      "created": 1791236938088,
+      "updated": 1791236938368,
+      "idle": 1791236939076
+    },
+    "permissions": [
+      {
+        "action": "browser",
+        "resource": "*",
+        "effect": "allow"
+      }
+    ],
+    "location": {
+      "directory": "C:\\Users\\hp\\Documents\\Default Project"
+    }
+  },
+  "messages": [
+    {
+      "id": "msg_10e0a994b001pL45iT9tiI0Yis",
+      "metadata": {
+        "displayText": "b2olk eh ama b3ml new event msh by sync m3 time line ely f dashboard wla calender wla saf7t el events",
+        "comments": [],
+        "attachments": [
+          {
+            "name": "pr project",
+            "mime": "text/plain",
+            "path": "D:\\pr project"
+          }
+        ],
+        "agent": "build",
+        "model": {
+          "modelID": "fledge-alpha-free",
+          "providerID": "opencode",
+          "variant": "max"
+        }
+      },
+      "time": {
+        "created": 1791236938402
+      },
+      "text": "b2olk eh ama b3ml new event msh by sync m3 time line ely f dashboard wla calender wla saf7t el events\nAttached file: `D:\\pr project`",
+      "files": [],
+      "agents": [],
+      "type": "user"
+    },
+    {
+      "id": "msg_10e0a9ac0001t4UC31n6mEYuL4",
+      "time": {
+        "created": 1791236938455,
+        "completed": 1791236939060
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+        "id": "fledge-alpha-free",
+        "providerID": "opencode",
+        "variant": "max"
+      },
+      "content": [],
+      "finish": "error",
+      "error": {
+        "type": "provider.quota",
+        "message": "Rate limit exceeded. Please try again later.",
+        "status": 429,
+        "response": {
+          "body": "{\"type\":\"error\",\"error\":{\"type\":\"FreeUsageLimitError\",\"message\":\"Rate limit exceeded. Please try again later.\"},\"metadata\":{}}"
+        }
+      }
+    },
+    {
+      "id": "msg_10e0a9d43001BFNKGHMwuCzd5r",
+      "time": {
+        "created": 1791236939076
+      },
+      "type": "idle",
+      "outcome": "failed"
+    }
+  ]
+}

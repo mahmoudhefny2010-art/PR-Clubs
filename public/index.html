@@ -3,28 +3,58 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>if(['/admin','/club-login','/club-dashboard'].includes(location.pathname))document.documentElement.classList.add('auth-route-pending');</script>
     <title>Club Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/style.css?v=20261005-form-statuses" />
-    <link rel="icon" href="/logo.svg.png" type="image/png">
+    <link rel="stylesheet" href="/assets/css/base.css?v=20261009q" />
+    <link rel="stylesheet" href="/assets/css/responsive.css?v=20261006e" />
+    <link rel="stylesheet" href="/assets/css/dark.css?v=20261009c" />
+    <link rel="stylesheet" href="/assets/css/features.css?v=20261009aj" />
+    <link rel="stylesheet" href="/assets/css/event-modal.css?v=3" />
+    <link rel="icon" href="/assets/img/pics/logo.svg.png" type="image/png">
+    <style>
+      .admin-login-panel { max-width: 460px; margin: 48px auto; padding: 36px 32px; text-align: center; }
+      .admin-login-panel h2 { text-align: center; font-size: 1.6rem; font-weight: 800; margin: 0 0 8px; }
+      #adminLoginMessage { text-align: center; color: var(--text-muted); margin: 0 0 24px; font-size: .95rem; }
+      #adminLoginForm { text-align: left; }
+      #adminLoginForm .primary-btn { width: 100%; padding: 13px; font-size: 1rem; border-radius: var(--radius-md); }
+      #adminLoginForgotWrap { text-align: center; margin-top: 14px; }
+      .login-foot { text-align: center; margin-top: 22px; font-size: .9rem; color: var(--text-muted); }
+      .login-foot-link { background: none; border: none; padding: 0; color: var(--primary-700); font-weight: 700; cursor: pointer; font-size: .9rem; }
+      .login-foot-link:hover { text-decoration: underline; }
+      .admin-feedback { margin-top: 14px; text-align: center; }
+      .content-type-badge { display: inline-block; margin: 4px 0 0; padding: 2px 9px; border-radius: 999px; font-size: .64rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
+      .content-type-badge.event { background: #dbeafe; color: #1d4ed8; }
+      .content-type-badge.feed { background: #ede9fe; color: #6d28d9; }
+      .content-type-badge.sponsor { background: #fef3c7; color: #92400e; }
+      .content-type-badge.booth { background: #d1fae5; color: #065f46; }
+      .club-image-placeholder { width: 120px; height: 120px; margin: 18px auto 0; background: #f3f4f6; color: #6b7280; font-size: .66rem; font-weight: 800; display: flex; align-items: center; justify-content: center; text-transform: uppercase; letter-spacing: .04em; border-radius: 12px; }
+    </style>
 </head>
   <body>
     <div class="page-shell">
-      <header class="topbar">
-        <a class="brand-banner brand-home-link" href="/" aria-label="MIU homepage">
-          <img class="brand-mark" src="/logo.svg.png" alt="MIU logo" />
-        </a>
-      </header>
+      <div id="site-header"></div>
 
       <main class="app-container">
+        <section id="authLoadingView" class="view auth-loading-view" role="status" aria-live="polite"><span class="auth-loading-spinner" aria-hidden="true"></span><p>Checking your session…</p></section>
         <section id="homeView" class="view active">
           <div class="welcome-box hero-panel">
             <h1 id="homePageTitle">University Clubs</h1>
             <p id="homePageSubtitle">Explore all clubs and apply to the ones that match your interests.</p>
-            <div class="home-form-actions"><a id="myFormsButton" class="secondary-btn" href="/applicant-login.html">Sign In</a></div>
+            <div id="todayEvents" class="today-events hidden"></div>
           </div>
+
+          <section class="events-slideshow" id="eventsSlideshow">
+            <div class="events-slideshow-head">
+              <h2>Today &amp; Past Events</h2>
+            </div>
+            <div class="events-slideshow-track" id="eventsSlideshowTrack"></div>
+            <button class="slide-arrow slide-prev" id="slidePrev" type="button" aria-label="Previous">&larr;</button>
+            <button class="slide-arrow slide-next" id="slideNext" type="button" aria-label="Next">&rarr;</button>
+            <div class="events-slideshow-dots" id="eventsSlideshowDots"></div>
+          </section>
 
           <div class="stats-summary">
             <div class="summary-card">
@@ -49,22 +79,54 @@
             </div>
           </div>
 
+          <div class="search-filter-section" id="searchFilterSection">
+            <div id="categoryChips" class="category-chips"></div>
+          </div>
           <div id="clubGrid" class="club-grid"></div>
+          <div id="emptyClubsState" class="empty-state hidden">
+            <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/><path d="M8 11h6"/></svg>
+            <h3>No matching clubs found</h3>
+            <p>Try adjusting your search terms or category filters.</p>
+            <button id="clearFiltersBtn" class="secondary-btn" type="button">Clear filters</button>
+          </div>
+        </section>
+
+        <section id="signInView" class="view">
+          <div class="admin-login-panel">
+            <img class="club-login-miu-logo" src="/assets/img/pics/logo.svg.png" alt="MIU logo" />
+            <span class="admin-eyebrow">SIGN IN</span>
+            <h2>Welcome back</h2>
+            <p>Sign in with your university/club account. You will be taken to the dashboard you have access to.</p>
+            <form id="unifiedLoginForm">
+              <div class="field-group">
+                <label for="unifiedEmail">Email</label>
+                <input id="unifiedEmail" type="text" autocomplete="username" required />
+              </div>
+              <div class="field-group">
+                <label for="unifiedPassword">Password</label>
+                <input id="unifiedPassword" type="password" autocomplete="current-password" required />
+              </div>
+              <button class="primary-btn" type="submit">Sign In</button>
+            </form>
+            <a class="text-button" href="/pages/forgot-password.html">Forgot Password?</a>
+            <p id="unifiedLoginFeedback" class="admin-feedback"></p>
+            <button id="unifiedLoginBackBtn" class="text-button" type="button">Back to homepage</button>
+          </div>
         </section>
 
         <section id="adminLoginView" class="view">
           <div class="admin-login-panel">
-            <span class="admin-eyebrow">PRIVATE ACCESS</span>
+            <img class="club-login-miu-logo" src="/assets/img/pics/logo.svg.png" alt="MIU logo" />
             <h2 id="adminLoginTitle">Admin access</h2>
-            <p id="adminLoginMessage">Enter your email and password to manage the homepage.</p>
+            <p id="adminLoginMessage">Sign in with your admin account to manage the homepage.</p>
             <form id="adminLoginForm">
               <div class="field-group">
                 <label for="adminEmailInput">Email</label>
-                <input id="adminEmailInput" name="email" type="email" autocomplete="username" maxlength="254" required />
+                <input id="adminEmailInput" name="email" type="email" autocomplete="username" maxlength="254" placeholder="e.g. name@miuegypt.edu.eg" required />
               </div>
               <div class="field-group">
                 <label for="adminPasswordInput">Password</label>
-                <input id="adminPasswordInput" name="password" type="password" autocomplete="current-password" required />
+                <input id="adminPasswordInput" name="password" type="password" autocomplete="current-password" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" required />
               </div>
               <div id="adminConfirmRow" class="field-group hidden">
                 <label for="adminConfirmInput">Confirm password</label>
@@ -73,13 +135,14 @@
               <button id="adminLoginSubmit" class="primary-btn" type="submit">Unlock dashboard</button>
             </form>
             <p id="adminLoginFeedback" class="admin-feedback" aria-live="polite"></p>
-            <button id="adminLoginBackBtn" class="text-button" type="button">Back to homepage</button>
+            <p id="adminLoginForgotWrap"><a class="text-button" href="/pages/forgot-password.html">Forgot Password?</a></p>
+            <p class="login-foot">Back to homepage? <button id="adminLoginBackBtn" class="login-foot-link" type="button">Click here</button></p>
           </div>
         </section>
 
         <section id="clubLoginView" class="view">
           <div class="club-login-panel">
-            <img class="club-login-miu-logo" src="/logo.svg.png" alt="MIU logo" />
+            <img class="club-login-miu-logo" src="/assets/img/pics/logo.svg.png" alt="MIU logo" />
             <span class="admin-eyebrow">MIU CLUB PORTAL</span>
             <h2>Club dashboard login</h2>
             <p>Presidents manage committee heads. Committee heads review applications assigned to their committee.</p>
@@ -94,6 +157,7 @@
               </div>
               <button class="primary-btn" id="clubLoginSubmit" type="submit">Sign in</button>
             </form>
+            <a class="text-button" href="/pages/forgot-password.html">Forgot Password?</a>
             <p id="clubLoginFeedback" class="admin-feedback" aria-live="polite"></p>
             <a class="text-button" href="/">Back to clubs</a>
           </div>
@@ -107,7 +171,10 @@
                 <h2>Admin dashboard</h2>
               </div>
               <div class="admin-session-actions">
+                <button class="secondary-btn" id="openAdminDataStatusBtn" type="button">Site data &amp; sync</button>
                 <a class="secondary-btn" href="/admin/global">All-club access</a>
+                <button class="secondary-btn" type="button" data-open-member-directory="admin">View club members</button>
+                <button class="secondary-btn" id="openArchivedClubsBtn" type="button">Archived clubs</button>
                 <button class="secondary-btn" id="adminBackBtn" type="button">Back to homepage</button>
                 <button class="delete-btn" id="adminLogoutBtn" type="button">Log out</button>
               </div>
@@ -184,6 +251,25 @@
                     <label for="clubRequirementsInput">Requirements</label>
                     <textarea id="clubRequirementsInput" name="requirements" maxlength="600" required></textarea>
                   </div>
+                  <section id="clubLoginCredentialsFields" class="application-form-builder admin-field-full" aria-labelledby="clubLoginCredentialsHeading">
+                    <div class="admin-section-heading">
+                      <div>
+                        <h3 id="clubLoginCredentialsHeading">Club Login Credentials</h3>
+                        <p class="admin-form-hint">Create the initial sign-in for this clubâ€™s dashboard.</p>
+                      </div>
+                    </div>
+                    <div class="form-row">
+                      <div class="field-group">
+                        <label for="clubLoginEmailInput">Club Login Email</label>
+                        <input id="clubLoginEmailInput" name="clubLoginEmail" type="email" autocomplete="username" maxlength="254" />
+                      </div>
+                      <div class="field-group">
+                        <label for="clubInitialPasswordInput">Initial Password</label>
+                        <input id="clubInitialPasswordInput" name="clubInitialPassword" type="password" autocomplete="new-password" minlength="12" maxlength="200" />
+                        <small>Use 12 to 200 characters. This password is stored as a secure hash.</small>
+                      </div>
+                    </div>
+                  </section>
                   <div class="field-group admin-field-full">
                     <label for="clubApplicationIntroInput">Application form introduction</label>
                     <input id="clubApplicationIntroInput" name="applicationIntro" type="text" maxlength="240" placeholder="Intro shown on this club's Apply page" />
@@ -361,20 +447,73 @@
                 </div>
               </div>
               <div class="top-actions">
+                <a class="secondary-btn" href="/pages/club-content.html">Open Content Studio</a>
                 <button id="backHomeBtn" class="secondary-btn" type="button">Back to Clubs</button>
                 <button id="logoutBtn" class="logout-btn" type="button">Log out</button>
               </div>
             </div>
 
+            <dialog id="clubReviewNotifications" class="club-review-notice-dialog" aria-labelledby="clubReviewNoticeTitle">
+              <div class="club-review-notice-content">
+                <button id="dismissNotificationBtn" type="button" class="club-review-notice-close" aria-label="Close notifications">&times;</button>
+                <span class="admin-eyebrow">PRESIDENT DASHBOARD</span>
+                <h2 id="clubReviewNoticeTitle">Review updates from the approval team</h2>
+                <div id="clubReviewNotificationList"></div>
+              </div>
+            </dialog>
+
+            <section id="approvalCheckpointPanel" class="approval-checkpoints hidden" aria-label="Application workflow checkpoints">
+              <div id="approvalCheckpointTrack" class="approval-checkpoint-track" aria-live="polite"></div>
+              <div class="approval-checkpoint-more-row">
+                <button id="approvalCheckpointMoreBtn" class="secondary-btn approval-checkpoint-more hidden" type="button">More</button>
+                <span id="approvalCheckpointStatus" class="approval-checkpoint-status is-live">Loading timeline...</span>
+              </div>
+            </section>
+            <dialog id="approvalCheckpointMoreDialog" class="approval-checkpoint-more-dialog" aria-labelledby="approvalCheckpointMoreTitle">
+              <div class="approval-checkpoint-more-inner">
+                <header class="approval-checkpoint-more-header">
+                  <div><span class="admin-eyebrow">APPLICATION WORKFLOW</span><h2 id="approvalCheckpointMoreTitle">Other club requests</h2></div>
+                  <button id="closeApprovalCheckpointMoreBtn" class="calendar-close-btn" type="button" aria-label="Close requests">&times;</button>
+                </header>
+                <div id="approvalCheckpointMoreList" class="approval-checkpoint-more-list"></div>
+              </div>
+            </dialog>
+
+            <div id="presidentDashboardLayout" class="president-dashboard-layout">
+              <nav id="presidentSidebar" class="president-sidebar hidden" data-unread-scope="club-president" aria-label="President dashboard sections">
+                <span class="president-sidebar-title">Dashboard</span>
+                <a href="#presidentOverviewPanel" data-dashboard-section="presidentOverviewPanel">Overview</a>
+                <a href="#presidentHeadManager" data-dashboard-section="presidentHeadManager" data-unread-section="committeeHeads" data-president-only>Committee heads <span class="sidebar-unread-badge" data-unread-badge="committeeHeads" hidden></span></a>
+                <a href="#presidentFormManager" data-dashboard-section="presidentFormManager" data-president-only>Application form</a>
+                <a href="#interviewFormManager" data-dashboard-section="interviewFormManager" data-president-only>Interview questions</a>
+                <a href="#presidentApplicantsPanel" data-dashboard-section="presidentApplicantsPanel" data-unread-section="applicants" data-president-only>Applicants <span class="sidebar-unread-badge" data-unread-badge="applicants" hidden></span></a>
+                <span class="president-sidebar-group-title">Club operations</span>
+                <button id="openMemberManagerBtn" class="president-sidebar-action hidden" data-unread-section="clubMembers" type="button">Club members <span class="sidebar-unread-badge" data-unread-badge="clubMembers" hidden></span></button>
+                <button id="openAttendanceManagerBtn" class="president-sidebar-action hidden" data-unread-section="eventAttendance" type="button">Event attendance <span class="sidebar-unread-badge" data-unread-badge="eventAttendance" hidden></span></button>
+              </nav>
+              <div class="president-dashboard-main">
             <section id="presidentHeadManager" class="committee-head-manager hidden">
               <div class="admin-section-heading">
                 <div>
-                  <span class="admin-eyebrow">PRESIDENT DASHBOARD</span>
+                  <span class="admin-eyebrow">CLUB DASHBOARD</span>
                   <h3>Committee heads</h3>
                 </div>
                 <span id="committeeHeadCount" class="admin-club-count">0 heads</span>
               </div>
               <p>Create one head account for each committee. Applicants choosing that committee will appear in that head's dashboard.</p>
+              <section class="committee-availability-settings" aria-labelledby="committeeAvailabilityHeading">
+                <div class="admin-section-heading">
+                  <div>
+                    <h4 id="committeeAvailabilityHeading">Application availability</h4>
+                    <p>Mark a committee as open, full, or closed. Full and closed committees cannot be selected by applicants.</p>
+                  </div>
+                </div>
+                <div id="presidentCommitteeAvailability" class="committee-availability-list"></div>
+                <div class="president-form-actions">
+                  <button id="saveCommitteeAvailabilityBtn" class="primary-btn" type="button">Save availability</button>
+                  <p id="committeeAvailabilityFeedback" class="admin-feedback" aria-live="polite"></p>
+                </div>
+              </section>
               <form id="createCommitteeHeadForm" class="committee-head-form">
                 <div class="field-group">
                   <label for="committeeHeadName">Committee name</label>
@@ -398,10 +537,10 @@
               <div class="admin-section-heading">
                 <div>
                   <span class="admin-eyebrow">PUBLIC APPLICATION FORM</span>
-                  <h3>Manage your club’s form</h3>
+                  <h3>Manage your clubâ€™s form</h3>
                 </div>
               </div>
-              <p>Changes here appear on your club’s application page. Add, edit, or remove questions, then save.</p>
+              <p>Changes here appear on your clubâ€™s application page. Add, edit, or remove questions, then save.</p>
               <form id="presidentFormEditor" class="president-form-editor">
                 <div class="field-group">
                   <label for="presidentApplicationIntro">Form introduction</label>
@@ -439,38 +578,216 @@
               </div>
             </section>
 
-            <div class="stats-row">
-              <div class="stat-box">
-                <span>Total</span>
-                <strong id="statTotal">0</strong>
+            <div id="presidentOverviewPanel" class="president-dashboard-section">
+              <div class="admin-section-heading president-overview-heading">
+                <div>
+                  <span class="admin-eyebrow">CLUB DASHBOARD</span>
+                  <h3>Overview</h3>
+                </div>
               </div>
-              <div class="stat-box">
-                <span>Accepted</span>
-                <strong id="statAccepted">0</strong>
+              <div class="stats-row">
+                <div class="stat-box">
+                  <span>Total applicants</span>
+                  <strong id="statTotal">0</strong>
+                </div>
+                <div class="stat-box">
+                  <span>Accepted</span>
+                  <strong id="statAccepted">0</strong>
+                </div>
+                <div class="stat-box">
+                  <span>Rejected</span>
+                  <strong id="statRejected">0</strong>
+                </div>
+                <div class="stat-box stat-box-actionable">
+                  <span>Needs review</span>
+                  <strong id="statNeedsReview">0</strong>
+                </div>
               </div>
-              <div class="stat-box">
-                <span>Rejected</span>
-                <strong id="statRejected">0</strong>
-              </div>
+              <section id="presidentRecentApplicants" class="president-recent-applicants" aria-labelledby="presidentRecentApplicantsTitle">
+                <div class="president-recent-heading"><div><span class="admin-eyebrow">LATEST ACTIVITY</span><h4 id="presidentRecentApplicantsTitle">Recent applicants</h4></div><button id="presidentOverviewApplicantsBtn" class="secondary-btn" type="button">View applicants</button></div>
+                <div id="presidentRecentApplicantsList" class="president-recent-list" aria-live="polite"></div>
+              </section>
             </div>
 
+            <div id="presidentApplicantsPanel" class="president-applicants-panel">
             <div id="applicationsList" class="applications-list"></div>
+            </div>
+              </div>
+            </div>
           </div>
+
         </section>
       </main>
+
+      <dialog id="memberManagerDialog" class="member-manager-dialog" aria-labelledby="memberManagerTitle">
+        <div class="member-dialog-inner">
+          <header class="member-dialog-header">
+            <div>
+              <span class="admin-eyebrow">PRESIDENT DASHBOARD</span>
+              <h2 id="memberManagerTitle">Club members</h2>
+              <p>View your roster and assign each member to a committee and position.</p>
+            </div>
+            <button id="closeMemberManagerBtn" class="calendar-close-btn" type="button" aria-label="Close club members">&times;</button>
+          </header>
+          <div class="member-dialog-toolbar">
+            <span id="memberRosterCount">Loading membersâ€¦</span>
+            <button id="showMemberFormBtn" class="primary-btn" type="button">Add member</button>
+          </div>
+          <form id="clubMemberForm" class="member-add-form hidden">
+            <div class="member-form-grid">
+              <label>Full name<input name="name" maxlength="120" autocomplete="name" required /></label>
+              <label>Committee<select name="committee" id="clubMemberCommittee" required><option value="">Choose a committee</option></select></label>
+              <label>Position in committee<input name="position" id="clubMemberPosition" maxlength="100" placeholder="Enter their committee position" required /></label>
+              <label>Member level<select name="memberType" required><option value="">Choose member level</option><option value="new">New member</option><option value="senior">Senior member</option></select></label>
+            </div>
+            <div class="member-form-actions">
+              <div><button id="cancelMemberFormBtn" class="secondary-btn" type="button">Cancel</button><button class="primary-btn" type="submit">Save member</button></div>
+            </div>
+          </form>
+          <p id="clubMemberFeedback" class="admin-feedback" aria-live="polite"></p>
+          <div id="clubMemberList" class="member-roster-list" aria-live="polite"></div>
+        </div>
+      </dialog>
+
+      <dialog id="memberDirectoryDialog" class="member-directory-dialog" aria-labelledby="memberDirectoryTitle">
+        <div class="member-directory-inner">
+          <header class="member-directory-header">
+            <div>
+              <span class="admin-eyebrow">CLUB OPERATIONS</span>
+              <h2 id="memberDirectoryTitle">Club member directory</h2>
+              <p id="memberDirectoryDescription">Browse named member profiles by club.</p>
+            </div>
+            <button class="calendar-close-btn" type="button" data-close-member-directory aria-label="Close member directory">&times;</button>
+          </header>
+          <label class="member-directory-filter">Choose a club
+            <select id="memberDirectoryClubSelect" class="member-directory-native-select" tabindex="-1" aria-hidden="true"><option value="all">All clubs</option></select>
+            <span class="member-directory-picker">
+              <button id="memberDirectoryClubTrigger" class="member-directory-picker-trigger" type="button" aria-haspopup="listbox" aria-expanded="false">All clubs <span aria-hidden="true">⌄</span></button>
+              <span id="memberDirectoryClubOptions" class="member-directory-picker-options" role="listbox" aria-label="Club options" hidden></span>
+            </span>
+          </label>
+          <div id="memberDirectoryList" class="member-directory-list" aria-live="polite"></div>
+        </div>
+      </dialog>
+
+      <dialog id="attendanceQrDialog" class="member-manager-dialog attendance-qr-dialog" aria-labelledby="attendanceDialogTitle">
+        <div class="member-dialog-inner attendance-qr-dialog-inner">
+          <header class="member-dialog-header">
+            <div><span class="admin-eyebrow">CLUB OPERATIONS</span><h2 id="attendanceDialogTitle">Event attendance</h2><p>QR codes are available only for events and booths scheduled today. Codes refresh every 20 seconds.</p></div>
+            <button id="closeAttendanceQrBtn" class="calendar-close-btn" type="button" aria-label="Close QR code">&times;</button>
+          </header>
+          <form id="attendanceQrForm" class="attendance-qr-form">
+            <label>Event or booth happening today
+              <select id="attendanceEventSelect" required><option value="">Loading activitiesâ€¦</option></select>
+            </label>
+            <button id="createAttendanceQrBtn" class="primary-btn" type="submit">Show attendance QR</button>
+          </form>
+          <p id="attendanceManagerFeedback" class="admin-feedback" aria-live="polite"></p>
+          <section id="attendanceQrResult" class="attendance-qr-result hidden" aria-live="polite">
+            <h3 id="attendanceQrEventTitle"></h3>
+            <div id="attendanceQrCanvas" class="attendance-qr-canvas"></div>
+            <p id="attendanceQrRefreshStatus" role="status">This code changes every 20 seconds. Attendees must sign in with a verified MIU account.</p>
+          </section>
+          <details class="attendance-records-details">
+            <summary>Attendance records</summary>
+            <div class="attendance-records-toolbar">
+              <label class="attendance-record-filter">Activity
+                <select id="attendanceRecordsActivityFilter"><option value="all">All events and booths</option></select>
+              </label>
+              <button id="refreshAttendanceBtn" class="secondary-btn" type="button">Refresh records</button>
+            </div>
+            <div id="attendanceRecordsList" class="attendance-records-list" aria-live="polite"></div>
+          </details>
+        </div>
+      </dialog>
+
+      <dialog id="adminDataStatusDialog" class="admin-data-status-dialog" aria-labelledby="adminDataStatusTitle">
+        <div class="admin-data-status-inner">
+          <header class="admin-data-status-header">
+            <div>
+              <span class="admin-eyebrow">ADMINISTRATOR</span>
+              <h2 id="adminDataStatusTitle">Site data &amp; sync</h2>
+              <p>Read-only totals from the live database and the site data routes.</p>
+            </div>
+            <button class="calendar-close-btn" id="closeAdminDataStatusBtn" type="button" aria-label="Close site data status">&times;</button>
+          </header>
+          <div class="admin-data-status-actions">
+            <p id="adminDataStatusMessage" class="admin-data-status-message" aria-live="polite">Open the report to check the latest database data.</p>
+            <button id="refreshAdminDataStatusBtn" class="secondary-btn" type="button">Refresh report</button>
+          </div>
+          <div id="adminDataStatusDatabase" class="admin-data-status-database" hidden></div>
+          <div id="adminDataStatusSections" class="admin-data-status-sections"></div>
+        </div>
+      </dialog>
+
+      <div class="calendar-modal hidden" id="calendarModal">
+        <div class="calendar-panel">
+          <div class="calendar-head">
+            <div class="calendar-head-title">
+              <h2 id="calendarTitle">Events calendar</h2>
+            </div>
+            <button id="calendarClose" class="calendar-close-btn" type="button" aria-label="Close calendar">&times;</button>
+          </div>
+          <div id="calendarGrid" class="calendar-grid"></div>
+        </div>
+      </div>
+
+      <div class="event-modal hidden" id="calendarDayEventsModal" role="dialog" aria-modal="true" aria-labelledby="calendarDayEventsTitle">
+        <section class="event-modal-panel calendar-day-events-panel">
+          <button id="calendarDayEventsClose" class="calendar-close-btn event-modal-close" type="button" aria-label="Close day events">&times;</button>
+          <h2 id="calendarDayEventsTitle" class="calendar-day-events-title">Events</h2>
+          <div id="calendarDayEventsList" class="calendar-day-events-list"></div>
+        </section>
+      </div>
+
+      <div class="event-modal hidden" id="archivedClubsModal" role="dialog" aria-modal="true" aria-labelledby="archivedClubHeading">
+        <article class="event-modal-panel" style="grid-template-columns: 1fr;">
+          <button id="archivedClubsModalClose" class="calendar-close-btn event-modal-close" type="button" aria-label="Close archived clubs">&times;</button>
+          <div class="event-modal-copy">
+            <h2 id="archivedClubHeading">Archived clubs</h2>
+            <span id="archivedClubCount" class="admin-count"></span>
+            <div id="archivedClubList" class="admin-club-list" aria-labelledby="archivedClubHeading"></div>
+          </div>
+        </article>
+      </div>
+
+      <div class="event-modal hidden" id="eventModal" role="dialog" aria-modal="true" aria-labelledby="eventModalTitle">
+        <article class="event-modal-panel">
+          <button id="eventModalClose" class="calendar-close-btn event-modal-close" type="button" aria-label="Close event">&times;</button>
+          <img id="eventModalImage" class="event-modal-image" src="" alt="" />
+          <div class="event-modal-copy">
+            <span id="eventModalClub" class="event-modal-club"></span>
+            <h2 id="eventModalTitle"></h2>
+            <p id="eventModalMeta" class="event-modal-meta"></p>
+            <p id="eventModalDescription" class="event-modal-description"></p>
+            <form id="eventModalForm">
+              <div class="field-group">
+                <label for="eventModalName">Your Name</label>
+                <input id="eventModalName" placeholder="Full name" required />
+              </div>
+              <div class="field-group">
+                <label for="eventModalEmail">University Email</label>
+                <input id="eventModalEmail" type="email" placeholder="example@miuegypt.edu.eg" required />
+              </div>
+              <button class="primary-btn" type="submit">Register for event</button>
+            </form>
+            <p id="eventModalFeedback" class="admin-feedback" aria-live="polite"></p>
+          </div>
+        </article>
+      </div>
     </div>
 
     <div id="reviewModal" class="modal hidden">
       <div class="modal-card">
         <div class="modal-header">
           <h3>Interview Evaluation</h3>
-          <button id="closeModalBtn" class="close-btn" type="button">✕</button>
+          <button id="closeModalBtn" class="close-btn" type="button" aria-label="Close interview">&times;</button>
         </div>
 
-        <img id="modalApplicantPhoto" class="review-applicant-photo hidden" alt="Applicant photo" />
-        <div id="modalApplicantAvatar" class="avatar-box">A</div>
-
-        <div class="form-row">
+        <div class="review-applicant-summary">
+          <img id="modalApplicantPhoto" class="review-applicant-photo hidden" alt="Applicant photo" />
+          <div id="modalApplicantAvatar" class="avatar-box">A</div>
+          <div class="form-row">
           <div class="modal-field">
             <label>Applicant</label>
             <div id="modalName" class="field-value"></div>
@@ -478,6 +795,7 @@
           <div class="modal-field">
             <label>Email</label>
             <div id="modalEmail" class="field-value"></div>
+          </div>
           </div>
         </div>
 
@@ -531,11 +849,18 @@
       </div>
     </div>
 
-    <footer class="site-footer">
-      <p>Copyright 2026 © Misr International University, All Right Reserved | Made by <a href="https://www.linkedin.com/in/mahmoud-hefny-1264763b0" target="_blank" rel="noopener noreferrer">Mahmoud Hefny</a></p>
-    </footer>
+    <div id="site-footer"></div>
 
-    <script src="/script.js?v=20261005-form-statuses"></script>
-    <script src="/theme.js?v=20261005-global-theme" defer></script>
+    <script src="/assets/js/event-modal.js?v=2"></script>
+    <script src="/assets/js/committee-sidebar.js?v=13"></script>
+    <script src="/assets/js/app-home.js?v=20261009ab"></script>
+    <script src="/assets/js/app-admin.js?v=20261009c"></script>
+    <script src="/assets/js/app-dashboard.js?v=20261009x"></script>
+    <script src="/assets/js/admin-data-status.js?v=2" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js" defer></script>
+    <script src="/assets/js/attendance-dashboard.js?v=13" defer></script>
+    <script src="/assets/js/member-directory.js?v=20261009s"></script>
+    <script src="/assets/js/layout.js?v=11" defer></script>
+    <script src="/assets/js/theme.js?v=20261009c" defer></script>
   </body>
 </html>
