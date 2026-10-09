@@ -5,3 +5,6 @@ data/club-accounts.json
 data/club-logins.generated.json
 .vercel
 .env*
+
+# Local frontend audit snapshots, browser profiles, and screenshots.
+.frontend-audit/

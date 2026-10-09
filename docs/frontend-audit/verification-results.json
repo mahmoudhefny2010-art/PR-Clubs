@@ -1,0 +1,128 @@
+{
+  "date": "2026-10-09",
+  "baselineCommit": "9bd35a9dd8ac58ff7827462c813be6ebbf68d15b",
+  "environment": {
+    "node": "24.13.1",
+    "chrome": "153.0.8010.55",
+    "timezone": "Africa/Cairo"
+  },
+  "structure": {
+    "passed": true,
+    "htmlFiles": 24,
+    "externalScripts": 26,
+    "inlineScripts": 4,
+    "localAssetReferences": 215
+  },
+  "preservation": {
+    "sourceChecksPassed": true,
+    "unchangedProtectedFiles": 32,
+    "reconstructedOriginalFrontendSources": 50,
+    "runtimeDataDrift": [
+      "data/club-views.json",
+      "data/event-views.json"
+    ],
+    "defaultStrictCheckPasses": false
+  },
+  "browser": {
+    "stage": "final",
+    "scenarios": 172,
+    "baselineScenarios": 172,
+    "exactPixels": 163,
+    "noise": [
+      {
+        "key": "pr-dashboard-desktop-light",
+        "pass": true,
+        "changedPixels": 16,
+        "changedRatio": 0.00001301447860745079,
+        "maximumChannelDelta": 1
+      },
+      {
+        "key": "club-studio-embedded-desktop-light",
+        "pass": true,
+        "changedPixels": 13,
+        "changedRatio": 0.000010574263868553766,
+        "maximumChannelDelta": 1
+      },
+      {
+        "key": "event-edit-desktop-light",
+        "pass": true,
+        "changedPixels": 1,
+        "changedRatio": 8.134049129656744e-7,
+        "maximumChannelDelta": 1
+      },
+      {
+        "key": "feed-edit-desktop-light",
+        "pass": true,
+        "changedPixels": 1,
+        "changedRatio": 8.134049129656744e-7,
+        "maximumChannelDelta": 1
+      },
+      {
+        "key": "feed-edit-desktop-dark",
+        "pass": true,
+        "changedPixels": 1,
+        "changedRatio": 8.134049129656744e-7,
+        "maximumChannelDelta": 1
+      },
+      {
+        "key": "booth-edit-desktop-dark",
+        "pass": true,
+        "changedPixels": 1,
+        "changedRatio": 8.134049129656744e-7,
+        "maximumChannelDelta": 1
+      },
+      {
+        "key": "english-dashboard-mobile-light",
+        "pass": true,
+        "changedPixels": 28,
+        "changedRatio": 0.00008506501397496658,
+        "maximumChannelDelta": 2
+      },
+      {
+        "key": "dean-request-details-mobile-light",
+        "pass": true,
+        "changedPixels": 1,
+        "changedRatio": 0.0000030380362133916637,
+        "maximumChannelDelta": 1
+      },
+      {
+        "key": "club-studio-embedded-mobile-dark",
+        "pass": true,
+        "changedPixels": 11,
+        "changedRatio": 0.0000334183983473083,
+        "maximumChannelDelta": 1
+      }
+    ],
+    "failures": [],
+    "missingFixtures": [],
+    "exceptions": [],
+    "externalHostsStubbed": [
+      "fonts.googleapis.com"
+    ]
+  },
+  "fullCaptureExternalHostsStubbed": [
+    "fonts.googleapis.com",
+    "cdn.jsdelivr.net"
+  ],
+  "metadataNote": "Final historical merged report lists hosts from the last targeted run only. Both stubbed hosts are recorded in archived full-run reports. Future harness merges retain metadata.",
+  "finalTargetedRecapture": {
+    "scenario": "pr-dashboard",
+    "variants": 4,
+    "bothBaselineAndFinal": true,
+    "reason": "Wait for smooth scroll to settle before capturing geometry."
+  },
+  "limitations": [
+    "Synthetic API fixtures; real backend never started or imported.",
+    "External fonts and QR CDN stubbed.",
+    "Fixed clock; CSS animations and transitions disabled.",
+    "No live authentication, email, uploads, QR generation, database, or network-performance validation."
+  ],
+  "changedSourceBytes": {
+    "htmlBefore": 236323,
+    "htmlAfter": 180226,
+    "frontendBefore": 646056,
+    "frontendAfter": 637463,
+    "duplicateCssRemoved": 9721
+  },
+  "published": false
+}

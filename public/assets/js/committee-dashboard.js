@@ -17,8 +17,8 @@ let activeDetailContext = 'pending';
 let currentRequests = [];
 let statusOverviewMode = 'all';
 
-const CONTENT_TYPE_LABELS = { event: 'Event', feed: 'Feed', sponsor: 'Sponsor', booth: 'Booth' };
-const CONTENT_ITEM_LABELS = { event: 'event', feed: 'feed post', sponsor: 'sponsor request', booth: 'booth request' };
+const CONTENT_TYPE_LABELS = { event: 'Event', feed: 'Feed', sponsor: 'Sponsor', booth: 'Booth', entry_permit: 'Entry Permit' };
+const CONTENT_ITEM_LABELS = { event: 'event', feed: 'feed post', sponsor: 'sponsor request', booth: 'booth request', entry_permit: 'Entry Permit' };
 
 function contentTypeLabel(type) {
   return CONTENT_TYPE_LABELS[type] || type || 'Content';
@@ -48,13 +48,13 @@ async function ensureSession() {
     const response = await fetch('/api/club-auth/session');
     const data = await response.json();
     if (!data.authenticated || !data.club) {
-      sessionMessage.textContent = 'Please sign in with a PR / English / Dean account.';
+      sessionMessage.textContent = 'Please sign in with a committee account.';
       window.dashboardSync?.report('requests', 'error', 'Sign in required');
       window.dashboardSync?.report('allRequests', 'error', 'Sign in required');
       return false;
     }
-    if (!['pr', 'english', 'dean'].includes(data.club.role)) {
-      sessionMessage.textContent = 'This dashboard is for PR, English Department, or the Dean.';
+    if (!['pr', 'english', 'security', 'dean'].includes(data.club.role)) {
+      sessionMessage.textContent = 'This dashboard is for PR, English Department, Security Office, or the Dean.';
       window.dashboardSync?.report('requests', 'error', 'Access denied');
       window.dashboardSync?.report('allRequests', 'error', 'Access denied');
       return false;
@@ -62,15 +62,17 @@ async function ensureSession() {
     currentRole = data.club.role;
     const memberDirectoryButton = document.getElementById('prMemberDirectoryBtn');
     if (memberDirectoryButton) memberDirectoryButton.hidden = currentRole !== 'pr';
-    const titles = { pr: 'PR Department — Approvals', english: 'English Department — Preview & Approve', dean: 'Dean — Final Approval' };
+    const titles = { pr: 'PR Department — Approvals', english: 'English Department — Preview & Approve', security: 'Security Office — Entry Permits', dean: 'Dean — Final Approval' };
     document.getElementById('committeeTitle').textContent = titles[currentRole];
     if (currentRole === 'english') document.getElementById('openStatusOverviewBtn').textContent = 'Restart Review';
     hintText.textContent = currentRole === 'pr'
       ? 'Pending requests from clubs. Approve, reject, or comment.'
       : currentRole === 'english'
         ? 'Requests approved by PR. Preview, approve, reject, or request changes.'
-        : 'Requests approved by English Department. Final approve or reject.';
-    document.getElementById('requestChangesBtn').hidden = !['pr', 'english'].includes(currentRole);
+        : currentRole === 'security'
+          ? 'Entry Permits approved by PR. Approve or return them with requested edits.'
+          : 'Requests approved by the previous review stage. Final approve or reject.';
+    document.getElementById('requestChangesBtn').hidden = !['pr', 'english', 'security'].includes(currentRole);
     return true;
   } catch {
     sessionMessage.textContent = 'Could not check your session.';
@@ -111,12 +113,14 @@ function hasCurrentApproval(item, role) {
   return !history.slice(approvalIndex + 1).some((event) => {
     if (event.role === 'dean' && event.action === 'returned_to_pr') return true;
     if (event.role === 'dean' && event.action === 'returned_to_english') return ['english', 'dean'].includes(role);
+    if (event.role === 'dean' && event.action === 'returned_to_security') return ['security', 'dean'].includes(role);
     if (event.action === 'restarted_review' || event.action === 'request_edit') {
-      return event.role === role || (role === 'dean' && ['pr', 'english'].includes(event.role)) || (role === 'english' && event.role === 'pr');
+      return event.role === role || (role === 'dean' && ['pr', 'english', 'security'].includes(event.role)) || (role === 'english' && event.role === 'pr') || (role === 'security' && event.role === 'pr');
     }
     if (event.role === 'club' && event.action === 'resubmitted') {
       if (event.toStatus === 'pending_pr') return true;
       if (event.toStatus === 'pending_english') return ['english', 'dean'].includes(role);
+      if (event.toStatus === 'pending_security') return ['security', 'dean'].includes(role);
     }
     return false;
   });
@@ -124,7 +128,7 @@ function hasCurrentApproval(item, role) {
 
 function getActiveComment(item) {
   if (item.status !== 'changes_requested') return null;
-  const role = item.editRequestedBy || 'english';
+  const role = item.editRequestedBy || (item.type === 'entry_permit' ? 'security' : 'english');
   const history = Array.isArray(item.commentHistory) ? item.commentHistory.filter((entry) => entry.role === role) : [];
   if (history.length) {
     const latest = [...history].reverse().find((entry) => !entry.deletedAt);
@@ -137,37 +141,52 @@ function getActiveComment(item) {
 
 function openDetails(item, context = 'pending') {
   if (!item) return;
+  const requestImage = item.image
+    || (item.type === 'sponsor' ? item.sponsorLogo : '')
+    || (['entry_permit', 'booth'].includes(item.type) ? item.clubImage : '');
   activeRequest = item;
   activeDetailContext = context;
   const statusContext = context === 'status';
-  const canRestart = statusContext && ['pr', 'english'].includes(currentRole) && !['draft', 'changes_requested', ({ pr: 'pending_pr', english: 'pending_english' })[currentRole]].includes(item.status);
-  const canReturn = currentRole === 'dean' && ['pending_dean', 'published'].includes(item.status);
-  document.getElementById('dialogApproveBtn').hidden = statusContext;
+  const canRestart = statusContext && ['pr', 'english', 'security'].includes(currentRole) && !['draft', 'changes_requested', ({ pr: 'pending_pr', english: 'pending_english', security: 'pending_security' })[currentRole]].includes(item.status) && (currentRole !== 'security' || item.type === 'entry_permit');
+  const canReturn = currentRole === 'dean' && item.type !== 'entry_permit'
+    && ['pending_dean', 'published'].includes(item.status);
+  const dialogApproveButton = document.getElementById('dialogApproveBtn');
+  dialogApproveButton.hidden = statusContext;
+  if (item.type === 'entry_permit' && currentRole === 'security') dialogApproveButton.textContent = 'Approve & Send back to PR';
+  else if (item.type === 'entry_permit' && currentRole === 'pr') {
+    const latestSecurityReview = [...(item.workflowHistory || [])].reverse().find((event) => event.role === 'security'
+      && ['approve', 'request_edit', 'reject', 'restarted_review'].includes(event.action));
+    dialogApproveButton.textContent = latestSecurityReview?.action === 'approve'
+      ? 'Final approve · Send to Dean view'
+      : 'Approve & Send to Security';
+  } else dialogApproveButton.textContent = 'Accept';
   document.getElementById('dialogRejectBtn').hidden = statusContext;
-  document.getElementById('requestChangesBtn').hidden = statusContext || !['pr', 'english'].includes(currentRole);
+  document.getElementById('requestChangesBtn').hidden = statusContext || !['pr', 'english', 'security'].includes(currentRole);
   document.getElementById('requestChangesBtn').textContent = 'Request Edit';
   document.getElementById('requestChangesBtn').dataset.dialogAction = 'request_edit';
   document.getElementById('reopenRequestBtn').hidden = !canRestart;
-  document.getElementById('reopenRequestBtn').textContent = `Restart ${currentRole === 'pr' ? 'PR' : 'English'} Review`;
+  document.getElementById('reopenRequestBtn').textContent = `Restart ${{ pr: 'PR', english: 'English', security: 'Security' }[currentRole] || 'Review'} Review`;
   const deleteRequestButton = document.getElementById('deleteRequestBtn');
   if (deleteRequestButton) {
-    deleteRequestButton.hidden = currentRole !== 'dean' || item.status === 'deleted';
+    deleteRequestButton.hidden = currentRole !== 'dean' || item.type === 'entry_permit' || item.status === 'deleted';
     deleteRequestButton.textContent = `Delete ${contentTypeLabel(item.type)}`;
   }
   const returnToPrButton = document.getElementById('returnToPrBtn');
   const returnToEnglishButton = document.getElementById('returnToEnglishBtn');
+  const returnToSecurityButton = document.getElementById('returnToSecurityBtn');
   if (returnToPrButton) { returnToPrButton.hidden = !canReturn; returnToPrButton.disabled = canReturn; }
-  if (returnToEnglishButton) { returnToEnglishButton.hidden = !canReturn; returnToEnglishButton.disabled = canReturn; }
+  if (returnToEnglishButton) { returnToEnglishButton.hidden = !canReturn || item.type === 'entry_permit'; returnToEnglishButton.disabled = canReturn; }
+  if (returnToSecurityButton) { returnToSecurityButton.hidden = currentRole !== 'dean' || !canReturn || item.type !== 'entry_permit'; returnToSecurityButton.disabled = canReturn; }
   document.getElementById('detailTitle').textContent = item.title || 'Untitled request';
   requestDetails.replaceChildren();
   const requestDetailsHero = requestDialog.querySelector('.request-details-hero');
   const requestDetailImageWrap = document.getElementById('requestDetailImageWrap');
   const requestDetailImage = document.getElementById('requestDetailImage');
-  requestDetailsHero?.classList.toggle('no-image', !item.image);
+  requestDetailsHero?.classList.toggle('no-image', !requestImage);
   if (requestDetailImageWrap && requestDetailImage) {
-    requestDetailImageWrap.hidden = !item.image;
-    requestDetailImage.alt = `${item.clubName || 'Club'} request image`;
-    if (item.image) requestDetailImage.src = item.image;
+    requestDetailImageWrap.hidden = !requestImage;
+    requestDetailImage.alt = `${item.clubName || 'Club'} ${item.image || item.sponsorLogo ? 'request image' : 'logo'}`;
+    if (requestImage) requestDetailImage.src = requestImage;
   }
   addDetail('Club', item.clubName);
   addDetail('Type', contentTypeLabel(item.type));
@@ -199,9 +218,34 @@ function openDetails(item, context = 'pending') {
     addDetail('Time', window.formatSiteTime(item.time));
     addDetail('Location', item.location);
     addDetail('Budget', item.budget);
+    if (item.type === 'entry_permit' && Array.isArray(item.permitItems) && item.permitItems.length) {
+      const permitSection = document.createElement('section');
+      permitSection.className = 'detail-item detail-wide';
+      const permitHeading = document.createElement('h3');
+      permitHeading.textContent = 'People and items requested';
+      const tableWrap = document.createElement('div');
+      tableWrap.className = 'entry-permit-table-wrap';
+      const table = document.createElement('table');
+      table.className = 'entry-permit-table';
+      table.innerHTML = '<thead><tr><th scope="col">Quantity</th><th scope="col">Number / ID</th><th scope="col">Details</th></tr></thead>';
+      const tbody = document.createElement('tbody');
+      item.permitItems.forEach((permitItem) => {
+        const row = document.createElement('tr');
+        [permitItem.quantity, permitItem.number, permitItem.details].forEach((value) => {
+          const cell = document.createElement('td');
+          cell.textContent = value == null ? '' : String(value);
+          row.append(cell);
+        });
+        tbody.append(row);
+      });
+      table.append(tbody);
+      tableWrap.append(table);
+      permitSection.append(permitHeading, tableWrap);
+      requestDetails.append(permitSection);
+    }
   }
   addDetail('Status', formatStatus(item.status));
-  if (item.type !== 'sponsor' && item.type !== 'booth') {
+  if (item.type !== 'sponsor' && item.type !== 'booth' && (item.type !== 'entry_permit' || !item.permitItems?.length)) {
     addDetail('Description', item.description, true);
   }
 
@@ -264,7 +308,7 @@ function openDetails(item, context = 'pending') {
     const entry = document.createElement('p');
     entry.style.cssText = 'display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px;white-space:pre-wrap';
     const author = document.createElement('strong');
-    author.textContent = `${({ pr: 'PR Department', english: 'English Department', dean: 'Dean' })[activeComment.role] || 'Committee'}: `;
+    author.textContent = `${({ pr: 'PR Department', english: 'English Department', security: 'Security Office', dean: 'Dean' })[activeComment.role] || 'Committee'}: `;
     const text = document.createElement('span');
     text.style.flex = '1';
     text.textContent = activeComment.text;
@@ -295,11 +339,11 @@ function openDetails(item, context = 'pending') {
   commentInput.rows = 3;
   commentInput.maxLength = 2000;
   commentInput.placeholder = currentRole === 'dean'
-    ? 'Explain what PR or English needs to review. This note goes to that committee; the club only sees a return notification.'
+    ? 'Explain what the review team needs to check. This note goes to that committee; the club only sees a return notification.'
     : 'Write a comment for the club';
   commentInput.style.cssText = 'width:100%;margin-top:6px;padding:10px 12px;border:1px solid #ddd;border-radius:12px;resize:vertical';
   commentInput.addEventListener('input', () => {
-    for (const button of [returnToPrButton, returnToEnglishButton]) {
+    for (const button of [returnToPrButton, returnToEnglishButton, returnToSecurityButton]) {
       if (button && canReturn) button.disabled = !commentInput.value.trim();
     }
   });
@@ -322,12 +366,12 @@ function openDetails(item, context = 'pending') {
     approvals.append(approvalsHeading);
     const approvalList = document.createElement('div');
     approvalList.className = 'committee-approval-list';
-    for (const role of ['pr', 'english', 'dean']) {
+    for (const role of (item.type === 'entry_permit' ? ['pr', 'security', 'dean'] : ['pr', 'english', 'dean'])) {
       const approved = hasCurrentApproval(item, role);
       const line = document.createElement('div');
       line.className = 'committee-approval-row';
       const name = document.createElement('span');
-      name.textContent = ({ pr: 'PR Department', english: 'English Department', dean: 'Dean' })[role];
+      name.textContent = ({ pr: 'PR Department', english: 'English Department', security: 'Security Office', dean: 'Dean' })[role];
       const state = document.createElement('strong');
       state.className = approved ? 'is-approved' : 'is-pending';
       state.textContent = approved ? 'Approved' : 'Not approved yet';
@@ -351,7 +395,7 @@ function openDetails(item, context = 'pending') {
     for (const event of timeline) {
       const line = document.createElement('article');
       line.className = 'committee-timeline-event';
-      const actor = ({ club: 'Club', pr: 'PR Department', english: 'English Department', dean: 'Dean' })[event.role] || event.role;
+      const actor = ({ club: 'Club', pr: 'PR Department', english: 'English Department', security: 'Security Office', dean: 'Dean' })[event.role] || event.role;
       const timestamp = event.createdAt ? new Date(event.createdAt) : null;
       const validTimestamp = timestamp && !Number.isNaN(timestamp.getTime());
       const time = document.createElement('time');
@@ -414,10 +458,13 @@ async function loadRequests() {
     for (const item of items) {
       const card = document.createElement('article');
       card.className = 'req-card';
-      if (item.image) {
+      const requestImage = item.image
+        || (item.type === 'sponsor' ? item.sponsorLogo : '')
+        || (['entry_permit', 'booth'].includes(item.type) ? item.clubImage : '');
+      if (requestImage) {
         const image = document.createElement('img');
-        image.src = item.image;
-        image.alt = '';
+        image.src = requestImage;
+        image.alt = `${item.clubName || 'Club'} ${item.image || item.sponsorLogo ? 'request image' : 'logo'}`;
         card.append(image);
       }
       const summary = document.createElement('div');
@@ -441,7 +488,7 @@ async function loadRequests() {
         button.addEventListener('click', () => act(item, action));
         actions.append(button);
       }
-      if (['pr', 'english'].includes(currentRole)) {
+      if (['pr', 'english', 'security'].includes(currentRole)) {
         const editButton = document.createElement('button');
         editButton.type = 'button'; editButton.className = 'changes'; editButton.textContent = 'Request Edit';
         editButton.addEventListener('click', () => act(item, 'request_edit'));
@@ -475,7 +522,7 @@ async function loadRequests() {
         const note = document.createElement('div');
         note.className = 'status-overview-meta';
         note.style.cssText = 'white-space:pre-wrap;color:#92400e';
-        note.textContent = `Dean's note for ${currentRole === 'pr' ? 'PR' : 'English'}: ${returnAction.comment}`;
+        note.textContent = `Dean's note for ${{ pr: 'PR', english: 'English', security: 'Security Office' }[currentRole] || 'committee'}: ${returnAction.comment}`;
         summary.append(note);
       }
       summary.append(actions);
@@ -502,13 +549,18 @@ async function refreshUnreadRequestBadges() {
     if (!statusResponse.ok) throw new Error(statuses.message || 'Could not sync request status.');
     if (!Array.isArray(pending)) throw new Error('Unexpected pending requests response.');
     if (!Array.isArray(statuses)) throw new Error('Unexpected request status response.');
+    document.querySelectorAll('[data-entry-permit-count]').forEach((node) => {
+      node.textContent = String(statuses.filter((item) => item.type === 'entry_permit').length);
+    });
     window.dashboardSync?.report('requests', 'success');
     window.dashboardUnread?.update('requests', pending.map((item) => `${item.id}:${item.updatedAt || item.status || ''}`));
     window.dashboardUnread?.setOverview('requests', pending.length);
     window.dashboardSync?.report('allRequests', 'success');
     const relevantStatuses = currentRole === 'english'
       ? statuses.filter((item) => !['draft', 'changes_requested', 'pending_english'].includes(item.status))
-      : statuses;
+      : currentRole === 'security'
+        ? statuses.filter((item) => !['draft', 'changes_requested', 'pending_security'].includes(item.status))
+        : statuses;
     window.dashboardUnread?.update('allRequests', relevantStatuses.map((item) => `${item.id}:${item.updatedAt || item.status || ''}`));
   } catch (error) {
     window.dashboardSync?.report('requests', 'error', error.message);
@@ -519,8 +571,19 @@ async function refreshUnreadRequestBadges() {
 async function showStatusOverview() {
   if (!statusOverviewDialog || !statusOverviewList) return;
   statusOverviewMode = 'all';
-  document.getElementById('statusOverviewTitle').textContent = 'All Requests Status';
+  document.getElementById('statusOverviewTitle').textContent = currentRole === 'security' ? 'All Entry Permits' : 'All Requests Status';
   statusOverviewList.textContent = 'Loading request statuses…';
+  window.dashboardPanels?.show('statusOverviewDialog');
+  await loadStatusOverview();
+}
+
+async function showEntryPermitOverview() {
+  if (!statusOverviewDialog || !statusOverviewList) return;
+  statusOverviewMode = 'entry_permits';
+  document.getElementById('statusOverviewTitle').textContent = 'Entry Permits';
+  statusOverviewList.textContent = 'Loading Entry Permits…';
+  const entryPermitNav = document.querySelector('.committee-sidebar [data-entry-permit-overview]');
+  document.querySelectorAll('.committee-sidebar-link').forEach((item) => item.classList.toggle('is-active', item === entryPermitNav));
   window.dashboardPanels?.show('statusOverviewDialog');
   await loadStatusOverview();
 }
@@ -541,8 +604,10 @@ async function loadStatusOverview() {
     let items = await response.json();
     if (!response.ok) throw new Error(items.message || 'Could not load request statuses.');
     if (statusOverviewMode === 'restartable') {
-      items = items.filter((item) => !['draft', 'changes_requested', 'pending_english'].includes(item.status));
+      items = items.filter((item) => !['draft', 'changes_requested', 'pending_english', 'pending_security'].includes(item.status)
+        && (currentRole !== 'security' || item.type === 'entry_permit'));
     }
+    if (statusOverviewMode === 'entry_permits') items = items.filter((item) => item.type === 'entry_permit');
     if (statusOverviewMode === 'all') {
       window.dashboardUnread?.update('allRequests', items.map((item) => `${item.id}:${item.updatedAt || item.status || ''}`));
     }
@@ -555,17 +620,21 @@ async function loadStatusOverview() {
       draft: 'Draft',
       pending_pr: 'Waiting for PR',
       pending_english: 'Waiting for English',
+      pending_security: 'Waiting for Security Office',
       pending_dean: 'Waiting for Dean',
       changes_requested: 'Changes requested',
       rejected: 'Rejected',
       published: 'Published · Dean approved',
+      approved: 'Approved · Internal',
       deleted: 'Deleted'
     };
-    const reviewStage = { pr: 'pending_pr', english: 'pending_english', dean: 'pending_dean' }[currentRole];
+    const reviewStage = { pr: 'pending_pr', english: 'pending_english', security: 'pending_security', dean: 'pending_dean' }[currentRole];
     for (const item of items) {
       const row = document.createElement('article');
       row.className = 'req-card';
-      const rowImage = item.image || (item.type === 'sponsor' ? item.sponsorLogo : '');
+      const rowImage = item.image
+        || (item.type === 'sponsor' ? item.sponsorLogo : '')
+        || (['entry_permit', 'booth'].includes(item.type) ? item.clubImage : '');
       if (!rowImage) row.classList.add('no-image');
       if (rowImage) {
         const image = document.createElement('img');
@@ -590,13 +659,13 @@ async function loadStatusOverview() {
         const note = document.createElement('p');
         note.className = 'status-overview-meta';
         note.style.cssText = 'margin:7px 0 0;white-space:pre-wrap';
-        note.textContent = `English Department: ${activeComment.text}`;
+        note.textContent = `${({ pr: 'PR Department', english: 'English Department', security: 'Security Office', dean: 'Dean' })[activeComment.role] || 'Review team'}: ${activeComment.text}`;
         details.append(note);
       }
       const actions = document.createElement('div');
       actions.className = 'req-actions';
       const canReview = item.status === reviewStage;
-      const canRestart = ['pr', 'english'].includes(currentRole) && !['draft', 'changes_requested', ({ pr: 'pending_pr', english: 'pending_english' })[currentRole]].includes(item.status);
+      const canRestart = ['pr', 'english', 'security'].includes(currentRole) && !['draft', 'changes_requested', ({ pr: 'pending_pr', english: 'pending_english', security: 'pending_security' })[currentRole]].includes(item.status) && (currentRole !== 'security' || item.type === 'entry_permit');
       if (canReview || canRestart) {
         const comment = document.createElement('input');
         comment.placeholder = 'Comment (optional)';
@@ -611,7 +680,7 @@ async function loadStatusOverview() {
             button.addEventListener('click', () => act(item, action, false, 'status'));
             actions.append(button);
           }
-          if (['pr', 'english'].includes(currentRole)) {
+          if (['pr', 'english', 'security'].includes(currentRole)) {
             const editButton = document.createElement('button');
             editButton.type = 'button'; editButton.className = 'changes'; editButton.textContent = 'Request Edit';
             editButton.addEventListener('click', () => act(item, 'request_edit', false, 'status'));
@@ -621,7 +690,7 @@ async function loadStatusOverview() {
           const restartButton = document.createElement('button');
           restartButton.type = 'button';
           restartButton.className = 'reopen-review';
-          restartButton.textContent = `Restart ${currentRole === 'pr' ? 'PR' : 'English'} Review`;
+          restartButton.textContent = `Restart ${{ pr: 'PR', english: 'English', security: 'Security' }[currentRole] || 'Review'} Review`;
           restartButton.addEventListener('click', () => restartReview(item, comment.value, false, restartButton));
           actions.append(restartButton);
         }
@@ -680,6 +749,7 @@ function displayAction(action) {
     restarted_review: 'Restarted review',
     returned_to_pr: 'Returned the request to PR review',
     returned_to_english: 'Returned the request to English review',
+    returned_to_security: 'Returned the permit to the Security Office',
     comment: 'Added a comment',
     comment_deleted: 'Deleted a comment',
     deleted: 'Deleted the request'
@@ -690,7 +760,10 @@ async function deleteDeanContent() {
   if (!activeRequest) return;
   const item = activeRequest;
   const itemLabel = contentItemLabel(item);
-  if (!confirm(`Delete this ${itemLabel}? It will be removed from the published content, and its review history will be kept.`)) return;
+  const deleteMessage = item.type === 'entry_permit'
+    ? `Delete this ${itemLabel}? Its review history will be kept.`
+    : `Delete this ${itemLabel}? It will be removed from the published content, and its review history will be kept.`;
+  if (!confirm(deleteMessage)) return;
   const button = document.getElementById('deleteRequestBtn');
   button.disabled = true;
   try {
@@ -713,10 +786,12 @@ function displayTimelineStatus(status) {
     draft: 'Draft',
     pending_pr: 'Under PR Review',
     pending_english: 'Under English Review',
+    pending_security: 'Under Security Office Review',
     pending_dean: 'Under Dean Review',
     changes_requested: 'Edit Requested',
     rejected: 'Rejected',
-    published: 'Approved / Published'
+    published: 'Approved / Published',
+    approved: 'Approved · Internal only'
   })[status] || (status ? String(status).replaceAll('_', ' ') : '—');
 }
 
@@ -730,9 +805,9 @@ function focusCommitteeHistory(role) {
 function openHistoryReturn(role) {
   historyReturnTarget = role;
   focusCommitteeHistory(role);
-  const targetName = role === 'pr' ? 'PR' : 'English';
+  const targetName = role === 'pr' ? 'PR' : role === 'security' ? 'Security Office' : 'English';
   const panel = document.getElementById('historyReturnPanel');
-  const available = ['pending_dean', 'published'].includes(activeReviewHistoryItem?.status);
+  const available = ['pending_dean', 'published', 'approved'].includes(activeReviewHistoryItem?.status);
   document.getElementById('historyReturnTitle').textContent = `Return request to ${targetName}`;
   document.getElementById('historyReturnHelp').textContent = available
     ? `Write the required note for ${targetName}. The committee will see it; the club will only be notified that the request was returned.`
@@ -759,9 +834,9 @@ function renderReviewHistory(item) {
   if (!events.length) {
     const empty = document.createElement('p'); empty.textContent = 'No review history is recorded for this request yet.'; reviewHistoryList.append(empty); return;
   }
-  const roles = { club: 'Club', pr: 'PR Committee', english: 'English Committee', dean: 'Religion Committee (Dean)', system: 'Workflow' };
+  const roles = { club: 'Club', pr: 'PR Committee', english: 'English Committee', security: 'Security Office', dean: 'Religion Committee (Dean)', system: 'Workflow' };
   for (const event of events) {
-    const actionKey = ['request_edit', 'returned_to_pr', 'returned_to_english'].includes(event.action) ? 'request_edit'
+    const actionKey = ['request_edit', 'returned_to_pr', 'returned_to_english', 'returned_to_security'].includes(event.action) ? 'request_edit'
       : event.action === 'reject' ? 'reject'
         : event.action === 'deleted' ? 'reject'
         : event.action === 'resubmitted' ? 'resubmitted'
@@ -774,9 +849,10 @@ function renderReviewHistory(item) {
     if (event.action === 'approve') {
       const badge = document.createElement('span'); badge.className = 'review-history-badge'; badge.textContent = 'Done'; heading.append(badge);
       reviewLinks = document.createElement('div'); reviewLinks.className = 'review-committee-links';
-      for (const [role, label] of [['pr', 'Review PR'], ['english', 'Review English']]) {
+      const destinations = item.type === 'entry_permit' ? [] : [['pr', 'Review PR'], ['english', 'Review English']];
+      for (const [role, label] of destinations) {
         const button = document.createElement('button'); button.type = 'button'; button.textContent = label;
-        button.disabled = !['pending_dean', 'published'].includes(item.status);
+        button.disabled = !['pending_dean', 'published', 'approved'].includes(item.status);
         button.title = button.disabled ? 'Available after the request reaches Dean review' : `Return the request to ${label.replace('Review ', '')} with a comment`;
         button.addEventListener('click', () => openHistoryReturn(role));
         reviewLinks.append(button);
@@ -784,7 +860,7 @@ function renderReviewHistory(item) {
       heading.append(reviewLinks);
     } else {
       const badge = document.createElement('span'); badge.className = `review-history-badge ${actionKey}`;
-      badge.textContent = event.action === 'request_edit' ? 'Request Edit' : event.action === 'returned_to_pr' ? 'Returned to PR' : event.action === 'returned_to_english' ? 'Returned to English' : event.action === 'reject' ? 'Rejected' : event.action === 'deleted' ? 'Deleted' : event.action === 'resubmitted' ? 'Resubmitted' : 'Comment'; heading.append(badge);
+      badge.textContent = event.action === 'request_edit' ? 'Request Edit' : event.action === 'returned_to_pr' ? 'Returned to PR' : event.action === 'returned_to_english' ? 'Returned to English' : event.action === 'returned_to_security' ? 'Returned to Security Office' : event.action === 'reject' ? 'Rejected' : event.action === 'deleted' ? 'Deleted' : event.action === 'resubmitted' ? 'Resubmitted' : 'Comment'; heading.append(badge);
     }
     entry.append(heading);
     const status = document.createElement('p');
@@ -976,8 +1052,10 @@ requestDialog.querySelectorAll('[data-dialog-action]').forEach((button) => butto
 document.getElementById('reopenRequestBtn')?.addEventListener('click', () => restartReview(activeRequest));
 document.getElementById('returnToPrBtn')?.addEventListener('click', (event) => returnToCommittee('pr', event.currentTarget));
 document.getElementById('returnToEnglishBtn')?.addEventListener('click', (event) => returnToCommittee('english', event.currentTarget));
+document.getElementById('returnToSecurityBtn')?.addEventListener('click', (event) => returnToCommittee('security', event.currentTarget));
 document.getElementById('deleteRequestBtn')?.addEventListener('click', deleteDeanContent);
 document.getElementById('openStatusOverviewBtn')?.addEventListener('click', () => currentRole === 'english' ? showRestartOverview() : showStatusOverview());
+document.querySelectorAll('[data-entry-permit-overview]').forEach((button) => button.addEventListener('click', showEntryPermitOverview));
 document.getElementById('overviewRestartsBtn')?.addEventListener('click', () => document.getElementById('openStatusOverviewBtn')?.click());
 document.getElementById('closeStatusOverviewBtn')?.addEventListener('click', () => window.dashboardPanels?.showOverview());
 document.getElementById('closeReviewHistoryBtn')?.addEventListener('click', () => reviewHistoryDialog?.close());
@@ -988,7 +1066,7 @@ document.getElementById('cancelHistoryReturnBtn')?.addEventListener('click', () 
 });
 document.getElementById('submitHistoryReturnBtn')?.addEventListener('click', submitHistoryReturn);
 document.getElementById('historyReturnComment')?.addEventListener('input', (event) => {
-  const canReturn = ['pending_dean', 'published'].includes(activeReviewHistoryItem?.status);
+  const canReturn = ['pending_dean', 'published', 'approved'].includes(activeReviewHistoryItem?.status);
   document.getElementById('submitHistoryReturnBtn').disabled = !canReturn || !event.currentTarget.value.trim();
 });
 document.getElementById('logoutBtn').addEventListener('click', async () => {

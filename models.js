@@ -103,7 +103,7 @@ const clubAccountSchema = new mongoose.Schema({
   sessionVersion: { type: Number, default: 0 },
   passwordChangedAt: { type: Date, default: null },
   lastLoginAt: { type: Date, default: null },
-  role: { type: String, enum: ['president', 'head', 'pr', 'english', 'sso', 'dean'], default: 'president' },
+  role: { type: String, enum: ['president', 'head', 'pr', 'english', 'security', 'sso', 'dean'], default: 'president' },
   committee: { type: String, default: '' }
 }, { timestamps: true, autoIndex: false });
 
@@ -111,7 +111,7 @@ const contentRequestSchema = new mongoose.Schema({
   id: { type: Number, required: true, unique: true, index: true },
   clubId: { type: Number, required: true, index: true },
   clubName: { type: String, default: '' },
-  type: { type: String, enum: ['event', 'feed', 'sponsor', 'booth'], required: true },
+  type: { type: String, enum: ['event', 'feed', 'sponsor', 'booth', 'entry_permit'], required: true },
   title: { type: String, required: true, trim: true },
   description: { type: String, default: '' },
   date: { type: String, default: '' },
@@ -119,6 +119,11 @@ const contentRequestSchema = new mongoose.Schema({
   location: { type: String, default: '' },
   budget: { type: String, default: '' },
   image: { type: String, default: '' },
+  permitItems: [{
+    quantity: { type: Number, min: 1 },
+    number: { type: String, trim: true, maxlength: 80 },
+    details: { type: String, trim: true, maxlength: 1000 }
+  }],
   sponsorName: { type: String, default: '' },
   sponsorCompany: { type: String, default: '' },
   sponsorContact: { type: String, default: '' },
@@ -142,13 +147,13 @@ const contentRequestSchema = new mongoose.Schema({
   boothCloseDate: { type: String, default: '' },
   boothContact: { type: String, default: '' },
   boothNotes: { type: String, default: '' },
-  status: { type: String, enum: ['draft', 'pending_pr', 'pending_english', 'pending_dean', 'changes_requested', 'rejected', 'published', 'deleted'], default: 'draft', index: true },
-  resubmitTo: { type: String, enum: ['pending_pr', 'pending_english'], default: 'pending_pr' },
-  editRequestedBy: { type: String, enum: ['', 'pr', 'english'], default: '' },
+  status: { type: String, enum: ['draft', 'pending_pr', 'pending_english', 'pending_security', 'pending_dean', 'changes_requested', 'rejected', 'published', 'approved', 'deleted'], default: 'draft', index: true },
+  resubmitTo: { type: String, enum: ['pending_pr', 'pending_english', 'pending_security'], default: 'pending_pr' },
+  editRequestedBy: { type: String, enum: ['', 'pr', 'english', 'security'], default: '' },
   skipEnglishOnNextPrApproval: { type: Boolean, default: false },
   clubNotice: { type: String, default: '' },
   workflowHistory: [{
-    role: { type: String, enum: ['club', 'pr', 'english', 'dean'], required: true },
+    role: { type: String, enum: ['club', 'pr', 'english', 'security', 'dean'], required: true },
     actorRole: { type: String, default: '' },
     actorEmail: { type: String, default: '' },
     action: { type: String, required: true },
@@ -160,10 +165,11 @@ const contentRequestSchema = new mongoose.Schema({
   comments: {
     pr: { type: String, default: '' },
     english: { type: String, default: '' },
+    security: { type: String, default: '' },
     dean: { type: String, default: '' }
   },
   commentHistory: [{
-    role: { type: String, enum: ['pr', 'english', 'dean'], required: true },
+    role: { type: String, enum: ['pr', 'english', 'security', 'dean'], required: true },
     text: { type: String, required: true },
     createdAt: { type: Date, default: Date.now },
     deletedAt: { type: Date, default: null }

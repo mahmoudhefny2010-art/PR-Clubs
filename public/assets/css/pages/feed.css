@@ -1,0 +1,33 @@
+.community-feed-page { max-width: 900px; padding-top: 24px; padding-bottom: 48px; }
+.feed-hero { margin-bottom: 22px; }
+.feed-eyebrow { display: inline-block; margin-bottom: 8px; color: #a51d24; font-size: .72rem; font-weight: 800; letter-spacing: .12em; }
+.feed-hero h1 { margin: 0; }
+.community-feed-panel { padding: 20px; border: 1px solid var(--border-color); border-radius: var(--radius-xl); background: var(--bg-panel); box-shadow: var(--shadow-md); }
+.community-feed-toolbar { display: flex; flex-wrap: wrap; gap: 9px; margin-bottom: 20px; }
+.feed-filter { min-height: 38px; padding: 8px 14px; border: 1px solid var(--border-color); border-radius: 999px; background: var(--bg-soft); color: var(--text-main); font: inherit; font-size: .84rem; font-weight: 700; cursor: pointer; }
+.feed-filter:hover, .feed-filter.is-active { border-color: #b91c1c; background: #b91c1c; color: #fff; }
+.feed-filter:focus-visible { outline: 3px solid rgba(185, 27, 31, .3); outline-offset: 2px; }
+.community-feed-status { margin: 0; padding: 24px 12px; color: var(--text-muted); text-align: center; }
+.community-feed-list { display: grid; gap: 16px; }
+.feed-post-card { min-width: 0; padding: 18px 20px; border: 1px solid #f0e3e3; border-radius: 16px; background: var(--bg-panel); box-shadow: 0 4px 16px rgba(201, 34, 42, .06); }
+.feed-post-card .feed-timeline-header { align-items: center; }
+.feed-post-card .feed-timeline-meta { min-width: 0; flex: 1; }
+.feed-post-type { flex: 0 0 auto; padding: 5px 10px; border-radius: 999px; background: #fff1f1; color: #a51d24; font-size: .7rem; font-weight: 800; }
+.feed-post-type.type-event { background: #eff6ff; color: #1d4ed8; }
+.feed-post-card .feed-event-meta { font-weight: 700; }
+.feed-event-footer { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.feed-event-footer .feed-timeline-text { flex: 1 1 auto; min-width: 0; }
+.feed-post-action { flex: 0 0 auto; margin: 0; text-align: right; text-decoration: none; white-space: nowrap; }
+@media (max-width: 640px) {
+  .community-feed-page { padding-top: 16px; }
+  .community-feed-panel { padding: 14px; }
+  .community-feed-toolbar { flex-wrap: nowrap; overflow-x: auto; padding: 2px 1px 8px; }
+  .feed-filter { flex: 0 0 auto; }
+  .feed-post-card { padding: 14px; }
+  .feed-post-type { font-size: .64rem; }
+  .feed-event-footer { align-items: flex-start; flex-wrap: wrap; }
+  .feed-post-action { margin-left: auto; }
+}
+:root[data-theme="dark"] body .feed-eyebrow { color: #f07880; }
+:root[data-theme="dark"] body .feed-post-card { border-color: var(--border-color); }
+:root[data-theme="dark"] body .feed-post-type.type-event { background: rgba(37, 99, 235, .2); color: #9bbcff; }

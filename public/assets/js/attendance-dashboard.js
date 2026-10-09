@@ -24,6 +24,12 @@
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? '—' : window.formatSiteTime(date);
   };
+  const attendanceApprovalLabel = (status) => ({
+    pending_pr: 'Waiting for PR',
+    pending_sso: 'Waiting for SSO',
+    pending_dean: 'SSO approved · Waiting for Dean',
+    approved: 'Dean approved · Internal'
+  })[status] || 'Waiting for PR';
   const apiJson = async (url, options) => {
     const response = await fetch(url, { cache: 'no-store', ...options });
     const payload = await response.json().catch(() => ({}));
@@ -133,7 +139,7 @@
     const table = document.createElement('table');
     table.className = 'attendance-records-table';
     const head = table.createTHead().insertRow();
-    ['Name', 'Email', 'Activity', 'Activity date', 'Activity time', 'Club', 'Check-in date', 'Check-in time', 'Note'].forEach((label) => {
+    ['Name', 'Email', 'Activity', 'Activity date', 'Activity time', 'Club', 'Check-in date', 'Check-in time', 'Approval status', 'Note'].forEach((label) => {
       const cell = document.createElement('th');
       cell.scope = 'col';
       cell.textContent = label;
@@ -142,9 +148,14 @@
     const body = table.createTBody();
     records.forEach((record) => {
       const row = body.insertRow();
-      [record.name, record.email, `${record.itemType === 'booth' ? 'Booth' : 'Event'}: ${record.eventTitle || ''}`, record.eventDate, window.formatSiteTime(record.eventTime), record.clubName, formatDate(record.attendedAt), formatTime(record.attendedAt), record.note].forEach((value) => {
-        row.insertCell().textContent = value || '—';
-      });
+      const values = [record.name, record.email, `${record.itemType === 'booth' ? 'Booth' : 'Event'}: ${record.eventTitle || ''}`, record.eventDate, window.formatSiteTime(record.eventTime), record.clubName, formatDate(record.attendedAt), formatTime(record.attendedAt)];
+      values.forEach((value) => { row.insertCell().textContent = value || '—'; });
+      const statusCell = row.insertCell();
+      const statusBadge = document.createElement('span');
+      statusBadge.className = 'attendance-approval-status';
+      statusBadge.textContent = attendanceApprovalLabel(record.approvalStatus);
+      statusCell.append(statusBadge);
+      row.insertCell().textContent = record.note || '—';
     });
     recordsList.append(table);
     recordsList.scrollTop = previousScrollTop;

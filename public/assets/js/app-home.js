@@ -58,7 +58,6 @@ const totalClubsStat = document.getElementById('totalClubsStat');
 const openClubsStat = document.getElementById('openClubsStat');
 const fullClubsStat = document.getElementById('fullClubsStat');
 const openingSoonClubsStat = document.getElementById('openingSoonClubsStat');
-const totalApplicantsStat = document.getElementById('totalApplicantsStat');
 const homePageTitle = document.getElementById('homePageTitle');
 const homePageSubtitle = document.getElementById('homePageSubtitle');
 const adminClubList = document.getElementById('adminClubList');
@@ -278,13 +277,23 @@ async function loadApplications() {
 }
 
 function createApprovalRequestCheckpoint(request) {
-  const labels = ['Submitted', 'PR review', 'English review', 'Dean review', 'Published'];
-  const stageByRole = { club: 0, pr: 1, english: 2, dean: 3 };
-  const statusIndex = { draft: -1, pending_pr: 1, pending_english: 2, pending_dean: 3, published: 4 };
+  const isEntryPermit = request.type === 'entry_permit';
+  const labels = isEntryPermit
+    ? ['Submitted', 'PR review', 'Security review', 'PR final review', 'Dean view']
+    : ['Submitted', 'PR review', 'English review', 'Dean review', 'Published'];
+  const stageByRole = { club: 0, pr: 1, english: 2, security: 2, dean: 3 };
+  const statusIndex = isEntryPermit
+    ? { draft: -1, pending_security: 2, pending_dean: 3, approved: 4 }
+    : { draft: -1, pending_pr: 1, pending_english: 2, pending_dean: 3, published: 4 };
   const status = String(request.status || 'draft');
   const history = Array.isArray(request.workflowHistory) ? request.workflowHistory : [];
   const lastEvent = history[history.length - 1];
-  let currentIndex = statusIndex[status] ?? (status === 'changes_requested' ? stageByRole[request.editRequestedBy] || 1 : 4);
+  const latestSecurityReview = [...history].reverse().find((event) => event.role === 'security'
+    && ['approve', 'request_edit', 'reject', 'restarted_review'].includes(event.action));
+  const entryPermitFinalReview = isEntryPermit && latestSecurityReview?.action === 'approve';
+  let currentIndex = status === 'pending_pr' && isEntryPermit
+    ? (entryPermitFinalReview ? 3 : 1)
+    : statusIndex[status] ?? (status === 'changes_requested' ? stageByRole[request.editRequestedBy] || 1 : 4);
   const terminalClass = ['rejected', 'deleted'].includes(status) ? 'is-failed' : '';
   if (terminalClass) currentIndex = stageByRole[lastEvent?.role] ?? 4;
 
@@ -298,7 +307,7 @@ function createApprovalRequestCheckpoint(request) {
   state.className = `approval-request-state${terminalClass ? ' is-failed' : ''}`;
   state.textContent = status === 'changes_requested'
     ? `Changes requested · ${request.editRequestedBy || 'review team'}`
-    : status.replaceAll('_', ' ');
+    : status === 'approved' ? 'Approved · Internal only' : status.replaceAll('_', ' ');
   heading.append(title, state);
 
   const requestTrack = document.createElement('div');
@@ -399,8 +408,8 @@ async function loadClubReviewNotifications() {
     if (!response.ok) throw new Error('Could not load approval checkpoints.');
     renderApprovalCheckpoints(items);
     const actionableUpdates = items.flatMap((item) => (Array.isArray(item.workflowHistory) ? item.workflowHistory : [])
-      .filter((event) => ['request_edit', 'reject', 'comment', 'returned_to_pr', 'returned_to_english'].includes(event.action)
-        && ['pr', 'english', 'dean'].includes(event.role))
+      .filter((event) => ['request_edit', 'reject', 'comment', 'returned_to_pr', 'returned_to_english', 'returned_to_security'].includes(event.action)
+        && ['pr', 'english', 'security', 'dean'].includes(event.role))
       .map((event) => ({
         item,
         event,
@@ -425,13 +434,14 @@ async function loadClubReviewNotifications() {
     const latestUpdate = actionableUpdates[0];
     if (!latestUpdate || seenSet.has(latestUpdate.key) || new Date(latestUpdate.event.createdAt || 0).getTime() <= seenThrough) return;
 
-    const roleLabels = { pr: 'PR', english: 'English Department', dean: 'Dean' };
+    const roleLabels = { pr: 'PR', english: 'English Department', security: 'Security Office', dean: 'Dean' };
     const actionLabels = {
       request_edit: 'requested changes',
       reject: 'rejected the request',
       comment: 'left a comment',
       returned_to_pr: 'returned the request to PR for another review',
-      returned_to_english: 'returned the request to English for another review'
+      returned_to_english: 'returned the request to English for another review',
+      returned_to_security: 'returned the permit to the Security Office for another review'
     };
     list.replaceChildren();
     const { item, event } = latestUpdate;
@@ -475,6 +485,10 @@ async function loadClubReviewNotifications() {
   }
 }
 
+window.addEventListener('club:entry-permit-submitted', () => {
+  if (state.clubAccount?.role === 'president') loadClubReviewNotifications();
+});
+
 function startApprovalCheckpointLiveUpdates() {
   if (approvalCheckpointRefreshTimer) clearInterval(approvalCheckpointRefreshTimer);
   approvalCheckpointRefreshTimer = setInterval(() => {
@@ -507,8 +521,8 @@ async function openClubPortal(initialSession = null) {
       return;
     }
 
-    if (session.club && ['pr', 'english', 'sso', 'dean'].includes(session.club.role)) {
-      const routes = { pr: '/dashboards/pr-dashboard.html', english: '/dashboards/english-dashboard.html', sso: '/dashboards/sso-dashboard.html', dean: '/dashboards/dean-dashboard.html' };
+    if (session.club && ['pr', 'english', 'security', 'sso', 'dean'].includes(session.club.role)) {
+      const routes = { pr: '/dashboards/pr-dashboard.html', english: '/dashboards/english-dashboard.html', security: '/dashboards/security-dashboard.html', sso: '/dashboards/sso-dashboard.html', dean: '/dashboards/dean-dashboard.html' };
       window.location.assign(routes[session.club.role]);
       return;
     }
@@ -529,12 +543,14 @@ async function openClubPortal(initialSession = null) {
       || (club.role === 'head' && (/(^|[^a-z])it([^a-z]|$)/.test(attendanceCommittee) || attendanceCommittee.includes('information technology')));
     presidentHeadManager.classList.toggle('hidden', club.role !== 'president');
     presidentFormManager.classList.toggle('hidden', club.role !== 'president');
-    presidentSidebar.classList.toggle('hidden', !canViewAttendance);
-    presidentDashboardLayout.classList.toggle('is-president', canViewAttendance);
+    const canViewClubOperations = ['president', 'head'].includes(club.role);
+    presidentSidebar.classList.toggle('hidden', !canViewClubOperations);
+    presidentDashboardLayout.classList.toggle('is-president', canViewClubOperations);
     presidentSidebar.querySelectorAll('[data-president-only]').forEach((item) => item.classList.toggle('hidden', !isPresident));
     document.getElementById('approvalCheckpointPanel')?.classList.toggle('hidden', club.role !== 'president');
     document.getElementById('openMemberManagerBtn')?.classList.toggle('hidden', club.role !== 'president');
     document.getElementById('openAttendanceManagerBtn')?.classList.toggle('hidden', !canViewAttendance);
+    document.getElementById('openEntryPermitDialogBtn')?.classList.toggle('hidden', !canViewClubOperations);
     interviewFormManager.classList.add('hidden');
     toggleInterviewFormBtn.classList.remove('hidden');
     toggleInterviewFormBtn.setAttribute('aria-expanded', 'false');
@@ -644,13 +660,10 @@ function renderClubGrid() {
   const openCount = state.clubs.filter((club) => club.status === 'open').length;
   const fullCount = state.clubs.filter((club) => club.status === 'full').length;
   const openingSoonCount = state.clubs.filter((club) => club.status === 'opening-soon').length;
-  const applicantTotal = state.clubs.reduce((sum, club) => sum + (club.applicants || 0), 0);
-
   if (totalClubsStat) totalClubsStat.textContent = state.clubs.length;
   if (openClubsStat) openClubsStat.textContent = openCount;
   if (fullClubsStat) fullClubsStat.textContent = fullCount;
   if (openingSoonClubsStat) openingSoonClubsStat.textContent = openingSoonCount;
-  if (totalApplicantsStat) totalApplicantsStat.textContent = applicantTotal;
 
   const filteredClubs = state.clubs.filter((club) => {
     const matchesCat = state.activeCategory === 'All' || club.category === state.activeCategory;

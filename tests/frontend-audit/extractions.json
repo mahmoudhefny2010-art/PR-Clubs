@@ -1,0 +1,29 @@
+{
+  "styles": {
+    "public/404.html": "pages/error-404.css",
+    "public/500.html": "pages/error-500.css",
+    "public/attendance.html": "pages/attendance.css",
+    "public/index.html": "pages/home.css",
+    "public/dashboards/pr-dashboard.html": "pages/pr-dashboard.css",
+    "public/dashboards/english-dashboard.html": "pages/english-dashboard.css",
+    "public/dashboards/dean-dashboard.html": "pages/dean-dashboard.css",
+    "public/dashboards/sso-dashboard.html": "pages/sso-dashboard.css",
+    "public/pages/applicant-login.html": "pages/applicant-login.css",
+    "public/pages/club-content.html": "pages/club-content.css",
+    "public/pages/booth-form.html": "pages/content-form.css",
+    "public/pages/event-form.html": "pages/content-form.css",
+    "public/pages/feed-form.html": "pages/content-form.css",
+    "public/pages/sponsor-form.html": "pages/content-form.css",
+    "public/pages/forgot-password.html": "pages/password-recovery.css",
+    "public/pages/reset-password.html": "pages/password-recovery.css"
+  },
+  "scripts": {
+    "public/pages/applicant-login.html": "pages/applicant-login.js",
+    "public/pages/booth-form.html": "pages/booth-form.js",
+    "public/pages/event-form.html": "pages/event-form.js",
+    "public/pages/feed-form.html": "pages/feed-form.js",
+    "public/pages/sponsor-form.html": "pages/sponsor-form.js",
+    "public/pages/forgot-password.html": "pages/forgot-password.js",
+    "public/pages/reset-password.html": "pages/reset-password.js"
+  }
+}

@@ -1,8 +1,8 @@
 // Shared logic for the dedicated content module forms (Event, Feed, Sponsor, Booth).
 // Each module page assigns its own content type automatically — the user never picks a type.
 const ContentStudio = (() => {
-  const reviewerNames = { pr: 'PR Department', english: 'English Department', dean: 'Dean' };
-  const typeLabels = { event: 'Event', feed: 'Feed', sponsor: 'Sponsor', booth: 'Booth' };
+  const reviewerNames = { pr: 'PR Department', english: 'English Department', security: 'Security Office', dean: 'Dean' };
+  const typeLabels = { event: 'Event', feed: 'Feed', sponsor: 'Sponsor', booth: 'Booth', entry_permit: 'Entry Permit' };
 
   function escapeHtml(value) {
     return String(value ?? '').replace(/[&<>"']/g, (character) => ({
@@ -50,6 +50,11 @@ const ContentStudio = (() => {
     return item.image || '';
   }
 
+  function renderPermitItems(item) {
+    if (item.type !== 'entry_permit' || !Array.isArray(item.permitItems) || !item.permitItems.length) return '';
+    return `<div class="entry-permit-table-wrap content-card-permit-items"><table class="entry-permit-table"><thead><tr><th>Qty</th><th>Number / ID</th><th>Details</th></tr></thead><tbody>${item.permitItems.map((row) => `<tr><td>${escapeHtml(row.quantity)}</td><td>${escapeHtml(row.number)}</td><td>${escapeHtml(row.details)}</td></tr>`).join('')}</tbody></table></div>`;
+  }
+
   function renderCard(item) {
     const activeComment = getActiveReviewComment(item);
     const image = contentImage(item);
@@ -62,6 +67,7 @@ const ContentStudio = (() => {
       <div style="flex:1">
         <strong>${escapeHtml(item.title)}</strong>
         <div class="meta"><span class="type-badge type-${escapeHtml(item.type)}">${escapeHtml(label)}</span>${escapeHtml(contentMeta(item)) || 'no details'}</div>
+        ${renderPermitItems(item)}
         <div><span class="status-badge status-${escapeHtml(item.status)}" title="Request status">${escapeHtml(item.status.replaceAll('_', ' '))}</span></div>
         ${item.clubNotice ? `<div role="status" style="margin-top:8px;padding:9px 11px;border-radius:10px;background:#fff1d5;color:#92400e;font-size:.85rem"><strong>Review update:</strong> ${escapeHtml(item.clubNotice)}</div>` : ''}
         ${activeComment ? `<section class="review-comments" style="margin-top:10px"><strong>Active comment</strong><p class="meta" style="margin:5px 0;white-space:pre-wrap"><strong>${reviewerNames[activeComment.role]}:</strong> ${escapeHtml(activeComment.text)}</p></section>` : ''}
@@ -205,6 +211,16 @@ const ContentStudio = (() => {
       formFeedback.textContent = '';
       if (window.validateDataEntryForm && !window.validateDataEntryForm(contentForm)) return;
       const payload = { ...(collect ? collect() : {}), submit };
+      if (submit && (type === 'event' || type === 'feed') && !String(payload.image || '').trim()) {
+        formFeedback.textContent = 'Add an image before submitting this content for review.';
+        document.getElementById('imageInput')?.focus();
+        return;
+      }
+      if (submit && type === 'sponsor' && !String(payload.sponsorLogo || '').trim()) {
+        formFeedback.textContent = 'Add the company logo before submitting this sponsor for review.';
+        document.getElementById('sponsorLogoInput')?.focus();
+        return;
+      }
       const url = editingId ? `/api/club/content/${editingId}` : `/api/club/content/${type}`;
       const method = editingId ? 'PUT' : 'POST';
       try {
@@ -215,6 +231,10 @@ const ContentStudio = (() => {
           ? 'Saved as draft.'
           : result.status === 'pending_english'
             ? 'Resubmitted to English Department.'
+            : result.status === 'pending_security'
+              ? 'Resubmitted to Security Office.'
+              : result.status === 'pending_dean'
+                ? 'Resubmitted to the Dean.'
             : result.status === 'pending_pr'
               ? 'Submitted to PR Department.'
               : 'Submitted for review.';

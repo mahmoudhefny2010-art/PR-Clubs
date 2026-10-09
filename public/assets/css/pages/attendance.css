@@ -1,0 +1,11 @@
+
+    body { display: grid; place-items: center; padding: 24px; }
+    .attendance-checkin { width: min(100%, 460px); margin: 0; padding: 30px; text-align: center; }
+    .attendance-checkin h1 { margin: 0 0 8px; font-size: 1.55rem; }
+    .attendance-checkin p { color: var(--text-muted); }
+    .attendance-checkin form { display: grid; gap: 16px; margin-top: 24px; }
+    .attendance-checkin label { display: grid; gap: 7px; font-weight: 700; }
+    .attendance-checkin input, .attendance-checkin textarea { width: 100%; padding: 12px 14px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: #fff; color: #111827; }
+    .attendance-checkin textarea { min-height: 90px; resize: vertical; }
+    .attendance-checkin .admin-feedback { min-height: 1.5em; }
+    .attendance-checkin .admin-feedback.is-error { color: var(--danger); }

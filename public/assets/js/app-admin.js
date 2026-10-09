@@ -696,6 +696,7 @@ function openClubDetail(clubId) {
 
   state.selectedClub = club;
   clubDetail.innerHTML = `
+    <button class="club-detail-close" data-action="go-home" type="button" aria-label="Close club details" title="Close">&times;</button>
     <div class="club-detail-hero">
       <div class="detail-logo-frame">
         <img class="detail-logo${club.imageFit === 'contain' ? ' detail-logo-contain' : ''}" src="${escapeHtml(club.image)}" alt="${escapeHtml(club.name)} logo" />
@@ -707,6 +708,7 @@ function openClubDetail(clubId) {
         <div class="detail-meta">${escapeHtml(club.committee)}</div>
         <span class="status-pill status-${escapeHtml(club.status)}">${escapeHtml(getClubStatusLabel(club.status))}</span>
         ${club.pinned ? '<span class="detail-pinned-label">Featured club</span>' : ''}
+        <button class="primary-btn club-detail-apply" data-action="apply-club" data-id="${club.id}" ${canApply ? '' : 'disabled'}>${canApply ? 'Apply Now' : escapeHtml(getClubActionLabel(club.status))}</button>
       </div>
     </div>
     <section class="detail-section">
@@ -736,10 +738,6 @@ function openClubDetail(clubId) {
 
     ${renderClubContentSections(club)}
 
-    <div class="detail-actions">
-      <button class="primary-btn" data-action="apply-club" data-id="${club.id}" ${canApply ? '' : 'disabled'}>${canApply ? 'Apply Now' : escapeHtml(getClubActionLabel(club.status))}</button>
-      <button class="secondary-btn" data-action="go-home">Back</button>
-    </div>
   `;
 
   clubDetail.querySelector('[data-action="apply-club"]').addEventListener('click', () => openApplicationForm(clubId));
@@ -754,6 +752,7 @@ function openClubDetail(clubId) {
   });
 
   showView('club');
+  window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
 }
 
 async function openApplicationForm(clubId, allowClosedClub = false) {

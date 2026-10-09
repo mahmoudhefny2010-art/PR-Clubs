@@ -11,27 +11,10 @@
     <link rel="stylesheet" href="/assets/css/base.css?v=20261009q" />
     <link rel="stylesheet" href="/assets/css/responsive.css?v=20261006e" />
     <link rel="stylesheet" href="/assets/css/dark.css?v=20261009c" />
-    <link rel="stylesheet" href="/assets/css/features.css?v=20261009aj" />
+    <link rel="stylesheet" href="/assets/css/features.css?v=20261010permitpicker1" />
     <link rel="stylesheet" href="/assets/css/event-modal.css?v=3" />
     <link rel="icon" href="/assets/img/pics/logo.svg.png" type="image/png">
-    <style>
-      .admin-login-panel { max-width: 460px; margin: 48px auto; padding: 36px 32px; text-align: center; }
-      .admin-login-panel h2 { text-align: center; font-size: 1.6rem; font-weight: 800; margin: 0 0 8px; }
-      #adminLoginMessage { text-align: center; color: var(--text-muted); margin: 0 0 24px; font-size: .95rem; }
-      #adminLoginForm { text-align: left; }
-      #adminLoginForm .primary-btn { width: 100%; padding: 13px; font-size: 1rem; border-radius: var(--radius-md); }
-      #adminLoginForgotWrap { text-align: center; margin-top: 14px; }
-      .login-foot { text-align: center; margin-top: 22px; font-size: .9rem; color: var(--text-muted); }
-      .login-foot-link { background: none; border: none; padding: 0; color: var(--primary-700); font-weight: 700; cursor: pointer; font-size: .9rem; }
-      .login-foot-link:hover { text-decoration: underline; }
-      .admin-feedback { margin-top: 14px; text-align: center; }
-      .content-type-badge { display: inline-block; margin: 4px 0 0; padding: 2px 9px; border-radius: 999px; font-size: .64rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
-      .content-type-badge.event { background: #dbeafe; color: #1d4ed8; }
-      .content-type-badge.feed { background: #ede9fe; color: #6d28d9; }
-      .content-type-badge.sponsor { background: #fef3c7; color: #92400e; }
-      .content-type-badge.booth { background: #d1fae5; color: #065f46; }
-      .club-image-placeholder { width: 120px; height: 120px; margin: 18px auto 0; background: #f3f4f6; color: #6b7280; font-size: .66rem; font-weight: 800; display: flex; align-items: center; justify-content: center; text-transform: uppercase; letter-spacing: .04em; border-radius: 12px; }
-    </style>
+    <link rel="stylesheet" href="/assets/css/pages/home.css?v=1" />
 </head>
   <body>
     <div class="page-shell">
@@ -51,8 +34,8 @@
               <h2>Today &amp; Past Events</h2>
             </div>
             <div class="events-slideshow-track" id="eventsSlideshowTrack"></div>
-            <button class="slide-arrow slide-prev" id="slidePrev" type="button" aria-label="Previous">&larr;</button>
-            <button class="slide-arrow slide-next" id="slideNext" type="button" aria-label="Next">&rarr;</button>
+            <button class="slide-arrow slide-prev" id="slidePrev" type="button" aria-label="Previous">&lsaquo;</button>
+            <button class="slide-arrow slide-next" id="slideNext" type="button" aria-label="Next">&rsaquo;</button>
             <div class="events-slideshow-dots" id="eventsSlideshowDots"></div>
           </section>
 
@@ -72,10 +55,6 @@
             <div class="summary-card">
               <span>Opening Soon</span>
               <strong id="openingSoonClubsStat">0</strong>
-            </div>
-            <div class="summary-card">
-              <span>Applicants</span>
-              <strong id="totalApplicantsStat">0</strong>
             </div>
           </div>
 
@@ -469,6 +448,7 @@
                 <span id="approvalCheckpointStatus" class="approval-checkpoint-status is-live">Loading timeline...</span>
               </div>
             </section>
+
             <dialog id="approvalCheckpointMoreDialog" class="approval-checkpoint-more-dialog" aria-labelledby="approvalCheckpointMoreTitle">
               <div class="approval-checkpoint-more-inner">
                 <header class="approval-checkpoint-more-header">
@@ -480,7 +460,7 @@
             </dialog>
 
             <div id="presidentDashboardLayout" class="president-dashboard-layout">
-              <nav id="presidentSidebar" class="president-sidebar hidden" data-unread-scope="club-president" aria-label="President dashboard sections">
+              <nav id="presidentSidebar" class="president-sidebar hidden" data-unread-scope="club-president" aria-label="Club dashboard sections">
                 <span class="president-sidebar-title">Dashboard</span>
                 <a href="#presidentOverviewPanel" data-dashboard-section="presidentOverviewPanel">Overview</a>
                 <a href="#presidentHeadManager" data-dashboard-section="presidentHeadManager" data-unread-section="committeeHeads" data-president-only>Committee heads <span class="sidebar-unread-badge" data-unread-badge="committeeHeads" hidden></span></a>
@@ -490,6 +470,7 @@
                 <span class="president-sidebar-group-title">Club operations</span>
                 <button id="openMemberManagerBtn" class="president-sidebar-action hidden" data-unread-section="clubMembers" type="button">Club members <span class="sidebar-unread-badge" data-unread-badge="clubMembers" hidden></span></button>
                 <button id="openAttendanceManagerBtn" class="president-sidebar-action hidden" data-unread-section="eventAttendance" type="button">Event attendance <span class="sidebar-unread-badge" data-unread-badge="eventAttendance" hidden></span></button>
+                <button id="openEntryPermitDialogBtn" class="president-sidebar-action hidden" type="button">Entry permits</button>
               </nav>
               <div class="president-dashboard-main">
             <section id="presidentHeadManager" class="committee-head-manager hidden">
@@ -701,6 +682,28 @@
         </div>
       </dialog>
 
+      <dialog id="entryPermitDialog" class="committee-attendance-dialog entry-permit-dialog" aria-labelledby="entryPermitDialogTitle">
+        <div class="committee-attendance-inner">
+          <header class="committee-attendance-header">
+            <div><span class="admin-eyebrow">CLUB OPERATIONS</span><h2 id="entryPermitDialogTitle">New campus entry permit</h2><p>Submitted requests go to PR, Security, PR for final approval, then the Dean for viewing.</p></div>
+            <button id="closeEntryPermitDialogBtn" class="calendar-close-btn" type="button" aria-label="Close entry permit form">&times;</button>
+          </header>
+          <form id="dashboardEntryPermitForm" class="entry-permit-form">
+            <div class="entry-permit-fields">
+              <label>Request title<input name="title" required maxlength="140" placeholder="e.g. Equipment entry for event"></label>
+              <div class="entry-permit-field"><label for="dashboardPermitDate">Requested date</label><div class="entry-permit-picker"><input id="dashboardPermitDate" name="date" type="date" required><button type="button" data-open-picker="dashboardPermitDate" aria-label="Choose requested date" title="Choose date"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2"></rect><path d="M7.5 3.5v3M16.5 3.5v3M3.5 9.5h17M8 13h.01M12 13h.01M16 13h.01M8 16.5h.01M12 16.5h.01"></path></svg></button></div></div>
+              <div class="entry-permit-field"><label for="dashboardPermitTime">Entry time</label><div class="entry-permit-picker"><input id="dashboardPermitTime" name="time" type="time"><button type="button" data-open-picker="dashboardPermitTime" aria-label="Choose entry time" title="Choose time"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7v5l3.5 2"></path></svg></button></div></div>
+              <label>Campus location / destination<input name="location" required maxlength="120" placeholder="Building, gate, or venue"></label>
+            </div>
+            <section class="entry-permit-items-section" aria-labelledby="entryPermitItemsTitle">
+              <div class="entry-permit-items-heading"><div><h3 id="entryPermitItemsTitle">People and items to bring in</h3><p>Add a row for each person, item, or equipment type.</p></div><button id="addPermitItemRowBtn" class="secondary-btn" type="button">Add row</button></div>
+              <div class="entry-permit-table-wrap"><table class="entry-permit-table"><thead><tr><th scope="col">Quantity</th><th scope="col">Number / ID</th><th scope="col">Details</th><th scope="col"><span class="sr-only">Remove row</span></th></tr></thead><tbody id="dashboardPermitItemsBody"></tbody></table></div>
+            </section>
+            <div class="entry-permit-form-footer"><p id="dashboardEntryPermitFeedback" role="status" aria-live="polite"></p><button id="submitEntryPermitBtn" class="primary-btn" type="submit">Submit to PR</button></div>
+          </form>
+        </div>
+      </dialog>
+
       <dialog id="adminDataStatusDialog" class="admin-data-status-dialog" aria-labelledby="adminDataStatusTitle">
         <div class="admin-data-status-inner">
           <header class="admin-data-status-header">
@@ -853,12 +856,13 @@
 
     <script src="/assets/js/event-modal.js?v=2"></script>
     <script src="/assets/js/committee-sidebar.js?v=13"></script>
-    <script src="/assets/js/app-home.js?v=20261009ab"></script>
+    <script src="/assets/js/app-home.js?v=20261010sidebar1"></script>
     <script src="/assets/js/app-admin.js?v=20261009c"></script>
     <script src="/assets/js/app-dashboard.js?v=20261009x"></script>
     <script src="/assets/js/admin-data-status.js?v=2" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js" defer></script>
-    <script src="/assets/js/attendance-dashboard.js?v=13" defer></script>
+    <script src="/assets/js/attendance-dashboard.js?v=20261009attendance1" defer></script>
+    <script src="/assets/js/entry-permit-dashboard.js?v=20261010permitpicker1" defer></script>
     <script src="/assets/js/member-directory.js?v=20261009s"></script>
     <script src="/assets/js/layout.js?v=11" defer></script>
     <script src="/assets/js/theme.js?v=20261009c" defer></script>
