@@ -34,6 +34,13 @@
 .request-dialog .dialog-actions button:focus-visible { outline: 3px solid rgba(185, 27, 31, .35); outline-offset: 2px; }
 .request-dialog .dialog-actions button:disabled { cursor: not-allowed; opacity: .58; }
 .request-dialog .dialog-actions .delete-request { background: #fff1f1; border-color: #fecaca; color: #991b1b; }
+.request-dialog .detail-item.detail-wide { grid-column: 1 / -1; }
+.request-dialog .entry-permit-table { min-width: 0; table-layout: fixed; }
+.request-dialog .entry-permit-table th:nth-child(1), .request-dialog .entry-permit-table td:nth-child(1) { width: 16%; }
+.request-dialog .entry-permit-table th:nth-child(2), .request-dialog .entry-permit-table td:nth-child(2) { width: 24%; }
+.request-dialog .entry-permit-table th, .request-dialog .entry-permit-table td { overflow-wrap: anywhere; }
+.request-dialog .dialog-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 130px), 1fr)); align-items: stretch; }
+.request-dialog .dialog-actions button { min-width: 0; white-space: normal; text-align: center; }
 .committee-approval-list { display: grid; gap: 7px; margin-top: 10px; }
 .committee-approval-row { display: flex; min-height: 40px; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 10px; border: 1px solid #e6eaf0; border-radius: 10px; background: #fafbfc; font-size: .88rem; }
 .committee-approval-row > span { min-width: 0; font-weight: 650; }
@@ -343,9 +350,12 @@
   #attendanceQrDialog[open] .attendance-qr-result { display: block !important; margin: 8vh auto; border: 0; }
 }
 @media (max-width: 600px) {
-  .request-dialog .dialog-actions button { flex: 1 1 calc(50% - 9px); min-width: 0; white-space: normal; }
+  .request-dialog .dialog-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .committee-approval-row { align-items: flex-start; }
   .committee-approval-row > strong { text-align: center; }
+}
+@media (max-width: 380px) {
+  .request-dialog .dialog-actions { grid-template-columns: 1fr; }
 }
 
 #adminDataStatusSections { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; gap: 12px; }

@@ -244,7 +244,7 @@ function openDetails(item, context = 'pending') {
       requestDetails.append(permitSection);
     }
   }
-  addDetail('Status', formatStatus(item.status));
+  addDetail('Status', formatStatus(item.status), true);
   if (item.type !== 'sponsor' && item.type !== 'booth' && (item.type !== 'entry_permit' || !item.permitItems?.length)) {
     addDetail('Description', item.description, true);
   }
