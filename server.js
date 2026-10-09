@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const nodemailer = require('nodemailer');
 const cloudinary = require('cloudinary').v2;
+const { createAskAiRouter } = require('./services/ask-ai');
 const {
   Club,
   Application,
@@ -327,7 +328,7 @@ let clubs = readJsonFile(clubsFile, defaultClubs).map((club, index) => ({
 }));
 let clubAccounts = readJsonFile(clubAccountsFile, []).map((account) => ({
   ...account,
-  role: ['head', 'pr', 'english', 'sso', 'dean'].includes(account.role) ? account.role : 'president',
+  role: ['head', 'pr', 'english', 'security', 'sso', 'dean'].includes(account.role) ? account.role : 'president',
   committee: typeof account.committee === 'string' ? account.committee : ''
 }));
 
@@ -786,7 +787,7 @@ async function identifySiteVisitor(req) {
     const clubAccount = await getClubAccountFromRequest(req);
     if (clubAccount) {
       const club = clubs.find((item) => Number(item.id) === Number(clubAccount.clubId));
-      const roleLabels = { president: 'Club president', head: 'Committee head', pr: 'PR', english: 'English', sso: 'SSO', dean: 'Dean' };
+      const roleLabels = { president: 'Club president', head: 'Committee head', pr: 'PR', english: 'English', security: 'Security Office', sso: 'SSO', dean: 'Dean' };
       const role = roleLabels[clubAccount.role] || 'Club account';
       return {
         accountType: 'club', accountEmail: clubAccount.email,
@@ -1011,6 +1012,17 @@ function toPublicClubRecord(record) {
   return publicRecord;
 }
 
+app.use('/api/ask-ai', createAskAiRouter({
+  getPublicClubs: async () => {
+    const records = mongoReady
+      ? await Club.find({ archivedAt: null })
+        .select('id sortOrder name committee category tagline description requirements applicationIntro status committeeAvailability events posts')
+        .sort({ sortOrder: 1, id: 1 }).lean()
+      : clubs.filter((club) => !club.archivedAt);
+    return records.map(toPublicClubRecord);
+  }
+}));
+
 const MY_FORM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const MY_FORM_CODE_PATTERN = /^[A-HJ-NP-Z2-9]{12}$/i;
 const myFormAccessAttempts = new Map();
@@ -1090,7 +1102,7 @@ async function initializeMongoData() {
     await ClubAccount.bulkWrite(clubAccounts.map(({ clubId, email, salt, passwordHash, role, committee }) => ({
       updateOne: {
         filter: { clubId, email },
-        update: { $setOnInsert: { clubId, email, salt, passwordHash, role: ['head', 'pr', 'english', 'sso', 'dean'].includes(role) ? role : 'president', committee: committee || '' } },
+        update: { $setOnInsert: { clubId, email, salt, passwordHash, role: ['head', 'pr', 'english', 'security', 'sso', 'dean'].includes(role) ? role : 'president', committee: committee || '' } },
         upsert: true
       }
     })));
@@ -1114,6 +1126,16 @@ async function initializeMongoData() {
   // Legacy feed posts used the generic "post" type; normalize them to "feed".
   await ContentRequest.updateMany({ type: 'post' }, { $set: { type: 'feed' } });
 
+  // Permits previously sent from Security directly to the Dean need the PR's final approval.
+  const permitsAwaitingDean = await ContentRequest.find({ type: 'entry_permit', status: 'pending_dean' });
+  for (const record of permitsAwaitingDean) {
+    record.status = 'pending_pr';
+    record.resubmitTo = 'pending_pr';
+    record.clubNotice = 'Security Office review is complete. Waiting for PR final approval.';
+    appendWorkflowEvent(record, 'security', 'sent_to_pr_final_review', 'pending_dean', 'pending_pr');
+    await record.save();
+  }
+
   clubs = (await Club.find().sort({ sortOrder: 1, id: 1 }).lean()).map((record, index) => ({
     ...toApiRecord(record),
     sortOrder: Number.isFinite(Number(record.sortOrder)) ? Number(record.sortOrder) : index + 1,
@@ -1122,7 +1144,7 @@ async function initializeMongoData() {
   applications = await Application.find().sort({ id: 1 }).lean();
   clubAccounts = (await ClubAccount.find().sort({ clubId: 1, role: 1, committee: 1 }).lean()).map((account) => ({
     ...toApiRecord(account),
-    role: ['head', 'pr', 'english', 'sso', 'dean'].includes(account.role) ? account.role : 'president',
+    role: ['head', 'pr', 'english', 'security', 'sso', 'dean'].includes(account.role) ? account.role : 'president',
     committee: account.committee || ''
   }));
 }
@@ -1209,7 +1231,7 @@ app.get('/api/club-auth/session', async (req, res) => {
     console.error('Club session validation failed:', error.name);
     return res.status(503).json({ message: 'Club access is temporarily unavailable.' });
   }
-  if (account && ['pr', 'english', 'sso', 'dean'].includes(account.role)) {
+  if (account && ['pr', 'english', 'security', 'sso', 'dean'].includes(account.role)) {
     return res.json({
       configured: clubAccounts.length > 0,
       authenticated: true,
@@ -1254,7 +1276,7 @@ app.post('/api/club-auth/login', async (req, res) => {
   if (!await clearLoginSourceFailures(req, res)) return;
   await recordSuccessfulSignIn('club', account.email);
   setClubSessionCookie(req, res, account);
-  const committeeRoles = ['pr', 'english', 'sso', 'dean'];
+  const committeeRoles = ['pr', 'english', 'security', 'sso', 'dean'];
   const club = committeeRoles.includes(account.role)
     ? { id: 0, name: account.role.toUpperCase(), image: '/assets/img/pics/logo.svg.png', role: account.role, committee: '' }
     : clubs.find((item) => item.id === account.clubId);
@@ -2126,7 +2148,7 @@ app.delete('/api/club/heads/:email', requireClubAuth, requireClubPresident, asyn
 
 function requireCommitteeRole(req, res, next) {
   const role = req.clubAccount?.role;
-  if (!['pr', 'english', 'dean'].includes(role)) {
+  if (!['pr', 'english', 'security', 'dean'].includes(role)) {
     return res.status(403).json({ message: 'Committee access only.' });
   }
   next();
@@ -2212,19 +2234,25 @@ app.get('/api/committee/club-members', requireClubAuth, async (req, res) => {
   }
 });
 
-const committeeStage = { pr: 'pending_pr', english: 'pending_english', dean: 'pending_dean' };
-const committeeRoleLabels = { pr: 'PR Department', english: 'English Department', dean: 'Dean' };
+const committeeStage = { pr: 'pending_pr', english: 'pending_english', security: 'pending_security', dean: 'pending_dean' };
+const committeeRoleLabels = { pr: 'PR Department', english: 'English Department', security: 'Security Office', dean: 'Dean' };
+
+function committeeCanAccessRequest(role, type) {
+  if (role === 'security') return type === 'entry_permit';
+  if (role === 'english') return ['event', 'feed', 'sponsor', 'booth'].includes(type);
+  return ['pr', 'dean'].includes(role);
+}
 
 // Dedicated content types. Each module (Event, Feed, Sponsor, Booth) assigns its own type.
-const CONTENT_TYPES = ['event', 'feed', 'sponsor', 'booth'];
-const contentTypeLabels = { event: 'Event', feed: 'Feed', sponsor: 'Sponsor', booth: 'Booth' };
+const CONTENT_TYPES = ['event', 'feed', 'sponsor', 'booth', 'entry_permit'];
+const contentTypeLabels = { event: 'Event', feed: 'Feed', sponsor: 'Sponsor', booth: 'Booth', entry_permit: 'Entry Permit' };
 const contentHomeLabels = {
   event: 'Upcoming Event',
   feed: 'Latest Feed',
   sponsor: 'Upcoming Sponsor',
   booth: 'Booth Opening Soon'
 };
-const contentSingular = { event: 'event', feed: 'feed post', sponsor: 'sponsor request', booth: 'booth request' };
+const contentSingular = { event: 'event', feed: 'feed post', sponsor: 'sponsor request', booth: 'booth request', entry_permit: 'entry permit' };
 const contentClubField = { event: 'events', feed: 'posts', sponsor: 'sponsors', booth: 'booths' };
 
 function isContentType(value) {
@@ -2278,10 +2306,27 @@ function extractBoothFields(body) {
   };
 }
 
+function validEntryPermitItems(items) {
+  return Array.isArray(items) && items.length > 0 && items.length <= 100 && items.every((item) => {
+    const quantity = Number(item?.quantity);
+    return Number.isInteger(quantity) && quantity >= 1 && quantity <= 10000
+      && Boolean(cleanText(item?.number, 80))
+      && Boolean(cleanText(item?.details, 1000));
+  });
+}
+
 // Type-specific fields attached to every content request.
 function extractContentFields(type, body) {
   if (type === 'sponsor') return extractSponsorFields(body);
   if (type === 'booth') return extractBoothFields(body);
+  if (type === 'entry_permit') {
+    const permitItems = Array.isArray(body.permitItems) ? body.permitItems.slice(0, 100).map((item) => ({
+      quantity: Math.max(1, Math.min(10000, Math.floor(Number(item?.quantity) || 1))),
+      number: cleanText(item?.number, 80),
+      details: cleanText(item?.details, 1000)
+    })).filter((item) => item.number || item.details) : [];
+    return { permitItems };
+  }
   return {};
 }
 
@@ -2295,7 +2340,19 @@ function contentTitle(type, body) {
 }
 
 function contentRequiresTitle(type) {
-  return type === 'event' || type === 'feed';
+  return ['event', 'feed', 'entry_permit'].includes(type);
+}
+
+function missingRequiredPublicContentImage(type, content) {
+  if (type === 'event' || type === 'feed') return !String(content?.image || '').trim();
+  if (type === 'sponsor') return !String(content?.sponsorLogo || '').trim();
+  return false;
+}
+
+function addCommitteeClubImage(record) {
+  const { _id, __v, ...item } = typeof record.toObject === 'function' ? record.toObject() : record;
+  const club = clubs.find((entry) => Number(entry.id) === Number(item.clubId));
+  return { ...item, clubImage: club?.image || '' };
 }
 
 // Remove a published item from the club's content list for a request.
@@ -2373,10 +2430,10 @@ function contentNotice(roleLabel, action, type, comment) {
 function shapeClubContentRecord(record) {
   const { _id, __v, ...rest } = record;
   const privateReturnEvents = (rest.workflowHistory || []).filter((event) => event.role === 'dean'
-    && ['returned_to_pr', 'returned_to_english'].includes(event.action));
+    && ['returned_to_pr', 'returned_to_english', 'returned_to_security'].includes(event.action));
   const privateReturnComments = new Set(privateReturnEvents.map((event) => event.comment).filter(Boolean));
   rest.workflowHistory = (rest.workflowHistory || []).map((event) => privateReturnComments.has(event.comment)
-    && ['returned_to_pr', 'returned_to_english'].includes(event.action) ? { ...event, comment: '' } : event);
+    && ['returned_to_pr', 'returned_to_english', 'returned_to_security'].includes(event.action) ? { ...event, comment: '' } : event);
   rest.commentHistory = (rest.commentHistory || []).filter((entry) => entry.role !== 'dean' || !privateReturnComments.has(entry.text));
   if (rest.comments?.dean) {
     rest.comments = { ...rest.comments, dean: rest.comments.dean.split('\n').filter((line) => !privateReturnComments.has(line)).join('\n') };
@@ -2386,7 +2443,7 @@ function shapeClubContentRecord(record) {
 }
 
 function appendCommitteeComment(record, role, text) {
-  if (!text || !['pr', 'english', 'dean'].includes(role)) return;
+  if (!text || !['pr', 'english', 'security', 'dean'].includes(role)) return;
   record.comments[role] = [record.comments[role], text].filter(Boolean).join('\n').slice(-10000);
   record.commentHistory.push({ role, text, createdAt: new Date() });
   record.hiddenCommentRoles = (record.hiddenCommentRoles || []).filter((hiddenRole) => hiddenRole !== role);
@@ -2418,14 +2475,26 @@ function shouldSendPrApprovalToDean(record) {
   return !invalidated;
 }
 
-function committeeNextStage(role, action) {
-  if (role === 'pr' && action === 'approve') return 'pending_english';
+function committeeNextStage(role, action, record) {
+  if (role === 'pr' && action === 'approve' && record?.type === 'entry_permit') {
+    const history = Array.isArray(record.workflowHistory) ? record.workflowHistory : [];
+    const latestSecurityReview = [...history].reverse().find((event) => event.role === 'security'
+      && ['approve', 'request_edit', 'reject', 'restarted_review'].includes(event.action));
+    const securityApproved = latestSecurityReview?.action === 'approve';
+    return securityApproved ? 'approved' : 'pending_security';
+  }
+  if (role === 'security' && action === 'approve' && record?.type === 'entry_permit') return 'pending_pr';
+  if (role === 'pr' && action === 'approve') return shouldSendPrApprovalToDean(record) ? 'pending_dean' : 'pending_english';
   if (role === 'english' && action === 'approve') return 'pending_dean';
-  if (role === 'dean' && action === 'approve') return 'published';
+  if (role === 'dean' && action === 'approve') return record?.type === 'entry_permit' ? null : 'published';
   if ((role === 'dean' || role === 'pr') && action === 'delete') return 'deleted';
   if (action === 'reject') return 'rejected';
   if (action === 'request_edit') return 'changes_requested';
   return null;
+}
+
+function nextCommitteeStageForRequest(role, action, record) {
+  return committeeNextStage(role, action, record);
 }
 
 app.get('/api/club/content', requireClubAuth, async (req, res) => {
@@ -2447,7 +2516,7 @@ app.post('/api/club/content', requireClubAuth, async (req, res) => {
     return res.status(403).json({ message: 'Only club presidents and heads can manage content.' });
   }
   if (!isContentType(req.body.type)) {
-    return res.status(400).json({ message: 'Choose a valid content type: event, feed, sponsor, or booth.' });
+    return res.status(400).json({ message: `Choose a valid content type: ${CONTENT_TYPES.join(', ')}.` });
   }
   return createContentRequest(req, res, req.body.type);
 });
@@ -2469,11 +2538,20 @@ async function createContentRequest(req, res, type) {
     if (!title) {
       return res.status(400).json({ message: type === 'event' || type === 'feed'
         ? 'Enter a title.'
-        : type === 'sponsor' ? 'Enter the sponsor name.' : 'Enter the booth name.' });
+        : type === 'sponsor' ? 'Enter the sponsor name.' : type === 'booth' ? 'Enter the booth name.' : 'Enter a permit title.' });
     }
     const description = cleanText(req.body.description, 2000)
       || (type === 'sponsor' ? cleanText(req.body.sponsorDescription, 2000) : '')
-      || (type === 'booth' ? cleanText(req.body.boothDescription, 2000) : '');
+      || (type === 'booth' ? cleanText(req.body.boothDescription, 2000) : '')
+      || (type === 'entry_permit' ? (Array.isArray(req.body.permitItems) ? req.body.permitItems.map((item) => cleanText(item.details, 1000)).filter(Boolean).join(' · ').slice(0, 2000) : '') : '');
+    if (type === 'entry_permit' && req.body.submit === true && !validEntryPermitItems(req.body.permitItems)) {
+      return res.status(400).json({ message: 'Add at least one complete permit row with a valid quantity, number, and details.' });
+    }
+    const sponsorFields = type === 'sponsor' ? extractSponsorFields(req.body) : {};
+    const contentForImageCheck = { image: req.body.image, ...sponsorFields };
+    if (req.body.submit === true && missingRequiredPublicContentImage(type, contentForImageCheck)) {
+      return res.status(400).json({ message: type === 'sponsor' ? 'Add the company logo before submitting this sponsor request.' : 'Add an image before submitting this content.' });
+    }
     const club = clubs.find((item) => item.id === req.clubAccount.clubId);
     const last = await ContentRequest.findOne().sort({ id: -1 }).lean();
     const record = await ContentRequest.create({
@@ -2530,22 +2608,43 @@ app.put('/api/club/content/:id', requireClubAuth, async (req, res) => {
     if (req.body.budget !== undefined) record.budget = cleanText(req.body.budget, 80);
     if (typeof req.body.image === 'string') record.image = req.body.image.slice(0, 4 * 1024 * 1024);
     if (type === 'sponsor') Object.assign(record, extractSponsorFields(req.body));
+    if (type === 'entry_permit' && req.body.submit === true
+      && !validEntryPermitItems(req.body.permitItems === undefined ? record.permitItems : req.body.permitItems)) {
+      return res.status(400).json({ message: 'Add at least one complete permit row with a valid quantity, number, and details.' });
+    }
+    if (type === 'entry_permit' && req.body.permitItems !== undefined) {
+      if (!validEntryPermitItems(req.body.permitItems) && req.body.permitItems.length) {
+        return res.status(400).json({ message: 'Add at least one complete permit row with a valid quantity, number, and details.' });
+      }
+      const fields = extractContentFields(type, req.body);
+      record.permitItems = fields.permitItems;
+      record.description = fields.permitItems.map((item) => item.details).filter(Boolean).join(' · ').slice(0, 2000);
+    }
+    if (req.body.submit === true && missingRequiredPublicContentImage(type, record)) {
+      return res.status(400).json({ message: type === 'sponsor' ? 'Add the company logo before submitting this sponsor request.' : 'Add an image before submitting this content.' });
+    }
     if (type === 'booth') {
       Object.assign(record, extractBoothFields(req.body));
       // Booths are tracked by their opening date and preferred location.
       record.date = record.boothOpenDate || record.date;
       record.location = record.boothLocation || record.location;
     }
-    if (record.status === 'changes_requested' && !record.editRequestedBy && record.comments?.english) {
-      record.resubmitTo = 'pending_english';
+    if (record.status === 'changes_requested' && !record.editRequestedBy && type === 'entry_permit' && record.comments?.security) {
+      record.resubmitTo = 'pending_security';
+    } else if (record.status === 'changes_requested' && !record.editRequestedBy && record.comments?.english) {
+      record.resubmitTo = type === 'event' ? 'pending_english' : 'pending_pr';
     }
     if (req.body.submit === true) {
       const fromStatus = record.editRequestedBy ? 'changes_requested' : record.status;
-      const targetStage = record.editRequestedBy ? committeeStage[record.editRequestedBy] : (record.resubmitTo || 'pending_pr');
+      const targetStage = type === 'entry_permit' && record.editRequestedBy === 'pr'
+        ? 'pending_pr'
+        : type !== 'event' && record.editRequestedBy === 'english' ? 'pending_pr'
+        : record.editRequestedBy ? committeeStage[record.editRequestedBy] : (record.resubmitTo || 'pending_pr');
       const isFirstSubmission = !(record.workflowHistory || []).some((event) => ['submitted', 'resubmitted'].includes(event.action));
       record.status = targetStage;
       record.resubmitTo = 'pending_pr';
-      record.clubNotice = `${isFirstSubmission ? 'Club submitted a new' : 'Club resubmitted the updated'} ${contentSingularLabel(type)}. Waiting for ${targetStage === 'pending_pr' ? 'PR Department' : 'English Department'} review.`;
+      const nextReviewer = { pending_pr: 'PR Department', pending_english: 'English Department', pending_security: 'Security Office' }[targetStage] || 'Dean';
+      record.clubNotice = `${isFirstSubmission ? 'Club submitted a new' : 'Club resubmitted the updated'} ${contentSingularLabel(type)}. Waiting for ${nextReviewer} review.`;
       appendWorkflowEvent(record, 'club', isFirstSubmission ? 'submitted' : 'resubmitted', fromStatus, targetStage, '', req.clubAccount);
       record.editRequestedBy = '';
     } else {
@@ -2591,8 +2690,13 @@ app.get('/api/committee/requests', requireClubAuth, requireCommitteeRole, async 
   try {
     if (!mongoReady) return res.status(503).json({ message: 'Content storage needs MongoDB.' });
     const stage = committeeStage[req.clubAccount.role];
-    const records = await ContentRequest.find({ status: stage }).sort({ id: -1 }).lean();
-    res.json(records.map((record) => { const { _id, __v, ...rest } = record; return rest; }));
+    const filter = req.clubAccount.role === 'security'
+      ? { status: stage, type: 'entry_permit' }
+      : req.clubAccount.role === 'english'
+        ? { status: stage, type: { $ne: 'entry_permit' } }
+        : { status: stage };
+    const records = await ContentRequest.find(filter).sort({ id: -1 }).lean();
+    res.json(records.map(addCommitteeClubImage));
   } catch (error) {
     console.error('Database operation failed:', error.name);
     res.status(503).json({ message: 'Could not load requests right now.' });
@@ -2602,11 +2706,14 @@ app.get('/api/committee/requests', requireClubAuth, requireCommitteeRole, async 
 app.get('/api/committee/status', requireClubAuth, requireCommitteeRole, async (req, res) => {
   try {
     if (!mongoReady) return res.status(503).json({ message: 'Content storage needs MongoDB.' });
-    const records = await ContentRequest.find({})
-      .select('id clubName type title date time status image submittedAt publishedAt clubNotice editRequestedBy comments commentHistory hiddenCommentRoles createdAt sponsorName sponsorCompany sponsorContact sponsorEmail sponsorPhone sponsorType sponsorAmount sponsorBenefits sponsorDescription sponsorLogo sponsorAttachment sponsorNotes boothName boothPurpose boothDescription boothLocation boothSize boothEquipment boothSetupDate boothOpenDate boothCloseDate boothContact boothNotes')
+    const filter = req.clubAccount.role === 'security'
+      ? { type: 'entry_permit' }
+      : req.clubAccount.role === 'english' ? { type: { $ne: 'entry_permit' } } : {};
+    const records = await ContentRequest.find(filter)
+      .select('id clubId clubName type title date time status image submittedAt publishedAt clubNotice editRequestedBy comments commentHistory hiddenCommentRoles createdAt sponsorName sponsorCompany sponsorContact sponsorEmail sponsorPhone sponsorType sponsorAmount sponsorBenefits sponsorDescription sponsorLogo sponsorAttachment sponsorNotes boothName boothPurpose boothDescription boothLocation boothSize boothEquipment boothSetupDate boothOpenDate boothCloseDate boothContact boothNotes')
       .sort({ id: -1 })
       .lean();
-    res.json(records.map((record) => { const { _id, __v, ...rest } = record; return rest; }));
+    res.json(records.map(addCommitteeClubImage));
   } catch (error) {
     console.error('Database operation failed:', error.name);
     res.status(503).json({ message: 'Could not load request statuses right now.' });
@@ -2618,8 +2725,11 @@ app.get('/api/committee/status/:id', requireClubAuth, requireCommitteeRole, asyn
     if (!mongoReady) return res.status(503).json({ message: 'Content storage needs MongoDB.' });
     const record = await ContentRequest.findOne({ id: Number(req.params.id) }).lean();
     if (!record) return res.status(404).json({ message: 'Request not found.' });
+    if (!committeeCanAccessRequest(req.clubAccount.role, record.type)) {
+      return res.status(404).json({ message: 'Request not found.' });
+    }
     const { _id, __v, ...rest } = record;
-    res.json(rest);
+    res.json(addCommitteeClubImage(rest));
   } catch (error) {
     console.error('Database operation failed:', error.name);
     res.status(503).json({ message: 'Could not load request details right now.' });
@@ -2630,9 +2740,10 @@ app.post('/api/committee/requests/:id/reopen', requireClubAuth, requireCommittee
   try {
     if (!mongoReady) return res.status(503).json({ message: 'Content storage needs MongoDB.' });
     const role = req.clubAccount.role;
-    if (!['pr', 'english'].includes(role)) return res.status(403).json({ message: 'Only PR or English can restart the review process.' });
+    if (!['pr', 'english', 'security'].includes(role)) return res.status(403).json({ message: 'This account cannot restart the review process.' });
     const record = await ContentRequest.findOne({ id: Number(req.params.id) });
     if (!record) return res.status(404).json({ message: 'Request not found.' });
+  if (!committeeCanAccessRequest(role, record.type) || record.type === 'entry_permit' && !['pr', 'security'].includes(role)) return res.status(404).json({ message: 'Request not found.' });
     if (record.status === 'draft' || record.status === 'changes_requested' || record.status === committeeStage[role]) {
       return res.status(409).json({ message: `This request is already in the ${committeeRoleLabels[role]} review process.` });
     }
@@ -2670,24 +2781,28 @@ app.post('/api/committee/requests/:id/return-to-committee', requireClubAuth, req
   try {
     if (!mongoReady) return res.status(503).json({ message: 'Content storage needs MongoDB.' });
     if (req.clubAccount.role !== 'dean') return res.status(403).json({ message: 'Only the Dean can return a request to a committee.' });
-    const targetRole = req.body.target === 'pr' ? 'pr' : req.body.target === 'english' ? 'english' : null;
-    if (!targetRole) return res.status(400).json({ message: 'Choose PR or English as the review destination.' });
-    const comment = cleanText(req.body.comment, 2000);
-    if (!comment) return res.status(400).json({ message: 'Add a comment explaining why the request is being returned.' });
     const record = await ContentRequest.findOne({ id: Number(req.params.id) });
     if (!record) return res.status(404).json({ message: 'Request not found.' });
-    if (!['pending_dean', 'published'].includes(record.status)) {
+    if (!committeeCanAccessRequest(req.clubAccount.role, record.type)) return res.status(404).json({ message: 'Request not found.' });
+    if (record.type === 'entry_permit') return res.status(403).json({ message: 'The Dean can view Entry Permits but cannot review or change them.' });
+    const targetRole = req.body.target === 'pr' ? 'pr'
+      : req.body.target === 'english' && record.type !== 'entry_permit' ? 'english' : null;
+    if (!targetRole) return res.status(400).json({ message: 'Choose a valid review destination for this request.' });
+    const comment = cleanText(req.body.comment, 2000);
+    if (!comment) return res.status(400).json({ message: 'Add a comment explaining why the request is being returned.' });
+    const returnableStatus = ['pending_dean', 'published'].includes(record.status);
+    if (!returnableStatus) {
       return res.status(409).json({ message: 'Only a request waiting for the Dean or already published can be returned.' });
     }
 
     const fromStatus = record.status;
-    const wasPublished = fromStatus === 'published';
+    const wasPublished = record.status === 'published';
     const nextStatus = committeeStage[targetRole];
     appendWorkflowEvent(record, 'dean', `returned_to_${targetRole}`, fromStatus, nextStatus, comment, req.clubAccount);
     record.status = nextStatus;
     record.resubmitTo = nextStatus;
     record.editRequestedBy = '';
-    record.skipEnglishOnNextPrApproval = targetRole === 'pr';
+    record.skipEnglishOnNextPrApproval = targetRole === 'pr' && record.type !== 'entry_permit';
     record.publishedAt = undefined;
     record.clubNotice = `Dean returned the ${contentSingularLabel(record.type)} to ${committeeRoleLabels[targetRole]} for another review.`;
 
@@ -2741,8 +2856,11 @@ app.delete('/api/committee/requests/:id/comment', requireClubAuth, requireCommit
     if (!mongoReady) return res.status(503).json({ message: 'Content storage needs MongoDB.' });
     const record = await ContentRequest.findOne({ id: Number(req.params.id) });
     if (!record) return res.status(404).json({ message: 'Request not found.' });
+    if (!committeeCanAccessRequest(req.clubAccount.role, record.type)) {
+      return res.status(404).json({ message: 'Request not found.' });
+    }
     const role = req.clubAccount.role;
-    if (!['pr', 'english', 'dean'].includes(role)) {
+    if (!['pr', 'english', 'security', 'dean'].includes(role)) {
       return res.status(404).json({ message: 'Your comment was not found.' });
     }
     const roleHistory = record.commentHistory.filter((entry) => entry.role === role);
@@ -2774,20 +2892,30 @@ app.post('/api/committee/requests/:id/action', requireClubAuth, requireCommittee
     if (!mongoReady) return res.status(503).json({ message: 'Content storage needs MongoDB.' });
     const record = await ContentRequest.findOne({ id: Number(req.params.id) });
     if (!record) return res.status(404).json({ message: 'Request not found.' });
+    if (!committeeCanAccessRequest(req.clubAccount.role, record.type)) {
+      return res.status(404).json({ message: 'Request not found.' });
+    }
     const expected = committeeStage[req.clubAccount.role];
     const action = ['approve', 'reject', 'request_edit', 'comment', 'delete'].includes(req.body.action) ? req.body.action : null;
     if (!action) return res.status(400).json({ message: 'Choose approve, reject, request edit, comment, or delete.' });
+    if (action === 'approve' && req.clubAccount.role === 'dean' && missingRequiredPublicContentImage(record.type, record)) {
+      return res.status(400).json({ message: record.type === 'sponsor' ? 'This sponsor cannot be published without a company logo.' : 'This content cannot be published without an image.' });
+    }
+    if (record.type === 'entry_permit' && req.clubAccount.role === 'dean') {
+      return res.status(403).json({ message: 'The Dean can view Entry Permits but cannot approve or change them. PR has final approval.' });
+    }
+    if (action === 'delete' && !['pr', 'dean'].includes(req.clubAccount.role)) return res.status(403).json({ message: 'Only PR or the Dean can delete a request.' });
     if (action !== 'comment' && action !== 'delete' && record.status !== expected) return res.status(409).json({ message: 'This request is not waiting for your review.' });
-    if (action === 'request_edit' && !['pr', 'english'].includes(req.clubAccount.role)) {
-      return res.status(403).json({ message: 'Only PR or English can request edits.' });
+    if (action === 'request_edit' && !['pr', 'english', 'security'].includes(req.clubAccount.role)) {
+      return res.status(403).json({ message: 'This account cannot request edits.' });
     }
     const comment = cleanText(req.body.comment, 2000);
     if (action === 'comment' && !comment) return res.status(400).json({ message: 'Enter a comment before sending.' });
     if (action === 'request_edit' && !comment) return res.status(400).json({ message: 'Add a comment explaining the requested edits.' });
     const fromStatus = record.status;
     if (comment) appendCommitteeComment(record, req.clubAccount.role, comment);
-    let nextStatus = action === 'comment' ? record.status : committeeNextStage(req.clubAccount.role, action);
-    const skipEnglish = req.clubAccount.role === 'pr' && action === 'approve' && shouldSendPrApprovalToDean(record);
+    let nextStatus = action === 'comment' ? record.status : nextCommitteeStageForRequest(req.clubAccount.role, action, record);
+    const skipEnglish = record.type !== 'entry_permit' && req.clubAccount.role === 'pr' && action === 'approve' && shouldSendPrApprovalToDean(record);
     if (skipEnglish) nextStatus = 'pending_dean';
     record.status = nextStatus;
     if (action === 'request_edit') {
@@ -2802,13 +2930,19 @@ app.post('/api/committee/requests/:id/action', requireClubAuth, requireCommittee
     const includeComment = action === 'request_edit' || action === 'reject' || action === 'comment';
     record.clubNotice = `${roleLabel} ${actionLabel}.${includeComment && comment ? ` Comment: ${comment}` : ''}`;
     appendWorkflowEvent(record, req.clubAccount.role, action, fromStatus, nextStatus, comment, req.clubAccount);
-    if (action === 'approve' && req.clubAccount.role === 'pr') {
+    if (action === 'approve' && req.clubAccount.role === 'pr' && record.type === 'entry_permit') {
+      record.clubNotice = nextStatus === 'pending_security'
+        ? 'PR Department approved the Entry Permit and sent it to the Security Office.'
+        : 'PR Department gave final approval to the Entry Permit. It is available to the Dean for viewing.';
+    }
+    if (action === 'approve' && req.clubAccount.role === 'pr' && record.type !== 'entry_permit') {
       record.clubNotice = skipEnglish
         ? `PR approved the ${contentSingularLabel(record.type)} and returned it directly to the Dean.`
         : `PR approved the ${contentSingularLabel(record.type)} and sent it to the English Department.`;
     }
     if (action === 'approve' && req.clubAccount.role === 'english') record.clubNotice = `English Department approved the ${contentSingularLabel(record.type)} and sent it to the Dean.`;
-    if (action === 'approve' && req.clubAccount.role === 'dean') record.clubNotice = `Dean approved the ${contentSingularLabel(record.type)}. It is now published.`;
+    if (action === 'approve' && req.clubAccount.role === 'security' && record.type === 'entry_permit') record.clubNotice = 'Security Office approved the Entry Permit and sent it back to PR for final approval.';
+    if (action === 'approve' && req.clubAccount.role === 'dean' && record.type !== 'entry_permit') record.clubNotice = `Dean approved the ${contentSingularLabel(record.type)}. It is now published.`;
     if (action === 'delete') {
       record.clubNotice = contentNotice(roleLabel, 'delete', record.type);
       const club = await Club.findOne({ id: record.clubId });
@@ -2818,7 +2952,7 @@ app.post('/api/committee/requests/:id/action', requireClubAuth, requireCommittee
       }
     }
     if (action === 'request_edit') record.clubNotice = `${roleLabel} requested edits: ${comment}`;
-    if (nextStatus === 'published') {
+    if (nextStatus === 'published' && record.type !== 'entry_permit') {
       record.publishedAt = new Date();
       const club = await Club.findOne({ id: record.clubId });
       if (club) {
@@ -3072,6 +3206,7 @@ app.post('/api/auth/login', async (req, res) => {
       head: '/club-login',
       pr: '/dashboards/pr-dashboard.html',
       english: '/dashboards/english-dashboard.html',
+      security: '/dashboards/security-dashboard.html',
       sso: '/dashboards/sso-dashboard.html',
       dean: '/dashboards/dean-dashboard.html',
     };
@@ -3492,7 +3627,7 @@ app.get('/api/admin/system/data-status', async (req, res) => {
         { title: 'Club members', count: namedMemberProfiles[0]?.count || 0, detail: `${memberTotals[0]?.total || 0} total members across club rosters`, methods: 'GET /api/admin/club-members · GET/POST /api/club/members (club login required)' },
         { title: 'Applications', count: Object.values(countMap(applicationsByStatus)).reduce((sum, value) => sum + value, 0), detail: Object.entries(countMap(applicationsByStatus)).map(([key, value]) => `${key}: ${value}`).join(' · ') || 'No applications', methods: 'GET /api/admin/applications · POST /api/applications · PATCH status · DELETE application' },
         { title: 'Events, booths, posts, and sponsors', count: Object.values(embeddedContent).reduce((sum, value) => sum + value, 0), detail: `Events ${embeddedContent.events} · booths ${embeddedContent.booths} · posts ${embeddedContent.posts} · sponsors ${embeddedContent.sponsors}; ${Object.values(countMap(contentByType)).reduce((sum, value) => sum + value, 0)} workflow requests`, methods: 'GET /api/clubs · GET/POST /api/club/content · POST event/feed/sponsor/booth · PUT/DELETE content item' },
-        { title: 'Content approval workflow', count: Object.values(countMap(contentByStatus)).reduce((sum, value) => sum + value, 0), detail: Object.entries(countMap(contentByStatus)).map(([key, value]) => `${key}: ${value}`).join(' · ') || 'No requests', methods: 'GET /api/committee/requests · POST /api/committee/requests/:id/action · PR → English → Dean (role protected)' },
+        { title: 'Content approval workflow', count: Object.values(countMap(contentByStatus)).reduce((sum, value) => sum + value, 0), detail: Object.entries(countMap(contentByStatus)).map(([key, value]) => `${key}: ${value}`).join(' · ') || 'No requests', methods: 'GET /api/committee/requests · POST /api/committee/requests/:id/action · Entry Permits: PR → Security Office → Dean; other content: PR → English → Dean' },
         { title: 'Event attendance', count: await AttendanceRecord.countDocuments(), detail: `${attendanceSessions} QR sessions · ${eventRegistrations} event registrations · ${Object.entries(countMap(attendanceByStatus)).map(([key, value]) => `${key}: ${value}`).join(' · ') || 'no review records'}`, methods: 'GET /api/club/attendance-events · POST /api/club/attendance-sessions · POST /api/attendance/:token · GET attendance records/reviews · POST approval' },
         { title: 'Accounts and sign-in', count: clubAccounts + studentAccounts + adminAccounts, detail: `${clubAccounts} club/committee · ${studentAccounts} student · ${adminAccounts} admin accounts`, methods: 'POST /api/admin/login · POST /api/auth/login · POST /api/student-auth/google · session checks' },
         { title: 'Security and recovery', count: studentEmailCodes + passwordResetTokens + loginAttempts, detail: `${studentEmailCodes} verification codes · ${passwordResetTokens} reset tokens · ${loginAttempts} login protection records`, methods: 'POST /api/password-reset/request · POST /api/password-reset/confirm · email verification · login rate limits' },

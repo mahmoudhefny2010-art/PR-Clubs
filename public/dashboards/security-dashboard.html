@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Security Office Review</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/assets/css/base.css?v=20261007d" />
+    <link rel="stylesheet" href="/assets/css/responsive.css?v=20261005h" />
+    <link rel="stylesheet" href="/assets/css/dark.css?v=20261009c" />
+    <link rel="stylesheet" href="/assets/css/features.css?v=20261009permit1" />
+    <link rel="icon" href="/assets/img/pics/logo.svg.png" type="image/png">
+    <link rel="stylesheet" href="/assets/css/pages/english-dashboard.css?v=1" />
+  </head>
+  <body>
+    <div id="site-header"></div>
+    <main class="app-container committee-dashboard-layout">
+      <aside class="committee-sidebar" data-unread-scope="security" aria-label="Security Office dashboard navigation">
+        <h2>DASHBOARD</h2><a class="committee-sidebar-link is-active" href="#committeeOverviewPanel" data-dashboard-panel="committeeOverviewPanel">Overview</a><a class="committee-sidebar-link" href="#pendingRequestsSection" data-dashboard-panel="pendingRequestsSection">Entry permits <span class="sidebar-unread-badge" data-unread-badge="requests" hidden></span></a>
+        <h3>REVIEWS</h3><button id="openStatusOverviewBtn" class="committee-sidebar-link" data-dashboard-panel="statusOverviewDialog" type="button">All entry permits <span class="sidebar-unread-badge" data-unread-badge="allRequests" hidden></span></button>
+      </aside>
+      <section id="committee-overview" class="committee-card">
+        <div class="committee-top"><div><div class="committee-label">APPROVALS COMMITTEE</div><h2 id="committeeTitle">Security Office — Entry Permits</h2></div><div class="top-actions"><a class="secondary-btn" href="/">Back</a><button id="logoutBtn" class="logout-btn" type="button">Logout</button></div></div>
+        <p id="sessionMessage"></p>
+        <section id="committeeOverviewPanel" class="committee-overview-panel"><span class="committee-label">SECURITY OFFICE</span><h2>Entry Permit Review</h2><p>Review Entry Permits from PR, then send each decision back to PR for final approval.</p><div class="committee-overview-stats overview-grid-1"><button class="overview-stat-card" type="button" data-dashboard-panel="pendingRequestsSection"><span>Entry permits awaiting review</span><strong data-overview-count="requests">—</strong><small>Open the security review queue</small></button></div></section>
+        <section id="pendingRequestsSection" class="committee-requests-section" hidden><h2>Entry permits</h2><p id="hintText"></p><div id="requestsList"></div></section>
+      </section>
+    </main>
+    <dialog id="requestDialog" class="request-dialog" aria-labelledby="detailTitle"><div class="request-dialog-inner"><div class="request-details-hero"><div id="requestDetailImageWrap" class="request-detail-image-wrap" hidden><img id="requestDetailImage" class="request-detail-image" alt="Entry Permit request image" /></div><div class="request-dialog-head request-details-head"><div><div class="committee-label">ENTRY PERMIT DETAILS</div><h2 id="detailTitle"></h2></div><button type="button" id="detailsCancelBtn" class="request-dialog-close" aria-label="Close request details">&times;</button></div></div><div id="requestDetails" class="detail-grid"></div><div class="dialog-actions"><button id="dialogApproveBtn" class="approve" data-dialog-action="approve">Approve &amp; Send back to PR</button><button id="dialogRejectBtn" class="reject" data-dialog-action="reject">Reject</button><button id="requestChangesBtn" class="changes" data-dialog-action="request_edit" hidden>Request Edit</button><button id="reopenRequestBtn" class="reopen-review" type="button" hidden>Restart Security Review</button></div></div></dialog>
+    <dialog id="attachmentPreviewDialog" class="attachment-preview-dialog" aria-label="Attachment preview"><div class="attachment-preview-panel"><button type="button" class="attachment-preview-close" aria-label="Close attachment preview" onclick="this.closest('dialog').close()">&times;</button><img id="attachmentPreviewImage" alt="Entry Permit attachment"></div></dialog>
+    <dialog id="statusOverviewDialog" class="status-overview-dialog" aria-labelledby="statusOverviewTitle"><div class="status-overview-inner"><div class="request-dialog-head"><div><div class="committee-label">ENTRY PERMIT TRACKING</div><h2 id="statusOverviewTitle">All Entry Permits</h2></div><button type="button" id="closeStatusOverviewBtn" class="request-dialog-close" aria-label="Close request status">&times;</button></div><div id="statusOverviewList" class="status-overview-list" aria-live="polite"></div></div></dialog>
+    <div id="site-footer"></div>
+    <script src="/assets/js/committee-sidebar.js?v=13"></script>
+    <script src="/assets/js/committee-dashboard.js?v=20261010images1"></script>
+    <script src="/assets/js/layout.js?v=11" defer></script>
+    <script src="/assets/js/theme.js?v=20261009c" defer></script>
+  </body>
+</html>

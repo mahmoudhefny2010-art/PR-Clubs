@@ -1,0 +1,17 @@
+
+      .admin-login-panel { max-width: 460px; margin: 48px auto; padding: 36px 32px; text-align: center; }
+      .admin-login-panel h2 { text-align: center; font-size: 1.6rem; font-weight: 800; margin: 0 0 8px; }
+      #adminLoginMessage { text-align: center; color: var(--text-muted); margin: 0 0 24px; font-size: .95rem; }
+      #adminLoginForm { text-align: left; }
+      #adminLoginForm .primary-btn { width: 100%; padding: 13px; font-size: 1rem; border-radius: var(--radius-md); }
+      #adminLoginForgotWrap { text-align: center; margin-top: 14px; }
+      .login-foot { text-align: center; margin-top: 22px; font-size: .9rem; color: var(--text-muted); }
+      .login-foot-link { background: none; border: none; padding: 0; color: var(--primary-700); font-weight: 700; cursor: pointer; font-size: .9rem; }
+      .login-foot-link:hover { text-decoration: underline; }
+      .admin-feedback { margin-top: 14px; text-align: center; }
+      .content-type-badge { display: inline-block; margin: 4px 0 0; padding: 2px 9px; border-radius: 999px; font-size: .64rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
+      .content-type-badge.event { background: #dbeafe; color: #1d4ed8; }
+      .content-type-badge.feed { background: #ede9fe; color: #6d28d9; }
+      .content-type-badge.sponsor { background: #fef3c7; color: #92400e; }
+      .content-type-badge.booth { background: #d1fae5; color: #065f46; }
+      .club-image-placeholder { width: 120px; height: 120px; margin: 18px auto 0; background: #f3f4f6; color: #6b7280; font-size: .66rem; font-weight: 800; display: flex; align-items: center; justify-content: center; text-transform: uppercase; letter-spacing: .04em; border-radius: 12px; }

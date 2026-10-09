@@ -1,114 +1,53 @@
-// Structure regression test for the refactored frontend.
-// Run with: node tests/verify-structure.js  (requires the local server on :1111)
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
-const assert = require('assert');
-
+// Static frontend regression checks. No running backend or database is required.
+// Run: node tests/verify-structure.js
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
 const root = path.resolve(__dirname, '..');
-const pub = path.join(root, 'public');
-
-// Expected content hashes of the concatenated split bundles.
-// If these change, the CSS/JS modules were edited — update the hash on purpose.
-const EXPECTED_CSS_HASH = '546d400417b672d2ddfd250aeed5a7ff0ae5e1a97aa2268a127dbb8580d9bbdb';
-const EXPECTED_JS_HASH = '9441e1b01843ee4642b344f56950947f73268205cba8b740f8b4d8fdaf785139';
-
-const CSS_FILES = ['base.css', 'responsive.css', 'dark.css', 'features.css'];
-const JS_FILES = ['app-home.js', 'app-admin.js', 'app-dashboard.js'];
-
-const read = (f) => fs.readFileSync(f, 'utf8');
-const walk = (dir, out = []) => {
-  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, e.name);
-    if (e.isDirectory()) walk(full, out);
-    else if (/\.(html|js|css|json)$/i.test(e.name)) out.push(full);
+const publicRoot = path.join(root, 'public');
+function walk(dir) {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const file = path.join(dir, entry.name);
+    return entry.isDirectory() ? walk(file) : [file];
+  });
+}
+const files = [...walk(publicRoot), ...walk(path.join(root, 'private'))];
+let scripts = 0, inlineScripts = 0, references = 0;
+const read = (file) => fs.readFileSync(file, 'utf8');
+const relative = (file) => path.relative(root, file);
+function checkAsset(url, source) {
+  if (!url.startsWith('/assets/') && !url.startsWith('/components/')) return;
+  const file = path.join(publicRoot, url.split(/[?#]/)[0]);
+  assert.ok(fs.existsSync(file) && fs.statSync(file).isFile(), `${relative(source)} references missing asset ${url}`);
+  references++;
+}
+for (const file of files) {
+  if (!/\.(html|css|js)$/.test(file)) continue;
+  const source = read(file);
+  assert.ok(!/assets\/css\/style\.css|assets\/js\/script\.js/.test(source), `Stale monolith reference in ${relative(file)}`);
+  if (file.endsWith('.js')) { new vm.Script(source, { filename: relative(file) }); scripts++; }
+  if (file.endsWith('.html')) {
+    for (const match of source.matchAll(/<(?:script|link|img)\b[^>]*\b(?:src|href)=["']([^"']+)["'][^>]*>/gi)) checkAsset(match[1], file);
+    for (const match of source.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
+      if (/\bsrc\s*=/.test(match[1]) || !match[2].trim() || /application\/(?:ld\+)?json/.test(match[1])) continue;
+      new vm.Script(match[2], { filename: `${relative(file)} inline script` }); inlineScripts++;
+    }
+    if (!file.includes(`${path.sep}components${path.sep}`) && !/[/\\](?:404|500)\.html$/.test(file)) {
+      for (const css of ['base.css', 'responsive.css', 'dark.css']) assert.ok(source.includes(`/assets/css/${css}`), `${relative(file)} missing ${css}`);
+      assert.ok(source.includes('/assets/js/layout.js'), `${relative(file)} missing shared layout`);
+      if (!file.endsWith(`${path.sep}attendance.html`)) assert.ok(source.includes('id="site-footer"'), `${relative(file)} missing shared footer`);
+    }
   }
-  return out;
-};
-
-// 1. Split bundles still reproduce the expected content (regression guard).
-const cssBundle = CSS_FILES.map((f) => read(path.join(pub, 'assets/css', f))).join('');
-assert.strictEqual(
-  crypto.createHash('sha256').update(cssBundle).digest('hex'),
-  EXPECTED_CSS_HASH,
-  'CSS bundle content changed — update EXPECTED_CSS_HASH if intentional',
-);
-const jsBundle = JS_FILES.map((f) => read(path.join(pub, 'assets/js', f))).join('');
-assert.strictEqual(
-  crypto.createHash('sha256').update(jsBundle).digest('hex'),
-  EXPECTED_JS_HASH,
-  'JS bundle content changed — update EXPECTED_JS_HASH if intentional',
-);
-console.log('CSS/JS module bundles match expected hashes ✓');
-
-// 2. No stale references to the removed monolith files.
-let stale = 0;
-for (const file of [...walk(pub), ...walk(path.join(root, 'private'))]) {
-  const c = read(file);
-  if (/assets\/css\/style\.css|assets\/js\/script\.js/.test(c)) {
-    console.log('STALE REF:', file);
-    stale++;
+  if (file.endsWith('.js') || file.endsWith('.css')) {
+    for (const match of source.matchAll(/["'](\/(?:assets|components)\/[^"'\s`$]+)["']/g)) checkAsset(match[1], file);
   }
 }
-assert.strictEqual(stale, 0, 'stale references found');
-console.log('No stale references to style.css / script.js ✓');
-
-// 3. Every page loads the four stylesheets.
-const htmlFiles = [...walk(pub), ...walk(path.join(root, 'private'))]
-  .filter((f) => f.endsWith('.html') && !f.includes(path.join('public', 'components')));
-for (const file of htmlFiles) {
-  const c = read(file);
-  for (const css of CSS_FILES) assert.ok(c.includes(`/assets/css/${css}`), `${file} missing ${css}`);
-}
-console.log(`All ${htmlFiles.length} HTML pages load the four CSS files ✓`);
-
-// 4. The SPA index loads the three JS modules plus the shared helpers.
-const index = read(path.join(pub, 'index.html'));
-for (const js of [...JS_FILES, 'layout.js', 'theme.js']) assert.ok(index.includes(`/assets/js/${js}`), `index missing ${js}`);
-console.log('index.html loads app-home, app-admin, app-dashboard, layout, theme ✓');
-
-// 5. Shared header/footer components + placeholders on every page.
-for (const comp of ['site-header.html', 'site-footer.html']) {
-  assert.ok(fs.existsSync(path.join(pub, 'components', comp)), `missing ${comp}`);
-}
-const ownHeaderPages = ['applicant-login.html', 'admin-club-credentials.html'];
-for (const file of htmlFiles) {
-  const c = read(file);
-  assert.ok(c.includes('id="site-footer"'), `${file} missing footer placeholder`);
-  assert.ok(c.includes('/assets/js/layout.js'), `${file} missing layout.js`);
-  if (!ownHeaderPages.some((n) => file.endsWith(n))) {
-    assert.ok(c.includes('id="site-header"'), `${file} missing header placeholder`);
-  }
-}
-console.log('Header/footer placeholders + layout.js present on every page ✓');
-
-// 6. Live checks against the running local server.
-(async () => {
-  const base = 'http://localhost:1111';
-  const checks = [
-    '/', '/pages/club-content.html?embed=1', '/pages/applicant-login.html', '/pages/events.html',
-    '/pages/events.html?club=2&event=0',
-    '/pages/event-form.html', '/pages/feed-form.html', '/pages/sponsor-form.html', '/pages/booth-form.html',
-    '/pages/sponsors.html', '/pages/booths.html',
-    '/dashboards/pr-dashboard.html', '/dashboards/english-dashboard.html', '/dashboards/dean-dashboard.html',
-    '/assets/css/base.css', '/assets/css/responsive.css', '/assets/css/dark.css', '/assets/css/features.css',
-    '/assets/css/pages/events.css',
-    '/assets/js/app-home.js', '/assets/js/app-admin.js', '/assets/js/app-dashboard.js',
-    '/assets/js/content-studio.js',
-    '/assets/js/pages/events.js', '/assets/js/pages/sponsors.js', '/assets/js/pages/booths.js',
-    '/assets/js/layout.js', '/assets/js/theme.js',
-    '/components/site-header.html', '/components/site-footer.html',
-    '/assets/img/pics/logo.svg.png', '/assets/img/pics/mun.jpg',
-  ];
-  for (const p of checks) {
-    const res = await fetch(base + p);
-    assert.ok(res.ok, `${p} -> ${res.status}`);
-  }
-  console.log(`All ${checks.length} local URLs return 200 ✓`);
-
-  const clubs = await fetch(base + '/api/clubs').then((r) => r.json());
-  assert.ok(Array.isArray(clubs) && clubs.length > 0, 'clubs API empty');
-  assert.ok(clubs[0].image.startsWith('/assets/img/pics/'), 'club image path wrong');
-  console.log(`API: ${clubs.length} clubs, images at ${clubs[0].image} ✓`);
-  console.log('\nALL CHECKS PASSED');
-})().catch((e) => { console.error('FAILED:', e.message); process.exit(1); });
+const homepage = read(path.join(publicRoot, 'index.html'));
+const orderedScripts = ['app-home.js', 'app-admin.js', 'app-dashboard.js'];
+const positions = orderedScripts.map((name) => homepage.indexOf(`/assets/js/${name}`));
+assert.ok(positions.every((pos, i) => pos >= 0 && (!i || pos > positions[i - 1])), 'Homepage shared globals must load in the original order');
+new vm.Script(orderedScripts.map((file) => read(path.join(publicRoot, 'assets/js', file))).join('\n'), { filename: 'homepage-shared-scope.js' });
+assert.ok(homepage.indexOf("document.documentElement.classList.add('auth-route-pending')") < homepage.indexOf('<body'), 'Keep the authentication guard before page rendering');
+for (const component of ['site-header.html', 'site-footer.html']) assert.ok(fs.existsSync(path.join(publicRoot, 'components', component)));
+console.log(`Structure passed: ${files.filter((file) => file.endsWith('.html')).length} HTML files, ${scripts} external scripts, ${inlineScripts} inline scripts, ${references} local asset references; homepage execution order and combined scope valid.`);

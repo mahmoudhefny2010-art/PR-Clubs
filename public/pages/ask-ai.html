@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Ask questions about MIU student clubs, events, announcements, and applications." />
+  <title>Ask AI | MIU Student Clubs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/css/base.css?v=20261009q" />
+  <link rel="stylesheet" href="/assets/css/responsive.css?v=20261006e" />
+  <link rel="stylesheet" href="/assets/css/dark.css?v=20261009c" />
+  <link rel="stylesheet" href="/assets/css/pages/ask-ai.css?v=1" />
+  <link rel="icon" href="/assets/img/pics/logo.svg.png" type="image/png" />
+</head>
+<body>
+  <div class="page-shell">
+    <div id="site-header"></div>
+    <main class="app-container ask-ai-page">
+      <header class="ask-ai-heading">
+        <span class="ask-ai-mark" aria-hidden="true">✦</span>
+        <div>
+          <p class="ask-ai-eyebrow">YOUR CLUBS, MADE EASIER</p>
+          <h1>Ask AI</h1>
+          <p>Ask about clubs, events, announcements, and how to use the website.</p>
+        </div>
+      </header>
+      <section class="ask-ai-card" aria-label="Ask AI chat">
+        <div class="ask-ai-card-head">
+          <div class="ask-ai-assistant-id"><span class="ask-ai-avatar" aria-hidden="true">✦</span><span><strong>Club assistant</strong><small id="askAiMode">Checking answer mode…</small></span></div>
+          <button id="clearChatButton" class="ask-ai-clear" type="button" disabled>New chat</button>
+        </div>
+        <div id="askAiMessages" class="ask-ai-messages" role="log" aria-live="polite" aria-relevant="additions text">
+          <article class="ask-message assistant-message">
+            <span class="message-avatar" aria-hidden="true">✦</span>
+            <div class="message-body"><p>Hi! I can help you explore the clubs website. Ask me about joining a club, upcoming events, recent announcements, or finding an application.</p></div>
+          </article>
+        </div>
+        <div id="askAiSuggestions" class="ask-ai-suggestions" aria-label="Suggested questions">
+          <button type="button" data-question="Which clubs are open to join?">Which clubs can I join?</button>
+          <button type="button" data-question="What events are happening this week?">Events this week</button>
+          <button type="button" data-question="How do I find my submitted application?">Find my application</button>
+          <button type="button" data-question="What announcements were published recently?">Recent announcements</button>
+        </div>
+        <form id="askAiForm" class="ask-ai-form">
+          <label class="visually-hidden" for="askAiInput">Your question</label>
+          <textarea id="askAiInput" name="message" rows="1" maxlength="1000" placeholder="Ask a question about clubs, events, or applications…" required></textarea>
+          <button id="askAiSend" class="primary-btn ask-ai-send" type="submit" aria-label="Send question"><span>Send</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg></button>
+        </form>
+        <p class="ask-ai-disclaimer">Answers use published club information. When AI mode is enabled, your question and selected public snippets are sent to OpenAI. Chat history is not saved by this site. Don’t share passwords or private application details. <a href="/pages/privacy-policy.html">Privacy Policy</a></p>
+      </section>
+    </main>
+  </div>
+  <div id="site-footer"></div>
+  <script src="/assets/js/pages/ask-ai.js?v=1" defer></script>
+  <script src="/assets/js/layout.js?v=11" defer></script>
+  <script src="/assets/js/theme.js?v=20261009c" defer></script>
+</body>
+</html>

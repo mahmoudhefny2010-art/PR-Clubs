@@ -1,0 +1,6 @@
+
+      .sso-page { flex: 1 0 auto; width: min(100%, 1192px); padding: 32px 16px 52px; }
+      .sso-hero { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; padding:24px; margin-bottom:22px; border:1px solid var(--border-color); border-radius:16px; background:var(--bg-panel); }
+      .sso-hero h1 { margin:4px 0; }
+      .sso-hero p { margin:0; color:var(--text-muted); }
+      .attendance-review-panel { margin-top:0; }

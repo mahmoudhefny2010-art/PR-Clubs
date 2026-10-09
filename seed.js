@@ -296,6 +296,7 @@ function seedClubAccounts(dataDirectory) {
   const committeeAccounts = [
     { clubId: 0, email: 'pr@miu.local', role: 'pr' },
     { clubId: 0, email: 'english@miu.local', role: 'english' },
+    { clubId: 0, email: 'security@miu.local', role: 'security' },
     { clubId: 0, email: 'sso@miu.local', role: 'sso' },
     { clubId: 0, email: 'dean@miu.local', role: 'dean' }
   ];

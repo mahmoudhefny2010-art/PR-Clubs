@@ -1,0 +1,1628 @@
+{
+  "capturedAt": "2026-10-09T00:05:34.477Z",
+  "commit": "9bd35a9dd8ac58ff7827462c813be6ebbf68d15b",
+  "branch": "feature/site-analytics-and-dashboard-updates",
+  "gitStatus": "",
+  "gitStatusBranch": "## feature/site-analytics-and-dashboard-updates...origin/feature/site-analytics-and-dashboard-updates",
+  "files": [
+    {
+      "path": ".gitignore",
+      "bytes": 112,
+      "sha256": "554e603d8a0fcfad15994d834d3794768866f60fd47c0387000df773aee069f2",
+      "kind": "project-support"
+    },
+    {
+      "path": "api/index.js",
+      "bytes": 161,
+      "sha256": "1a14165239e5283418145abcb90283480bea7d6a655ec1230b6fb3a558aa8a9d",
+      "kind": "protected-backend-data-config",
+      "lines": 8,
+      "apiReferences": []
+    },
+    {
+      "path": "data/audit-logs.json",
+      "bytes": 366,
+      "sha256": "39c1192d2bbfb11ff6aa655a52ffe6ff186ddd1e4058653f5e4d62ca904e43ec",
+      "kind": "protected-backend-data-config"
+    },
+    {
+      "path": "data/club-views.json",
+      "bytes": 22,
+      "sha256": "14fddd692ce379de8df6a932a704410628a55bbc4f569141881088f4d743adea",
+      "kind": "protected-backend-data-config"
+    },
+    {
+      "path": "data/clubs.json",
+      "bytes": 19767,
+      "sha256": "2d8db08e43116f3b1e81c55ac9f3f2937b9da4cd837491852ec39585a3831b72",
+      "kind": "protected-backend-data-config"
+    },
+    {
+      "path": "data/event-views.json",
+      "bytes": 23,
+      "sha256": "48ecbec652af79a5125de02f8cd0f5c2039d80e60d545e47aff1a46eecc24026",
+      "kind": "protected-backend-data-config"
+    },
+    {
+      "path": "data/homepage.json",
+      "bytes": 117,
+      "sha256": "022715b98339fb4836f2078fe1059b9adab6282230e0a82853ed6cc44972e71f",
+      "kind": "protected-backend-data-config"
+    },
+    {
+      "path": "dev.js",
+      "bytes": 1220,
+      "sha256": "d22234e00d91009a69c90625a649068d358c156627948fadc0cf0319866b3432",
+      "kind": "protected-backend-data-config",
+      "lines": 43,
+      "apiReferences": []
+    },
+    {
+      "path": "docs/BACKUP_PLAN.md",
+      "bytes": 7810,
+      "sha256": "d77ae89ddbd9cdef5ed940709c7589b8ca0c0451e4e45c3fc013375915f78095",
+      "kind": "project-support"
+    },
+    {
+      "path": "docs/GOOGLE_SIGN_IN_SETUP.md",
+      "bytes": 1367,
+      "sha256": "cec558174a46cea5408ecc88ddce8483687d3302f97fca73aa002bddcf975960",
+      "kind": "project-support"
+    },
+    {
+      "path": "miu project new.xlsx",
+      "bytes": 8433,
+      "sha256": "9328b0145fefa18e27f3d673756580f0b49b181d737bb1030c0d4dbc51d069d1",
+      "kind": "project-support"
+    },
+    {
+      "path": "models.js",
+      "bytes": 16948,
+      "sha256": "5433abb5f13148b16695763917f4dfd7f321f5264b519f4158ebb81698fa566a",
+      "kind": "protected-backend-data-config",
+      "lines": 329,
+      "apiReferences": []
+    },
+    {
+      "path": "package-lock.json",
+      "bytes": 54683,
+      "sha256": "ac0c70bbcd4b575aeeb933a5268d2442f726ab758fcbffb85107be01ed347a6d",
+      "kind": "protected-backend-data-config"
+    },
+    {
+      "path": "package.json",
+      "bytes": 633,
+      "sha256": "42833cf14180596382cff89d5a94a54d3fa0aa3a644c2f1e4af567329351d023",
+      "kind": "protected-backend-data-config"
+    },
+    {
+      "path": "private/admin-club-credentials.html",
+      "bytes": 4286,
+      "sha256": "f7442b0d68c7bc799fd785289541accb8314097954bb3450f2fe20fd4f90800f",
+      "kind": "frontend-source",
+      "lines": 91,
+      "styles": [
+        "/assets/css/base.css?v=20261009b",
+        "/assets/css/responsive.css?v=20261009b",
+        "/assets/css/dark.css?v=20261009c",
+        "/assets/css/features.css?v=20261009b",
+        "/assets/img/pics/logo.svg.png"
+      ],
+      "scripts": [
+        {
+          "attributes": "src=\"/assets/js/layout.js?v=11\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/theme.js?v=20261009c\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "",
+          "inlineBytes": 1224,
+          "sha256": "48075d1aa39fae9957fd8f0835867849dfbed1378304a265d412244220125e38"
+        }
+      ],
+      "inlineStyles": [
+        {
+          "attributes": "",
+          "bytes": 1471,
+          "sha256": "b0d6f4b9482d957fe5d4259505c1a9dea016eb494d49109eaf6091fb162119a3"
+        }
+      ],
+      "apiReferences": [
+        "/api/admin/club-credentials",
+        "/api/admin/logout"
+      ]
+    },
+    {
+      "path": "private/global-admin.html",
+      "bytes": 51335,
+      "sha256": "25c8045e8d0ed37b334defc5ff372dbcf2e366d4cc250f78b028d1cb6391aaa9",
+      "kind": "frontend-source",
+      "lines": 827,
+      "styles": [
+        "/assets/css/base.css?v=20261009e",
+        "/assets/css/responsive.css?v=20261009b",
+        "/assets/css/dark.css?v=20261009c",
+        "/assets/css/features.css?v=20261009b",
+        "/assets/img/pics/logo.svg.png"
+      ],
+      "scripts": [
+        {
+          "attributes": "src=\"/assets/js/layout.js?v=11\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/theme.js?v=20261009c\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "",
+          "inlineBytes": 27145,
+          "sha256": "49bb5a4cadce543ead721e6ea618385729abde05372fd7e9981379434e58d556"
+        }
+      ],
+      "inlineStyles": [
+        {
+          "attributes": "",
+          "bytes": 14113,
+          "sha256": "aa10394fbabb8cd13ceb381f6c0f8980d317b0cd31417b316fb4c800a4b4ce55"
+        }
+      ],
+      "apiReferences": [
+        "/api/site/visitor-ping",
+        "/api/admin/visitor-analytics",
+        "/api/admin/club-heads/${encodeURIComponent(btn.dataset.email)}",
+        "/api/admin/club-heads",
+        "/api/admin/club-views",
+        "/api/admin/event-analytics",
+        "/api/admin/clubs/${activeCommitteeClubId}/committee-availability",
+        "/api/admin/applications",
+        "/api/admin/applications/${id}",
+        "/api/admin/applications/${id}/status",
+        "/api/admin/logout",
+        "/api/clubs"
+      ]
+    },
+    {
+      "path": "public/404.html",
+      "bytes": 1551,
+      "sha256": "9b76f51b329f2a24517b9eb677b21c9a0164024b8a16d58a609621c3659c7669",
+      "kind": "frontend-source",
+      "lines": 31,
+      "styles": [
+        "/assets/css/dark.css?v=20261009c"
+      ],
+      "scripts": [
+        {
+          "attributes": "src=\"/assets/js/theme.js?v=20261009c\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "inlineStyles": [
+        {
+          "attributes": "",
+          "bytes": 934,
+          "sha256": "d10e994f0d1728726f9aa2993b54644b2ba20357181839894cd4221182fc68e4"
+        }
+      ],
+      "apiReferences": []
+    },
+    {
+      "path": "public/500.html",
+      "bytes": 1927,
+      "sha256": "dcf320f5949f3e61bfb4c9d379624be396e50e78e9ee2359daa948c1456e1199",
+      "kind": "frontend-source",
+      "lines": 33,
+      "styles": [
+        "/assets/css/dark.css?v=20261009c"
+      ],
+      "scripts": [
+        {
+          "attributes": "src=\"/assets/js/theme.js?v=20261009c\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "inlineStyles": [
+        {
+          "attributes": "",
+          "bytes": 1208,
+          "sha256": "596c792bed7829cb3014f3970dada18c6cdecedf4f42b06660575da384b44587"
+        }
+      ],
+      "apiReferences": []
+    },
+    {
+      "path": "public/assets/css/base.css",
+      "bytes": 55525,
+      "sha256": "30adfa66eb3c719847207c027f9c0a5bd1dfb6c8f9595a9d304ef6acc866c327",
+      "kind": "frontend-source",
+      "lines": 1894,
+      "apiReferences": []
+    },
+    {
+      "path": "public/assets/css/dark.css",
+      "bytes": 17771,
+      "sha256": "b13d048e2b4af7dd1f6bee5f74400fa2c683a023846bb59fd2fc4da362314b8e",
+      "kind": "frontend-source",
+      "lines": 253,
+      "apiReferences": []
+    },
+    {
+      "path": "public/assets/css/event-modal.css",
+      "bytes": 2797,
+      "sha256": "015bf970333a11777a1b0086ef7108658062e0a7c2e2d5eae79579ad2a220d34",
+      "kind": "frontend-source",
+      "lines": 114,
+      "apiReferences": []
+    },
+    {
+      "path": "public/assets/css/features.css",
+      "bytes": 42443,
+      "sha256": "9476876a13ded59e1df8dc1855483c343492b7195e0244b01e5026b9846cd342",
+      "kind": "frontend-source",
+      "lines": 333,
+      "apiReferences": []
+    },
+    {
+      "path": "public/assets/css/pages/events.css",
+      "bytes": 6641,
+      "sha256": "17d0469425295c7454ef6d33db3872b2489532ccc95aaa39cff836a4fc6df10a",
+      "kind": "frontend-source",
+      "lines": 307,
+      "apiReferences": []
+    },
+    {
+      "path": "public/assets/css/responsive.css",
+      "bytes": 4154,
+      "sha256": "183a1deae93fd7c7ac090db3505a70484d8f22c05fde422fcb688cc31ed289b8",
+      "kind": "frontend-source",
+      "lines": 255,
+      "apiReferences": []
+    },
+    {
+      "path": "public/assets/css/theme-toggle.css",
+      "bytes": 1097,
+      "sha256": "e8719bbaa880004942d6b8ffaea12022a09452a38d4e9d7c4b6802ec42530dc5",
+      "kind": "frontend-source",
+      "lines": 47,
+      "apiReferences": []
+    },
+    {
+      "path": "public/assets/img/pics/Utopia.jpg",
+      "bytes": 38707,
+      "sha256": "96829dc4226bd7b0322bc6743c4968bbcf9973f8996770a2f65a5f61b9fb59bc",
+      "kind": "frontend-asset"
+    },
+    {
+      "path": "public/assets/img/pics/acpc.jpg",
+      "bytes": 60502,
+      "sha256": "0d374c334a461fc9c408c9ff4973c5a313aec3acc5f70ba10a0f7f0131626701",
+      "kind": "frontend-asset"
+    },
+    {
+      "path": "public/assets/img/pics/cdc.jpg",
+      "bytes": 17326,
+      "sha256": "46f6ff51d49e99d0d2236f3b3e4fdd5a2e83cae0d4c2466811e7bbfed8ad629c",
+      "kind": "frontend-asset"
+    },
+    {
+      "path": "public/assets/img/pics/dimas.jpg",
+      "bytes": 36642,
+      "sha256": "584ab7fd03f34434f8a9512937b1b43996890eb9f28fd5acf78bc99716946dc0",
+      "kind": "frontend-asset"
+    },
+    {
+      "path": "public/assets/img/pics/gamerslegacy.jpg",
+      "bytes": 54850,
+      "sha256": "05261b4191a8816d1a5e997a38e5a883e3c034863e3e70ac5e6f395ec018f446",
+      "kind": "frontend-asset"
+    },
+    {
+      "path": "public/assets/img/pics/ieee.jpg",
+      "bytes": 126834,
+      "sha256": "07a9e852d5f2c0aad8a9f299976d231a4b86162804ebf4a0cec75d86506a6749",
+      "kind": "frontend-asset"
+    },
+    {
+      "path": "public/assets/img/pics/ihepc.jpg",
+      "bytes": 72568,
+      "sha256": "aa273957fd9ba8c7cb88919470b11b3e4434446639be468921fe0e328ac55cf1",
+      "kind": "frontend-asset"
+    },
+    {
+      "path": "public/assets/img/pics/logo.svg.png",
+      "bytes": 42084,
+      "sha256": "3886511293b5619f9dc3edbb1c1bd699da52358ff4c7702d2172bd766fb0936b",
+      "kind": "frontend-asset"
+    },
+    {
+      "path": "public/assets/img/pics/msp.jpg",
+      "bytes": 48180,
+      "sha256": "ada8e462087a3d910f777169f655774d53b0a25fdd385a611dac7aaba1881186",
+      "kind": "frontend-asset"
+    },
+    {
+      "path": "public/assets/img/pics/mun.jpg",
+      "bytes": 163249,
+      "sha256": "25c16a313e23c8cd0b3322d6d9e59db7e0ab67bc60f3919dcddab2934ecf8ea7",
+      "kind": "frontend-asset"
+    },
+    {
+      "path": "public/assets/img/pics/tedx.jpg",
+      "bytes": 45389,
+      "sha256": "7fb7722385887c1cb33e1d2e39e8292be51920efad4ed2d1628600beb5e9d250",
+      "kind": "frontend-asset"
+    },
+    {
+      "path": "public/assets/img/pics/theater.jpg",
+      "bytes": 72740,
+      "sha256": "a3b756cb322d2a3c0614d0a64181ccd9ce00c5b0bfae44855f223206400a2564",
+      "kind": "frontend-asset"
+    },
+    {
+      "path": "public/assets/img/pics/tuners.jpg",
+      "bytes": 104423,
+      "sha256": "954a4835267e9cb9b50ae077a86655731e911b2d9473d0359ef16c549fd0dc60",
+      "kind": "frontend-asset"
+    },
+    {
+      "path": "public/assets/js/admin-data-status.js",
+      "bytes": 3122,
+      "sha256": "b13bdae43c946ff33f9cea940c743fc51635e8538ce2be9d93bb1fd376c0bdce",
+      "kind": "frontend-source",
+      "lines": 67,
+      "apiReferences": [
+        "/api/admin/system/data-status"
+      ]
+    },
+    {
+      "path": "public/assets/js/app-admin.js",
+      "bytes": 45588,
+      "sha256": "0e929d9f8e49982935f90051553d929edfe8371b6dfa8a425a0c84fe128c3b07",
+      "kind": "frontend-source",
+      "lines": 948,
+      "apiReferences": [
+        "/api/admin/session",
+        "/api/admin/clubs/archived",
+        "/api/admin/clubs/order",
+        "/api/club/application-form",
+        "/api/club/interview-form",
+        "/api/admin/clubs/${clubId}/archive",
+        "/api/admin/clubs/${clubId}/restore",
+        "/api/clubs/${clubId}/view",
+        "/api/my-forms/${encodeURIComponent(editing.id)}",
+        "/api/applications"
+      ]
+    },
+    {
+      "path": "public/assets/js/app-dashboard.js",
+      "bytes": 37228,
+      "sha256": "5e0a254fe8b2fc1dbfd0e53190a534b95ffda079149c40bb540446d791b7722e",
+      "kind": "frontend-source",
+      "lines": 848,
+      "apiReferences": [
+        "/api/applications/${appId}",
+        "/api/club/heads",
+        "/api/club/committee-availability",
+        "/api/club/members",
+        "/api/club/heads/${encodeURIComponent(head.email)}",
+        "/api/clubs/${clubId}/application-committees",
+        "/api/applications/${state.selectedApplication.id}/status",
+        "/api/club-auth/logout",
+        "/api/admin/setup",
+        "/api/admin/login",
+        "/api/club-auth/login",
+        "/api/admin/logout",
+        "/api/admin/homepage",
+        "/api/admin/clubs/${clubId}",
+        "/api/admin/clubs"
+      ]
+    },
+    {
+      "path": "public/assets/js/app-home.js",
+      "bytes": 51912,
+      "sha256": "4cb0a0d88c6953469ed5e4fe0cfa09c3b81bf2b6a64a9de4b6fc0ae823794c24",
+      "kind": "frontend-source",
+      "lines": 1097,
+      "apiReferences": [
+        "/api/my-forms/${encodeURIComponent(entry.id)}",
+        "/api/my-forms/${encodeURIComponent(item.id)}",
+        "/api/clubs",
+        "/api/admin/homepage",
+        "/api/club/applications",
+        "/api/club/heads",
+        "/api/club/members",
+        "/api/club/attendance-records",
+        "/api/club/content",
+        "/api/club-auth/session"
+      ]
+    },
+    {
+      "path": "public/assets/js/attendance-approval-workflow.js",
+      "bytes": 8875,
+      "sha256": "6dea133003bc86ea980dd80a3c6d89ed77de88e37b4652bc13fa9ef28ff32020",
+      "kind": "frontend-source",
+      "lines": 193,
+      "apiReferences": [
+        "/api/committee/attendance-reviews",
+        "/api/committee/attendance-reviews/${escapePathPart(review.clubId)}/${escapePathPart(review.itemType)}/${escapePathPart(review.eventRequestId)}/approve",
+        "/api/club-auth/logout",
+        "/api/club-auth/session"
+      ]
+    },
+    {
+      "path": "public/assets/js/attendance-checkin.js",
+      "bytes": 3031,
+      "sha256": "5d8808f33e949e30b2ed647b3cec413d6b9773f43d55411dc798890204a83c80",
+      "kind": "frontend-source",
+      "lines": 67,
+      "apiReferences": [
+        "/api/attendance/${encodeURIComponent(token)}",
+        "/api/student-auth/session"
+      ]
+    },
+    {
+      "path": "public/assets/js/attendance-dashboard.js",
+      "bytes": 10640,
+      "sha256": "85eebd3e19d3e4074a8d5e5d2fb8eef3bca7819d439d4f7f1adc024f117cd5f4",
+      "kind": "frontend-source",
+      "lines": 233,
+      "apiReferences": [
+        "/api/club/attendance-qr-challenge",
+        "/api/club/attendance-events",
+        "/api/club/attendance-records",
+        "/api/club/attendance-sessions"
+      ]
+    },
+    {
+      "path": "public/assets/js/committee-attendance.js",
+      "bytes": 7977,
+      "sha256": "63254bbf5efbda72ff51ebac6f3b408a2b999741121ef23eaca6cee99c77e8cd",
+      "kind": "frontend-source",
+      "lines": 182,
+      "apiReferences": [
+        "/api/committee/attendance-overview",
+        "/api/committee/attendance-records?${query}",
+        "/api/committee/attendance-records?clubId=all"
+      ]
+    },
+    {
+      "path": "public/assets/js/committee-dashboard.js",
+      "bytes": 50776,
+      "sha256": "1461cc1a1a28555727e295a84b89e2eb20ab3f3781fb5fe5ff95ed7916f812d2",
+      "kind": "frontend-source",
+      "lines": 1011,
+      "apiReferences": [
+        "/api/club-auth/session",
+        "/api/committee/requests/${item.id}/comment",
+        "/api/committee/requests",
+        "/api/committee/status",
+        "/api/committee/requests/${item.id}/action",
+        "/api/committee/requests/${item.id}",
+        "/api/committee/status/${id}",
+        "/api/committee/requests/${item.id}/return-to-committee",
+        "/api/committee/requests/${item.id}/reopen",
+        "/api/committee/requests/${activeRequest.id}/return-to-committee",
+        "/api/club-auth/logout"
+      ]
+    },
+    {
+      "path": "public/assets/js/committee-sidebar.js",
+      "bytes": 7858,
+      "sha256": "a7f36a7c55e978d27437d21be78f3191cd3c91d2b97f4fceef3d97a9bd72d8f6",
+      "kind": "frontend-source",
+      "lines": 173,
+      "apiReferences": []
+    },
+    {
+      "path": "public/assets/js/content-studio.js",
+      "bytes": 11514,
+      "sha256": "7b46c27aa8f2918cb31f4eaf61cae2099a3204708d06fd002b53dc416f1b6959",
+      "kind": "frontend-source",
+      "lines": 259,
+      "apiReferences": [
+        "/api/club-auth/session",
+        "/api/club/content",
+        "/api/club/content/${id}",
+        "/api/club/content/${editingId}",
+        "/api/club/content/${type}",
+        "/api/club-auth/logout"
+      ]
+    },
+    {
+      "path": "public/assets/js/event-modal.js",
+      "bytes": 3457,
+      "sha256": "cab3d8f1b1108eaf80b9f7b032db66e43e37a9b988daff00100052e4b9ff5931",
+      "kind": "frontend-source",
+      "lines": 77,
+      "apiReferences": [
+        "/api/events/${encodeURIComponent(event.clubId)}/${encodeURIComponent(event.eventIndex)}/view",
+        "/api/events/${encodeURIComponent(activeEvent.clubId)}/${encodeURIComponent(activeEvent.eventIndex)}/registrations"
+      ]
+    },
+    {
+      "path": "public/assets/js/layout.js",
+      "bytes": 6844,
+      "sha256": "fbb30828afa75af817eba799a966544c857a8e6bcb309b0fe2c64688d60311ee",
+      "kind": "frontend-source",
+      "lines": 163,
+      "apiReferences": [
+        "/api/site/visitor-ping"
+      ]
+    },
+    {
+      "path": "public/assets/js/member-directory.js",
+      "bytes": 8704,
+      "sha256": "fe7aee85d188fec75c55ae6553966df6e8009f2399edd4559c4314001cb66641",
+      "kind": "frontend-source",
+      "lines": 184,
+      "apiReferences": [
+        "/api/clubs",
+        "/api/committee/club-members",
+        "/api/admin/club-members"
+      ]
+    },
+    {
+      "path": "public/assets/js/pages/booths.js",
+      "bytes": 4981,
+      "sha256": "48f1142c79bb53fa0a9979d91b9a029ceb3ab597079360ccd2b1f402425bdb1d",
+      "kind": "frontend-source",
+      "lines": 112,
+      "apiReferences": [
+        "/api/clubs"
+      ]
+    },
+    {
+      "path": "public/assets/js/pages/event-detail.js",
+      "bytes": 3865,
+      "sha256": "1248dfb667f2f51e3ef2badcaa29474ee78c05b9cbf5b56629a1e09cd1c3904a",
+      "kind": "frontend-source",
+      "lines": 84,
+      "apiReferences": [
+        "/api/clubs",
+        "/api/events/${encodeURIComponent(clubId)}/${encodeURIComponent(eventIndex)}/view",
+        "/api/events/${clubId}/${eventIndex}/registrations"
+      ]
+    },
+    {
+      "path": "public/assets/js/pages/events.js",
+      "bytes": 6215,
+      "sha256": "7edc913849ba8b60747ccda35ee2407529803ff12d40144d52d03d155aeb419b",
+      "kind": "frontend-source",
+      "lines": 149,
+      "apiReferences": [
+        "/api/clubs"
+      ]
+    },
+    {
+      "path": "public/assets/js/pages/sponsors.js",
+      "bytes": 4156,
+      "sha256": "07453453606f524b4551b29f1d0f1562e799ece6542806a7bd6cd27fecf6f7d4",
+      "kind": "frontend-source",
+      "lines": 97,
+      "apiReferences": [
+        "/api/clubs"
+      ]
+    },
+    {
+      "path": "public/assets/js/theme.js",
+      "bytes": 2562,
+      "sha256": "9d2ae41230b168f4f99eb1056cd3972bcba5ec26a4c86f041a3bc87a9e2d0a0f",
+      "kind": "frontend-source",
+      "lines": 55,
+      "apiReferences": []
+    },
+    {
+      "path": "public/attendance.html",
+      "bytes": 2419,
+      "sha256": "d92c73eb6f4f033cb87fa52b323d534efad183d31fdf72f889ddd9228d21560f",
+      "kind": "frontend-source",
+      "lines": 43,
+      "styles": [
+        "/assets/css/base.css?v=20261009h",
+        "/assets/css/responsive.css?v=20261006e",
+        "/assets/css/dark.css?v=20261009c"
+      ],
+      "scripts": [
+        {
+          "attributes": "src=\"/assets/js/layout.js?v=11\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/attendance-checkin.js?v=7\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/theme.js?v=20261009c\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "inlineStyles": [
+        {
+          "attributes": "",
+          "bytes": 858,
+          "sha256": "97f7de13ce26608e1302c4b8b4341a13f1793ee29f61f0077c1ed31ee581cecd"
+        }
+      ],
+      "apiReferences": []
+    },
+    {
+      "path": "public/components/site-footer.html",
+      "bytes": 703,
+      "sha256": "e9d6c5aaf71822ac06cddefd530dad6ca783cd87763e00116c80723300fac53c",
+      "kind": "frontend-source",
+      "lines": 12,
+      "styles": [],
+      "scripts": [],
+      "inlineStyles": [],
+      "apiReferences": []
+    },
+    {
+      "path": "public/components/site-header.html",
+      "bytes": 3802,
+      "sha256": "97a0dbd6bba330e7a077620db2daf8b927b4f32f9e722616f668154faf7a388f",
+      "kind": "frontend-source",
+      "lines": 54,
+      "styles": [],
+      "scripts": [],
+      "inlineStyles": [],
+      "apiReferences": []
+    },
+    {
+      "path": "public/dashboards/dean-dashboard.html",
+      "bytes": 17987,
+      "sha256": "26cca2b7ede03acf8adb4a0320a97e95af73262fc3c8b821005cfb18b83c14be",
+      "kind": "frontend-source",
+      "lines": 178,
+      "styles": [
+        "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap",
+        "/assets/css/base.css?v=20261007d",
+        "/assets/css/responsive.css?v=20261005h",
+        "/assets/css/dark.css?v=20261009c",
+        "/assets/css/features.css?v=20261009au",
+        "/assets/img/pics/logo.svg.png"
+      ],
+      "scripts": [
+        {
+          "attributes": "src=\"/assets/js/committee-sidebar.js?v=13\"",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/committee-dashboard.js?v=20261009ac\"",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/committee-attendance.js?v=6\"",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/attendance-approval-workflow.js?v=9\"",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/layout.js?v=11\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/theme.js?v=20261009c\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "inlineStyles": [
+        {
+          "attributes": "",
+          "bytes": 8204,
+          "sha256": "816d7c3b18f4ae4e1e9f1a959e91697fabefa71f0cc7a7559f892b10813d74aa"
+        }
+      ],
+      "apiReferences": []
+    },
+    {
+      "path": "public/dashboards/english-dashboard.html",
+      "bytes": 10751,
+      "sha256": "6bcd511a759885c2b84eb0541a536f0f1786562964286202e7a58a4d22edbb0c",
+      "kind": "frontend-source",
+      "lines": 115,
+      "styles": [
+        "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap",
+        "/assets/css/base.css?v=20261007d",
+        "/assets/css/responsive.css?v=20261005h",
+        "/assets/css/dark.css?v=20261009c",
+        "/assets/css/features.css?v=20261009au",
+        "/assets/img/pics/logo.svg.png"
+      ],
+      "scripts": [
+        {
+          "attributes": "src=\"/assets/js/committee-sidebar.js?v=13\"",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/committee-dashboard.js?v=20261009ac\"",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/layout.js?v=11\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/theme.js?v=20261009c\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "inlineStyles": [
+        {
+          "attributes": "",
+          "bytes": 5321,
+          "sha256": "af2d3aeb7f58ea5e8f3ff01598c2255af6cfd2b8a1edfd34eca0e5658fee992d"
+        }
+      ],
+      "apiReferences": []
+    },
+    {
+      "path": "public/dashboards/pr-dashboard.html",
+      "bytes": 14932,
+      "sha256": "4a7e92e26b87e415032c63d4853890995c49ca4620b86ec0563fb82adbd45cd6",
+      "kind": "frontend-source",
+      "lines": 154,
+      "styles": [
+        "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap",
+        "/assets/css/base.css?v=20261008l",
+        "/assets/css/responsive.css?v=20261005h",
+        "/assets/css/dark.css?v=20261009c",
+        "/assets/css/features.css?v=20261009au",
+        "/assets/img/pics/logo.svg.png"
+      ],
+      "scripts": [
+        {
+          "attributes": "src=\"/assets/js/committee-sidebar.js?v=13\"",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/committee-dashboard.js?v=20261009ac\"",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/member-directory.js?v=20261009y\"",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/committee-attendance.js?v=6\"",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/attendance-approval-workflow.js?v=9\"",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/layout.js?v=11\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/theme.js?v=20261009c\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "inlineStyles": [
+        {
+          "attributes": "",
+          "bytes": 5234,
+          "sha256": "b56f1463f0e56af089882c423591d3a8ed45337049f792205782b9c3bee9425a"
+        }
+      ],
+      "apiReferences": []
+    },
+    {
+      "path": "public/dashboards/sso-dashboard.html",
+      "bytes": 3603,
+      "sha256": "0f71c7904d47009d9ae6c253b3ee4875d0c4fee4e0d923f999d8a67d41f8fa24",
+      "kind": "frontend-source",
+      "lines": 46,
+      "styles": [
+        "/assets/css/base.css?v=20261009e",
+        "/assets/css/responsive.css?v=20261009b",
+        "/assets/css/dark.css?v=20261009c",
+        "/assets/css/features.css?v=20261009au",
+        "/assets/img/pics/logo.svg.png"
+      ],
+      "scripts": [
+        {
+          "attributes": "src=\"/assets/js/committee-sidebar.js?v=13\"",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/attendance-approval-workflow.js?v=9\"",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/layout.js?v=11\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/theme.js?v=20261009c\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "inlineStyles": [
+        {
+          "attributes": "",
+          "bytes": 466,
+          "sha256": "cf835c3adf4a385415e80579fa450914c49c6c8db6918afd0ab261035b0ef1ea"
+        }
+      ],
+      "apiReferences": []
+    },
+    {
+      "path": "public/index.html",
+      "bytes": 51002,
+      "sha256": "2fff1dc97a430491c7d9047141276e8ac39e77a0261d2d33db3d089c8931ebc1",
+      "kind": "frontend-source",
+      "lines": 867,
+      "styles": [
+        "https://fonts.googleapis.com",
+        "https://fonts.gstatic.com",
+        "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap",
+        "/assets/css/base.css?v=20261009q",
+        "/assets/css/responsive.css?v=20261006e",
+        "/assets/css/dark.css?v=20261009c",
+        "/assets/css/features.css?v=20261009aj",
+        "/assets/css/event-modal.css?v=3",
+        "/assets/img/pics/logo.svg.png"
+      ],
+      "scripts": [
+        {
+          "attributes": "",
+          "inlineBytes": 135,
+          "sha256": "2869a32e1e29566cc296f41aa7783788d5382c09b01ac13aa8f45a95ecc57e12"
+        },
+        {
+          "attributes": "src=\"/assets/js/event-modal.js?v=2\"",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/committee-sidebar.js?v=13\"",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/app-home.js?v=20261009ab\"",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/app-admin.js?v=20261009c\"",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/app-dashboard.js?v=20261009x\"",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/admin-data-status.js?v=2\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/attendance-dashboard.js?v=13\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/member-directory.js?v=20261009s\"",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/layout.js?v=11\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/theme.js?v=20261009c\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "inlineStyles": [
+        {
+          "attributes": "",
+          "bytes": 1737,
+          "sha256": "1c7f08d8bdf807aca886282f0f4838795e81b46f2ceaac266b119c31938db971"
+        }
+      ],
+      "apiReferences": []
+    },
+    {
+      "path": "public/pages/applicant-login.html",
+      "bytes": 8795,
+      "sha256": "3594be475b71d4687805ffd1769a110d53d5971b3b74426c83f6ca44fe586945",
+      "kind": "frontend-source",
+      "lines": 148,
+      "styles": [
+        "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap",
+        "/assets/css/base.css?v=20261007d",
+        "/assets/css/responsive.css?v=20261005h",
+        "/assets/css/dark.css?v=20261009c",
+        "/assets/css/features.css?v=20261008g",
+        "/assets/img/pics/logo.svg.png"
+      ],
+      "scripts": [
+        {
+          "attributes": "",
+          "inlineBytes": 4043,
+          "sha256": "788701fd1dd5bd3e564e427e04cbd7cdd8b59756dc9b1d0d03e0ceec68acd896"
+        },
+        {
+          "attributes": "src=\"/assets/js/layout.js?v=11\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/theme.js?v=20261009c\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "inlineStyles": [
+        {
+          "attributes": "",
+          "bytes": 1474,
+          "sha256": "bfd96242158e6cf0f80d3ee385e79106822660e4bbc23036cd785b784412cef6"
+        }
+      ],
+      "apiReferences": [
+        "/api/auth/login",
+        "/api/student-auth/google-config",
+        "/api/student-auth/google"
+      ]
+    },
+    {
+      "path": "public/pages/booth-form.html",
+      "bytes": 9031,
+      "sha256": "74d7feb923dd2f48fdf4c898f689c21dc0c3c39ac603dc783197b8e55ad30961",
+      "kind": "frontend-source",
+      "lines": 152,
+      "styles": [
+        "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap",
+        "/assets/css/base.css?v=20261007d",
+        "/assets/css/responsive.css?v=20261005i",
+        "/assets/css/dark.css?v=20261009c",
+        "/assets/css/features.css?v=20261005i",
+        "/assets/img/pics/logo.svg.png"
+      ],
+      "scripts": [
+        {
+          "attributes": "src=\"/assets/js/content-studio.js?v=20261007c\"",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "",
+          "inlineBytes": 2019,
+          "sha256": "e52deb59590d4c778ceb8f764eb1d05d43edd12ca31c64bf3d3e2147dafd286e"
+        },
+        {
+          "attributes": "src=\"/assets/js/layout.js?v=11\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/theme.js?v=20261009c\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "inlineStyles": [
+        {
+          "attributes": "",
+          "bytes": 3056,
+          "sha256": "984315087154026b8d8a0b2d18722c9b48b05c38c9a426bcc353722b2fa8d4b9"
+        }
+      ],
+      "apiReferences": []
+    },
+    {
+      "path": "public/pages/booths.html",
+      "bytes": 2861,
+      "sha256": "d4644aff5a3922438db4010917e51aa9e4123778dc5da195eab07597fe327db4",
+      "kind": "frontend-source",
+      "lines": 60,
+      "styles": [
+        "https://fonts.googleapis.com",
+        "https://fonts.gstatic.com",
+        "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap",
+        "/assets/css/base.css?v=20261007d",
+        "/assets/css/responsive.css?v=20261005h",
+        "/assets/css/dark.css?v=20261009c",
+        "/assets/css/features.css?v=20261008g",
+        "/assets/css/pages/events.css?v=13",
+        "/assets/css/event-modal.css?v=2",
+        "/assets/img/pics/logo.svg.png"
+      ],
+      "scripts": [
+        {
+          "attributes": "src=\"/assets/js/pages/booths.js?v=2\"",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/layout.js?v=11\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/theme.js?v=20261009c\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "inlineStyles": [],
+      "apiReferences": []
+    },
+    {
+      "path": "public/pages/club-content.html",
+      "bytes": 6778,
+      "sha256": "03ad3f21cca48506f34fc945b0024e567583343de15bcc8c5219424fa9f11711",
+      "kind": "frontend-source",
+      "lines": 112,
+      "styles": [
+        "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap",
+        "/assets/css/base.css?v=20261007d",
+        "/assets/css/responsive.css?v=20261005i",
+        "/assets/css/dark.css?v=20261009c",
+        "/assets/css/features.css?v=20261005i",
+        "/assets/img/pics/logo.svg.png"
+      ],
+      "scripts": [
+        {
+          "attributes": "src=\"/assets/js/content-studio.js?v=20261007c\"",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "",
+          "inlineBytes": 145,
+          "sha256": "b4371bb7308c925841863b823dbdd9c2fa808264a8f43093568c2c57739f6ce7"
+        },
+        {
+          "attributes": "src=\"/assets/js/layout.js?v=11\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/theme.js?v=20261009c\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "inlineStyles": [
+        {
+          "attributes": "",
+          "bytes": 3271,
+          "sha256": "272a59a239b227552c7ae4e44ca1de9f12477e585cc853fa34c692143b905ac1"
+        }
+      ],
+      "apiReferences": []
+    },
+    {
+      "path": "public/pages/event-form.html",
+      "bytes": 8101,
+      "sha256": "49a07c4e277c6c0fb503f453b54cc98be93c47c8896b5cfb36a35a5c1826f071",
+      "kind": "frontend-source",
+      "lines": 148,
+      "styles": [
+        "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap",
+        "/assets/css/base.css?v=20261007d",
+        "/assets/css/responsive.css?v=20261005i",
+        "/assets/css/dark.css?v=20261009c",
+        "/assets/css/features.css?v=20261005i",
+        "/assets/img/pics/logo.svg.png"
+      ],
+      "scripts": [
+        {
+          "attributes": "src=\"/assets/js/content-studio.js?v=20261007c\"",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "",
+          "inlineBytes": 1500,
+          "sha256": "fd8475f63feb5c06d9d672e398081dcaf743b7905c046517a3f93597c811dd5b"
+        },
+        {
+          "attributes": "src=\"/assets/js/layout.js?v=11\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/theme.js?v=20261009c\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "inlineStyles": [
+        {
+          "attributes": "",
+          "bytes": 3056,
+          "sha256": "984315087154026b8d8a0b2d18722c9b48b05c38c9a426bcc353722b2fa8d4b9"
+        }
+      ],
+      "apiReferences": []
+    },
+    {
+      "path": "public/pages/event.html",
+      "bytes": 2860,
+      "sha256": "2b96f23ac1ae4badf8e807c436117fc4879e6c2e3db9dd8832449a275a330897",
+      "kind": "frontend-source",
+      "lines": 55,
+      "styles": [
+        "https://fonts.googleapis.com",
+        "https://fonts.gstatic.com",
+        "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap",
+        "/assets/css/base.css?v=20261007d",
+        "/assets/css/responsive.css?v=20261006a",
+        "/assets/css/dark.css?v=20261009c",
+        "/assets/css/features.css?v=20261005h",
+        "/assets/css/pages/events.css?v=12",
+        "/assets/img/pics/logo.svg.png"
+      ],
+      "scripts": [
+        {
+          "attributes": "src=\"/assets/js/pages/event-detail.js?v=2\"",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/layout.js?v=11\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/theme.js?v=20261009c\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "inlineStyles": [],
+      "apiReferences": []
+    },
+    {
+      "path": "public/pages/events.html",
+      "bytes": 3830,
+      "sha256": "cd200f8f9c15283bdcdac8cc22ff2b2feae5447cdaaa11c7630e1df8335ef235",
+      "kind": "frontend-source",
+      "lines": 80,
+      "styles": [
+        "https://fonts.googleapis.com",
+        "https://fonts.gstatic.com",
+        "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap",
+        "/assets/css/base.css?v=20261007d",
+        "/assets/css/responsive.css?v=20261006a",
+        "/assets/css/dark.css?v=20261009c",
+        "/assets/css/features.css?v=20261008g",
+        "/assets/css/event-modal.css?v=2",
+        "/assets/css/pages/events.css?v=10",
+        "/assets/img/pics/logo.svg.png"
+      ],
+      "scripts": [
+        {
+          "attributes": "src=\"/assets/js/event-modal.js?v=2\"",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/pages/events.js?v=11\"",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/layout.js?v=11\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/theme.js?v=20261009c\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "inlineStyles": [],
+      "apiReferences": []
+    },
+    {
+      "path": "public/pages/feed-form.html",
+      "bytes": 7616,
+      "sha256": "6fe715d74630397588a8d995077860c54101fbdfbcf43ca7058c9534d4cc0012",
+      "kind": "frontend-source",
+      "lines": 140,
+      "styles": [
+        "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap",
+        "/assets/css/base.css?v=20261007d",
+        "/assets/css/responsive.css?v=20261005i",
+        "/assets/css/dark.css?v=20261009c",
+        "/assets/css/features.css?v=20261005i",
+        "/assets/img/pics/logo.svg.png"
+      ],
+      "scripts": [
+        {
+          "attributes": "src=\"/assets/js/content-studio.js?v=20261007c\"",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "",
+          "inlineBytes": 1214,
+          "sha256": "3f75ae868ae6c06ab178cd517d26b63283e122c9d4d14a75b9954331a4c45da0"
+        },
+        {
+          "attributes": "src=\"/assets/js/layout.js?v=11\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/theme.js?v=20261009c\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "inlineStyles": [
+        {
+          "attributes": "",
+          "bytes": 3056,
+          "sha256": "984315087154026b8d8a0b2d18722c9b48b05c38c9a426bcc353722b2fa8d4b9"
+        }
+      ],
+      "apiReferences": []
+    },
+    {
+      "path": "public/pages/forgot-password.html",
+      "bytes": 3867,
+      "sha256": "6ba5e3f693e85ed9a8800879127b63dbf66820566511e46ded3ffeefa5cd607b",
+      "kind": "frontend-source",
+      "lines": 82,
+      "styles": [
+        "/assets/css/base.css?v=20261007d",
+        "/assets/css/responsive.css?v=20261005h",
+        "/assets/css/dark.css?v=20261009c",
+        "/assets/css/features.css?v=20261005h",
+        "/assets/img/pics/logo.svg.png"
+      ],
+      "scripts": [
+        {
+          "attributes": "",
+          "inlineBytes": 1358,
+          "sha256": "47e7023a8b568e657a3da9216ed45335220d0b9461c0bae1a8c1ffd2d4dad8c3"
+        },
+        {
+          "attributes": "src=\"/assets/js/layout.js?v=11\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/theme.js?v=20261009c\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "inlineStyles": [
+        {
+          "attributes": "",
+          "bytes": 553,
+          "sha256": "7b498a631225d2e87b54a8293489f343f1cdef238fd0c716ddaea6e03e74abb0"
+        }
+      ],
+      "apiReferences": [
+        "/api/password-reset/request"
+      ]
+    },
+    {
+      "path": "public/pages/reset-password.html",
+      "bytes": 5204,
+      "sha256": "f07ed07476245e405d7778210223e01ce7e49249d4dcbd2d5df80472bbefb66b",
+      "kind": "frontend-source",
+      "lines": 103,
+      "styles": [
+        "/assets/css/base.css?v=20261007d",
+        "/assets/css/responsive.css?v=20261005h",
+        "/assets/css/dark.css?v=20261009c",
+        "/assets/css/features.css?v=20261005h",
+        "/assets/img/pics/logo.svg.png"
+      ],
+      "scripts": [
+        {
+          "attributes": "",
+          "inlineBytes": 2263,
+          "sha256": "0131b7925c5db18372f9eddc80ab726655edade3483017156b9cef989887dadb"
+        },
+        {
+          "attributes": "src=\"/assets/js/layout.js?v=11\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/theme.js?v=20261009c\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "inlineStyles": [
+        {
+          "attributes": "",
+          "bytes": 553,
+          "sha256": "7b498a631225d2e87b54a8293489f343f1cdef238fd0c716ddaea6e03e74abb0"
+        }
+      ],
+      "apiReferences": [
+        "/api/password-reset/confirm"
+      ]
+    },
+    {
+      "path": "public/pages/sponsor-form.html",
+      "bytes": 10265,
+      "sha256": "39e9302c1ca3c8609a38586dd2b2052d7206ff7690808fbba09d261b74524f2f",
+      "kind": "frontend-source",
+      "lines": 180,
+      "styles": [
+        "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap",
+        "/assets/css/base.css?v=20261007d",
+        "/assets/css/responsive.css?v=20261005i",
+        "/assets/css/dark.css?v=20261009c",
+        "/assets/css/features.css?v=20261005i",
+        "/assets/img/pics/logo.svg.png"
+      ],
+      "scripts": [
+        {
+          "attributes": "src=\"/assets/js/content-studio.js?v=20261007c\"",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "",
+          "inlineBytes": 2866,
+          "sha256": "db7b0f52b5beadf88ccefe8e2af3063c5e390321321c19ba3f73fda6fa3b7459"
+        },
+        {
+          "attributes": "src=\"/assets/js/layout.js?v=11\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/theme.js?v=20261009c\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "inlineStyles": [
+        {
+          "attributes": "",
+          "bytes": 3056,
+          "sha256": "984315087154026b8d8a0b2d18722c9b48b05c38c9a426bcc353722b2fa8d4b9"
+        }
+      ],
+      "apiReferences": []
+    },
+    {
+      "path": "public/pages/sponsors.html",
+      "bytes": 2817,
+      "sha256": "ce12cf37c44584665f6c511339364717fd09714bdf29d122d45d73ca32361040",
+      "kind": "frontend-source",
+      "lines": 59,
+      "styles": [
+        "https://fonts.googleapis.com",
+        "https://fonts.gstatic.com",
+        "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap",
+        "/assets/css/base.css?v=20261007d",
+        "/assets/css/responsive.css?v=20261005h",
+        "/assets/css/dark.css?v=20261009c",
+        "/assets/css/features.css?v=20261008g",
+        "/assets/css/pages/events.css?v=12",
+        "/assets/css/event-modal.css?v=2",
+        "/assets/img/pics/logo.svg.png"
+      ],
+      "scripts": [
+        {
+          "attributes": "src=\"/assets/js/pages/sponsors.js?v=3\"",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/layout.js?v=11\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "attributes": "src=\"/assets/js/theme.js?v=20261009c\" defer",
+          "inlineBytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "inlineStyles": [],
+      "apiReferences": []
+    },
+    {
+      "path": "scripts/backup-worker.env.example",
+      "bytes": 620,
+      "sha256": "636d3aa2fc2b62418a2809b3cc9f034e83aa774075d1d50d5c75df2526269b64",
+      "kind": "protected-backend-data-config"
+    },
+    {
+      "path": "scripts/database-backup-worker.js",
+      "bytes": 13101,
+      "sha256": "9190f6185f1f12eaf4f394e8f816bc673cba943c8aeed539748328eb8c1397ca",
+      "kind": "protected-backend-data-config",
+      "lines": 263,
+      "apiReferences": []
+    },
+    {
+      "path": "scripts/restore-database-backup.js",
+      "bytes": 2972,
+      "sha256": "fc8a7479c2ec9fa169f0f79f7d8c78705d1c2bcd4cf36b5cf9c673c8c3d17bed",
+      "kind": "protected-backend-data-config",
+      "lines": 66,
+      "apiReferences": []
+    },
+    {
+      "path": "scripts/xlsx-writer.js",
+      "bytes": 10636,
+      "sha256": "eb2a6ba6390a803229eefc4617b118a1b1adda38ad453c013b22bc97a91b4777",
+      "kind": "protected-backend-data-config",
+      "lines": 137,
+      "apiReferences": []
+    },
+    {
+      "path": "seed.js",
+      "bytes": 14650,
+      "sha256": "aa963c5150888715d7a0f7aafc54c6bb21916f068ded38e37cb797dfd9ab7652",
+      "kind": "protected-backend-data-config",
+      "lines": 398,
+      "apiReferences": []
+    },
+    {
+      "path": "server.js",
+      "bytes": 205498,
+      "sha256": "77a965529bc53e3b9b6062a15a94b3feffdd5c03859b3b89cae8e10d662f6736",
+      "kind": "protected-backend-data-config",
+      "lines": 4477,
+      "apiReferences": [
+        "/api/site/visitor-ping",
+        "/api/clubs",
+        "/api/clubs/:id/view",
+        "/api/admin/session",
+        "/api/events/:clubId/:eventIndex/view",
+        "/api/club-auth/session",
+        "/api/club-auth/login",
+        "/api/club-auth/logout",
+        "/api/club/dashboard",
+        "/api/events/:clubId/:eventIndex/registrations",
+        "/api/club/attendance-events",
+        "/api/club/attendance-sessions",
+        "/api/club/attendance-qr-challenge",
+        "/api/club/attendance-records",
+        "/api/committee/attendance-overview",
+        "/api/committee/attendance-records",
+        "/api/attendance/:token",
+        "/api/club/event-registrations",
+        "/api/clubs/:id/committees",
+        "/api/clubs/:id/application-committees",
+        "/api/club/committee-availability",
+        "/api/club/heads",
+        "/api/club/members",
+        "/api/club/application-form",
+        "/api/club/interview-form",
+        "/api/club/heads/:email",
+        "/api/committee/attendance-reviews",
+        "/api/committee/attendance-reviews/:clubId/:itemType/:eventRequestId/approve",
+        "/api/committee/club-members",
+        "/api/club/content",
+        "/api/club/content/${moduleType}",
+        "/api/club/content/:id",
+        "/api/committee/requests",
+        "/api/committee/status",
+        "/api/committee/status/:id",
+        "/api/committee/requests/:id/reopen",
+        "/api/committee/requests/:id/return-to-committee",
+        "/api/committee/requests/:id",
+        "/api/committee/requests/:id/comment",
+        "/api/committee/requests/:id/action",
+        "/api/student-auth/google-config",
+        "/api/student-auth/google",
+        "/api/student-auth/session",
+        "/api/auth/login",
+        "/api/admin/setup",
+        "/api/admin/login",
+        "/api/admin/logout",
+        "/api/password-reset/request",
+        "/api/password-reset/confirm",
+        "/api/admin",
+        "/api/admin/visitor-analytics",
+        "/api/admin/system/data-status",
+        "/api/admin/clubs/:id/committee-availability",
+        "/api/admin/club-views",
+        "/api/admin/event-analytics",
+        "/api/admin/club-members",
+        "/api/admin/clubs/archived",
+        "/api/admin/applications",
+        "/api/admin/applications/:id/status",
+        "/api/admin/applications/:id",
+        "/api/admin/club-heads",
+        "/api/admin/club-heads/:email",
+        "/api/admin/club-credentials",
+        "/api/admin/homepage",
+        "/api/admin/clubs",
+        "/api/admin/clubs/order",
+        "/api/admin/clubs/:id",
+        "/api/admin/clubs/:id/archive",
+        "/api/admin/clubs/:id/restore",
+        "/api/club/applications",
+        "/api/club/:id/applications",
+        "/api/applications",
+        "/api/my-forms/access",
+        "/api/my-forms/:id",
+        "/api/applications/:id/status",
+        "/api/applications/:id",
+        "/api/"
+      ]
+    },
+    {
+      "path": "ses_ef1f566b3ffeoidtt4pcccgrzg.json",
+      "bytes": 2499,
+      "sha256": "bfd4a8dbcf6d283963eaddada06dae60fe346e065067c82d5cf8f76098a0041e",
+      "kind": "project-support"
+    },
+    {
+      "path": "tests/verify-structure.js",
+      "bytes": 5465,
+      "sha256": "2c88941d2fc6d11723a7ae8cb07a69854da5daab0bfccade3b08005f90afefae",
+      "kind": "project-support",
+      "lines": 115,
+      "apiReferences": [
+        "/api/clubs"
+      ]
+    },
+    {
+      "path": "vercel.json",
+      "bytes": 81,
+      "sha256": "bd2291ab440689f64e678980315de1441dd9e0efb2a5d0801806b4937f448daf",
+      "kind": "protected-backend-data-config"
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Home - MIU Clubs</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/assets/css/base.css?v=20261007d" />
+    <link rel="stylesheet" href="/assets/css/responsive.css?v=20261006a" />
+    <link rel="stylesheet" href="/assets/css/dark.css?v=20261009c" />
+    <link rel="stylesheet" href="/assets/css/features.css?v=20261008g" />
+    <link rel="stylesheet" href="/assets/css/pages/events.css?v=10" />
+    <link rel="stylesheet" href="/assets/css/pages/feed.css?v=3" />
+    <link rel="icon" href="/assets/img/pics/logo.svg.png" type="image/png" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <div id="site-header"></div>
+      <main class="app-container community-feed-page">
+        <section class="welcome-box hero-panel feed-hero">
+          <span class="feed-eyebrow">MIU CLUBS COMMUNITY</span>
+          <h1>Community Feed</h1>
+          <p>Discover announcements, events, and activities from clubs across the university.</p>
+        </section>
+        <section class="community-feed-panel" aria-label="Club community posts">
+          <div class="community-feed-toolbar" role="group" aria-label="Filter community feed">
+            <button class="feed-filter is-active" type="button" data-filter="all" aria-pressed="true">All Posts</button>
+            <button class="feed-filter" type="button" data-filter="announcements" aria-pressed="false">Announcements</button>
+            <button class="feed-filter" type="button" data-filter="events" aria-pressed="false">Upcoming Events</button>
+            <button class="feed-filter" type="button" data-filter="activities" aria-pressed="false">Activities</button>
+          </div>
+          <p id="communityFeedStatus" class="community-feed-status" role="status">Loading community updates…</p>
+          <div id="communityFeedList" class="community-feed-list" aria-live="polite"></div>
+        </section>
+      </main>
+    </div>
+    <div id="site-footer"></div>
+    <script src="/assets/js/pages/feed.js?v=2"></script>
+    <script src="/assets/js/layout.js?v=11" defer></script>
+    <script src="/assets/js/theme.js?v=20261009c" defer></script>
+  </body>
+</html>

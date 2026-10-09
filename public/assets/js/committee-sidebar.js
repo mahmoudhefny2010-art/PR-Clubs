@@ -9,6 +9,7 @@
   const syncSucceeded = new Set();
   const actionableSections = new Set(['requests', 'attendanceApprovals', 'applicants']);
   if (scope === 'english') actionableSections.add('allRequests');
+  if (scope === 'security') actionableSections.add('allRequests');
   let activeSection = '';
 
   try {

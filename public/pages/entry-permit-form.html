@@ -1,0 +1,55 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Entry Permit</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/assets/css/base.css?v=20261007d" />
+    <link rel="stylesheet" href="/assets/css/responsive.css?v=20261005i" />
+    <link rel="stylesheet" href="/assets/css/dark.css?v=20261009c" />
+    <link rel="stylesheet" href="/assets/css/features.css?v=20261010permitpicker1" />
+    <link rel="icon" href="/assets/img/pics/logo.svg.png" type="image/png">
+    <link rel="stylesheet" href="/assets/css/pages/content-form.css?v=1" />
+  </head>
+  <body>
+    <div id="site-header"></div>
+    <main class="app-container">
+      <section class="committee-card">
+        <div class="committee-top">
+          <div><div class="committee-label">ENTRY PERMIT</div><h2 id="studioTitle">Entry Permit</h2></div>
+          <div class="top-actions"><a class="secondary-btn" href="/" data-history-back>Back</a><button id="logoutBtn" class="logout-btn" type="button">Logout</button></div>
+        </div>
+        <nav class="module-nav" aria-label="Content modules">
+          <a href="/pages/event-form.html">Events</a><a href="/pages/feed-form.html">Feed</a><a href="/pages/sponsor-form.html">Sponsors</a><a href="/pages/booth-form.html">Booths</a><a href="/pages/club-content.html">All content</a>
+        </nav>
+        <p id="sessionMessage"></p>
+        <div class="content-layout" id="contentLayout" hidden>
+          <div class="panel">
+            <h2 id="formTitle">New Entry Permit</h2>
+            <p class="meta">PR reviews the request, Security reviews it next, then PR gives final approval. The Dean can view approved permits; they are not published.</p>
+            <form id="contentForm">
+              <label for="titleInput">Request title</label><input id="titleInput" required maxlength="140" />
+              <div class="entry-permit-field"><label for="dateInput">Requested date</label><div class="entry-permit-picker"><input id="dateInput" type="date" /><button type="button" data-open-picker="dateInput" aria-label="Choose requested date" title="Choose date"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2"></rect><path d="M7.5 3.5v3M16.5 3.5v3M3.5 9.5h17M8 13h.01M12 13h.01M16 13h.01M8 16.5h.01M12 16.5h.01"></path></svg></button></div></div>
+              <div class="entry-permit-field"><label for="timeInput">Entry time</label><div class="entry-permit-picker"><input id="timeInput" type="time" /><button type="button" data-open-picker="timeInput" aria-label="Choose entry time" title="Choose time"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7v5l3.5 2"></path></svg></button></div></div>
+              <label for="locationInput">Campus location / destination</label><input id="locationInput" maxlength="120" />
+              <section class="entry-permit-items-section" aria-labelledby="permitItemsTitle">
+                <div class="entry-permit-items-heading"><div><h3 id="permitItemsTitle">People and items to bring in</h3><p>Add the requested quantity, number or ID, and clear details for every row.</p></div><button id="addEntryPermitRowBtn" class="secondary-btn" type="button">Add row</button></div>
+                <div class="entry-permit-table-wrap"><table class="entry-permit-table"><thead><tr><th scope="col">Quantity</th><th scope="col">Number / ID</th><th scope="col">Details</th><th scope="col">Action</th></tr></thead><tbody id="entryPermitItemsBody"></tbody></table></div>
+              </section>
+              <label for="imageInput">Supporting image</label><input id="imageInput" type="file" accept="image/*" />
+              <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap"><button class="primary-btn" type="submit" name="action" value="draft">Save as draft</button><button class="secondary-btn" type="button" id="submitReviewBtn">Submit for review</button><button class="secondary-btn" type="button" id="resetFormBtn">Clear</button></div>
+              <p id="formFeedback" role="status" aria-live="polite"></p>
+            </form>
+          </div>
+          <div class="panel"><h2>Your Entry Permits</h2><div class="content-list" id="contentList"></div></div>
+        </div>
+      </section>
+    </main>
+    <div id="site-footer"></div>
+    <script src="/assets/js/content-studio.js?v=20261010image1"></script>
+    <script src="/assets/js/pages/entry-permit-form.js?v=20261010permitpicker1"></script>
+    <script src="/assets/js/layout.js?v=11" defer></script>
+    <script src="/assets/js/theme.js?v=20261009c" defer></script>
+  </body>
+</html>
