@@ -128,6 +128,14 @@ document.addEventListener('DOMContentLoaded', () => {
           iconClose.classList.toggle('hidden', !isOpen);
         }
       });
+      navMenu.querySelectorAll('.nav-link').forEach((link) => {
+        link.addEventListener('click', () => {
+          navMenu.classList.remove('open');
+          mobileToggle.setAttribute('aria-expanded', 'false');
+          mobileToggle.querySelector('.icon-menu')?.classList.remove('hidden');
+          mobileToggle.querySelector('.icon-close')?.classList.add('hidden');
+        });
+      });
     }
 
     // 3. Update Auth button if user session cookie is detected
