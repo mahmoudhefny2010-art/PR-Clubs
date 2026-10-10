@@ -28,17 +28,19 @@
   window.openEventModal = function (event) {
     if (!event) return;
     activeEvent = event;
-    if (Number.isInteger(Number(event.clubId)) && Number.isInteger(Number(event.eventIndex))) {
+    if (!event.university && Number.isInteger(Number(event.clubId)) && Number.isInteger(Number(event.eventIndex))) {
       fetch(`/api/events/${encodeURIComponent(event.clubId)}/${encodeURIComponent(event.eventIndex)}/view`, { method: 'POST', cache: 'no-store' }).catch(() => {});
     }
     image.src = event.image || event.clubImage || '';
     image.alt = event.title || 'Event';
+    image.classList.toggle('university-brand-image', event.university === true && (event.image || '/assets/img/pics/logo.svg.png') === '/assets/img/pics/logo.svg.png');
     club.textContent = event.clubName || '';
     title.textContent = event.title || 'Event';
-    meta.textContent = [formatDate(event.date), window.formatSiteTime(event.time), event.location].filter(Boolean).join(' · ');
+    meta.textContent = [formatDate(event.date), window.formatSiteTime ? window.formatSiteTime(event.time) : event.time, event.location].filter(Boolean).join(' · ');
     description.textContent = event.description || '';
     feedback.textContent = '';
     form.reset();
+    form.hidden = event.registrationEnabled === false;
     modal.classList.remove('hidden');
     document.body.classList.add('modal-open');
     closeButton.focus();
@@ -53,13 +55,19 @@
     const email = document.getElementById('eventModalEmail').value.trim();
     feedback.textContent = '';
     feedback.classList.remove('is-error');
-    if (!activeEvent || !Number.isInteger(Number(activeEvent.clubId)) || !Number.isInteger(Number(activeEvent.eventIndex))) {
+    if (!activeEvent || activeEvent.registrationEnabled === false) {
       feedback.textContent = 'This form was not saved. Please try again.';
       feedback.classList.add('is-error');
       return;
     }
     try {
-      const response = await fetch(`/api/events/${encodeURIComponent(activeEvent.clubId)}/${encodeURIComponent(activeEvent.eventIndex)}/registrations`, {
+      const endpoint = activeEvent.university === true
+        ? `/api/university-content/${encodeURIComponent(activeEvent.universityContentId || activeEvent.id)}/registrations`
+        : Number.isInteger(Number(activeEvent.clubId)) && Number.isInteger(Number(activeEvent.eventIndex))
+          ? `/api/events/${encodeURIComponent(activeEvent.clubId)}/${encodeURIComponent(activeEvent.eventIndex)}/registrations`
+          : '';
+      if (!endpoint) throw new Error('This form was not saved. Please try again.');
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email }),

@@ -11,6 +11,7 @@ const applicationFieldSchema = new mongoose.Schema({
 const clubMemberSchema = new mongoose.Schema({
   id: { type: String, required: true },
   name: { type: String, required: true, trim: true, maxlength: 120 },
+  email: { type: String, default: '', trim: true, lowercase: true, maxlength: 254 },
   committee: { type: String, required: true, trim: true, maxlength: 100 },
   position: { type: String, required: true, trim: true, maxlength: 100 },
   memberType: { type: String, enum: ['new', 'senior'], required: true }
@@ -78,6 +79,20 @@ const siteSettingSchema = new mongoose.Schema({
   subtitle: { type: String, required: true }
 }, { timestamps: true });
 
+const universityContentSchema = new mongoose.Schema({
+  id: { type: Number, required: true, unique: true, index: true },
+  type: { type: String, enum: ['event', 'announcement'], required: true, index: true },
+  title: { type: String, required: true, trim: true, maxlength: 140 },
+  description: { type: String, required: true, trim: true, maxlength: 2000 },
+  date: { type: String, default: '' },
+  time: { type: String, default: '' },
+  registrationEnabled: { type: Boolean, default: false },
+  location: { type: String, default: '', trim: true, maxlength: 160 },
+  image: { type: String, default: '' },
+  imagePublicId: { type: String, default: '' },
+  publishedBy: { type: String, default: '' }
+}, { timestamps: true });
+
 const siteVisitorSchema = new mongoose.Schema({
   visitorId: { type: String, required: true, unique: true, index: true },
   deviceType: { type: String, enum: ['mobile', 'tablet', 'desktop', 'unknown'], default: 'unknown', index: true },
@@ -111,11 +126,13 @@ const contentRequestSchema = new mongoose.Schema({
   id: { type: Number, required: true, unique: true, index: true },
   clubId: { type: Number, required: true, index: true },
   clubName: { type: String, default: '' },
+  assignedHeadEmail: { type: String, default: '', lowercase: true, trim: true },
   type: { type: String, enum: ['event', 'feed', 'sponsor', 'booth', 'entry_permit'], required: true },
   title: { type: String, required: true, trim: true },
   description: { type: String, default: '' },
   date: { type: String, default: '' },
   time: { type: String, default: '' },
+  registrationEnabled: { type: Boolean, default: true },
   location: { type: String, default: '' },
   budget: { type: String, default: '' },
   image: { type: String, default: '' },
@@ -216,6 +233,41 @@ const attendanceSessionSchema = new mongoose.Schema({
 }, { timestamps: true });
 attendanceSessionSchema.index({ clubId: 1, itemType: 1, eventRequestId: 1, active: 1 });
 
+const attendanceActivityClosureSchema = new mongoose.Schema({
+  clubId: { type: Number, required: true, index: true },
+  itemType: { type: String, enum: ['event', 'booth'], required: true },
+  eventRequestId: { type: Number, required: true },
+  eventTitle: { type: String, required: true, trim: true },
+  eventDate: { type: String, default: '' },
+  endedByEmail: { type: String, required: true, lowercase: true, trim: true },
+  endedByRole: { type: String, enum: ['president', 'head'], required: true },
+  endedAt: { type: Date, default: Date.now }
+}, { timestamps: true });
+attendanceActivityClosureSchema.index({ clubId: 1, itemType: 1, eventRequestId: 1 }, { unique: true });
+
+const attendanceAssignmentSchema = new mongoose.Schema({
+  clubId: { type: Number, required: true, index: true },
+  clubName: { type: String, required: true, trim: true },
+  itemType: { type: String, enum: ['event', 'booth'], required: true },
+  eventRequestId: { type: Number, required: true },
+  eventTitle: { type: String, required: true, trim: true },
+  eventDate: { type: String, default: '' },
+  eventTime: { type: String, default: '' },
+  memberEmail: { type: String, required: true, lowercase: true, trim: true, index: true },
+  activeMemberDayKey: { type: String, default: undefined },
+  memberName: { type: String, required: true, trim: true },
+  committee: { type: String, required: true, trim: true },
+  assignedBy: { type: String, required: true, lowercase: true, trim: true },
+  status: { type: String, enum: ['assigned', 'accepted'], default: 'assigned', index: true },
+  acceptedAt: { type: Date, default: null }
+}, { timestamps: true });
+attendanceAssignmentSchema.index({ clubId: 1, itemType: 1, eventRequestId: 1 }, { unique: true });
+attendanceAssignmentSchema.index({ memberEmail: 1, eventDate: 1 });
+attendanceAssignmentSchema.index({ activeMemberDayKey: 1 }, {
+  unique: true,
+  partialFilterExpression: { activeMemberDayKey: { $type: 'string' } }
+});
+
 const attendanceRecordSchema = new mongoose.Schema({
   sessionId: { type: mongoose.Schema.Types.ObjectId, required: true, index: true },
   clubId: { type: Number, required: true, index: true },
@@ -226,27 +278,49 @@ const attendanceRecordSchema = new mongoose.Schema({
   eventTime: { type: String, default: '' },
   name: { type: String, required: true, trim: true, maxlength: 160 },
   email: { type: String, required: true, trim: true, lowercase: true, maxlength: 254 },
+  deviceHash: { type: String, select: false },
   note: { type: String, default: '', trim: true, maxlength: 500 },
-  approvalStatus: { type: String, enum: ['pending_pr', 'pending_sso', 'pending_dean', 'approved'], default: 'pending_pr', index: true },
+  approvalStatus: { type: String, enum: ['pending_pr', 'pending_sso', 'pending_dean', 'approved', 'rejected'], default: 'pending_pr', index: true },
   approvalHistory: [{
     role: { type: String, enum: ['pr', 'sso', 'dean'], required: true },
     email: { type: String, default: '', lowercase: true, trim: true },
-    action: { type: String, enum: ['approved'], required: true },
+    action: { type: String, enum: ['approved', 'rejected', 'noted'], required: true },
+    note: { type: String, default: '', trim: true, maxlength: 500 },
     createdAt: { type: Date, default: Date.now }
   }],
   attendedAt: { type: Date, required: true, default: Date.now }
 }, { timestamps: true });
 attendanceRecordSchema.index({ clubId: 1, itemType: 1, eventRequestId: 1, email: 1 }, { unique: true });
+attendanceRecordSchema.index({ clubId: 1, itemType: 1, eventRequestId: 1, deviceHash: 1 }, {
+  unique: true,
+  partialFilterExpression: { deviceHash: { $type: 'string' } }
+});
 
 const studentAccountSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   name: { type: String, required: true, trim: true, maxlength: 160 },
+  universityId: { type: String, default: '', trim: true, maxlength: 40 },
+  major: { type: String, default: '', trim: true, maxlength: 120 },
+  phone: { type: String, default: '', trim: true, maxlength: 40 },
+  age: { type: String, default: '', trim: true, maxlength: 3 },
   salt: { type: String, default: '' },
   passwordHash: { type: String, default: '' },
   googleSub: { type: String, unique: true, sparse: true },
   sessionVersion: { type: Number, default: 0 },
   lastLoginAt: { type: Date, default: null }
 }, { timestamps: true });
+
+const studentInterestSchema = new mongoose.Schema({
+  studentEmail: { type: String, required: true, lowercase: true, trim: true },
+  clubId: { type: Number, required: true },
+  eventIndex: { type: Number, required: true },
+  eventTitle: { type: String, default: '', trim: true, maxlength: 140 },
+  detailViews: { type: Number, default: 0 },
+  registered: { type: Boolean, default: false },
+  lastViewedAt: { type: Date, default: Date.now }
+}, { timestamps: true });
+studentInterestSchema.index({ studentEmail: 1, clubId: 1, eventIndex: 1 }, { unique: true });
+studentInterestSchema.index({ clubId: 1, eventIndex: 1 });
 
 const studentEmailCodeSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
@@ -296,8 +370,11 @@ const adminAuthStateSchema = new mongoose.Schema({
 
 const EventRegistration = mongoose.models.EventRegistration || mongoose.model('EventRegistration', eventRegistrationSchema);
 const AttendanceSession = mongoose.models.AttendanceSession || mongoose.model('AttendanceSession', attendanceSessionSchema);
+const AttendanceActivityClosure = mongoose.models.AttendanceActivityClosure || mongoose.model('AttendanceActivityClosure', attendanceActivityClosureSchema);
+const AttendanceAssignment = mongoose.models.AttendanceAssignment || mongoose.model('AttendanceAssignment', attendanceAssignmentSchema);
 const AttendanceRecord = mongoose.models.AttendanceRecord || mongoose.model('AttendanceRecord', attendanceRecordSchema);
 const StudentAccount = mongoose.models.StudentAccount || mongoose.model('StudentAccount', studentAccountSchema);
+const StudentInterest = mongoose.models.StudentInterest || mongoose.model('StudentInterest', studentInterestSchema);
 const StudentEmailCode = mongoose.models.StudentEmailCode || mongoose.model('StudentEmailCode', studentEmailCodeSchema);
 const LoginAttempt = mongoose.models.LoginAttempt || mongoose.model('LoginAttempt', loginAttemptSchema);
 const PasswordResetToken = mongoose.models.PasswordResetToken || mongoose.model('PasswordResetToken', passwordResetTokenSchema);
@@ -307,6 +384,7 @@ const AdminAuthState = mongoose.models.AdminAuthState || mongoose.model('AdminAu
 const Club = mongoose.models.Club || mongoose.model('Club', clubSchema);
 const Application = mongoose.models.Application || mongoose.model('Application', applicationSchema);
 const SiteSetting = mongoose.models.SiteSetting || mongoose.model('SiteSetting', siteSettingSchema);
+const UniversityContent = mongoose.models.UniversityContent || mongoose.model('UniversityContent', universityContentSchema);
 const SiteVisitor = mongoose.models.SiteVisitor || mongoose.model('SiteVisitor', siteVisitorSchema);
 const SiteNetwork = mongoose.models.SiteNetwork || mongoose.model('SiteNetwork', siteNetworkSchema);
 const ClubAccount = mongoose.models.ClubAccount || mongoose.model('ClubAccount', clubAccountSchema);
@@ -317,6 +395,7 @@ module.exports = {
   Club,
   Application,
   SiteSetting,
+  UniversityContent,
   SiteVisitor,
   SiteNetwork,
   ClubAccount,
@@ -324,8 +403,11 @@ module.exports = {
   AuditLog,
   EventRegistration,
   AttendanceSession,
+  AttendanceActivityClosure,
+  AttendanceAssignment,
   AttendanceRecord,
   StudentAccount,
+  StudentInterest,
   StudentEmailCode,
   LoginAttempt,
   PasswordResetToken,

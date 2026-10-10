@@ -44,6 +44,7 @@ body.modal-open { overflow: hidden; }
   object-fit: cover;
   border-radius: 16px;
 }
+.event-modal-image.university-brand-image { object-fit: contain; background: #fff; padding: 12px; }
 
 .event-modal-copy { min-width: 0; padding: 8px 36px 0 0; }
 .event-modal-club { color: #b71c1c; font-size: .85rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
@@ -51,6 +52,7 @@ body.modal-open { overflow: hidden; }
 .event-modal-meta, .event-modal-description { color: #536176; font-size: 1.05rem; line-height: 1.55; }
 .event-modal-description { white-space: pre-wrap; }
 .event-modal-copy form { max-width: 440px; }
+.event-modal-copy form[hidden] { display: none !important; }
 
 .calendar-day-events-panel {
   display: block;

@@ -3,15 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <script src="/assets/js/site-loading.js?v=1"></script>
+    <script src="/assets/js/site-loading.js?v=20261010scrolltop1"></script>
     <title>Booth Studio</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/assets/css/base.css?v=20261010loading1" />
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" /></noscript>
+    <link rel="stylesheet" href="/assets/css/base.css?v=20261010loading2" />
     <link rel="stylesheet" href="/assets/css/responsive.css?v=20261010navpolish1" />
     <link rel="stylesheet" href="/assets/css/dark.css?v=20261009c" />
     <link rel="stylesheet" href="/assets/css/features.css?v=20261005i" />
     <link rel="icon" href="/assets/img/pics/logo.svg.png" type="image/png">
-    <link rel="stylesheet" href="/assets/css/pages/content-form.css?v=1" />
+    <link rel="stylesheet" href="/assets/css/pages/content-form.css?v=20261010pickers4" />
   </head>
   <body>
     <div id="site-header"></div>
@@ -51,11 +52,11 @@
               <input id="boothSizeInput" type="text" placeholder="e.g. 3x3 meters" />
               <label>Required Equipment</label>
               <textarea id="boothEquipmentInput" placeholder="List required equipment"></textarea>
-              <label>Setup Date</label>
+              <label for="boothSetupDateInput">Setup Date</label>
               <input id="boothSetupDateInput" type="date" />
-              <label>Opening Date</label>
+              <label for="boothOpenDateInput">Opening Date</label>
               <input id="boothOpenDateInput" type="date" />
-              <label>Closing Date</label>
+              <label for="boothCloseDateInput">Closing Date</label>
               <input id="boothCloseDateInput" type="date" />
               <label>Contact Person</label>
               <input id="boothContactInput" />
@@ -77,9 +78,10 @@
       </section>
     </main>
     <div id="site-footer"></div>
-    <script src="/assets/js/content-studio.js?v=20261010image1"></script>
+    <script src="/assets/js/content-studio.js?v=20261010headassignment1"></script>
+    <script src="/assets/js/date-time-picker.js?v=20261010pickers1"></script>
     <script src="/assets/js/pages/booth-form.js?v=1"></script>
-    <script src="/assets/js/layout.js?v=20261010account1" defer></script>
+    <script src="/assets/js/layout.js?v=20261010passwordeye1" defer></script>
     <script src="/assets/js/theme.js?v=20261009c" defer></script>
   </body>
 </html>

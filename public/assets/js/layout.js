@@ -17,6 +17,36 @@ window.formatSiteTime = (value) => {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('input[type="password"]').forEach((input) => {
+    if (input.dataset.passwordToggleInitialized === 'true') return;
+    input.dataset.passwordToggleInitialized = 'true';
+    const field = input.closest('.field-group, .modal-field') || input.parentElement;
+    if (!field) return;
+    field.classList.add('has-password-toggle');
+    input.classList.add('password-toggle-input');
+
+    const toggle = document.createElement('button');
+    toggle.className = 'password-visibility-toggle';
+    toggle.type = 'button';
+    toggle.setAttribute('aria-label', 'Show password');
+    toggle.title = 'Show password';
+    toggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>';
+    toggle.addEventListener('click', () => {
+      const reveal = input.type === 'password';
+      const start = input.selectionStart;
+      const end = input.selectionEnd;
+      input.type = reveal ? 'text' : 'password';
+      toggle.setAttribute('aria-label', reveal ? 'Hide password' : 'Show password');
+      toggle.title = reveal ? 'Hide password' : 'Show password';
+      toggle.innerHTML = reveal
+        ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 3 18 18"/><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"/><path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c6.4 0 10 7 10 7a15.8 15.8 0 0 1-3.1 3.8"/><path d="M6.2 6.2C3.5 8 2 12 2 12s3.6 7 10 7a10 10 0 0 0 4-.8"/></svg>'
+        : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>';
+      input.focus();
+      if (start !== null && end !== null) input.setSelectionRange(start, end);
+    });
+    field.append(toggle);
+  });
+
   const pingSiteVisitor = () => {
     if (document.visibilityState !== 'visible') return;
     fetch('/api/site/visitor-ping', { method: 'POST', credentials: 'same-origin', keepalive: true }).catch(() => {});
@@ -140,11 +170,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 3. Replace Sign In with the right account destination for an active session.
     const authBtn = document.getElementById('headerAuthBtn');
+    const studentSignoutBtn = document.getElementById('headerStudentSignoutBtn');
     if (authBtn) {
-      fetch('/api/site/account-session', { cache: 'no-store' })
-        .then((response) => response.ok ? response.json() : null)
-        .then((session) => {
-          if (!session?.authenticated) return;
+      const refreshHeaderAccountState = async () => {
+        try {
+          const response = await fetch('/api/site/account-session', { cache: 'no-store' });
+          if (!response.ok) return;
+          const session = await response.json();
           const destinations = {
             admin: { label: 'Dashboard', href: '/admin' },
             president: { label: 'Dashboard', href: '/club-dashboard' },
@@ -154,18 +186,51 @@ document.addEventListener('DOMContentLoaded', () => {
             security: { label: 'Dashboard', href: '/dashboards/security-dashboard.html' },
             sso: { label: 'Dashboard', href: '/dashboards/sso-dashboard.html' },
             dean: { label: 'Dashboard', href: '/dashboards/dean-dashboard.html' },
-            student: { label: 'My Forms', href: '/?myForms=1' }
+            student: { label: 'My Dashboard', href: '/?myForms=1' }
           };
-          const account = destinations[session.type === 'club' ? session.role : session.type];
-          if (!account) return;
-          authBtn.href = account.href;
-          authBtn.title = session.name ? `Signed in as ${session.name}` : account.label;
-          authBtn.setAttribute('aria-label', account.label);
-          const span = authBtn.querySelector('span');
-          if (span) span.textContent = account.label;
-        })
-        .catch(() => {});
+          const account = session?.authenticated
+            ? destinations[session.type === 'club' ? session.role : session.type]
+            : null;
+
+          if (account) {
+            authBtn.href = account.href;
+            authBtn.title = session.name ? `Signed in as ${session.name}` : account.label;
+            authBtn.setAttribute('aria-label', account.label);
+            const span = authBtn.querySelector('span');
+            if (span) span.textContent = account.label;
+          } else {
+            authBtn.href = '/pages/applicant-login.html';
+            authBtn.removeAttribute('title');
+            authBtn.setAttribute('aria-label', 'Sign In');
+            const span = authBtn.querySelector('span');
+            if (span) span.textContent = 'Sign In';
+          }
+          if (studentSignoutBtn) studentSignoutBtn.hidden = session?.type !== 'student' || !session?.authenticated;
+        } catch (error) {
+          // Keep the last known header state if the session endpoint is temporarily unavailable.
+        }
+      };
+
+      window.refreshHeaderAccountState = refreshHeaderAccountState;
+      window.addEventListener('miu:account-session-changed', refreshHeaderAccountState);
+      refreshHeaderAccountState();
     }
+    studentSignoutBtn?.addEventListener('click', async () => {
+      studentSignoutBtn.disabled = true;
+      try {
+        const response = await fetch('/api/student-auth/logout', { method: 'POST', cache: 'no-store' });
+        if (!response.ok) {
+          const result = await response.json().catch(() => ({}));
+          throw new Error(result.message || 'Could not sign out right now. Please try again.');
+        }
+        sessionStorage.removeItem('miu-last-app-view');
+        await window.refreshHeaderAccountState?.();
+        window.location.replace('/');
+      } catch (error) {
+        window.alert(error.message || 'Could not sign out right now. Please try again.');
+        studentSignoutBtn.disabled = false;
+      }
+    });
   };
 
   // Close open modals on Escape key press

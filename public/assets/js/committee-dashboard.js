@@ -19,6 +19,15 @@ let statusOverviewMode = 'all';
 
 const CONTENT_TYPE_LABELS = { event: 'Event', feed: 'Feed', sponsor: 'Sponsor', booth: 'Booth', entry_permit: 'Entry Permit' };
 const CONTENT_ITEM_LABELS = { event: 'event', feed: 'feed post', sponsor: 'sponsor request', booth: 'booth request', entry_permit: 'Entry Permit' };
+const CLOSED_REQUEST_STATUSES = new Set(['draft', 'approved', 'rejected', 'published', 'deleted']);
+
+function isActiveCommitteeRequest(item) {
+  return !CLOSED_REQUEST_STATUSES.has(item?.status);
+}
+
+function isPendingCommitteeRequest(item) {
+  return /^pending_/.test(item?.status || '');
+}
 
 function contentTypeLabel(type) {
   return CONTENT_TYPE_LABELS[type] || type || 'Content';
@@ -64,7 +73,6 @@ async function ensureSession() {
     if (memberDirectoryButton) memberDirectoryButton.hidden = currentRole !== 'pr';
     const titles = { pr: 'PR Department — Approvals', english: 'English Department — Preview & Approve', security: 'Security Office — Entry Permits', dean: 'Dean — Final Approval' };
     document.getElementById('committeeTitle').textContent = titles[currentRole];
-    if (currentRole === 'english') document.getElementById('openStatusOverviewBtn').textContent = 'Restart Review';
     hintText.textContent = currentRole === 'pr'
       ? 'Pending requests from clubs. Approve, reject, or comment.'
       : currentRole === 'english'
@@ -550,16 +558,21 @@ async function refreshUnreadRequestBadges() {
     if (!Array.isArray(pending)) throw new Error('Unexpected pending requests response.');
     if (!Array.isArray(statuses)) throw new Error('Unexpected request status response.');
     document.querySelectorAll('[data-entry-permit-count]').forEach((node) => {
-      node.textContent = String(statuses.filter((item) => item.type === 'entry_permit').length);
+      node.textContent = String(statuses.filter((item) => item.type === 'entry_permit'
+        && (currentRole !== 'pr' || isPendingCommitteeRequest(item))).length);
     });
     window.dashboardSync?.report('requests', 'success');
     window.dashboardUnread?.update('requests', pending.map((item) => `${item.id}:${item.updatedAt || item.status || ''}`));
     window.dashboardUnread?.setOverview('requests', pending.length);
     window.dashboardSync?.report('allRequests', 'success');
-    const relevantStatuses = currentRole === 'english'
-      ? statuses.filter((item) => !['draft', 'changes_requested', 'pending_english'].includes(item.status))
-      : currentRole === 'security'
-        ? statuses.filter((item) => !['draft', 'changes_requested', 'pending_security'].includes(item.status))
+    const activeEntryPermits = statuses.filter((item) => item.type === 'entry_permit' && isPendingCommitteeRequest(item));
+    if (['pr', 'security'].includes(currentRole)) {
+      window.dashboardUnread?.update('entryPermits', activeEntryPermits.map((item) => `${item.id}:${item.updatedAt || item.status || ''}`));
+    }
+    const relevantStatuses = ['pr', 'security'].includes(currentRole)
+      ? statuses.filter(isActiveCommitteeRequest)
+      : currentRole === 'english'
+        ? statuses.filter((item) => !['draft', 'changes_requested', 'pending_english'].includes(item.status))
         : statuses;
     window.dashboardUnread?.update('allRequests', relevantStatuses.map((item) => `${item.id}:${item.updatedAt || item.status || ''}`));
   } catch (error) {
@@ -571,7 +584,8 @@ async function refreshUnreadRequestBadges() {
 async function showStatusOverview() {
   if (!statusOverviewDialog || !statusOverviewList) return;
   statusOverviewMode = 'all';
-  document.getElementById('statusOverviewTitle').textContent = currentRole === 'security' ? 'All Entry Permits' : 'All Requests Status';
+  if (currentRole === 'security') window.dashboardUnread?.activate('entryPermits');
+  document.getElementById('statusOverviewTitle').textContent = 'All Requests';
   statusOverviewList.textContent = 'Loading request statuses…';
   window.dashboardPanels?.show('statusOverviewDialog');
   await loadStatusOverview();
@@ -580,6 +594,7 @@ async function showStatusOverview() {
 async function showEntryPermitOverview() {
   if (!statusOverviewDialog || !statusOverviewList) return;
   statusOverviewMode = 'entry_permits';
+  window.dashboardUnread?.activate('entryPermits');
   document.getElementById('statusOverviewTitle').textContent = 'Entry Permits';
   statusOverviewList.textContent = 'Loading Entry Permits…';
   const entryPermitNav = document.querySelector('.committee-sidebar [data-entry-permit-overview]');
@@ -607,13 +622,25 @@ async function loadStatusOverview() {
       items = items.filter((item) => !['draft', 'changes_requested', 'pending_english', 'pending_security'].includes(item.status)
         && (currentRole !== 'security' || item.type === 'entry_permit'));
     }
-    if (statusOverviewMode === 'entry_permits') items = items.filter((item) => item.type === 'entry_permit');
+    if (statusOverviewMode === 'entry_permits') {
+      items = items.filter((item) => item.type === 'entry_permit'
+        && (!['pr', 'security'].includes(currentRole) || isPendingCommitteeRequest(item)));
+    }
     if (statusOverviewMode === 'all') {
-      window.dashboardUnread?.update('allRequests', items.map((item) => `${item.id}:${item.updatedAt || item.status || ''}`));
+      const badgeItems = ['pr', 'security'].includes(currentRole) ? items.filter(isActiveCommitteeRequest) : items;
+      window.dashboardUnread?.update('allRequests', badgeItems.map((item) => `${item.id}:${item.updatedAt || item.status || ''}`));
+    }
+    if (statusOverviewMode === 'entry_permits' || (currentRole === 'security' && statusOverviewMode === 'all')) {
+      const activePermits = items.filter((item) => item.type === 'entry_permit' && isPendingCommitteeRequest(item));
+      window.dashboardUnread?.update('entryPermits', activePermits.map((item) => `${item.id}:${item.updatedAt || item.status || ''}`));
     }
     statusOverviewList.replaceChildren();
     if (!items.length) {
-      statusOverviewList.textContent = statusOverviewMode === 'restartable' ? 'No requests are available to restart right now.' : 'No requests yet.';
+      statusOverviewList.textContent = statusOverviewMode === 'restartable'
+        ? 'No requests are available to restart right now.'
+        : statusOverviewMode === 'entry_permits' && ['pr', 'security'].includes(currentRole)
+          ? 'No new or pending entry permits right now.'
+          : 'No requests yet.';
       return;
     }
     const labels = {
@@ -1035,6 +1062,7 @@ async function act(item, action, fromDialog = false, source = 'queue') {
       await loadRequests();
       if (source === 'status') await loadStatusOverview();
     }
+    await refreshUnreadRequestBadges();
   } catch (error) {
     alert(error.message);
   } finally {
@@ -1054,9 +1082,10 @@ document.getElementById('returnToPrBtn')?.addEventListener('click', (event) => r
 document.getElementById('returnToEnglishBtn')?.addEventListener('click', (event) => returnToCommittee('english', event.currentTarget));
 document.getElementById('returnToSecurityBtn')?.addEventListener('click', (event) => returnToCommittee('security', event.currentTarget));
 document.getElementById('deleteRequestBtn')?.addEventListener('click', deleteDeanContent);
-document.getElementById('openStatusOverviewBtn')?.addEventListener('click', () => currentRole === 'english' ? showRestartOverview() : showStatusOverview());
+document.getElementById('openStatusOverviewBtn')?.addEventListener('click', showStatusOverview);
+document.getElementById('openRestartOverviewBtn')?.addEventListener('click', showRestartOverview);
 document.querySelectorAll('[data-entry-permit-overview]').forEach((button) => button.addEventListener('click', showEntryPermitOverview));
-document.getElementById('overviewRestartsBtn')?.addEventListener('click', () => document.getElementById('openStatusOverviewBtn')?.click());
+document.getElementById('overviewRestartsBtn')?.addEventListener('click', () => document.getElementById('openRestartOverviewBtn')?.click());
 document.getElementById('closeStatusOverviewBtn')?.addEventListener('click', () => window.dashboardPanels?.showOverview());
 document.getElementById('closeReviewHistoryBtn')?.addEventListener('click', () => reviewHistoryDialog?.close());
 document.getElementById('closeReviewHistoryXBtn')?.addEventListener('click', () => reviewHistoryDialog?.close());

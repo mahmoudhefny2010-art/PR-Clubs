@@ -55,6 +55,9 @@ const ContentStudio = (() => {
     return `<div class="entry-permit-table-wrap content-card-permit-items"><table class="entry-permit-table"><thead><tr><th>Qty</th><th>Number / ID</th><th>Details</th></tr></thead><tbody>${item.permitItems.map((row) => `<tr><td>${escapeHtml(row.quantity)}</td><td>${escapeHtml(row.number)}</td><td>${escapeHtml(row.details)}</td></tr>`).join('')}</tbody></table></div>`;
   }
 
+  let accountRole = '';
+  let committeeHeads = [];
+
   function renderCard(item) {
     const activeComment = getActiveReviewComment(item);
     const image = contentImage(item);
@@ -71,9 +74,12 @@ const ContentStudio = (() => {
         <div><span class="status-badge status-${escapeHtml(item.status)}" title="Request status">${escapeHtml(item.status.replaceAll('_', ' '))}</span></div>
         ${item.clubNotice ? `<div role="status" style="margin-top:8px;padding:9px 11px;border-radius:10px;background:#fff1d5;color:#92400e;font-size:.85rem"><strong>Review update:</strong> ${escapeHtml(item.clubNotice)}</div>` : ''}
         ${activeComment ? `<section class="review-comments" style="margin-top:10px"><strong>Active comment</strong><p class="meta" style="margin:5px 0;white-space:pre-wrap"><strong>${reviewerNames[activeComment.role]}:</strong> ${escapeHtml(activeComment.text)}</p></section>` : ''}
-        <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
-          ${['draft', 'changes_requested', 'rejected'].includes(item.status) ? `<button class="mini-btn" data-edit="${item.id}">Edit</button><button class="mini-btn" data-submit="${item.id}">Submit</button>` : ''}
-          ${item.status !== 'deleted' ? `<button class="mini-btn" data-delete="${item.id}">Delete</button>` : ''}
+        <div class="content-task-actions" style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          ${accountRole === 'head'
+            ? `<a class="mini-btn" href="/pages/${escapeHtml(item.type.replace('_', '-'))}-form.html?edit=${Number(item.id)}">Open assigned task</a>`
+            : `${['draft', 'changes_requested', 'rejected'].includes(item.status) ? `<button class="mini-btn" data-edit="${item.id}">Edit</button><button class="mini-btn" data-submit="${item.id}">Submit</button>` : ''}
+              ${item.status !== 'deleted' ? `<button class="mini-btn" data-delete="${item.id}">Delete</button>` : ''}
+              ${item.type !== 'entry_permit' ? `<label class="content-task-assignment">Assigned head <select data-assign-content="${Number(item.id)}" data-saved-value="${escapeHtml(item.assignedHeadEmail || '')}" ${['draft', 'changes_requested', 'rejected'].includes(item.status) ? '' : 'disabled'}><option value="">Not assigned</option>${committeeHeads.map((head) => `<option value="${escapeHtml(head.email)}" ${head.email === item.assignedHeadEmail ? 'selected' : ''}>${escapeHtml(head.committee)} · ${escapeHtml(head.email)}</option>`).join('')}</select></label>` : ''}`}
         </div>
       </div>
     </article>`;
@@ -106,6 +112,7 @@ const ContentStudio = (() => {
     const contentList = document.getElementById('contentList');
     const formFeedback = document.getElementById('formFeedback');
     const contentForm = document.getElementById('contentForm');
+    const contentFormPanel = contentForm?.closest('.panel');
     let editingId = null;
 
     if (new URLSearchParams(window.location.search).get('embed') === '1') document.body.classList.add('embed');
@@ -122,7 +129,29 @@ const ContentStudio = (() => {
           sessionMessage.textContent = 'This account is for a committee dashboard. Open the right dashboard instead.';
           return false;
         }
+        if (type === 'entry_permit' && data.club.role !== 'president') {
+          sessionMessage.textContent = 'Only the club president can create or manage Entry Permits.';
+          return false;
+        }
+        if (data.club.role === 'head' && data.club.hasAssignedContent !== true) {
+          sessionMessage.textContent = 'There are no content tasks assigned to you.';
+          return false;
+        }
         document.getElementById('studioTitle').textContent = `${data.club.name} — ${pageTitle}`;
+        accountRole = data.club.role;
+        if (accountRole === 'head') {
+          document.querySelector('.module-cards')?.closest('.panel')?.classList.add('hidden');
+          document.querySelector('.module-nav')?.classList.add('hidden');
+          if (contentFormPanel) contentFormPanel.classList.add('hidden');
+          document.getElementById('studioTitle').textContent = `${data.club.name} · Assigned content`;
+          if (type === null) {
+            const assignedHeading = contentList?.closest('.panel')?.querySelector('h2');
+            if (assignedHeading) assignedHeading.textContent = 'Assigned tasks';
+          }
+        } else {
+          const headsResponse = await fetch('/api/club/heads');
+          if (headsResponse.ok) committeeHeads = await headsResponse.json();
+        }
         contentLayout.hidden = false;
         return true;
       } catch {
@@ -137,10 +166,11 @@ const ContentStudio = (() => {
         const items = await res.json();
         if (!res.ok) throw new Error(items.message || 'Could not load');
         const visible = type ? items.filter((item) => item.type === type) : items;
-        contentList.innerHTML = visible.map(renderCard).join('') || `<p>No content yet.${type ? '' : ''}</p>`;
+        contentList.innerHTML = visible.map(renderCard).join('') || `<p>${accountRole === 'head' ? 'No content tasks have been assigned to you.' : 'No content yet.'}</p>`;
         contentList.querySelectorAll('[data-edit]').forEach((btn) => btn.addEventListener('click', () => startEdit(Number(btn.dataset.edit))));
         contentList.querySelectorAll('[data-delete]').forEach((btn) => btn.addEventListener('click', () => deleteContent(Number(btn.dataset.delete))));
         contentList.querySelectorAll('[data-submit]').forEach((btn) => btn.addEventListener('click', () => submitExisting(Number(btn.dataset.submit))));
+        contentList.querySelectorAll('[data-assign-content]').forEach((select) => select.addEventListener('change', () => assignContent(Number(select.dataset.assignContent), select)));
       } catch (error) {
         contentList.innerHTML = `<p>${error.message}</p>`;
       }
@@ -152,14 +182,34 @@ const ContentStudio = (() => {
         const items = await res.json();
         if (!res.ok) throw new Error(items.message || 'Could not load this content.');
         const item = items.find((entry) => entry.id === id);
-        if (!item) throw new Error('This content could not be found.');
+        if (!item || (type && item.type !== type)) throw new Error('This content could not be found.');
         editingId = id;
+        if (accountRole === 'head' && contentFormPanel) contentFormPanel.classList.remove('hidden');
         document.getElementById('formTitle').textContent = `Edit ${typeLabels[item.type] || 'content'}`;
         if (fill) fill(item);
         if (contentForm) contentForm.querySelectorAll('[data-image-reset]').forEach((input) => { input.value = ''; });
         formFeedback.textContent = '';
       } catch (error) {
         formFeedback.textContent = error.message;
+      }
+    }
+
+    async function assignContent(id, select) {
+      select.disabled = true;
+      try {
+        const response = await fetch(`/api/club/content/${id}/assignment`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: select.value })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message || 'Could not assign this task.');
+        select.dataset.savedValue = select.value;
+      } catch (error) {
+        window.alert(error.message);
+        select.value = select.dataset.savedValue || '';
+      } finally {
+        select.disabled = false;
       }
     }
 
@@ -204,6 +254,7 @@ const ContentStudio = (() => {
       document.getElementById('formTitle').textContent = formTitle;
       if (contentForm) contentForm.reset();
       if (resetExtras) resetExtras();
+      if (accountRole === 'head' && contentFormPanel) contentFormPanel.classList.add('hidden');
       formFeedback.textContent = '';
     }
 
@@ -239,6 +290,10 @@ const ContentStudio = (() => {
               ? 'Submitted to PR Department.'
               : 'Submitted for review.';
         resetForm();
+        if (accountRole === 'head' && submit) {
+          window.location.assign('/pages/club-content.html');
+          return;
+        }
         await loadContent();
         if (onSave) onSave(result);
       } catch (error) {
@@ -265,7 +320,12 @@ const ContentStudio = (() => {
       window.location.href = '/';
     });
 
-    loadContent();
+    (async () => {
+      if (!await ensureSession()) return;
+      await loadContent();
+      const requestedEditId = Number(new URLSearchParams(window.location.search).get('edit'));
+      if (accountRole === 'head' && requestedEditId > 0) await startEdit(requestedEditId);
+    })();
 
     return {
       loadContent,

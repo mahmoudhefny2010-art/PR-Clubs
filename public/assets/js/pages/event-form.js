@@ -15,6 +15,7 @@
           date: document.getElementById('dateInput').value,
           time: document.getElementById('timeInput').value,
           location: document.getElementById('locationInput').value,
+          registrationEnabled: document.getElementById('registrationEnabledInput').value === 'true',
           budget: document.getElementById('budgetInput').value,
           description: document.getElementById('descInput').value,
           image: currentImage
@@ -24,6 +25,7 @@
           document.getElementById('dateInput').value = item.date || '';
           document.getElementById('timeInput').value = item.time || '';
           document.getElementById('locationInput').value = item.location || '';
+          document.getElementById('registrationEnabledInput').value = item.registrationEnabled === false ? 'false' : 'true';
           document.getElementById('budgetInput').value = item.budget || '';
           document.getElementById('descInput').value = item.description || '';
           currentImage = item.image || '';

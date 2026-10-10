@@ -2,19 +2,22 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <script src="/assets/js/site-loading.js?v=20261010scrolltop1"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-    <script src="/assets/js/site-loading.js?v=1"></script>
-  <meta name="theme-color" content="#fdf7f7">
+  <meta name="theme-color" content="#f8fafc">
   <title>Something went wrong | MIU Clubs</title>
-  <link rel="stylesheet" href="/assets/css/pages/error-500.css?v=1" />
-  <link rel="stylesheet" href="/assets/css/dark.css?v=20261009c" />
+  <link rel="stylesheet" href="/assets/css/pages/error-page.css?v=20261010miu-errors2">
+  <link rel="stylesheet" href="/assets/css/dark.css?v=20261009c">
 </head>
 <body>
-  <main>
-    <p class="code" aria-hidden="true">500</p>
-    <h1>Something went wrong</h1>
-    <p>We couldn’t complete this request. Please try again in a moment.</p>
-    <div class="actions"><a href="/">Back to home</a><button type="button" onclick="location.reload()">Try again</button></div>
+  <main class="error-card" aria-labelledby="error-title">
+    <div class="error-brand"><span class="error-logo"><img src="/assets/img/pics/logo.svg.png" alt="Misr International University"></span><span><small>CLUBS PORTAL</small></span></div>
+    <div class="error-code" aria-label="Error 500">500</div>
+    <h1 id="error-title">Something went wrong</h1>
+    <p class="error-detail">We couldn’t complete this request. Please try again in a moment.</p>
+    <p class="error-help">Your saved work is safe. If you were submitting a form, check its status before sending it again.</p>
+    <div class="error-actions"><a class="home-action" href="/">Go to home</a><button class="back-action" type="button" onclick="history.length > 1 ? history.back() : location.assign('/')">Go back</button><button class="retry-action" type="button" onclick="location.reload()">Try again</button></div>
+    <p class="error-reference">If this keeps happening, contact MIU support and mention error 500.</p>
   </main>
   <script src="/assets/js/theme.js?v=20261009c" defer></script>
 </body>

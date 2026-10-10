@@ -20,6 +20,8 @@
       body.embed { background: transparent; }
       body.embed .page-shell { padding: 0; }
       .mini-btn { padding: 4px 10px; border-radius: 999px; border: 1px solid #ddd; background: #fff; font-weight: 700; cursor: pointer; font-size: .75rem; }
+      .content-task-assignment { display: inline-flex; align-items: center; gap: 7px; color: #4b5563; font-size: .78rem; font-weight: 700; }
+      .content-task-assignment select { max-width: min(100%, 300px); padding: 7px 10px; border: 1px solid #d8e0ea; border-radius: 9px; background: #fff; color: #172033; font: inherit; font-weight: 600; }
       .type-badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: .68rem; font-weight: 800; text-transform: uppercase; margin-right: 8px; }
       .type-event { background: #dbeafe; color: #1d4ed8; }
       .type-feed { background: #ede9fe; color: #6d28d9; }

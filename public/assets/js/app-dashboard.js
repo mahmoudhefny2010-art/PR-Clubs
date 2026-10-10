@@ -29,36 +29,57 @@ function renderHeadDashboard() {
 
   clubDashboardName.textContent = state.clubAccount?.name || 'Club dashboard';
 
-  applicationsList.innerHTML = clubApplications
+  const search = String(document.getElementById('applicantSearchFilter')?.value || '').trim().toLowerCase();
+  const statusFilter = document.getElementById('applicantStatusFilter')?.value || 'all';
+  const committeeFilter = document.getElementById('applicantCommitteeFilter');
+  if (committeeFilter) {
+    const selectedCommittee = committeeFilter.value || 'all';
+    const committees = [...new Set(clubApplications.map((app) => String(app.committee || '').trim()).filter(Boolean))]
+      .sort((left, right) => left.localeCompare(right));
+    committeeFilter.replaceChildren(new Option('All committees', 'all'));
+    committees.forEach((committee) => committeeFilter.add(new Option(committee, committee)));
+    if (committees.includes(selectedCommittee)) committeeFilter.value = selectedCommittee;
+  }
+  const selectedCommittee = committeeFilter?.value || 'all';
+  const visibleApplications = clubApplications.filter((app) => {
+    const searchable = [app.studentName, app.email, app.universityId, app.major, app.phone].join(' ').toLowerCase();
+    const matchesSearch = !search || searchable.includes(search);
+    const matchesCommittee = selectedCommittee === 'all' || app.committee === selectedCommittee;
+    const matchesStatus = statusFilter === 'all'
+      || (statusFilter === 'pending' && app.status === 'pending' && !app.interviewed)
+      || (statusFilter === 'processing' && app.status === 'pending' && app.interviewed)
+      || (['accepted', 'rejected'].includes(statusFilter) && app.status === statusFilter);
+    return matchesSearch && matchesCommittee && matchesStatus;
+  });
+  const resultsCount = document.getElementById('applicantResultsCount');
+  if (resultsCount) resultsCount.textContent = `${visibleApplications.length} of ${clubApplications.length} applicants`;
+
+  applicationsList.innerHTML = visibleApplications.length ? visibleApplications
     .map(
       (app) => `
-        <article class="application-card">
-          <div class="application-row">
-            <div>
-              <div class="applicant-head">${app.studentName}</div>
-              <div class="applicant-meta">
-                <span>ID: ${app.universityId || 'N/A'}</span>
-                <span>Major: ${app.major || 'N/A'}</span>
-              </div>
-              <div class="applicant-meta">
-                <span>${app.email}</span>
-                <span>Phone: ${app.phone || 'N/A'}</span>
-              </div>
-              <div class="applicant-meta">
-                <span>Slot: ${app.slot || 'N/A'}</span>
-              </div>
+        <article class="application-card head-applicant-card">
+          <header class="head-applicant-header">
+            <div class="head-applicant-identity">
+              <h4>${escapeHtml(app.studentName || 'Applicant')}</h4>
+              <p>${escapeHtml([app.committee || state.clubAccount?.committee, app.major].filter(Boolean).join(' · ') || 'Club applicant')}</p>
             </div>
-            <span class="badge ${app.status}${app.status === 'pending' && app.interviewed ? ' processing' : ''}">${app.status === 'pending' && app.interviewed ? 'Processing' : app.status}</span>
+            <span class="badge ${escapeHtml(app.status)}${app.status === 'pending' && app.interviewed ? ' processing' : ''}">${app.status === 'pending' && app.interviewed ? 'Interviewed · pending' : escapeHtml(app.status)}</span>
+          </header>
+          <div class="head-applicant-details">
+            <div><span>Student ID</span><strong>${escapeHtml(app.universityId || 'Not provided')}</strong></div>
+            <div><span>Email</span><strong>${escapeHtml(app.email || 'Not provided')}</strong></div>
+            <div><span>Phone</span><strong>${escapeHtml(app.phone || 'Not provided')}</strong></div>
+            <div><span>Interview slot</span><strong>${escapeHtml(app.slot || 'Not selected')}</strong></div>
           </div>
-
-          <div class="card-actions">
-            <button class="preview-btn${app.interviewed ? ' is-preview' : ' is-interview'}" data-action="preview" data-id="${app.id}">${app.interviewed ? 'Preview' : 'Interview Now'}</button>
-            <button class="delete-btn" data-action="delete" data-id="${app.id}">Delete</button>
+          <div class="card-actions head-applicant-actions">
+            <button class="preview-btn${app.interviewed ? ' is-preview' : ' is-interview'}" data-action="preview" data-id="${Number(app.id)}">${app.interviewed ? 'Preview' : 'Interview Now'}</button>
+            <button class="delete-btn" data-action="delete" data-id="${Number(app.id)}">Delete</button>
           </div>
         </article>
       `
     )
-    .join('');
+    .join('')
+    : '<p class="application-filter-empty">No applicants match these filters.</p>';
 
   applicationsList.querySelectorAll('[data-action="preview"]').forEach((button) => {
     button.addEventListener('click', () => openReviewModal(Number(button.dataset.id)));
@@ -68,6 +89,10 @@ function renderHeadDashboard() {
     button.addEventListener('click', () => deleteApplication(Number(button.dataset.id)));
   });
 }
+
+document.getElementById('applicantSearchFilter')?.addEventListener('input', renderHeadDashboard);
+document.getElementById('applicantStatusFilter')?.addEventListener('change', renderHeadDashboard);
+document.getElementById('applicantCommitteeFilter')?.addEventListener('change', renderHeadDashboard);
 
 async function deleteApplication(appId) {
   const response = await fetch(`/api/applications/${appId}`, { method: 'DELETE' });
@@ -130,6 +155,7 @@ function renderInterviewReviewQuestions(app) {
   container.innerHTML = state.interviewSections.map((section) => `
     <section class="modal-interview-section">
       <h4>${escapeHtml(section.title)}</h4>
+      <div class="form-row modal-interview-question-grid">
       ${section.questions.map((question) => {
         const value = previousAnswers.get(question.key) || '';
         const required = question.required ? 'required' : '';
@@ -146,6 +172,7 @@ function renderInterviewReviewQuestions(app) {
         }
         return `<div class="modal-field"><label>${escapeHtml(question.label)}${question.required ? ' *' : ''}</label>${control}</div>`;
       }).join('')}
+      </div>
     </section>
   `).join('');
   container.classList.remove('hidden');
@@ -288,13 +315,15 @@ async function loadClubMembers() {
     const members = Array.isArray(data.members) ? data.members : [];
     window.dashboardUnread?.update('clubMembers', members.map((member) => `${member.createdAt || `${member.name}:${member.committee}:${member.position}`}`));
     const committees = Array.isArray(data.committees) ? data.committees : [];
-    count.textContent = `${members.length} listed · ${Number(data.totalCount) || 0} total club members`;
+    count.textContent = state.clubAccount?.role === 'head'
+      ? `${members.length} members in ${data.committee || state.clubAccount.committee}`
+      : `${members.length} listed · ${Number(data.totalCount) || 0} total club members`;
     const selectedCommittee = committeeSelect.value;
     committeeSelect.replaceChildren(new Option('Choose a committee', ''));
     committees.forEach((committee) => committeeSelect.add(new Option(committee, committee)));
     if (committees.includes(selectedCommittee)) committeeSelect.value = selectedCommittee;
     document.getElementById('showMemberFormBtn').disabled = committees.length === 0;
-    if (!committees.length) {
+    if (!committees.length && state.clubAccount?.role !== 'head') {
       const noCommittees = document.createElement('p');
       noCommittees.className = 'member-roster-empty';
       noCommittees.textContent = 'Add a committee head before assigning members to committees.';
@@ -302,7 +331,9 @@ async function loadClubMembers() {
     } else if (!members.length) {
       const empty = document.createElement('p');
       empty.className = 'member-roster-empty';
-      empty.textContent = `The club profile tracks ${Number(data.totalCount) || 0} members, but does not have individual names yet. Add a member to start the named roster.`;
+      empty.textContent = state.clubAccount?.role === 'head'
+        ? `No accepted applicants or listed members are available for ${data.committee || state.clubAccount.committee} yet.`
+        : `The club profile tracks ${Number(data.totalCount) || 0} members, but does not have individual names yet. Add a member to start the named roster.`;
       list.append(empty);
     }
     members.forEach((member) => {
@@ -315,13 +346,17 @@ async function loadClubMembers() {
       meta.textContent = `${member.committee} · ${member.position}`;
       const type = document.createElement('span');
       type.className = 'member-type-pill';
-      type.textContent = member.memberType === 'senior' ? 'Senior member' : 'New member';
+      type.textContent = member.source === 'accepted-application'
+        ? 'Accepted applicant'
+        : member.memberType === 'senior' ? 'Senior member' : 'New member';
       details.append(name, meta);
       card.append(details, type);
       list.append(card);
     });
     const note = document.getElementById('clubMemberCountNote');
-    if (note) note.textContent = `${Number(data.totalCount) || 0} club members · ${members.length} named profiles`;
+      if (note) note.textContent = state.clubAccount?.role === 'head'
+        ? `${members.length} members in ${data.committee || state.clubAccount.committee}`
+        : `${Number(data.totalCount) || 0} club members · ${members.length} named profiles`;
   } catch (error) {
     count.textContent = 'Members could not be loaded';
     const message = document.createElement('p');
@@ -333,7 +368,22 @@ async function loadClubMembers() {
 
 const memberManagerDialog = document.getElementById('memberManagerDialog');
 document.getElementById('openMemberManagerBtn')?.addEventListener('click', () => {
-  memberManagerDialog?.showModal();
+  const isHead = state.clubAccount?.role === 'head';
+  const dialog = document.getElementById('memberManagerDialog');
+  const heading = document.getElementById('memberManagerTitle');
+  const eyebrow = dialog?.querySelector('.admin-eyebrow');
+  const description = dialog?.querySelector('.member-dialog-header p');
+  const addButton = document.getElementById('showMemberFormBtn');
+  if (heading) heading.textContent = isHead ? `${state.clubAccount.committee} members` : 'Club members';
+  if (eyebrow) eyebrow.textContent = isHead ? 'COMMITTEE DASHBOARD' : 'PRESIDENT DASHBOARD';
+  if (description) description.textContent = isHead
+    ? 'Accepted applicants and listed members in your committee.'
+    : 'Add each member’s MIU email so they can receive committee tasks in their student dashboard.';
+  addButton?.classList.toggle('hidden', isHead);
+  document.getElementById('clubMemberForm')?.classList.add('hidden');
+  document.getElementById('clubMemberFeedback')?.classList.toggle('hidden', isHead);
+  document.querySelector('.member-dialog-toolbar')?.classList.toggle('head-member-toolbar', isHead);
+  dialog?.showModal();
   loadClubMembers();
 });
 document.getElementById('closeMemberManagerBtn')?.addEventListener('click', () => memberManagerDialog?.close());
@@ -362,6 +412,7 @@ document.getElementById('clubMemberForm')?.addEventListener('submit', async (eve
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         name: formData.get('name'),
+        email: formData.get('email'),
         committee: formData.get('committee'),
         position: formData.get('position'),
         memberType: formData.get('memberType')
@@ -399,7 +450,7 @@ function editCommitteeHead(head, row) {
     if (field.name === 'password') {
       input.minLength = 12;
       input.autocomplete = 'new-password';
-      input.placeholder = 'Leave blank to keep current password';
+      input.placeholder = 'Leave blank to keep password';
     }
     if (field.name !== 'password') input.required = true;
     label.append(input);
@@ -555,6 +606,7 @@ async function saveInterviewReview(status) {
 
 document.getElementById('logoutBtn').addEventListener('click', async () => {
   await fetch('/api/club-auth/logout', { method: 'POST' });
+  await window.refreshHeaderAccountState?.();
   state.clubAccount = null;
   state.applications = [];
   showView('clubLogin');
@@ -580,6 +632,9 @@ document.getElementById('adminLoginForm').addEventListener('submit', async (even
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Admin login failed.');
+    if (setupRequired && result.savedToDatabase !== true) {
+      throw new Error('The database did not confirm the new admin account. It was not accepted as saved.');
+    }
 
     resetClubEditor();
     setAdminFeedback('');
@@ -658,6 +713,7 @@ document.getElementById('adminBackBtn').addEventListener('click', () => {
 
 document.getElementById('adminLogoutBtn').addEventListener('click', async () => {
   await fetch('/api/admin/logout', { method: 'POST' });
+  await window.refreshHeaderAccountState?.();
   showView('home');
 });
 
@@ -797,11 +853,83 @@ document.getElementById('modalPhoto').addEventListener('change', (event) => {
   });
 });
 
+const lastAppViewStorageKey = 'miu-last-app-view';
+
+function persistCurrentViewState() {
+  const viewName = Object.keys(views).find((key) => views[key]?.classList.contains('active'));
+  if (!viewName || viewName === 'authLoading') return;
+  const snapshot = {
+    viewName,
+    clubId: Number(state.selectedClub?.id) || null,
+    editingFormId: Number(state.editingMyForm?.id) || null
+  };
+  try {
+    sessionStorage.setItem(lastAppViewStorageKey, JSON.stringify(snapshot));
+  } catch {}
+}
+
+function readLastAppView() {
+  try {
+    const snapshot = JSON.parse(sessionStorage.getItem(lastAppViewStorageKey) || 'null');
+    return snapshot && typeof snapshot === 'object' ? snapshot : null;
+  } catch {
+    return null;
+  }
+}
+
 function showView(viewName) {
   Object.entries(views).forEach(([key, view]) => {
     view.classList.toggle('active', key === viewName);
   });
-  if (viewName !== 'authLoading') document.documentElement.classList.remove('auth-route-pending');
+  if (viewName !== 'authLoading') {
+    document.documentElement.classList.remove('auth-route-pending');
+    persistCurrentViewState();
+  }
+}
+
+async function restoreLastAppView() {
+  const savedView = readLastAppView();
+  if (!savedView || !views[savedView.viewName]) return false;
+
+  if (savedView.viewName === 'club' && state.clubs.some((club) => Number(club.id) === Number(savedView.clubId))) {
+    openClubDetail(Number(savedView.clubId));
+    return true;
+  }
+  if (savedView.viewName === 'application' && state.clubs.some((club) => Number(club.id) === Number(savedView.clubId))) {
+    if (savedView.editingFormId) {
+      await loadMyForms();
+      const savedForm = state.myForms.find((item) => Number(item.id) === Number(savedView.editingFormId));
+      if (savedForm) {
+        await startEditingMyForm(savedForm);
+        return true;
+      }
+    }
+    await openApplicationForm(Number(savedView.clubId), true);
+    return true;
+  }
+  if (savedView.viewName === 'myForms') {
+    const studentSession = await fetch('/api/student-auth/session', { cache: 'no-store' }).catch(() => null);
+    if (!studentSession?.ok) {
+      try { sessionStorage.removeItem(lastAppViewStorageKey); } catch {}
+      return false;
+    }
+    await loadMyForms();
+    showView('myForms');
+    return true;
+  }
+  if (['admin', 'adminLogin'].includes(savedView.viewName)) {
+    await openAdminAccess();
+    return true;
+  }
+  if (['clubLogin', 'head'].includes(savedView.viewName)) {
+    await openClubPortal();
+    return true;
+  }
+  if (savedView.viewName === 'signIn') {
+    showView('signIn');
+    return true;
+  }
+  return false;
 }
 
 async function init() {
@@ -840,6 +968,7 @@ async function init() {
       showView('myForms');
       return;
     }
+    if (await restoreLastAppView()) return;
     showView('home');
   }
 }

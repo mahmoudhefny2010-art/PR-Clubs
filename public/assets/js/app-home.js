@@ -1,5 +1,6 @@
 const state = {
   clubs: [],
+  universityContent: [],
   applications: [],
   selectedClub: null,
   selectedApplication: null,
@@ -10,11 +11,14 @@ const state = {
   clubAccount: null,
   myForms: [],
   editingMyForm: null,
+  studentProfile: null,
   searchQuery: '',
   activeCategory: 'All',
 };
 let clubsLoaded = false;
 let clubsLoadPromise = null;
+let universityContentRefreshTimer = null;
+let universityContentRefreshId = 0;
 
 const views = {
   authLoading: document.getElementById('authLoadingView'),
@@ -95,7 +99,7 @@ function getStoredMyForms() {
   try {
     const records = JSON.parse(localStorage.getItem(myFormsStorageKey) || '[]');
     return Array.isArray(records) ? records.filter((item) => Number.isFinite(Number(item.id)) && typeof item.token === 'string') : [];
-  } catch {
+  } catch (error) {
     return [];
   }
 }
@@ -128,6 +132,7 @@ async function loadMyForms() {
   }));
   state.myForms = results.filter(Boolean);
   renderMyForms();
+  await window.loadMemberAttendanceAssignments?.();
 }
 
 function renderMyForms() {
@@ -188,6 +193,7 @@ async function startEditingMyForm(item) {
   const app = item.application;
   await openApplicationForm(app.clubId, true);
   state.editingMyForm = item;
+  persistCurrentViewState();
   const currentCommitteeOption = [...applicationCommitteeInput.options]
     .find((option) => option.value === app.committee);
   if (currentCommitteeOption) {
@@ -241,10 +247,15 @@ async function removeMyForm(item) {
 async function loadClubs() {
   if (!clubsLoadPromise) {
     clubsLoadPromise = (async () => {
-      const response = await fetch('/api/clubs', { cache: 'no-store' });
+      const [response, universityResponse] = await Promise.all([
+        fetch('/api/clubs', { cache: 'no-store' }),
+        fetch('/api/university-content', { cache: 'no-store' }).catch(() => null)
+      ]);
       if (!response.ok) throw new Error('Could not load club events.');
       const records = await response.json();
       state.clubs = Array.isArray(records) ? records : [];
+      state.universityContent = universityResponse?.ok ? await universityResponse.json().catch(() => []) : [];
+      if (!Array.isArray(state.universityContent)) state.universityContent = [];
       clubsLoaded = true;
     })();
   }
@@ -255,6 +266,11 @@ async function loadClubs() {
   }
   renderClubGrid();
   renderAdminClubList();
+  if (!universityContentRefreshTimer) {
+    universityContentRefreshTimer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') refreshUniversityContentFromDatabase();
+    }, 60_000);
+  }
 }
 
 async function loadHomepageSettings() {
@@ -279,7 +295,7 @@ async function loadApplications() {
 function createApprovalRequestCheckpoint(request) {
   const isEntryPermit = request.type === 'entry_permit';
   const labels = isEntryPermit
-    ? ['Submitted', 'PR review', 'Security review', 'PR final review', 'Dean view']
+    ? ['Submitted', 'PR review', 'Security review', 'PR final approval', 'Dean view only']
     : ['Submitted', 'PR review', 'English review', 'Dean review', 'Published'];
   const stageByRole = { club: 0, pr: 1, english: 2, security: 2, dean: 3 };
   const statusIndex = isEntryPermit
@@ -298,17 +314,35 @@ function createApprovalRequestCheckpoint(request) {
   if (terminalClass) currentIndex = stageByRole[lastEvent?.role] ?? 4;
 
   const card = document.createElement('article');
-  card.className = 'approval-request-checkpoint';
+  card.className = `approval-request-checkpoint${isEntryPermit ? ' is-entry-permit' : ''}${status === 'approved' || status === 'published' ? ' is-approved' : ''}${terminalClass ? ` ${terminalClass}` : ''}`;
   const heading = document.createElement('div');
   heading.className = 'approval-request-heading';
+  const identity = document.createElement('div');
+  identity.className = 'approval-request-identity';
   const title = document.createElement('strong');
   title.textContent = request.title || 'Untitled request';
+  identity.append(title);
+  if (isEntryPermit) {
+    const type = document.createElement('span');
+    type.className = 'approval-request-type';
+    type.textContent = 'Entry Permit';
+    identity.append(type);
+  }
   const state = document.createElement('span');
-  state.className = `approval-request-state${terminalClass ? ' is-failed' : ''}`;
-  state.textContent = status === 'changes_requested'
-    ? `Changes requested · ${request.editRequestedBy || 'review team'}`
-    : status === 'approved' ? 'Approved · Internal only' : status.replaceAll('_', ' ');
-  heading.append(title, state);
+  const roleLabels = { pr: 'PR', english: 'English Department', security: 'Security Office', dean: 'Dean' };
+  state.className = `approval-request-state${terminalClass ? ' is-failed' : status === 'approved' || status === 'published' ? ' is-approved' : status.startsWith('pending_') || status === 'changes_requested' ? ' is-pending' : ''}`;
+  state.textContent = isEntryPermit
+    ? status === 'approved' ? 'Approved by PR · Internal · Dean view only'
+      : status === 'pending_pr' ? entryPermitFinalReview ? 'Waiting for PR final approval' : 'Waiting for PR review'
+        : status === 'pending_security' ? 'Waiting for Security Office'
+          : status === 'rejected' ? `Rejected by ${roleLabels[lastEvent?.role] || 'review team'}`
+            : status === 'changes_requested' ? `Changes requested by ${roleLabels[request.editRequestedBy] || 'review team'}`
+              : status.replaceAll('_', ' ')
+    : status === 'changes_requested'
+      ? `Changes requested · ${roleLabels[request.editRequestedBy] || 'review team'}`
+      : status === 'rejected' ? `Rejected by ${roleLabels[lastEvent?.role] || 'review team'}`
+        : status === 'approved' ? 'Approved · Internal only' : status.replaceAll('_', ' ');
+  heading.append(identity, state);
 
   const requestTrack = document.createElement('div');
   requestTrack.className = 'approval-request-track';
@@ -333,7 +367,123 @@ function createApprovalRequestCheckpoint(request) {
   return card;
 }
 
-function renderApprovalCheckpoints(items) {
+function workflowDateHasPassed(value) {
+  const dateKey = String(value || '').trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return false;
+  const now = new Date();
+  const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  return dateKey < todayKey;
+}
+
+function clubRequestActivityEndDate(request) {
+  if (request.type === 'booth') return request.boothCloseDate || request.boothOpenDate || request.date;
+  if (['event', 'entry_permit'].includes(request.type)) return request.date;
+  return '';
+}
+
+function isCompletedClubRequest(request) {
+  const status = String(request.status || '').toLowerCase();
+  if (['rejected', 'deleted'].includes(status)) return true;
+  if (!['approved', 'published'].includes(status)) return false;
+  const endDate = clubRequestActivityEndDate(request);
+  return !endDate || workflowDateHasPassed(endDate);
+}
+
+function groupAttendanceApprovalRecords(records) {
+  const groups = new Map();
+  records.forEach((record) => {
+    const key = `${record.itemType || 'event'}:${record.eventRequestId}`;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        itemType: record.itemType === 'booth' ? 'Booth' : 'Event',
+        title: record.eventTitle || 'Untitled activity',
+        eventDate: record.eventDate || '',
+        eventTime: record.eventTime || '',
+        records: [],
+        updatedAt: 0
+      });
+    }
+    const group = groups.get(key);
+    group.records.push(record);
+    const approvalTime = (record.approvalHistory || []).reduce((latest, event) => Math.max(latest, new Date(event.createdAt || 0).getTime() || 0), 0);
+    group.updatedAt = Math.max(group.updatedAt, approvalTime, new Date(record.attendedAt || 0).getTime() || 0);
+  });
+
+  const stageOrder = ['pending_pr', 'pending_sso', 'pending_dean', 'approved'];
+  return [...groups.values()].map((group) => {
+    group.stageCounts = group.records.reduce((counts, record) => {
+      const status = stageOrder.includes(record.approvalStatus) ? record.approvalStatus : 'pending_pr';
+      counts[status] = (counts[status] || 0) + 1;
+      return counts;
+    }, {});
+    group.status = stageOrder.find((status) => group.stageCounts[status]) || 'pending_pr';
+    return group;
+  });
+}
+
+function createAttendanceApprovalCheckpoint(review) {
+  const labels = ['Club check-ins', 'PR review', 'SSO review', 'Dean approval'];
+  const roles = { pending_pr: 'PR', pending_sso: 'SSO', pending_dean: 'Dean' };
+  const index = { pending_pr: 1, pending_sso: 2, pending_dean: 3, approved: 3 }[review.status] ?? 1;
+  const isApproved = review.status === 'approved';
+  const card = document.createElement('article');
+  card.className = `approval-request-checkpoint is-attendance${isApproved ? ' is-approved' : ''}`;
+
+  const heading = document.createElement('div');
+  heading.className = 'approval-request-heading';
+  const identity = document.createElement('div');
+  identity.className = 'approval-request-identity';
+  const title = document.createElement('strong');
+  title.textContent = `${review.title} attendance`;
+  const type = document.createElement('span');
+  type.className = 'approval-request-type';
+  type.textContent = 'Attendance';
+  identity.append(title, type);
+
+  const state = document.createElement('span');
+  state.className = `approval-request-state${isApproved ? ' is-approved' : ' is-pending'}`;
+  const waitingCount = review.stageCounts[review.status] || 0;
+  state.textContent = isApproved
+    ? 'Approved by Dean'
+    : `Waiting for ${roles[review.status]} · ${waitingCount} check-in${waitingCount === 1 ? '' : 's'}`;
+  heading.append(identity, state);
+
+  const meta = document.createElement('p');
+  meta.className = 'approval-request-meta';
+  const date = review.eventDate ? new Date(`${review.eventDate}T00:00:00`) : null;
+  const dateLabel = date && !Number.isNaN(date.getTime())
+    ? new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(date)
+    : review.eventDate;
+  const stageNames = { pending_pr: 'PR', pending_sso: 'SSO', pending_dean: 'Dean', approved: 'approved' };
+  const stageSummary = ['pending_pr', 'pending_sso', 'pending_dean', 'approved']
+    .filter((status) => review.stageCounts[status])
+    .map((status) => `${review.stageCounts[status]} ${stageNames[status]}`)
+    .join(' · ');
+  meta.textContent = [review.itemType, dateLabel, window.formatSiteTime(review.eventTime), `${review.records.length} check-in${review.records.length === 1 ? '' : 's'}`, stageSummary]
+    .filter(Boolean).join(' · ');
+
+  const requestTrack = document.createElement('div');
+  requestTrack.className = 'approval-request-track is-attendance';
+  requestTrack.style.setProperty('--request-progress', `${index / (labels.length - 1) * 100}%`);
+  labels.forEach((label, stepIndex) => {
+    const step = document.createElement('div');
+    step.className = 'approval-request-step';
+    if (stepIndex < index) step.classList.add('is-complete');
+    if (stepIndex === index) step.classList.add('is-current');
+    const marker = document.createElement('span');
+    marker.className = 'approval-request-marker';
+    marker.setAttribute('aria-hidden', 'true');
+    const stepTitle = document.createElement('span');
+    stepTitle.textContent = label;
+    step.append(marker, stepTitle);
+    requestTrack.append(step);
+  });
+  card.append(heading, meta, requestTrack);
+  return card;
+}
+
+function renderApprovalCheckpoints(items, attendanceRecords = []) {
   const track = document.getElementById('approvalCheckpointTrack');
   const requestLabel = document.getElementById('approvalCheckpointRequest');
   const statusLabel = document.getElementById('approvalCheckpointStatus');
@@ -343,32 +493,58 @@ function renderApprovalCheckpoints(items) {
 
   const latestActivity = (item) => {
     const history = Array.isArray(item.workflowHistory) ? item.workflowHistory : [];
-    return new Date(history[history.length - 1]?.createdAt || item.updatedAt || item.createdAt || 0).getTime();
+    return new Date(item.updatedAt || history[history.length - 1]?.createdAt || item.createdAt || 0).getTime();
   };
-  const requests = [...items].sort((a, b) => latestActivity(b) - latestActivity(a));
+  const requests = [
+    ...items.filter((item) => !isCompletedClubRequest(item))
+      .map((data) => ({ kind: 'content', data, activity: latestActivity(data) })),
+    ...groupAttendanceApprovalRecords(attendanceRecords)
+      .filter((review) => review.status !== 'approved' || !workflowDateHasPassed(review.eventDate))
+      .map((data) => ({ kind: 'attendance', data, activity: data.updatedAt }))
+  ].sort((a, b) => b.activity - a.activity);
+  const allRequests = [
+    ...items.map((data) => ({ kind: 'content', data, activity: latestActivity(data) })),
+    ...groupAttendanceApprovalRecords(attendanceRecords).map((data) => ({ kind: 'attendance', data, activity: data.updatedAt }))
+  ].sort((a, b) => b.activity - a.activity);
   if (requestLabel) {
     requestLabel.textContent = requests.length
-      ? `Latest request${requests.length > 1 ? ` · ${requests.length} total` : ''}`
-      : 'Latest club request';
+      ? `Current workflows · ${requests.length} active · ${allRequests.length} total`
+      : allRequests.length ? 'No active workflows · history is available' : 'Club workflows';
   }
   statusLabel.textContent = `Live · ${window.formatSiteTime(new Date())}`;
+  statusLabel.removeAttribute('title');
   statusLabel.classList.add('is-live');
   track.replaceChildren();
   moreList.replaceChildren();
-  moreButton.classList.toggle('hidden', requests.length < 2);
-  moreButton.textContent = `More · ${Math.max(0, requests.length - 1)}`;
+  moreButton.classList.toggle('hidden', allRequests.length === 0);
+  moreButton.textContent = `All requests · ${allRequests.length}`;
+  const renderRequest = (request) => request.kind === 'attendance'
+    ? createAttendanceApprovalCheckpoint(request.data)
+    : createApprovalRequestCheckpoint(request.data);
   if (!requests.length) {
     const empty = document.createElement('p');
     empty.className = 'approval-checkpoint-empty';
-    empty.textContent = 'Club requests will appear here as soon as they are created.';
+    empty.textContent = allRequests.length
+      ? 'No active requests. Open All requests to view the full history.'
+      : 'Club request and attendance workflows will appear here as soon as they are created.';
     track.append(empty);
-    return;
+  } else {
+    track.append(renderRequest(requests[0]));
   }
 
-  track.append(createApprovalRequestCheckpoint(requests[0]));
-  requests.slice(1).forEach((request) => {
-    moreList.append(createApprovalRequestCheckpoint(request));
-  });
+  const historyRequests = allRequests.filter((request) => request.kind === 'attendance'
+    ? request.data.status === 'approved' && workflowDateHasPassed(request.data.eventDate)
+    : isCompletedClubRequest(request.data));
+  const appendRequestGroup = (title, group) => {
+    if (!group.length) return;
+    const heading = document.createElement('h3');
+    heading.className = 'approval-checkpoint-history-heading';
+    heading.textContent = `${title} · ${group.length}`;
+    moreList.append(heading);
+    group.forEach((request) => moreList.append(renderRequest(request)));
+  };
+  appendRequestGroup('In progress', requests);
+  appendRequestGroup('History', historyRequests);
 }
 
 document.getElementById('approvalCheckpointMoreBtn')?.addEventListener('click', () => {
@@ -395,7 +571,7 @@ async function refreshPresidentSidebarUnread() {
   } catch { /* Keep the last known section counts until the database reconnects. */ }
 }
 
-async function loadClubReviewNotifications() {
+async function loadClubReviewNotifications(showNotifications = true) {
   const dialog = document.getElementById('clubReviewNotifications');
   const list = document.getElementById('clubReviewNotificationList');
   const dismissBtn = document.getElementById('dismissNotificationBtn');
@@ -403,10 +579,16 @@ async function loadClubReviewNotifications() {
   if (approvalCheckpointRefreshInProgress) return;
   approvalCheckpointRefreshInProgress = true;
   try {
-    const response = await fetch('/api/club/content', { cache: 'no-store' });
-    const items = await response.json();
-    if (!response.ok) throw new Error('Could not load approval checkpoints.');
-    renderApprovalCheckpoints(items);
+    const [contentResponse, attendanceResponse] = await Promise.all([
+      fetch('/api/club/content', { cache: 'no-store' }),
+      fetch('/api/club/attendance-records', { cache: 'no-store' })
+    ]);
+    const [items, attendanceRecords] = await Promise.all([contentResponse.json(), attendanceResponse.json()]);
+    if (!contentResponse.ok) throw new Error(items.message || 'Could not load club request statuses.');
+    if (!attendanceResponse.ok) throw new Error(attendanceRecords.message || 'Could not load attendance request statuses.');
+    if (!Array.isArray(items) || !Array.isArray(attendanceRecords)) throw new Error('The database returned an unexpected workflow response.');
+    renderApprovalCheckpoints(items, attendanceRecords);
+    if (!showNotifications) return;
     const actionableUpdates = items.flatMap((item) => (Array.isArray(item.workflowHistory) ? item.workflowHistory : [])
       .filter((event) => ['request_edit', 'reject', 'comment', 'returned_to_pr', 'returned_to_english', 'returned_to_security'].includes(event.action)
         && ['pr', 'english', 'security', 'dean'].includes(event.role))
@@ -473,11 +655,26 @@ async function loadClubReviewNotifications() {
       event.preventDefault();
       markPendingNotificationsSeen();
     };
-  } catch {
+  } catch (error) {
+    const track = document.getElementById('approvalCheckpointTrack');
+    const moreList = document.getElementById('approvalCheckpointMoreList');
+    const moreButton = document.getElementById('approvalCheckpointMoreBtn');
+    track?.replaceChildren();
+    if (moreList) {
+      moreList.replaceChildren();
+      if (document.getElementById('approvalCheckpointMoreDialog')?.open) {
+        const message = document.createElement('p');
+        message.className = 'approval-checkpoint-empty';
+        message.textContent = 'Could not sync request history from the database. Check your connection and reopen All requests to try again.';
+        moreList.append(message);
+      }
+    }
+    moreButton?.classList.add('hidden');
     dialog.close();
     const status = document.getElementById('approvalCheckpointStatus');
     if (status) {
-      status.textContent = 'Reconnecting…';
+      status.textContent = 'Database sync failed · retrying';
+      status.title = error?.message || 'Could not load the latest request statuses.';
       status.classList.remove('is-live');
     }
   } finally {
@@ -487,6 +684,18 @@ async function loadClubReviewNotifications() {
 
 window.addEventListener('club:entry-permit-submitted', () => {
   if (state.clubAccount?.role === 'president') loadClubReviewNotifications();
+});
+
+document.getElementById('openClubRequestHistoryBtn')?.addEventListener('click', async () => {
+  const dialog = document.getElementById('approvalCheckpointMoreDialog');
+  const list = document.getElementById('approvalCheckpointMoreList');
+  if (!dialog || !list) return;
+  const syncing = document.createElement('p');
+  syncing.className = 'approval-checkpoint-empty';
+  syncing.textContent = 'Syncing all requests from the database…';
+  list.replaceChildren(syncing);
+  dialog.showModal();
+  await loadClubReviewNotifications(false);
 });
 
 function startApprovalCheckpointLiveUpdates() {
@@ -538,9 +747,17 @@ async function openClubPortal(initialSession = null) {
       ? 'PRESIDENT DASHBOARD - ALL COMMITTEES'
       : `${club.committee} - HEAD DASHBOARD`;
     const isPresident = club.role === 'president';
+    const contentStudioButton = document.getElementById('openContentStudioBtn');
+    if (contentStudioButton) {
+      const hasAssignedContent = isPresident || club.hasAssignedContent === true;
+      contentStudioButton.classList.toggle('hidden', !hasAssignedContent);
+      contentStudioButton.textContent = isPresident ? 'Open Content Studio' : 'Assigned content task';
+    }
     const attendanceCommittee = String(club.committee || '').trim().toLowerCase();
-    const canViewAttendance = isPresident
-      || (club.role === 'head' && (/(^|[^a-z])it([^a-z]|$)/.test(attendanceCommittee) || attendanceCommittee.includes('information technology')));
+    const isItCommitteeHead = club.role === 'head'
+      && (/(^|[^a-z])it([^a-z]|$)/.test(attendanceCommittee) || attendanceCommittee.includes('information technology'));
+    const canManageAttendanceTools = isPresident || isItCommitteeHead;
+    const canViewAttendanceHistory = isPresident || club.role === 'head';
     presidentHeadManager.classList.toggle('hidden', club.role !== 'president');
     presidentFormManager.classList.toggle('hidden', club.role !== 'president');
     const canViewClubOperations = ['president', 'head'].includes(club.role);
@@ -548,18 +765,37 @@ async function openClubPortal(initialSession = null) {
     presidentDashboardLayout.classList.toggle('is-president', canViewClubOperations);
     presidentSidebar.querySelectorAll('[data-president-only]').forEach((item) => item.classList.toggle('hidden', !isPresident));
     document.getElementById('approvalCheckpointPanel')?.classList.toggle('hidden', club.role !== 'president');
-    document.getElementById('openMemberManagerBtn')?.classList.toggle('hidden', club.role !== 'president');
-    document.getElementById('openAttendanceManagerBtn')?.classList.toggle('hidden', !canViewAttendance);
-    document.getElementById('openEntryPermitDialogBtn')?.classList.toggle('hidden', !canViewClubOperations);
+    document.getElementById('openMemberManagerBtn')?.classList.toggle('hidden', !['president', 'head'].includes(club.role));
+    const attendanceButton = document.getElementById('openAttendanceManagerBtn');
+    attendanceButton?.classList.toggle('hidden', !canViewAttendanceHistory);
+    attendanceButton?.setAttribute('aria-label', canManageAttendanceTools ? 'Event attendance and history' : 'Attendance history');
+    if (attendanceButton?.firstChild?.nodeType === Node.TEXT_NODE) {
+      attendanceButton.firstChild.textContent = canManageAttendanceTools ? 'Event attendance ' : 'Attendance history ';
+    }
+    const attendanceDialog = document.getElementById('attendanceQrDialog');
+    if (attendanceDialog) {
+      attendanceDialog.dataset.historyOnly = String(!canManageAttendanceTools);
+      attendanceDialog.dataset.selfCheckin = String(canViewAttendanceHistory);
+      attendanceDialog.dataset.clubId = String(club.id);
+      const attendanceDescription = document.getElementById('attendanceDialogDescription');
+      if (attendanceDescription) attendanceDescription.textContent = canManageAttendanceTools
+        ? 'QR codes refresh every 20 seconds. You can also record your own attendance.'
+        : 'Record your own attendance and browse your club’s attendance history.';
+    }
+    document.getElementById('attendanceDelegationPanel')?.classList.toggle('hidden', !canManageAttendanceTools);
+    // Entry permits are owned by the club president; committee heads cannot create them.
+    document.getElementById('openEntryPermitDialogBtn')?.classList.toggle('hidden', !isPresident);
     interviewFormManager.classList.add('hidden');
     toggleInterviewFormBtn.classList.remove('hidden');
     toggleInterviewFormBtn.setAttribute('aria-expanded', 'false');
     toggleInterviewFormBtn.textContent = 'Manage interview questions';
     if (club.role === 'president') {
-      setPresidentDashboardSection('presidentOverviewPanel');
+      const allowedSections = new Set(['presidentOverviewPanel', 'presidentHeadManager', 'presidentFormManager', 'interviewFormManager', 'presidentApplicantsPanel']);
+      let savedSection = '';
+      try { savedSection = localStorage.getItem(`miu-club-dashboard-section:${club.id}`) || ''; } catch { /* Start at Overview when storage is unavailable. */ }
+      setPresidentDashboardSection(allowedSections.has(savedSection) ? savedSection : 'presidentOverviewPanel');
     } else {
-      presidentOverviewPanel.classList.remove('hidden');
-      presidentApplicantsPanel.classList.remove('hidden');
+      setPresidentDashboardSection('presidentOverviewPanel');
     }
     document.getElementById('interviewFormHeading').textContent = club.role === 'president'
       ? 'Club interview questions'
@@ -590,6 +826,9 @@ async function openClubPortal(initialSession = null) {
 
 function setPresidentDashboardSection(sectionId) {
   const sectionIds = ['presidentOverviewPanel', 'presidentHeadManager', 'presidentFormManager', 'interviewFormManager', 'presidentApplicantsPanel'];
+  if (state.clubAccount?.role === 'president' && sectionIds.includes(sectionId)) {
+    try { localStorage.setItem(`miu-club-dashboard-section:${state.clubAccount.id}`, sectionId); } catch { /* The section still changes for this visit. */ }
+  }
   sectionIds.forEach((id) => document.getElementById(id)?.classList.toggle('hidden', id !== sectionId));
   toggleInterviewFormBtn.classList.add('hidden');
   presidentSidebar?.querySelectorAll('[data-dashboard-section]').forEach((item) => {
@@ -600,7 +839,7 @@ function setPresidentDashboardSection(sectionId) {
 }
 
 document.getElementById('presidentOverviewApplicantsBtn')?.addEventListener('click', () => {
-  if (state.clubAccount?.role === 'president') setPresidentDashboardSection('presidentApplicantsPanel');
+  if (['president', 'head'].includes(state.clubAccount?.role)) setPresidentDashboardSection('presidentApplicantsPanel');
   else document.getElementById('applicationsList')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
 
@@ -727,9 +966,33 @@ function renderClubGrid() {
 }
 
 function getAllEvents() {
-  return (state.clubs || []).flatMap((club) =>
+  const clubEvents = (state.clubs || []).flatMap((club) =>
     (Array.isArray(club.events) ? club.events : []).map((event, eventIndex) => ({ ...event, clubId: club.id, clubName: club.name, clubImage: club.image, eventIndex }))
   );
+  const universityEvents = (state.universityContent || []).filter((item) => item.type === 'event').map((event, index) => ({
+    ...event, clubId: 0, clubName: 'Misr International University',
+    clubImage: '/assets/img/pics/logo.svg.png', eventIndex: index, university: true,
+    universityContentId: event.id
+  }));
+  return [...clubEvents, ...universityEvents];
+}
+
+async function refreshUniversityContentFromDatabase() {
+  const refreshId = ++universityContentRefreshId;
+  try {
+    const response = await fetch('/api/university-content', { cache: 'no-store' });
+    if (!response.ok) throw new Error('University updates are unavailable.');
+    const latest = await response.json();
+    if (refreshId !== universityContentRefreshId) return;
+    const nextItems = Array.isArray(latest) ? latest : [];
+    if (JSON.stringify(nextItems) === JSON.stringify(state.universityContent)) return;
+    state.universityContent = nextItems;
+  } catch {
+    if (refreshId !== universityContentRefreshId || !state.universityContent.length) return;
+    state.universityContent = [];
+  }
+  renderEventsSlideshow();
+  renderTodayEvents();
 }
 
 function parseEventDate(value) {
@@ -789,7 +1052,11 @@ function collectClubContent(kind) {
 
 // The upcoming section shows events, sponsors and booths. Feeds stay in the feed section.
 function getAllUpcomingContent() {
-  return [...collectClubContent('events'), ...collectClubContent('sponsors'), ...collectClubContent('booths')];
+  const universityEvents = (state.universityContent || []).filter((item) => item.type === 'event').map((item, index) => ({
+    ...item, contentType: 'event', clubId: 0, clubName: 'Misr International University',
+    clubImage: '/assets/img/pics/logo.svg.png', index, eventIndex: index, university: true
+  }));
+  return [...collectClubContent('events'), ...universityEvents, ...collectClubContent('sponsors'), ...collectClubContent('booths')];
 }
 
 function getAllFeeds() {
@@ -815,7 +1082,7 @@ function renderTodayEvents() {
     return `
       <a class="today-event-chip" href="/pages/event.html?club=${event.clubId}&event=${event.eventIndex}" data-club="${event.clubId}" data-idx="${event.eventIndex}">
         <span class="today-event-badge">Today · New</span>
-        <img src="${escapeHtml(event.image || event.clubImage)}" alt="" />
+        <img class="${event.university && (event.image || '/assets/img/pics/logo.svg.png') === '/assets/img/pics/logo.svg.png' ? 'university-brand-image' : ''}" src="${escapeHtml(event.image || event.clubImage)}" alt="" />
         <span class="today-event-title">${escapeHtml(event.title || 'Event')}</span>
       </a>`;
   }).join('')}`;
@@ -866,7 +1133,7 @@ function renderEventsSlideshow() {
       : `${item.date || ''}${item.location ? ' · ' + escapeHtml(item.location) : ''}`;
     return `
     <div class="event-slide${i === slideIndex ? ' active' : ''}" data-club="${item.clubId}" data-idx="${item.index}" data-type="${item.contentType}">
-      <img src="${escapeHtml(item.image || item.clubImage)}" alt="${escapeHtml(item.title || 'event')}" />
+      <img class="${item.university && item.image === '/assets/img/pics/logo.svg.png' ? 'university-brand-image' : ''}" src="${escapeHtml(item.image || item.clubImage)}" alt="${escapeHtml(item.title || 'event')}" />
       <div class="event-slide-copy">
         <span class="event-slide-club">${escapeHtml(item.clubName || '')}</span>
         <h3>${escapeHtml(item.title || 'Event')}</h3>
@@ -991,7 +1258,7 @@ document.addEventListener('DOMContentLoaded', () => {
     for (let i = 0; i < firstDay; i++) html += '<span></span>';
     for (let day = 1; day <= daysInMonth; day++) {
       const dayEvents = events.filter((e) => e.parsed.getFullYear() === year && e.parsed.getMonth() === month && e.parsed.getDate() === day);
-      html += `<div class="calendar-day${selectedCalendarDay === day ? ' is-selected' : ''}" data-day="${day}"><strong>${day}</strong>${dayEvents.map((e, i) => `<button type="button" class="calendar-event${i >= 1 ? ' extra' : ''}" data-idx="${events.indexOf(e)}" data-day="${day}" title="${escapeHtml(e.title || '')}"><img src="${escapeHtml(e.image || e.clubImage)}" alt="" />${escapeHtml(e.title || '')}</button>`).join('')}${dayEvents.length > 1 ? `<button type="button" class="calendar-more" aria-expanded="false">See ${dayEvents.length - 1} more</button>` : ''}</div>`;
+      html += `<div class="calendar-day${selectedCalendarDay === day ? ' is-selected' : ''}" data-day="${day}"><strong>${day}</strong>${dayEvents.map((e, i) => `<button type="button" class="calendar-event${i >= 1 ? ' extra' : ''}" data-idx="${events.indexOf(e)}" data-day="${day}" title="${escapeHtml(e.title || '')}"><img class="${e.university && e.image === '/assets/img/pics/logo.svg.png' ? 'university-brand-image' : ''}" src="${escapeHtml(e.image || e.clubImage)}" alt="" />${escapeHtml(e.title || '')}</button>`).join('')}${dayEvents.length > 1 ? `<button type="button" class="calendar-more" aria-expanded="false">See ${dayEvents.length - 1} more</button>` : ''}</div>`;
     }
     html += '</div>';
     if (calendarGrid) calendarGrid.innerHTML = `${monthNavigation}${html}`;
