@@ -13,6 +13,12 @@ async function openAdminAccess() {
     const setupRequired = !session.configured;
     const confirmRow = document.getElementById('adminConfirmRow');
     const passwordInput = document.getElementById('adminPasswordInput');
+    const resetAccessButton = document.getElementById('adminResetAccessBtn');
+    const resetBackButton = document.getElementById('adminResetBackBtn');
+    const forgotWrap = document.getElementById('adminLoginForgotWrap');
+    if (resetAccessButton) resetAccessButton.hidden = !(session.configured && session.localSetupAllowed);
+    if (resetBackButton) resetBackButton.hidden = true;
+    if (forgotWrap) forgotWrap.hidden = false;
     document.getElementById('adminLoginTitle').textContent = setupRequired ? 'Create your admin account' : 'Admin access';
     document.getElementById('adminLoginMessage').textContent = setupRequired
       ? 'Create a private email and password of at least 12 characters. First-time setup is limited to this computer.'
@@ -31,6 +37,29 @@ async function openAdminAccess() {
     showView('adminLogin');
   }
 }
+
+document.getElementById('adminResetAccessBtn')?.addEventListener('click', () => {
+  const form = document.getElementById('adminLoginForm');
+  const confirmRow = document.getElementById('adminConfirmRow');
+  const passwordInput = document.getElementById('adminPasswordInput');
+  form.reset();
+  form.dataset.setup = 'true';
+  document.getElementById('adminLoginTitle').textContent = 'Set a new admin login';
+  document.getElementById('adminLoginMessage').textContent = 'Choose the new admin email and password. This replaces the current login and signs out existing sessions.';
+  document.getElementById('adminLoginSubmit').textContent = 'Save new admin login';
+  document.getElementById('adminConfirmInput').required = true;
+  confirmRow.classList.remove('hidden');
+  passwordInput.autocomplete = 'new-password';
+  document.getElementById('adminResetAccessBtn').hidden = true;
+  document.getElementById('adminResetBackBtn').hidden = false;
+  document.getElementById('adminLoginForgotWrap').hidden = true;
+  setAdminLoginFeedback('');
+  document.getElementById('adminEmailInput').focus();
+});
+
+document.getElementById('adminResetBackBtn')?.addEventListener('click', () => {
+  openAdminAccess();
+});
 
 function renderAdminClubList() {
   if (!adminClubList) return;
@@ -775,7 +804,80 @@ async function openApplicationForm(clubId, allowClosedClub = false) {
   applicationFormIntro.textContent = club.applicationIntro || `Complete your details and answer ${club.name}'s questions.`;
   renderApplicationFields(club);
   showView('application');
-  await loadApplicationCommittees(clubId);
+  const [profile] = await Promise.all([loadStudentProfile(), loadApplicationCommittees(clubId)]);
+  state.studentProfile = profile;
+  if (profile) {
+    const nameParts = String(profile.name || '').trim().split(/\s+/);
+    const defaults = {
+      firstName: nameParts.shift() || '', lastName: nameParts.join(' '), universityId: profile.universityId,
+      major: profile.major, email: profile.email, phone: profile.phone, age: profile.age
+    };
+    for (const [field, value] of Object.entries(defaults)) {
+      const input = applicationForm.elements.namedItem(field);
+      if (input && !input.value) input.value = value || '';
+    }
+  }
+}
+
+async function loadStudentProfile() {
+  try {
+    const response = await fetch('/api/student-auth/profile', { cache: 'no-store' });
+    return response.ok ? await response.json() : null;
+  } catch {
+    return null;
+  }
+}
+
+let studentProfileSaveTimer = null;
+let studentProfileSaveQueue = Promise.resolve();
+function getStudentProfileFormData() {
+  const value = (name) => String(applicationForm.elements.namedItem(name)?.value || '').trim();
+  return {
+    name: `${value('firstName')} ${value('lastName')}`.trim(),
+    universityId: value('universityId'), major: value('major'), phone: value('phone'), age: value('age')
+  };
+}
+
+async function saveStudentProfileFromForm() {
+  if (!state.studentProfile) return;
+  const profile = getStudentProfileFormData();
+  const save = studentProfileSaveQueue.then(async () => {
+    const response = await fetch('/api/student-auth/profile', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
+      body: JSON.stringify(profile)
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.message || 'Your profile was not saved. Please try again.');
+    state.studentProfile = result;
+    return result;
+  });
+  studentProfileSaveQueue = save.catch(() => {});
+  const result = await save;
+  return result;
+}
+
+for (const fieldName of ['firstName', 'lastName', 'universityId', 'major', 'phone', 'age']) {
+  const input = applicationForm.elements.namedItem(fieldName);
+  input?.addEventListener('input', () => {
+    if (!state.studentProfile || state.editingMyForm) return;
+    clearTimeout(studentProfileSaveTimer);
+    studentProfileSaveTimer = setTimeout(() => {
+      saveStudentProfileFromForm().catch((error) => {
+        applicationFeedback.textContent = error.message;
+        applicationFeedback.classList.add('is-error');
+      });
+    }, 700);
+  });
+  input?.addEventListener('change', () => {
+    if (!state.studentProfile || state.editingMyForm) return;
+    clearTimeout(studentProfileSaveTimer);
+    saveStudentProfileFromForm().catch((error) => {
+      applicationFeedback.textContent = error.message;
+      applicationFeedback.classList.add('is-error');
+    });
+  });
 }
 
 function clearApplicantPhotoPreview() {
@@ -880,6 +982,10 @@ applicationForm.addEventListener('submit', async (event) => {
   };
 
   try {
+    if (!state.editingMyForm && state.studentProfile) {
+      clearTimeout(studentProfileSaveTimer);
+      await saveStudentProfileFromForm();
+    }
     if (applicantPhoto) payload.photo = await readImageFile(applicantPhoto);
     if (!state.editingMyForm && !payload.photo) throw new Error('Upload your photo before submitting.');
     const editing = state.editingMyForm;

@@ -3,12 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="/assets/js/site-loading.js?v=20261010scrolltop1"></script>
     <title>Committee Review</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/assets/css/base.css?v=20261007d" />
-    <link rel="stylesheet" href="/assets/css/responsive.css?v=20261005h" />
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" /></noscript>
+    <link rel="stylesheet" href="/assets/css/base.css?v=20261010loading2" />
+    <link rel="stylesheet" href="/assets/css/responsive.css?v=20261010navpolish1" />
     <link rel="stylesheet" href="/assets/css/dark.css?v=20261009c" />
-    <link rel="stylesheet" href="/assets/css/features.css?v=20261009permit1" />
+    <link rel="stylesheet" href="/assets/css/features.css?v=20261010eventcards3" />
     <link rel="icon" href="/assets/img/pics/logo.svg.png" type="image/png">
     <link rel="stylesheet" href="/assets/css/pages/dean-dashboard.css?v=1" />
   </head>
@@ -34,7 +36,7 @@
         <p id="sessionMessage"></p>
         <section id="committeeOverviewPanel" class="committee-overview-panel">
           <span class="committee-label">DEAN DASHBOARD</span><h2>Overview</h2><p>Final request decisions and attendance reviews.</p>
-          <div class="committee-overview-stats overview-grid-4"><button class="overview-stat-card" type="button" data-dashboard-panel="pendingRequestsSection"><span>Requests awaiting decision</span><strong data-overview-count="requests">—</strong><small>Open final review queue</small></button><button class="overview-stat-card" type="button" data-entry-permit-overview><span>Entry permits</span><strong data-entry-permit-count>&#8212;</strong><small>View permit status (Dean is view-only)</small></button><button class="overview-stat-card" type="button" id="overviewAttendanceBtn"><span>Event attendance</span><strong data-overview-count="eventAttendance">—</strong><small>View check-in records</small></button><button class="overview-stat-card" type="button" id="overviewReviewsBtn"><span>Attendance reviews</span><strong data-overview-count="attendanceApprovals">—</strong><small>Review SSO approvals</small></button></div>
+          <div class="committee-overview-stats overview-grid-4"><button class="overview-stat-card" type="button" data-dashboard-panel="pendingRequestsSection"><span>Requests awaiting decision</span><strong data-overview-count="requests">&#8212;</strong><small>Open final review queue</small></button><button class="overview-stat-card" type="button" data-entry-permit-overview><span>Entry permits</span><strong data-entry-permit-count>&#8212;</strong><small>View permit status (Dean is view-only)</small></button><button class="overview-stat-card" type="button" id="overviewAttendanceBtn"><span>Event attendance</span><strong data-overview-count="eventAttendance">&#8212;</strong><small>View check-in records</small></button><button class="overview-stat-card" type="button" id="overviewReviewsBtn"><span>Attendance reviews</span><strong data-overview-count="attendanceApprovals">&#8212;</strong><small>Review SSO approvals</small></button></div>
         </section>
         <section id="pendingRequestsSection" class="committee-requests-section" hidden><h2>Pending requests</h2><p id="hintText"></p><div id="requestsList"></div></section>
       </section>
@@ -76,23 +78,20 @@
     <dialog id="committeeAttendanceDialog" class="committee-attendance-dialog" aria-labelledby="committeeAttendanceTitle">
       <div class="committee-attendance-inner">
         <header class="committee-attendance-header">
-          <div><span class="admin-eyebrow">CROSS-CLUB RECORDS</span><h2 id="committeeAttendanceTitle">Event attendance</h2><p>Review attendance records from every club.</p></div>
+          <div><span class="admin-eyebrow">EVENT ATTENDANCE</span><h2 id="committeeAttendanceTitle">Attendance by event</h2><p>Review check-ins grouped by event or booth after the club ends attendance.</p></div>
           <button class="calendar-close-btn" type="button" data-close-committee-attendance aria-label="Close attendance records">&times;</button>
         </header>
-        <div class="committee-attendance-filters">
-          <label>Club<select id="committeeAttendanceClubFilter"><option value="all">All clubs</option></select></label>
-          <label>Event or booth<select id="committeeAttendanceActivityFilter"><option value="all">All events and booths</option></select></label>
-        </div>
+        <label class="committee-attendance-search">Search events, clubs, or attendees<input id="committeeAttendanceSearch" type="search" placeholder="Search by event, club, name, or email"></label>
         <p id="committeeAttendanceFeedback" class="admin-feedback" role="status" aria-live="polite"></p>
         <div id="committeeAttendanceRecords" class="committee-attendance-records" aria-live="polite"></div>
       </div>
     </dialog>
     <div id="site-footer"></div>
-    <script src="/assets/js/committee-sidebar.js?v=13"></script>
-    <script src="/assets/js/committee-dashboard.js?v=20261010images1"></script>
-    <script src="/assets/js/committee-attendance.js?v=6"></script>
-    <script src="/assets/js/attendance-approval-workflow.js?v=9"></script>
-      <script src="/assets/js/layout.js?v=11" defer></script>
+    <script src="/assets/js/committee-sidebar.js?v=20261010unreadbadges1"></script>
+    <script src="/assets/js/committee-dashboard.js?v=20261010allrequestsdb1"></script>
+    <script src="/assets/js/committee-attendance.js?v=20261010eventcards3"></script>
+    <script src="/assets/js/attendance-approval-workflow.js?v=20261010eventreview2"></script>
+      <script src="/assets/js/layout.js?v=20261010passwordeye1" defer></script>
       <script src="/assets/js/theme.js?v=20261009c" defer></script>
   </body>
 </html>

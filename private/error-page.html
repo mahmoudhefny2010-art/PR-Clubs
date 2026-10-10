@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script src="/assets/js/site-loading.js?v=20261010scrolltop1"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f8fafc">
+  <title>{{TITLE}} | MIU</title>
+  <link rel="stylesheet" href="/assets/css/pages/error-page.css?v=20261010miu-errors2">
+  <link rel="stylesheet" href="/assets/css/dark.css?v=20261009c">
+</head>
+<body>
+  <main class="error-card" aria-labelledby="error-title">
+    <div class="error-brand">
+      <span class="error-logo"><img src="/assets/img/pics/logo.svg.png" alt="Misr International University"></span>
+      <span><small>CLUBS PORTAL</small></span>
+    </div>
+    <div class="error-code" aria-label="Error {{STATUS}}">{{STATUS}}</div>
+    <h1 id="error-title">{{TITLE}}</h1>
+    <p class="error-detail">{{DETAIL}}</p>
+    <p class="error-help">Your work and account are safe. You can go back and try again, or return to the portal home page.</p>
+    <div class="error-actions">
+      <a class="home-action" href="/">Go to home</a>
+      <button class="back-action" type="button" onclick="history.length > 1 ? history.back() : location.assign('/')">Go back</button>
+      {{RETRY_BUTTON}}
+    </div>
+    <p class="error-reference">If this keeps happening, contact MIU support and mention error {{STATUS}}.</p>
+  </main>
+  <script src="/assets/js/theme.js?v=20261009c" defer></script>
+</body>
+</html>

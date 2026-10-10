@@ -15,3 +15,41 @@
       .content-type-badge.sponsor { background: #fef3c7; color: #92400e; }
       .content-type-badge.booth { background: #d1fae5; color: #065f46; }
       .club-image-placeholder { width: 120px; height: 120px; margin: 18px auto 0; background: #f3f4f6; color: #6b7280; font-size: .66rem; font-weight: 800; display: flex; align-items: center; justify-content: center; text-transform: uppercase; letter-spacing: .04em; border-radius: 12px; }
+
+/* Keep the club snapshot compact and visually grouped on wide screens. */
+#homeView .stats-summary {
+  width: min(100%, 1180px);
+  margin: 14px auto 20px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  justify-content: center;
+  gap: 14px;
+}
+
+#homeView .stats-summary .summary-card {
+  min-width: 0;
+  min-height: 72px;
+  padding: 12px 16px;
+  border-top: 2px solid rgba(154, 31, 36, .72);
+  border-radius: 14px;
+}
+
+#homeView .stats-summary .summary-card span {
+  font-size: .76rem;
+  letter-spacing: .045em;
+}
+
+#homeView .stats-summary .summary-card strong {
+  font-size: 1.45rem;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 760px) {
+  #homeView .stats-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+}
+
+@media (max-width: 360px) {
+  #homeView .stats-summary { grid-template-columns: 1fr; }
+}

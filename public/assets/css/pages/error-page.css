@@ -1,0 +1,133 @@
+:root {
+  color-scheme: light;
+  font-family: Inter, Arial, sans-serif;
+  color: #142033;
+  background: #f5f7fb;
+  --error-accent: #a51f28;
+  --error-muted: #65748b;
+  --error-border: #e0e6ef;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(ellipse at 50% 38%, rgba(165, 31, 40, .07), transparent 42%),
+    #f5f7fb;
+}
+
+.error-card {
+  width: min(100%, 570px);
+  padding: clamp(28px, 6vw, 50px);
+  text-align: center;
+  background: #fff;
+  border: 1px solid var(--error-border);
+  border-radius: 26px;
+  box-shadow: 0 24px 70px rgba(19, 32, 51, .1);
+}
+
+.error-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 22px;
+  color: #172033;
+  font-size: .92rem;
+  font-weight: 850;
+  letter-spacing: .025em;
+  text-align: left;
+}
+
+.error-brand small {
+  display: block;
+  margin-top: 3px;
+  color: var(--error-muted);
+  font-size: .62rem;
+  letter-spacing: .13em;
+}
+
+.error-logo {
+  display: grid;
+  width: 148px;
+  height: 68px;
+  place-items: center;
+  border: 1px solid rgba(165, 31, 40, .22);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 0 0 5px rgba(165, 31, 40, .055), 0 8px 20px rgba(19, 32, 51, .12);
+  animation: error-logo-enter .7s ease-out both;
+}
+
+.error-logo img { width: 140px; height: 62px; object-fit: contain; }
+
+.error-code {
+  display: grid;
+  width: 78px;
+  height: 78px;
+  margin: 0 auto 16px;
+  place-items: center;
+  border: 1px solid rgba(165, 31, 40, .18);
+  border-radius: 24px;
+  background: #fff6f6;
+  color: var(--error-accent);
+  font-size: 1.45rem;
+  font-weight: 850;
+  letter-spacing: .025em;
+}
+
+h1 { margin: 0 0 10px; font-size: clamp(1.45rem, 5vw, 1.9rem); line-height: 1.2; }
+.error-detail { margin: 0; color: #34445b; font-size: 1rem; font-weight: 650; line-height: 1.65; }
+.error-help { max-width: 410px; margin: 9px auto 0; color: var(--error-muted); font-size: .9rem; line-height: 1.65; }
+
+.error-actions { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-top: 25px; }
+.error-actions a, .error-actions button {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 17px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  font: inherit;
+  font-size: .9rem;
+  font-weight: 750;
+  text-decoration: none;
+  cursor: pointer;
+}
+.home-action { background: var(--error-accent); color: #fff; box-shadow: 0 5px 14px rgba(165, 31, 40, .18); }
+.back-action, .retry-action { border-color: var(--error-border) !important; background: #fff; color: #243248; }
+.error-actions :focus-visible { outline: 3px solid #315fbd; outline-offset: 3px; }
+.error-reference { margin: 22px 0 0; color: #8290a3; font-size: .76rem; }
+
+@keyframes error-logo-enter {
+  from { opacity: .5; transform: scale(.88); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@media (max-width: 420px) {
+  body { padding: 14px; }
+  .error-card { padding: 27px 20px; border-radius: 21px; }
+  .error-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .error-actions > * { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; } }
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --error-accent: #df5961;
+  --error-muted: #aebbd0;
+  --error-border: #2a3a52;
+}
+:root[data-theme="dark"] body { background: radial-gradient(ellipse at 50% 38%, rgba(223, 89, 97, .11), transparent 42%), #0b1220; }
+:root[data-theme="dark"] .error-card { background: #111b2b; border-color: var(--error-border); }
+:root[data-theme="dark"] .error-brand { color: #edf2f8; }
+:root[data-theme="dark"] .error-logo { background: #fff; }
+:root[data-theme="dark"] .error-code { background: #271b2a; border-color: #55303b; }
+:root[data-theme="dark"] .error-detail { color: #d9e2ee; }
+:root[data-theme="dark"] .back-action, :root[data-theme="dark"] .retry-action { background: #172438; color: #edf2f8; }

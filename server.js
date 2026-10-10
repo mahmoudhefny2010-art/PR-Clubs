@@ -11,14 +11,18 @@ const {
   Club,
   Application,
   SiteSetting,
+  UniversityContent,
   SiteVisitor,
   SiteNetwork,
   ClubAccount,
   ContentRequest,
   EventRegistration,
   AttendanceSession,
+  AttendanceActivityClosure,
+  AttendanceAssignment,
   AttendanceRecord,
   StudentAccount,
+  StudentInterest,
   LoginAttempt,
   PasswordResetToken,
   PasswordRecoveryRateLimit,
@@ -47,6 +51,13 @@ if (cloudinaryConfigured) {
 
 app.use(cors());
 app.use(express.json({ limit: '8mb' }));
+// API responses are always revalidated against their source of truth. In
+// particular, browsers and intermediary caches must not reuse old dashboards.
+app.use('/api', (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.setHeader('Pragma', 'no-cache');
+  next();
+});
 app.use(express.urlencoded({ extended: true }));
 
 const defaultClubs = [
@@ -353,7 +364,7 @@ let mongoReady = false;
 // actually persisted to MongoDB. When the database is unavailable the client
 // gets a clear error and keeps the user's entered data.
 function requireLiveDatabase(res) {
-  if (mongoReady) return true;
+  if (mongoReady && mongoose.connection.readyState === 1) return true;
   res.status(503).json({ message: 'This form was not saved. Please try again.' });
   return false;
 }
@@ -481,7 +492,8 @@ async function removeClubImage(club) {
 function hasAdminPassword() {
   const hasEnvironmentAccount = Boolean(process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD);
   const hasStoredAccount = Boolean(adminCredentials?.email && adminCredentials?.salt && adminCredentials?.passwordHash);
-  return hasEnvironmentAccount || hasStoredAccount;
+  const hasDatabaseAccount = Boolean(adminAuthState?.email && adminAuthState?.salt && adminAuthState?.passwordHash);
+  return hasEnvironmentAccount || hasStoredAccount || hasDatabaseAccount;
 }
 
 function isLoopbackRequest(req) {
@@ -491,7 +503,7 @@ function isLoopbackRequest(req) {
 function getConfiguredAdminEmail() {
   return process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD
     ? process.env.ADMIN_EMAIL.trim().toLowerCase()
-    : adminCredentials?.email;
+    : adminAuthState?.email || adminCredentials?.email;
 }
 
 function matchesScryptPassword(password, salt, storedHash) {
@@ -524,9 +536,7 @@ async function passwordMatches(password) {
 }
 
 function emailMatches(email) {
-  const expectedEmail = process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD
-    ? process.env.ADMIN_EMAIL.trim().toLowerCase()
-    : adminCredentials?.email;
+  const expectedEmail = getConfiguredAdminEmail();
   return typeof email === 'string' && email.trim().toLowerCase() === expectedEmail;
 }
 
@@ -626,6 +636,21 @@ function getInterviewFormScope(account) {
   return account.role === 'head' ? account.committee : '__president__';
 }
 
+function getInterviewFormSections(interviewForms, scope) {
+  const normalizedScope = String(scope || '').trim().toLowerCase();
+  const forms = Array.isArray(interviewForms) ? interviewForms : [];
+  const scopedForm = forms.find((item) => String(item?.scope || '').trim().toLowerCase() === normalizedScope);
+  if (scopedForm) return Array.isArray(scopedForm.sections) ? scopedForm.sections : [];
+
+  // Existing club interview questions remain the default for heads until they
+  // save questions for their own committee. Saving then creates a committee scope.
+  if (normalizedScope !== '__president__') {
+    const clubForm = forms.find((item) => String(item?.scope || '').trim().toLowerCase() === '__president__');
+    return Array.isArray(clubForm?.sections) ? clubForm.sections : [];
+  }
+  return [];
+}
+
 async function getClubAccountFromRequest(req) {
   const cookies = String(req.headers.cookie || '').split(';');
   const clubCookie = cookies.map((cookie) => cookie.trim()).find((cookie) => cookie.startsWith('miu_club='));
@@ -710,7 +735,7 @@ async function requireClubAuth(req, res, next) {
 }
 
 function createStudentSession(account) {
-  const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
+  const expiresAt = Date.now() + 400 * 24 * 60 * 60 * 1000;
   const encodedEmail = Buffer.from(account.email).toString('base64url');
   const version = Number(account.sessionVersion) || 0;
   const payload = `${encodedEmail}.${expiresAt}.${version}`;
@@ -724,7 +749,7 @@ function secureCookieSuffix(req) {
 
 function setStudentSessionCookie(req, res, account) {
   const secure = secureCookieSuffix(req);
-  res.setHeader('Set-Cookie', `miu_student=${createStudentSession(account)}; Max-Age=2592000; HttpOnly; SameSite=Strict; Path=/;${secure}`);
+  res.setHeader('Set-Cookie', `miu_student=${createStudentSession(account)}; Max-Age=34560000; HttpOnly; SameSite=Strict; Path=/;${secure}`);
 }
 
 // Count unique accounts that have successfully signed in. Tracking errors never
@@ -849,7 +874,7 @@ app.post('/api/site/visitor-ping', async (req, res) => {
   }
 });
 
-async function getStudentAccountFromRequest(req) {
+async function getStudentAccountFromRequest(req, res) {
   if (!mongoReady) return null;
   const cookie = String(req.headers.cookie || '').split(';').map((part) => part.trim()).find((part) => part.startsWith('miu_student='));
   if (!cookie) return null;
@@ -862,14 +887,18 @@ async function getStudentAccountFromRequest(req) {
   if (!crypto.timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expected, 'hex'))) return null;
   let email;
   try { email = Buffer.from(encodedEmail, 'base64url').toString('utf8').toLowerCase(); } catch { return null; }
-  const account = await StudentAccount.findOne({ email }).select('email name sessionVersion').lean();
-  return account && Number(account.sessionVersion || 0) === Number(versionText) ? account : null;
+  const account = await StudentAccount.findOne({ email }).select('email name universityId major phone age sessionVersion').read('primary').readConcern('majority').lean();
+  if (!account || Number(account.sessionVersion || 0) !== Number(versionText)) return null;
+  // Browsers cap persistent cookies near 400 days. Renew active student
+  // sessions so students remain signed in while they continue using the site.
+  if (res && Number(expiresText) - Date.now() < 200 * 24 * 60 * 60 * 1000) setStudentSessionCookie(req, res, account);
+  return account;
 }
 
 async function requireStudentAuth(req, res, next) {
   try {
     if (!mongoReady) return res.status(503).json({ message: 'Student sign-in is temporarily unavailable.' });
-    const account = await getStudentAccountFromRequest(req);
+    const account = await getStudentAccountFromRequest(req, res);
     if (!account) return res.status(401).json({ message: 'Sign in with your verified MIU account to check in.' });
     req.studentAccount = account;
     next();
@@ -1014,11 +1043,12 @@ function toPublicClubRecord(record) {
 
 app.use('/api/ask-ai', createAskAiRouter({
   getPublicClubs: async () => {
-    const records = mongoReady
-      ? await Club.find({ archivedAt: null })
-        .select('id sortOrder name committee category tagline description requirements applicationIntro status committeeAvailability events posts')
-        .sort({ sortOrder: 1, id: 1 }).lean()
-      : clubs.filter((club) => !club.archivedAt);
+    if (!mongoReady || mongoose.connection.readyState !== 1) {
+      throw new Error('Live club data is unavailable.');
+    }
+    const records = await Club.find({ archivedAt: null })
+      .select('id sortOrder name committee category tagline description requirements applicationIntro status committeeAvailability events posts')
+      .read('primary').readConcern('majority').sort({ sortOrder: 1, id: 1 }).lean();
     return records.map(toPublicClubRecord);
   }
 }));
@@ -1079,7 +1109,7 @@ function canManageMyForm(application, token) {
 
 async function initializeMongoData() {
   await Promise.all([
-    Club.init(), Application.init(), SiteSetting.init(), SiteVisitor.init(), SiteNetwork.init(), EventRegistration.init(), LoginAttempt.init(),
+    Club.init(), Application.init(), SiteSetting.init(), UniversityContent.init(), SiteVisitor.init(), SiteNetwork.init(), EventRegistration.init(), AttendanceSession.init(), AttendanceAssignment.init(), AttendanceRecord.init(), LoginAttempt.init(),
     PasswordResetToken.init(), PasswordRecoveryRateLimit.init(), AdminAuthState.init()
   ]);
   const clubAccountCollectionName = ClubAccount.collection.collectionName;
@@ -1163,13 +1193,39 @@ function accountCanReviewApplication(account, application) {
 
 app.get('/api/clubs', async (req, res) => {
   try {
-    const records = mongoReady
-      ? (await Club.find({ archivedAt: null }).sort({ sortOrder: 1, id: 1 }).lean()).map(toPublicClubRecord)
-      : clubs.filter((club) => !club.archivedAt).map(toPublicClubRecord);
+    if (!requireLiveDatabase(res)) return;
+    const [clubsFromDatabase, memberDirectory] = await Promise.all([
+      Club.find({ archivedAt: null }).read('primary').readConcern('majority')
+        .sort({ sortOrder: 1, id: 1 }).lean(),
+      getClubMemberDirectory()
+    ]);
+    const membersByClub = new Map(memberDirectory.map((club) => [club.id, club.totalCount]));
+    const records = clubsFromDatabase.map((club) => ({
+      ...toPublicClubRecord(club),
+      members: membersByClub.get(club.id) ?? (Number(club.members) || 0)
+    }));
+    res.setHeader('Cache-Control', 'no-store');
     res.json(records);
   } catch (error) {
     console.error('Database operation failed:', error.name);
     res.status(503).json({ message: 'The data store is temporarily unavailable.' });
+  }
+});
+
+app.get('/api/university-content', async (req, res) => {
+  try {
+    if (!mongoReady) return res.status(503).json({ message: 'University updates are temporarily unavailable.' });
+    res.setHeader('Cache-Control', 'no-store');
+    const records = await UniversityContent.find().read('primary').readConcern('majority').sort({ createdAt: -1, id: -1 }).lean();
+    res.json(records.map((record) => ({
+      id: record.id, type: record.type, title: record.title, description: record.description,
+      date: record.date, time: record.time, location: record.location, image: record.image,
+      registrationEnabled: record.type === 'event' && record.registrationEnabled === true,
+      createdAt: record.createdAt
+    })));
+  } catch (error) {
+    console.error('University content read failed:', error.name);
+    res.status(503).json({ message: 'University updates are temporarily unavailable.' });
   }
 });
 
@@ -1191,11 +1247,37 @@ app.get('/api/admin/session', async (req, res) => {
   try {
     res.json({
       configured: hasAdminPassword(),
+      localSetupAllowed: isLoopbackRequest(req) && !(process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD),
       authenticated: hasAdminPassword() && await isAdminSessionValid(req)
     });
   } catch (error) {
     console.error('Admin session validation failed:', error.name);
     res.status(503).json({ message: 'Admin access is temporarily unavailable.' });
+  }
+});
+
+app.get('/api/site/account-session', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    if (await isAdminSessionValid(req)) return res.json({ authenticated: true, type: 'admin' });
+    const clubAccount = await getClubAccountFromRequest(req);
+    if (clubAccount) {
+      const club = clubs.find((item) => Number(item.id) === Number(clubAccount.clubId));
+      return res.json({
+        authenticated: true,
+        type: 'club',
+        role: clubAccount.role,
+        name: ['pr', 'english', 'security', 'sso', 'dean'].includes(clubAccount.role)
+          ? `${committeeRoleLabels[clubAccount.role] || clubAccount.role} Dashboard`
+          : club?.name || ''
+      });
+    }
+    const studentAccount = await getStudentAccountFromRequest(req, res);
+    if (studentAccount) return res.json({ authenticated: true, type: 'student', name: studentAccount.name || '' });
+    return res.json({ authenticated: false });
+  } catch (error) {
+    console.error('Site account session check failed:', error.name);
+    return res.status(503).json({ authenticated: false, message: 'Account status is temporarily unavailable.' });
   }
 });
 
@@ -1207,14 +1289,35 @@ app.post('/api/events/:clubId/:eventIndex/view', async (req, res) => {
     return res.status(400).json({ message: 'This event could not be found.' });
   }
   try {
-    const club = mongoReady
-      ? await Club.findOne({ id: clubId, archivedAt: null }).select('events').lean()
-      : clubs.find((item) => Number(item.id) === clubId && !item.archivedAt);
+    if (!requireLiveDatabase(res)) return;
+    const club = await Club.findOne({ id: clubId, archivedAt: null })
+      .select('events').read('primary').readConcern('majority').lean();
     if (!club?.events?.[eventIndex]) return res.status(404).json({ message: 'This event could not be found.' });
     const eventRequestId = Number(club.events[eventIndex]?.requestId);
     const key = eventRequestId > 0 ? `${clubId}:request:${eventRequestId}` : `${clubId}:${eventIndex}`;
     eventViews[key] = Number(eventViews[key] || 0) + 1;
     writeJsonFile(eventViewsFile, eventViews);
+    const student = await getStudentAccountFromRequest(req, res);
+    if (student) {
+      const interestKey = { studentEmail: student.email, clubId, eventIndex };
+      try {
+        await StudentInterest.updateOne(
+          interestKey,
+          {
+            $setOnInsert: interestKey,
+            $set: { eventTitle: cleanText(club.events[eventIndex].title, 140), lastViewedAt: new Date() },
+            $inc: { detailViews: 1 }
+          },
+          { upsert: true, writeConcern: { w: 'majority' } }
+        );
+      } catch (error) {
+        if (error.code !== 11000) throw error;
+        await StudentInterest.updateOne(interestKey, {
+          $set: { eventTitle: cleanText(club.events[eventIndex].title, 140), lastViewedAt: new Date() },
+          $inc: { detailViews: 1 }
+        }, { writeConcern: { w: 'majority' } });
+      }
+    }
     res.setHeader('Cache-Control', 'no-store');
     res.json({ views: eventViews[key] });
   } catch (error) {
@@ -1239,6 +1342,14 @@ app.get('/api/club-auth/session', async (req, res) => {
     });
   }
   const club = account && clubs.find((item) => item.id === account.clubId);
+  const hasAssignedContent = account?.role === 'head' && mongoReady
+    ? Boolean(await ContentRequest.exists({
+      clubId: account.clubId,
+      assignedHeadEmail: account.email,
+      type: { $ne: 'entry_permit' },
+      status: { $in: ['draft', 'changes_requested', 'rejected'] }
+    }).catch(() => null))
+    : false;
   res.json({
     configured: clubAccounts.length > 0,
     authenticated: Boolean(account && club),
@@ -1247,7 +1358,8 @@ app.get('/api/club-auth/session', async (req, res) => {
       name: club.name,
       image: club.image,
       role: account.role,
-      committee: account.committee || ''
+      committee: account.committee || '',
+      hasAssignedContent
     } : null
   });
 });
@@ -1343,6 +1455,29 @@ app.post('/api/events/:clubId/:eventIndex/registrations', async (req, res) => {
       name,
       email
     });
+    try {
+      const student = await getStudentAccountFromRequest(req, res);
+      if (student?.email === email) {
+        await StudentInterest.updateOne(
+          { studentEmail: student.email, clubId, eventIndex },
+          {
+            $setOnInsert: { studentEmail: student.email, clubId, eventIndex, detailViews: 0 },
+            $set: { eventTitle: cleanText(event.title, 140), registered: true }
+          },
+          { upsert: true, writeConcern: { w: 'majority' } }
+        );
+      }
+    } catch (interestError) {
+      if (interestError.code === 11000) {
+        await StudentInterest.updateOne(
+          { studentEmail: email, clubId, eventIndex },
+          { $set: { eventTitle: cleanText(event.title, 140), registered: true } },
+          { writeConcern: { w: 'majority' } }
+        ).catch((error) => console.error('Student event interest could not be recorded:', error.name));
+      } else {
+        console.error('Student event interest could not be recorded:', interestError.name);
+      }
+    }
     res.status(201).json({ message: 'You are registered for this event.', registrationId: registration.id });
   } catch (error) {
     if (error.code === 11000) {
@@ -1353,18 +1488,61 @@ app.post('/api/events/:clubId/:eventIndex/registrations', async (req, res) => {
   }
 });
 
+// Public registration for university events, stored in the shared registration collection.
+app.post('/api/university-content/:id/registrations', async (req, res) => {
+  const eventId = Number(req.params.id);
+  if (!Number.isSafeInteger(eventId) || eventId < 1) {
+    return res.status(400).json({ message: 'This event could not be found.' });
+  }
+  const name = cleanText(req.body.name, 160);
+  const email = cleanText(req.body.email, 254).toLowerCase();
+  if (!name) return res.status(400).json({ message: 'Enter your name.' });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ message: 'Enter a valid university email.' });
+  }
+
+  try {
+    if (!requireLiveDatabase(res)) return;
+    const event = await UniversityContent.findOne({ id: eventId, type: 'event' })
+      .read('primary').readConcern('majority').lean();
+    if (!event) return res.status(404).json({ message: 'This event could not be found.' });
+    if (event.registrationEnabled !== true) {
+      return res.status(409).json({ message: 'Registration is not open for this event.' });
+    }
+    const existing = await EventRegistration.findOne({ clubId: 0, eventIndex: eventId, email }).lean();
+    if (existing) {
+      return res.status(409).json({ message: 'This email is already registered for the event.' });
+    }
+    const registration = new EventRegistration({
+      id: Date.now(), clubId: 0, eventIndex: eventId,
+      eventTitle: cleanText(event.title, 140), name, email
+    });
+    await registration.save({ w: 'majority' });
+    const confirmed = await EventRegistration.findById(registration._id)
+      .read('primary').readConcern('majority').select('_id').lean();
+    if (!confirmed) throw new Error('University event registration was not confirmed in the database.');
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(201).json({ message: 'You are registered for this event.', registrationId: registration.id });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({ message: 'This email is already registered for the event.' });
+    }
+    console.error('University event registration failed:', error.name);
+    res.status(503).json({ message: 'This form was not saved. Please try again.' });
+  }
+});
+
 // Attendance sessions are backed by MongoDB. Only a club president or an IT
 // committee head can create sessions and review the resulting attendance.
 app.get('/api/club/attendance-events', requireClubAuth, async (req, res) => {
-  if (!canManageAttendance(req.clubAccount)) {
-    return res.status(403).json({ message: 'Attendance tools are available to club presidents and the IT head.' });
-  }
+  if (!['president', 'head'].includes(req.clubAccount.role)) return res.status(403).json({ message: 'Attendance is available to club presidents and committee heads.' });
   try {
     if (!requireLiveDatabase(res)) return;
-    const filter = req.clubAccount.role === 'president' ? { id: req.clubAccount.clubId, archivedAt: null } : { archivedAt: null };
+    const filter = canManageAttendance(req.clubAccount) && isItCommitteeHead(req.clubAccount)
+      ? { archivedAt: null }
+      : { id: req.clubAccount.clubId, archivedAt: null };
     const records = await Club.find(filter).select('id name events booths').sort({ name: 1 }).lean();
-    res.setHeader('Cache-Control', 'no-store');
-    res.json(records.flatMap((club) => ['event', 'booth'].flatMap((itemType) => {
+    const activities = records.flatMap((club) => ['event', 'booth'].flatMap((itemType) => {
       const items = itemType === 'event' ? club.events : club.booths;
       return (Array.isArray(items) ? items : []).flatMap((item, itemIndex) => {
         const title = cleanText(item.title || item.boothName, 140);
@@ -1388,10 +1566,144 @@ app.get('/api/club/attendance-events', requireClubAuth, async (req, res) => {
           location: cleanText(item.location || item.boothLocation, 160)
         }];
       });
-    })));
+    }));
+    const closures = activities.length ? await AttendanceActivityClosure.find({
+      $or: activities.map(({ clubId, itemType, eventRequestId }) => ({ clubId, itemType, eventRequestId }))
+    }).select('clubId itemType eventRequestId endedAt endedByRole').lean() : [];
+    const closureMap = new Map(closures.map((entry) => [attendanceActivityKey(entry), entry]));
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(activities.map((activity) => {
+      const closure = closureMap.get(attendanceActivityKey(activity));
+      return { ...activity, attendanceEnded: Boolean(closure), attendanceEndedAt: closure?.endedAt || null, attendanceEndedByRole: closure?.endedByRole || '' };
+    }));
   } catch (error) {
     console.error('Attendance events could not be loaded:', error.name);
     res.status(503).json({ message: 'Could not load events from the database.' });
+  }
+});
+
+app.post('/api/club/attendance-events/:clubId/:itemType/:eventRequestId/end', requireClubAuth, async (req, res) => {
+  const account = req.clubAccount;
+  const clubId = Number(req.params.clubId);
+  const eventRequestId = Number(req.params.eventRequestId);
+  const itemType = req.params.itemType;
+  if (!['president', 'head'].includes(account.role)) return res.status(403).json({ message: 'Only the club president or a committee head can end attendance.' });
+  if (clubId !== Number(account.clubId) || !Number.isSafeInteger(eventRequestId) || !['event', 'booth'].includes(itemType)) {
+    return res.status(400).json({ message: 'Choose a valid event or booth in your club.' });
+  }
+  try {
+    if (!requireLiveDatabase(res)) return;
+    const club = await Club.findOne({ id: clubId, archivedAt: null }).select('id events booths').read('primary').readConcern('majority').lean();
+    const items = itemType === 'event' ? club?.events : club?.booths;
+    let selected = eventRequestId > 0 ? (items || []).find((item) => Number(item.requestId) === eventRequestId) : null;
+    if (eventRequestId < 0) {
+      const legacyOffset = itemType === 'booth' ? 1_000_000 : 0;
+      const itemIndex = -eventRequestId - legacyOffset - 1;
+      selected = itemIndex >= 0 ? items?.[itemIndex] : null;
+      if (selected?.requestId) selected = null;
+    }
+    const eventTitle = cleanText(selected?.title || selected?.boothName, 140);
+    const eventDate = cleanText(selected?.date || selected?.boothOpenDate, 80);
+    if (!club || !selected || !eventTitle) return res.status(404).json({ message: 'This event or booth could not be found in your club.' });
+    if (!isActivityScheduledToday(eventDate)) return res.status(409).json({ message: 'Attendance can only be ended on the event or booth day.' });
+    const key = { clubId, itemType, eventRequestId };
+    const endedAt = new Date();
+    let alreadyEnded = false;
+    try {
+      const result = await AttendanceActivityClosure.updateOne(key, { $setOnInsert: {
+        ...key, eventTitle, eventDate, endedByEmail: account.email, endedByRole: account.role, endedAt
+      } }, { upsert: true, writeConcern: { w: 'majority' } });
+      alreadyEnded = !result.upsertedCount;
+    } catch (error) {
+      if (error.code !== 11000) throw error;
+      alreadyEnded = true;
+    }
+    await AttendanceSession.updateMany({ ...key, active: true }, { $set: { active: false } }, { writeConcern: { w: 'majority' } });
+    const closure = await AttendanceActivityClosure.findOne(key).read('primary').readConcern('majority').lean();
+    if (!closure) throw new Error('Attendance closure could not be confirmed in the database.');
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ ended: true, alreadyEnded, endedAt: closure.endedAt });
+  } catch (error) {
+    console.error('Attendance could not be ended:', error.name);
+    res.status(503).json({ message: 'Attendance was not ended. Please retry.' });
+  }
+});
+
+app.post('/api/attendance/admin-self-checkin', requireClubAuth, async (req, res) => {
+  const account = req.clubAccount;
+  if (!['president', 'head'].includes(account.role)) {
+    return res.status(403).json({ message: 'Only club presidents and committee heads can check in for themselves.' });
+  }
+  const clubId = Number(req.body.clubId);
+  const eventRequestId = Number(req.body.eventRequestId);
+  const itemType = ['event', 'booth'].includes(req.body.itemType) ? req.body.itemType : '';
+  const name = cleanText(req.body.name, 160);
+  const email = cleanText(account.email, 254).toLowerCase();
+  if (clubId !== Number(account.clubId) || !Number.isSafeInteger(eventRequestId) || !itemType || !name) {
+    return res.status(400).json({ message: 'Enter your name and choose an event or booth from your club.' });
+  }
+  try {
+    if (!requireLiveDatabase(res)) return;
+    const club = await Club.findOne({ id: clubId, archivedAt: null })
+      .select('id name events booths').read('primary').readConcern('majority').lean();
+    const items = itemType === 'event' ? club?.events : club?.booths;
+    let selected = eventRequestId > 0 ? (items || []).find((item) => Number(item.requestId) === eventRequestId) : null;
+    if (eventRequestId < 0) {
+      const legacyOffset = itemType === 'booth' ? 1_000_000 : 0;
+      const itemIndex = -eventRequestId - legacyOffset - 1;
+      selected = itemIndex >= 0 ? items?.[itemIndex] : null;
+      if (selected?.requestId) selected = null;
+    }
+    const eventTitle = cleanText(selected?.title || selected?.boothName, 140);
+    const eventDate = cleanText(selected?.date || selected?.boothOpenDate, 80);
+    const eventTime = cleanText(selected?.time || selected?.boothOpenTime, 80);
+    if (!club || !selected || !eventTitle) return res.status(404).json({ message: 'This event or booth could not be found in your club.' });
+    if (!isActivityScheduledToday(eventDate)) return res.status(409).json({ message: 'You can check in only on the event or booth date.' });
+    if (await isAttendanceActivityManuallyEnded(clubId, itemType, eventRequestId)) return res.status(409).json({ message: 'Attendance has ended for this event or booth.' });
+
+    const deviceId = ensureAttendanceDeviceCookie(req, res);
+    const deviceHash = attendanceDeviceHash(deviceId);
+    const existing = await AttendanceRecord.findOne({
+      clubId, itemType, eventRequestId,
+      $or: [{ email }, { deviceHash }]
+    }).select('+deviceHash email').read('primary').readConcern('majority').lean();
+    if (existing) return res.status(409).json({ message: existing.email === email
+      ? 'Your account has already checked in for this event or booth.'
+      : 'Attendance has already been recorded from this device for this event or booth.' });
+    if (await isAttendanceActivityManuallyEnded(clubId, itemType, eventRequestId)) return res.status(409).json({ message: 'Attendance has ended for this event or booth.' });
+
+    // Keep a database session reference for the record without opening or
+    // replacing the rotating QR session used by student check-ins.
+    const session = await AttendanceSession.create({
+      clubId, itemType, eventRequestId, eventTitle, eventDate, eventTime,
+      tokenHash: attendanceTokenHash(crypto.randomBytes(32).toString('base64url')),
+      active: false,
+      createdBy: email
+    });
+    try {
+      const record = await AttendanceRecord.create({
+        sessionId: session._id, clubId, itemType, eventRequestId, eventTitle,
+        eventDate, eventTime, name, email, deviceHash, attendedAt: new Date()
+      });
+      const confirmed = await AttendanceRecord.findById(record._id).select('email clubId eventRequestId')
+        .read('primary').readConcern('majority').lean();
+      if (!confirmed || confirmed.email !== email || confirmed.clubId !== clubId || confirmed.eventRequestId !== eventRequestId) {
+        throw new Error('Self check-in could not be confirmed in the database.');
+      }
+    } catch (error) {
+      if (error.code === 11000) {
+        await AttendanceSession.deleteOne({ _id: session._id }).catch(() => {});
+        return res.status(409).json({ message: error.keyPattern?.deviceHash
+          ? 'Attendance has already been recorded from this device for this event or booth.'
+          : 'Your account has already checked in for this event or booth.' });
+      }
+      throw error;
+    }
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(201).json({ savedToDatabase: true, message: 'Your attendance was recorded.' });
+  } catch (error) {
+    console.error('Club admin self check-in failed:', error.name);
+    res.status(503).json({ message: 'Attendance was not saved. Please try again.' });
   }
 });
 
@@ -1429,6 +1741,9 @@ app.post('/api/club/attendance-sessions', requireClubAuth, async (req, res) => {
     if (!isActivityScheduledToday(eventDate)) {
       return res.status(409).json({ message: 'Attendance QR codes can only be created on the event or booth date.' });
     }
+    if (await isAttendanceActivityManuallyEnded(clubId, itemType, eventRequestId)) {
+      return res.status(409).json({ message: 'Attendance has ended for this event or booth.' });
+    }
     const token = crypto.randomBytes(32).toString('base64url');
     const session = await AttendanceSession.create({
       clubId,
@@ -1451,6 +1766,60 @@ app.post('/api/club/attendance-sessions', requireClubAuth, async (req, res) => {
   } catch (error) {
     console.error('Attendance session could not be created:', error.name);
     res.status(503).json({ message: 'The QR code was not created. No attendance data was saved.' });
+  }
+});
+
+app.post('/api/member/attendance-assignments/:id/session', requireStudentAuth, async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ message: 'This attendance assignment could not be found.' });
+  try {
+    if (!requireLiveDatabase(res)) return;
+    const assignment = await currentMemberAttendanceAssignment(req.studentAccount.email);
+    if (!assignment || String(assignment._id) !== req.params.id || assignment.status !== 'accepted') {
+      return res.status(403).json({ message: 'Accept your current attendance task before opening its check-in QR.' });
+    }
+    if (!isActivityScheduledToday(assignment.eventDate)) return res.status(409).json({ message: 'The attendance QR is available only on the event or booth date.' });
+    const club = await Club.findOne({ id: assignment.clubId, archivedAt: null }).select('id name events booths').read('primary').readConcern('majority').lean();
+    const items = assignment.itemType === 'event' ? club?.events : club?.booths;
+    let selected = assignment.eventRequestId > 0 ? (items || []).find((item) => Number(item.requestId) === assignment.eventRequestId) : null;
+    if (assignment.eventRequestId < 0) {
+      const legacyOffset = assignment.itemType === 'booth' ? 1_000_000 : 0;
+      const itemIndex = -assignment.eventRequestId - legacyOffset - 1;
+      selected = itemIndex >= 0 ? items?.[itemIndex] : null;
+      if (selected?.requestId) selected = null;
+    }
+    const title = cleanText(selected?.title || selected?.boothName, 140);
+    const selectedDate = cleanText(selected?.date || selected?.boothOpenDate, 80);
+    if (!club || !selected || !title || title !== assignment.eventTitle || !isActivityScheduledToday(selectedDate)) {
+      return res.status(404).json({ message: 'The assigned event or booth is no longer available.' });
+    }
+    if (await isAttendanceActivityManuallyEnded(assignment.clubId, assignment.itemType, assignment.eventRequestId)) {
+      return res.status(410).json({ message: 'Attendance has ended for this event or booth.' });
+    }
+    const token = crypto.randomBytes(32).toString('base64url');
+    const session = await AttendanceSession.create({
+      clubId: assignment.clubId, itemType: assignment.itemType, eventRequestId: assignment.eventRequestId,
+      eventTitle: title, eventDate: assignment.eventDate, eventTime: assignment.eventTime,
+      tokenHash: attendanceTokenHash(token), createdBy: req.studentAccount.email
+    });
+    try {
+      await AttendanceSession.updateMany({
+        clubId: assignment.clubId, itemType: assignment.itemType,
+        eventRequestId: assignment.eventRequestId, active: true, _id: { $ne: session._id }
+      }, { $set: { active: false } });
+    } catch (error) {
+      await AttendanceSession.deleteOne({ _id: session._id }).catch(() => {});
+      throw error;
+    }
+    const confirmed = await AttendanceSession.findById(session._id).read('primary').readConcern('majority').lean();
+    if (!confirmed || confirmed.tokenHash !== attendanceTokenHash(token) || confirmed.createdBy !== req.studentAccount.email) {
+      await AttendanceSession.deleteOne({ _id: session._id }).catch(() => {});
+      return res.status(503).json({ message: 'The check-in QR session could not be confirmed in the database.' });
+    }
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(201).json({ token, eventTitle: title, eventDate: assignment.eventDate, itemType: assignment.itemType });
+  } catch (error) {
+    console.error('Delegated attendance session could not be created:', error.name);
+    res.status(503).json({ message: 'The attendance QR was not saved. Please try again.' });
   }
 });
 
@@ -1479,7 +1848,35 @@ function setAttendanceScanProofCookie(req, res, sessionId) {
   const payload = `${sessionId}.${expiresAt}`;
   const signature = crypto.createHmac('sha256', sessionSecret).update(payload).digest('hex');
   const secure = secureCookieSuffix(req);
-  res.setHeader('Set-Cookie', `miu_attendance_scan=${payload}.${signature}; Max-Age=180; HttpOnly; SameSite=Strict; Path=/api/attendance/;${secure}`);
+  appendAttendanceCookie(res, `miu_attendance_scan=${payload}.${signature}; Max-Age=180; HttpOnly; SameSite=Strict; Path=/api/attendance/;${secure}`);
+}
+
+function appendAttendanceCookie(res, cookie) {
+  const current = res.getHeader('Set-Cookie');
+  const cookies = Array.isArray(current) ? current : current ? [current] : [];
+  res.setHeader('Set-Cookie', [...cookies, cookie]);
+}
+
+function attendanceDeviceId(req) {
+  const cookie = requestCookie(req, 'miu_attendance_device');
+  const [id, signature] = cookie.split('.');
+  if (!/^[A-Za-z0-9_-]{40,60}$/.test(id || '') || !/^[a-f0-9]{64}$/.test(signature || '')) return '';
+  const expected = crypto.createHmac('sha256', sessionSecret).update(`attendance-device.${id}`).digest('hex');
+  return crypto.timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expected, 'hex')) ? id : '';
+}
+
+function ensureAttendanceDeviceCookie(req, res) {
+  const existingId = attendanceDeviceId(req);
+  if (existingId) return existingId;
+  const id = crypto.randomBytes(32).toString('base64url');
+  const signature = crypto.createHmac('sha256', sessionSecret).update(`attendance-device.${id}`).digest('hex');
+  const secure = secureCookieSuffix(req);
+  appendAttendanceCookie(res, `miu_attendance_device=${id}.${signature}; Max-Age=31536000; HttpOnly; SameSite=Strict; Path=/api/attendance/;${secure}`);
+  return id;
+}
+
+function attendanceDeviceHash(id) {
+  return crypto.createHmac('sha256', sessionSecret).update(`attendance-record-device.${id}`).digest('hex');
 }
 
 function hasAttendanceScanProof(req, sessionId) {
@@ -1503,8 +1900,12 @@ app.post('/api/club/attendance-qr-challenge', requireClubAuth, async (req, res) 
   if (!/^[A-Za-z0-9_-]{40,60}$/.test(token)) return res.status(400).json({ message: 'Attendance session is invalid.' });
   try {
     if (!requireLiveDatabase(res)) return;
-    const session = await AttendanceSession.findOne({ tokenHash: attendanceTokenHash(token), active: true }).select('clubId').lean();
+    const session = await AttendanceSession.findOne({ tokenHash: attendanceTokenHash(token), active: true }).select('clubId itemType eventRequestId eventDate').lean();
     if (!session) return res.status(404).json({ message: 'This attendance session has expired.' });
+    if (!isActivityScheduledToday(session.eventDate)) return res.status(410).json({ message: 'This attendance QR has expired because the event day is over.' });
+    if (await isAttendanceActivityManuallyEnded(session.clubId, session.itemType || 'event', session.eventRequestId)) {
+      return res.status(410).json({ message: 'Attendance has ended for this event or booth.' });
+    }
     if (req.clubAccount.role === 'president' && Number(session.clubId) !== Number(req.clubAccount.clubId)) {
       return res.status(403).json({ message: 'You can only create QR codes for your own club.' });
     }
@@ -1516,39 +1917,75 @@ app.post('/api/club/attendance-qr-challenge', requireClubAuth, async (req, res) 
   }
 });
 
+app.post('/api/member/attendance-qr-challenge', requireStudentAuth, async (req, res) => {
+  const token = String(req.body.token || '');
+  if (!/^[A-Za-z0-9_-]{40,60}$/.test(token)) return res.status(400).json({ message: 'Attendance session is invalid.' });
+  try {
+    if (!requireLiveDatabase(res)) return;
+    const session = await AttendanceSession.findOne({ tokenHash: attendanceTokenHash(token), active: true })
+      .select('clubId itemType eventRequestId eventDate createdBy').read('primary').readConcern('majority').lean();
+    if (!session || session.createdBy !== req.studentAccount.email || !isActivityScheduledToday(session.eventDate)) {
+      return res.status(403).json({ message: 'This QR session is no longer available to your account.' });
+    }
+    if (await isAttendanceActivityManuallyEnded(session.clubId, session.itemType || 'event', session.eventRequestId)) {
+      return res.status(410).json({ message: 'Attendance has ended for this event or booth.' });
+    }
+    const assignment = await currentMemberAttendanceAssignment(req.studentAccount.email);
+    if (!assignment || assignment.status !== 'accepted' || assignment.clubId !== session.clubId
+      || assignment.itemType !== session.itemType || assignment.eventRequestId !== session.eventRequestId) {
+      return res.status(403).json({ message: 'This account no longer has this attendance assignment.' });
+    }
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(attendanceQrChallenge(token));
+  } catch (error) {
+    console.error('Member attendance QR challenge could not be created:', error.name);
+    res.status(503).json({ message: 'A fresh attendance QR code could not be created.' });
+  }
+});
+
 app.get('/api/club/attendance-records', requireClubAuth, async (req, res) => {
-  if (!canManageAttendance(req.clubAccount)) {
-    return res.status(403).json({ message: 'Attendance records are available to club presidents and the IT head.' });
+  if (!['president', 'head'].includes(req.clubAccount.role)) {
+    return res.status(403).json({ message: 'Attendance history is available to club presidents and committee heads.' });
   }
   try {
     if (!requireLiveDatabase(res)) return;
-    const filter = req.clubAccount.role === 'president' ? { clubId: req.clubAccount.clubId } : {};
-    const records = await AttendanceRecord.find(filter).sort({ attendedAt: -1 }).limit(2000).lean();
+    const filter = req.clubAccount.role === 'president' || !isItCommitteeHead(req.clubAccount)
+      ? { clubId: req.clubAccount.clubId }
+      : {};
+    const records = await AttendanceRecord.find(filter).sort({ attendedAt: -1 }).lean();
     const clubIds = [...new Set(records.map((record) => record.clubId))];
     const clubsById = new Map((await Club.find({ id: { $in: clubIds } }).select('id name').lean()).map((club) => [club.id, club.name]));
+    const closureMap = await attendanceClosureMapFor(records);
     res.setHeader('Cache-Control', 'no-store');
-    res.json(records.map(({ _id, __v, ...record }) => ({ ...record, clubName: clubsById.get(record.clubId) || '' })));
+    res.json(records.map(({ _id, __v, ...record }) => {
+      const closure = closureMap.get(attendanceActivityKey(record));
+      return {
+        ...record, clubName: clubsById.get(record.clubId) || '',
+        attendanceEnded: isAttendanceActivityEnded(record.eventDate) || Boolean(closure),
+        attendanceEndedAt: closure?.endedAt || null
+      };
+    }));
   } catch (error) {
     console.error('Attendance records could not be loaded:', error.name);
     res.status(503).json({ message: 'Could not load attendance records from the database.' });
   }
 });
 
-function requirePrOrDeanAttendance(req, res) {
-  if (!['pr', 'dean'].includes(req.clubAccount?.role)) {
-    res.status(403).json({ message: 'Attendance overview is available to PR and Dean accounts.' });
+function requireInstitutionAttendanceHistory(req, res) {
+  if (!['pr', 'sso', 'dean'].includes(req.clubAccount?.role)) {
+    res.status(403).json({ message: 'Attendance history is available to PR, SSO, and Dean accounts.' });
     return false;
   }
   return true;
 }
 
 app.get('/api/committee/attendance-overview', requireClubAuth, async (req, res) => {
-  if (!requirePrOrDeanAttendance(req, res)) return;
+  if (!requireInstitutionAttendanceHistory(req, res)) return;
   try {
     if (!requireLiveDatabase(res)) return;
     const [clubs, attendanceRecords] = await Promise.all([
       Club.find({}).select('id name events booths').sort({ name: 1 }).lean(),
-      AttendanceRecord.find({}).select('clubId itemType eventRequestId eventTitle eventDate eventTime').sort({ attendedAt: -1 }).limit(5000).lean()
+      AttendanceRecord.find({}).select('clubId itemType eventRequestId eventTitle eventDate eventTime').sort({ attendedAt: -1 }).lean()
     ]);
     const clubsById = new Map(clubs.map((club) => [Number(club.id), club]));
     const activitiesByKey = new Map();
@@ -1609,7 +2046,7 @@ app.get('/api/committee/attendance-overview', requireClubAuth, async (req, res) 
 });
 
 app.get('/api/committee/attendance-records', requireClubAuth, async (req, res) => {
-  if (!requirePrOrDeanAttendance(req, res)) return;
+  if (!requireInstitutionAttendanceHistory(req, res)) return;
   const query = {};
   if (req.query.clubId && req.query.clubId !== 'all') {
     const clubId = Number(req.query.clubId);
@@ -1627,14 +2064,21 @@ app.get('/api/committee/attendance-records', requireClubAuth, async (req, res) =
   }
   try {
     if (!requireLiveDatabase(res)) return;
-    const records = await AttendanceRecord.find(query).sort({ attendedAt: -1 }).limit(5000).lean();
+    const records = await AttendanceRecord.find(query).sort({ attendedAt: -1 }).lean();
     const clubIds = [...new Set(records.map((record) => Number(record.clubId)))];
-    const clubsById = new Map((await Club.find({ id: { $in: clubIds } }).select('id name').lean()).map((club) => [Number(club.id), club.name]));
+    const clubsById = new Map((await Club.find({ id: { $in: clubIds } }).select('id name image').lean()).map((club) => [Number(club.id), club]));
+    const closureMap = await attendanceClosureMapFor(records);
     res.setHeader('Cache-Control', 'no-store');
-    res.json(records.map(({ _id, __v, ...record }) => ({
-      ...record,
-      clubName: clubsById.get(Number(record.clubId)) || `Club ${record.clubId}`
-    })));
+    res.json(records.map(({ _id, __v, ...record }) => {
+      const closure = closureMap.get(attendanceActivityKey(record));
+      return {
+        ...record,
+        attendanceEnded: isAttendanceActivityEnded(record.eventDate) || Boolean(closure),
+        attendanceEndedAt: closure?.endedAt || null,
+        clubName: clubsById.get(Number(record.clubId))?.name || `Club ${record.clubId}`,
+        clubImage: clubsById.get(Number(record.clubId))?.image || ''
+      };
+    }));
   } catch (error) {
     console.error('Committee attendance records could not be loaded:', error.name);
     res.status(503).json({ message: 'Could not load attendance records from the database.' });
@@ -1648,12 +2092,17 @@ app.get('/api/attendance/:token', async (req, res) => {
     if (!requireLiveDatabase(res)) return;
     const session = await AttendanceSession.findOne({ tokenHash: attendanceTokenHash(token), active: true }).lean();
     if (!session) return res.status(404).json({ message: 'This attendance QR code is invalid or expired.' });
+    if (!isActivityScheduledToday(session.eventDate)) return res.status(410).json({ message: 'This attendance QR code expired when the event day ended.' });
+    if (await isAttendanceActivityManuallyEnded(session.clubId, session.itemType || 'event', session.eventRequestId)) {
+      return res.status(410).json({ message: 'Attendance has ended for this event or booth.' });
+    }
     const hasProof = hasAttendanceScanProof(req, session._id);
     if (!hasProof && !isCurrentAttendanceQrChallenge(token, req.query.code)) {
       return res.status(410).json({ message: 'This QR code has changed. Scan the current code shown by the club.' });
     }
     const club = await Club.findOne({ id: session.clubId }).select('name').lean();
     res.setHeader('Cache-Control', 'no-store');
+    ensureAttendanceDeviceCookie(req, res);
     if (!hasProof) setAttendanceScanProofCookie(req, res, session._id);
     res.json({
       clubName: club?.name || '',
@@ -1680,16 +2129,45 @@ app.post('/api/attendance/:token', requireStudentAuth, async (req, res) => {
     if (!requireLiveDatabase(res)) return;
     const session = await AttendanceSession.findOne({ tokenHash: attendanceTokenHash(token), active: true }).lean();
     if (!session) return res.status(404).json({ message: 'This attendance QR code is invalid or expired.' });
+    if (!isActivityScheduledToday(session.eventDate)) return res.status(410).json({ message: 'Attendance is closed because the event day is over.' });
+    if (await isAttendanceActivityManuallyEnded(session.clubId, session.itemType || 'event', session.eventRequestId)) {
+      clearAttendanceScanProofCookie(req, res);
+      return res.status(410).json({ message: 'Attendance has ended for this event or booth.' });
+    }
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const [activityClub, acceptedApplication] = await Promise.all([
+      Club.findOne({ id: session.clubId, archivedAt: null })
+        .select('memberRoster').read('primary').readConcern('majority').lean(),
+      Application.findOne({ clubId: session.clubId, status: 'accepted', email: normalizedEmail })
+        .select('_id').read('primary').readConcern('majority').lean(),
+    ]);
+    const isRosterMember = (activityClub?.memberRoster || []).some((member) =>
+      String(member.email || '').trim().toLowerCase() === normalizedEmail);
+    if (!activityClub || (!isRosterMember && !acceptedApplication)) {
+      return res.status(403).json({ message: 'Attendance is limited to current members of this club. Sign in with the MIU email on your accepted membership.' });
+    }
     if (!hasAttendanceScanProof(req, session._id)) {
       return res.status(410).json({ message: 'Scan the current QR code to confirm attendance.' });
     }
+    const deviceId = attendanceDeviceId(req);
+    if (!deviceId) return res.status(403).json({ message: 'Reopen the current QR code on this device, then try again.' });
     const itemType = session.itemType || 'event';
-    const existing = await AttendanceRecord.findOne({ clubId: session.clubId, itemType, eventRequestId: session.eventRequestId, email }).lean();
+    const deviceHash = attendanceDeviceHash(deviceId);
+    const existing = await AttendanceRecord.findOne({
+      clubId: session.clubId, itemType, eventRequestId: session.eventRequestId,
+      $or: [{ email }, { deviceHash }]
+    }).select('+deviceHash').lean();
     if (existing) {
       clearAttendanceScanProofCookie(req, res);
-      return res.status(409).json({ message: 'Attendance is already recorded for this email.' });
+      return res.status(409).json({ message: existing.email === email
+        ? 'Attendance is already recorded for this account.'
+        : 'Attendance has already been recorded from this device for this event.' });
     }
-    await AttendanceRecord.create({
+    if (await isAttendanceActivityManuallyEnded(session.clubId, itemType, session.eventRequestId)) {
+      clearAttendanceScanProofCookie(req, res);
+      return res.status(410).json({ message: 'Attendance has ended for this event or booth.' });
+    }
+    const attendanceRecord = new AttendanceRecord({
       sessionId: session._id,
       clubId: session.clubId,
       itemType,
@@ -1699,15 +2177,26 @@ app.post('/api/attendance/:token', requireStudentAuth, async (req, res) => {
       eventTime: session.eventTime || '',
       name,
       email,
+      deviceHash,
       note,
       attendedAt: new Date()
     });
+    await attendanceRecord.save({ writeConcern: { w: 'majority' } });
+    const savedRecord = await AttendanceRecord.findById(attendanceRecord._id)
+      .select('clubId itemType eventRequestId email')
+      .read('primary').readConcern('majority').lean();
+    if (!savedRecord || savedRecord.clubId !== session.clubId || savedRecord.itemType !== itemType
+      || savedRecord.eventRequestId !== session.eventRequestId || savedRecord.email !== email) {
+      return res.status(503).json({ message: 'Attendance could not be confirmed in the database. Please retry only after checking your attendance status.' });
+    }
     clearAttendanceScanProofCookie(req, res);
     res.status(201).json({ message: 'Your attendance was recorded.' });
   } catch (error) {
     if (error.code === 11000) {
       clearAttendanceScanProofCookie(req, res);
-      return res.status(409).json({ message: 'Attendance is already recorded for this email.' });
+      return res.status(409).json({ message: error.keyPattern?.deviceHash
+        ? 'Attendance has already been recorded from this device for this event.'
+        : 'Attendance is already recorded for this account.' });
     }
     console.error('Attendance was not saved:', error.name);
     res.status(503).json({ message: 'Attendance was not saved. Please try again.' });
@@ -1779,6 +2268,203 @@ function isActivityScheduledToday(value) {
   const parsed = new Date(dateText);
   return !Number.isNaN(parsed.getTime()) && cairoDateKey(parsed) === cairoDateKey();
 }
+
+function isAttendanceActivityEnded(value) {
+  const dateText = cleanText(value, 80);
+  if (!dateText) return true; // Legacy records without a stored date remain reviewable.
+  const isoDate = dateText.match(/^(\d{4}-\d{2}-\d{2})/);
+  const activityDay = isoDate ? isoDate[1] : (() => {
+    const parsed = new Date(dateText);
+    return Number.isNaN(parsed.getTime()) ? '' : cairoDateKey(parsed);
+  })();
+  return Boolean(activityDay) && activityDay < cairoDateKey();
+}
+
+function attendanceActivityKey(activity) {
+  return `${Number(activity.clubId)}:${activity.itemType === 'booth' ? 'booth' : 'event'}:${Number(activity.eventRequestId)}`;
+}
+
+async function isAttendanceActivityManuallyEnded(clubId, itemType, eventRequestId) {
+  return Boolean(await AttendanceActivityClosure.exists({ clubId: Number(clubId), itemType, eventRequestId: Number(eventRequestId) }));
+}
+
+async function attendanceClosureMapFor(records) {
+  const keys = [...new Map(records.map((record) => [attendanceActivityKey(record), {
+    clubId: Number(record.clubId), itemType: record.itemType === 'booth' ? 'booth' : 'event', eventRequestId: Number(record.eventRequestId)
+  }])).values()];
+  if (!keys.length) return new Map();
+  const closures = await AttendanceActivityClosure.find({ $or: keys }).select('clubId itemType eventRequestId endedAt endedByEmail endedByRole').lean();
+  return new Map(closures.map((closure) => [attendanceActivityKey(closure), closure]));
+}
+
+async function currentMemberAttendanceAssignment(email) {
+  const assignments = await AttendanceAssignment.find({
+    memberEmail: email, status: { $in: ['assigned', 'accepted'] }
+  }).read('primary').readConcern('majority').sort({ createdAt: -1 }).limit(1000).lean();
+  return assignments.find((assignment) => isActivityScheduledToday(assignment.eventDate)) || null;
+}
+
+app.get('/api/club/attendance-assignment-options', requireClubAuth, async (req, res) => {
+  const isPresident = req.clubAccount.role === 'president';
+  if (!isPresident && !isItCommitteeHead(req.clubAccount)) return res.status(403).json({ message: 'Only the club president or IT committee head can assign attendance tasks.' });
+  try {
+    if (!requireLiveDatabase(res)) return;
+    const activityClubFilter = isPresident
+      ? { id: req.clubAccount.clubId, archivedAt: null }
+      : { archivedAt: null };
+    const [databaseClubs, ownClub, acceptedMembers] = await Promise.all([
+      Club.find(activityClubFilter).select('id name events booths').read('primary').readConcern('majority').lean(),
+      Club.findOne({ id: req.clubAccount.clubId }).select('memberRoster').read('primary').readConcern('majority').lean(),
+      Application.find({ clubId: req.clubAccount.clubId, status: 'accepted' })
+        .select('studentName email committee').read('primary').readConcern('majority').sort({ studentName: 1 }).lean()
+    ]);
+    const membersByEmail = new Map();
+    [...(ownClub?.memberRoster || []), ...acceptedMembers].forEach((member) => {
+      const memberCommittee = String(member.committee || '').trim().toLowerCase();
+      const belongsToEligibleCommittee = isPresident
+        ? /(^|[^a-z])it([^a-z]|$)/.test(memberCommittee) || memberCommittee.includes('information technology')
+        : memberCommittee === String(req.clubAccount.committee || '').trim().toLowerCase();
+      if (!belongsToEligibleCommittee) return;
+      const email = cleanText(member.email, 254).toLowerCase();
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
+      membersByEmail.set(email, { name: cleanText(member.name || member.studentName, 160) || email.split('@')[0], email });
+    });
+    const allEvents = databaseClubs.flatMap((club) => ['event', 'booth'].flatMap((itemType) => {
+      const items = itemType === 'event' ? club.events : club.booths;
+      return (Array.isArray(items) ? items : []).flatMap((item, itemIndex) => {
+        const title = cleanText(item.title || item.boothName, 140);
+        const date = cleanText(item.date || item.boothOpenDate, 80);
+        if (!title || !isActivityScheduledToday(date)) return [];
+        const requestId = Number(item.requestId);
+        const legacyOffset = itemType === 'booth' ? 1_000_000 : 0;
+        const eventRequestId = Number.isInteger(requestId) && requestId > 0 ? requestId : -(legacyOffset + itemIndex + 1);
+        return [{ clubId: club.id, clubName: club.name, itemType, eventRequestId, title, date, time: cleanText(item.time || item.boothOpenTime, 80) }];
+      });
+    })).sort((left, right) => left.date.localeCompare(right.date) || left.title.localeCompare(right.title));
+    const closures = allEvents.length ? await AttendanceActivityClosure.find({
+      $or: allEvents.map(({ clubId, itemType, eventRequestId }) => ({ clubId, itemType, eventRequestId }))
+    }).select('clubId itemType eventRequestId').lean() : [];
+    const closedKeys = new Set(closures.map(attendanceActivityKey));
+    const events = allEvents.filter((activity) => !closedKeys.has(attendanceActivityKey(activity)));
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ members: [...membersByEmail.values()].sort((left, right) => left.name.localeCompare(right.name)), events });
+  } catch (error) {
+    console.error('Attendance delegation options could not be loaded:', error.name);
+    res.status(503).json({ message: 'Could not load eligible IT members and today’s events from the database.' });
+  }
+});
+
+app.post('/api/club/attendance-assignments', requireClubAuth, async (req, res) => {
+  const isPresident = req.clubAccount.role === 'president';
+  if (!isPresident && !isItCommitteeHead(req.clubAccount)) return res.status(403).json({ message: 'Only the club president or IT committee head can assign attendance tasks.' });
+  const clubId = Number(req.body.clubId);
+  const eventRequestId = Number(req.body.eventRequestId);
+  const itemType = req.body.itemType === 'booth' ? 'booth' : req.body.itemType === 'event' ? 'event' : '';
+  const memberEmail = cleanText(req.body.memberEmail, 254).toLowerCase();
+  if (!Number.isSafeInteger(clubId) || !Number.isSafeInteger(eventRequestId) || !itemType || !memberEmail) {
+    return res.status(400).json({ message: 'Choose a member and an event or booth.' });
+  }
+  if (isPresident && clubId !== Number(req.clubAccount.clubId)) {
+    return res.status(403).json({ message: 'A president can assign attendance only for their own club.' });
+  }
+  try {
+    if (!requireLiveDatabase(res)) return;
+    const [activityClub, memberClub, acceptedMember] = await Promise.all([
+      Club.findOne({ id: clubId, archivedAt: null }).select('id name events booths').read('primary').readConcern('majority').lean(),
+      Club.findOne({ id: req.clubAccount.clubId }).select('memberRoster').read('primary').readConcern('majority').lean(),
+      Application.findOne({ clubId: req.clubAccount.clubId, status: 'accepted', email: memberEmail })
+        .select('studentName email committee').read('primary').readConcern('majority').lean()
+    ]);
+    const matchesEligibleCommittee = (member) => {
+      const committee = String(member?.committee || '').trim().toLowerCase();
+      return isPresident
+        ? /(^|[^a-z])it([^a-z]|$)/.test(committee) || committee.includes('information technology')
+        : committee === String(req.clubAccount.committee || '').trim().toLowerCase();
+    };
+    const rosterMember = (memberClub?.memberRoster || []).find((member) => String(member.email || '').toLowerCase() === memberEmail
+      && matchesEligibleCommittee(member));
+    const member = rosterMember || (matchesEligibleCommittee(acceptedMember) ? acceptedMember : null);
+    if (!member) return res.status(403).json({ message: 'Choose an eligible member with a verified MIU email.' });
+    const items = itemType === 'event' ? activityClub?.events : activityClub?.booths;
+    let selected = eventRequestId > 0 ? (items || []).find((item) => Number(item.requestId) === eventRequestId) : null;
+    if (eventRequestId < 0) {
+      const legacyOffset = itemType === 'booth' ? 1_000_000 : 0;
+      const itemIndex = -eventRequestId - legacyOffset - 1;
+      selected = itemIndex >= 0 ? items?.[itemIndex] : null;
+      if (selected?.requestId) selected = null;
+    }
+    const eventTitle = cleanText(selected?.title || selected?.boothName, 140);
+    const eventDate = cleanText(selected?.date || selected?.boothOpenDate, 80);
+    if (!activityClub || !selected || !eventTitle || !isActivityScheduledToday(eventDate)) {
+      return res.status(404).json({ message: 'Choose an event or booth scheduled for today.' });
+    }
+    if (await isAttendanceActivityManuallyEnded(clubId, itemType, eventRequestId)) {
+      return res.status(409).json({ message: 'Attendance has ended for this event or booth.' });
+    }
+    const activeMemberDayKey = crypto.createHmac('sha256', sessionSecret)
+      .update(`attendance-assignment.${memberEmail}.${cairoDateKey()}`).digest('hex');
+    const existingActiveAssignments = await AttendanceAssignment.find({
+      memberEmail, status: { $in: ['assigned', 'accepted'] }
+    }).select('eventDate').read('primary').readConcern('majority').lean();
+    if (existingActiveAssignments.some((assignment) => isActivityScheduledToday(assignment.eventDate))) {
+      return res.status(409).json({ message: 'This member already has an attendance assignment for today.' });
+    }
+    const assignment = await AttendanceAssignment.create({
+      clubId, clubName: activityClub.name, itemType, eventRequestId, eventTitle, eventDate,
+      eventTime: cleanText(selected.time || selected.boothOpenTime, 80),
+      memberEmail, memberName: cleanText(member.name || member.studentName, 160),
+      committee: cleanText(member.committee, 100), assignedBy: req.clubAccount.email, activeMemberDayKey
+    });
+    const saved = await AttendanceAssignment.findById(assignment._id).read('primary').readConcern('majority').lean();
+    if (!saved || saved.memberEmail !== memberEmail || saved.eventRequestId !== eventRequestId
+      || saved.activeMemberDayKey !== activeMemberDayKey || !isActivityScheduledToday(saved.eventDate)) {
+      await AttendanceAssignment.deleteOne({ _id: assignment._id }).catch(() => {});
+      return res.status(503).json({ message: 'The request could not be confirmed in the database.' });
+    }
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(201).json({ savedToDatabase: true, assignment: { id: String(saved._id), eventTitle: saved.eventTitle, eventDate: saved.eventDate, memberName: saved.memberName } });
+  } catch (error) {
+    if (error.code === 11000) return res.status(409).json({ message: 'This member already has an attendance assignment for today, or the activity is already assigned.' });
+    console.error('Attendance assignment could not be saved:', error.name);
+    res.status(503).json({ message: 'The request was not saved. Please try again.' });
+  }
+});
+
+app.get('/api/member/attendance-assignments', requireStudentAuth, async (req, res) => {
+  try {
+    if (!requireLiveDatabase(res)) return;
+    const assignment = await currentMemberAttendanceAssignment(req.studentAccount.email);
+    res.setHeader('Cache-Control', 'no-store');
+    if (!assignment) return res.json([]);
+    const { _id, __v, activeMemberDayKey, ...publicAssignment } = assignment;
+    res.json([{ ...publicAssignment, id: String(_id) }]);
+  } catch (error) {
+    console.error('Member attendance tasks could not be loaded:', error.name);
+    res.status(503).json({ message: 'Could not load your club attendance tasks.' });
+  }
+});
+
+app.post('/api/member/attendance-assignments/:id/accept', requireStudentAuth, async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ message: 'This attendance assignment could not be found.' });
+  try {
+    if (!requireLiveDatabase(res)) return;
+    const requested = await currentMemberAttendanceAssignment(req.studentAccount.email);
+    if (!requested || String(requested._id) !== req.params.id || requested.status !== 'assigned') {
+      return res.status(409).json({ message: 'This task is no longer waiting for your response.' });
+    }
+    const assignment = await AttendanceAssignment.findOneAndUpdate(
+      { _id: req.params.id, memberEmail: req.studentAccount.email, status: 'assigned' },
+      { $set: { status: 'accepted', acceptedAt: new Date() } },
+      { new: true, writeConcern: { w: 'majority' } }
+    ).read('primary').readConcern('majority').lean();
+    if (!assignment) return res.status(409).json({ message: 'This task is no longer waiting for your response.' });
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ savedToDatabase: true, id: String(assignment._id), status: assignment.status });
+  } catch (error) {
+    console.error('Member attendance task acceptance failed:', error.name);
+    res.status(503).json({ message: 'Your response was not saved. Please try again.' });
+  }
+});
 
 function getCommitteeAvailability(clubId) {
   const club = clubs.find((item) => item.id === clubId);
@@ -1874,16 +2560,75 @@ app.get('/api/club/heads', requireClubAuth, requireClubPresident, (req, res) => 
     .map(({ email, committee }) => ({ email, committee })));
 });
 
-app.get('/api/club/members', requireClubAuth, requireClubPresident, async (req, res) => {
+function acceptedApplicationsAsMembers(applicationsForClub) {
+  return applicationsForClub.map((application) => ({
+    id: `application-${application.id}`,
+    name: application.studentName,
+    email: application.email || '',
+    committee: application.committee,
+    position: 'Member',
+    memberType: 'new',
+    source: 'accepted-application',
+    createdAt: application.updatedAt
+  }));
+}
+
+function buildClubMemberListing(club, acceptedApplications) {
+  const members = Array.isArray(club.memberRoster) ? [...club.memberRoster] : [];
+  const acceptedMembers = acceptedApplicationsAsMembers(acceptedApplications);
+  const memberIndexByEmail = new Map(members
+    .map((member, index) => [String(member.email || '').trim().toLowerCase(), index])
+    .filter(([email]) => email));
+  acceptedMembers.forEach((member) => {
+    const email = String(member.email || '').trim().toLowerCase();
+    const existingIndex = email ? memberIndexByEmail.get(email) : undefined;
+    if (existingIndex === undefined) {
+      members.push(member);
+      if (email) memberIndexByEmail.set(email, members.length - 1);
+    } else {
+      // Accepted application data is the live source for new members.
+      members[existingIndex] = { ...members[existingIndex], ...member };
+    }
+  });
+  return {
+    id: club.id,
+    name: club.name,
+    members,
+    totalCount: Math.max(Number(club.members) || 0, members.length)
+  };
+}
+
+app.get('/api/club/members', requireClubAuth, async (req, res) => {
+  if (!['president', 'head'].includes(req.clubAccount.role)) {
+    return res.status(403).json({ message: 'Only club presidents and committee heads can view club members.' });
+  }
   try {
-    const club = mongoReady
-      ? await Club.findOne({ id: req.clubAccount.clubId }).select('members memberRoster').lean()
-      : clubs.find((item) => item.id === req.clubAccount.clubId);
+    if (!requireLiveDatabase(res)) return;
+    const [club, acceptedApplications] = await Promise.all([
+      Club.findOne({ id: req.clubAccount.clubId })
+        .select('members memberRoster').read('primary').readConcern('majority').lean(),
+      Application.find({ clubId: req.clubAccount.clubId, status: 'accepted' })
+        .select('id studentName email universityId committee updatedAt')
+        .read('primary').readConcern('majority').sort({ updatedAt: -1 }).lean()
+    ]);
     if (!club) return res.status(404).json({ message: 'Club not found.' });
     const committees = [...new Set(clubAccounts
       .filter((account) => account.clubId === req.clubAccount.clubId && account.role === 'head' && account.committee)
       .map((account) => account.committee))];
-    res.json({ members: Array.isArray(club.memberRoster) ? club.memberRoster : [], totalCount: Number(club.members) || 0, committees });
+    const listing = buildClubMemberListing(club, acceptedApplications);
+    const isHead = req.clubAccount.role === 'head';
+    const visibleMembers = isHead
+      ? listing.members.filter((member) => String(member.committee || '').trim().toLowerCase() === String(req.clubAccount.committee || '').trim().toLowerCase())
+      : listing.members;
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({
+      clubId: listing.id,
+      clubName: club.name,
+      committee: isHead ? req.clubAccount.committee : '',
+      members: visibleMembers,
+      totalCount: isHead ? visibleMembers.length : listing.totalCount,
+      committees
+    });
   } catch (error) {
     console.error('Database operation failed:', error.name);
     res.status(503).json({ message: 'Could not load club members right now.' });
@@ -1891,19 +2636,25 @@ app.get('/api/club/members', requireClubAuth, requireClubPresident, async (req, 
 });
 
 async function getClubMemberDirectory() {
-  const directoryClubs = mongoReady
-    ? await Club.find({}).select('id name members memberRoster').sort({ name: 1 }).lean()
-    : clubs;
-  return directoryClubs.map((club) => ({
-    id: club.id,
-    name: club.name,
-    totalCount: Number(club.members) || 0,
-    members: Array.isArray(club.memberRoster) ? club.memberRoster : []
-  }));
+  if (!mongoReady || mongoose.connection.readyState !== 1) throw new Error('Live club data is unavailable.');
+  const [directoryClubs, acceptedApplications] = await Promise.all([
+    Club.find({}).select('id name members memberRoster')
+      .read('primary').readConcern('majority').sort({ name: 1 }).lean(),
+    Application.find({ status: 'accepted' }).select('id clubId studentName committee updatedAt')
+      .read('primary').readConcern('majority').sort({ updatedAt: -1 }).lean()
+  ]);
+  const acceptedByClub = new Map();
+  acceptedApplications.forEach((application) => {
+    const grouped = acceptedByClub.get(application.clubId) || [];
+    grouped.push(application);
+    acceptedByClub.set(application.clubId, grouped);
+  });
+  return directoryClubs.map((club) => buildClubMemberListing(club, acceptedByClub.get(club.id) || []));
 }
 
 app.post('/api/club/members', requireClubAuth, requireClubPresident, async (req, res) => {
   const name = cleanText(req.body.name, 120);
+  const email = cleanText(req.body.email, 254).toLowerCase();
   const requestedCommittee = cleanText(req.body.committee, 100);
   const position = cleanText(req.body.position, 100);
   const memberType = req.body.memberType;
@@ -1912,21 +2663,24 @@ app.post('/api/club/members', requireClubAuth, requireClubPresident, async (req,
     && account.committee.toLowerCase() === requestedCommittee.toLowerCase())?.committee;
 
   if (!name) return res.status(400).json({ message: 'Enter the member name.' });
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(422).json({ message: 'Enter a valid member email.' });
   if (!committee) return res.status(400).json({ message: 'Choose a committee managed by a committee head.' });
   if (!position) return res.status(400).json({ message: 'Enter the member position.' });
   if (!['new', 'senior'].includes(memberType)) return res.status(400).json({ message: 'Choose New member or Senior member.' });
 
   const club = clubs.find((item) => item.id === req.clubAccount.clubId);
   if (!club) return res.status(404).json({ message: 'Club not found.' });
-  const member = { id: crypto.randomBytes(16).toString('hex'), name, committee, position, memberType, createdAt: new Date().toISOString() };
+  const member = { id: crypto.randomBytes(16).toString('hex'), name, email, committee, position, memberType, createdAt: new Date().toISOString() };
   try {
     if (!requireLiveDatabase(res)) return;
     const savedClub = await Club.findOneAndUpdate(
       { id: req.clubAccount.clubId },
       { $push: { memberRoster: member }, $inc: { members: 1 } },
       { new: true, runValidators: true }
-    ).select('id');
+    ).select('id memberRoster');
     if (!savedClub) return res.status(404).json({ message: 'Club not found.' });
+    const savedMember = savedClub.memberRoster?.find((item) => item.id === member.id);
+    if (!savedMember || (email && savedMember.email !== email)) return res.status(503).json({ message: 'The member was not confirmed in the database. Please retry.' });
     club.members = (Number(club.members) || 0) + 1;
     club.memberRoster = [...(club.memberRoster || []), member];
     res.status(201).json({ member, totalCount: club.members });
@@ -1970,13 +2724,12 @@ app.put('/api/club/application-form', requireClubAuth, requireClubPresident, asy
 
 app.get('/api/club/interview-form', requireClubAuth, async (req, res) => {
   try {
-    const club = mongoReady
-      ? await Club.findOne({ id: req.clubAccount.clubId }).select('interviewForms').lean()
-      : clubs.find((item) => item.id === req.clubAccount.clubId);
+    if (!requireLiveDatabase(res)) return;
+    const club = await Club.findOne({ id: req.clubAccount.clubId }).select('interviewForms')
+      .read('primary').readConcern('majority').lean();
     if (!club) return res.status(404).json({ message: 'Club not found.' });
     const scope = getInterviewFormScope(req.clubAccount);
-    const form = (club.interviewForms || []).find((item) => item.scope === scope);
-    res.json({ scope, sections: form?.sections || [] });
+    res.json({ scope, sections: getInterviewFormSections(club.interviewForms, scope) });
   } catch (error) {
     console.error('Database operation failed:', error.name);
     res.status(503).json({ message: 'Could not load interview questions right now.' });
@@ -2163,24 +2916,39 @@ app.get('/api/committee/attendance-reviews', requireClubAuth, async (req, res) =
   if (!stage) return res.status(403).json({ message: 'Attendance review is available to PR, SSO, and Dean accounts.' });
   try {
     if (!requireLiveDatabase(res)) return;
-    const filter = role === 'pr'
+    const stageFilter = role === 'pr'
       ? { $or: [{ approvalStatus: stage }, { approvalStatus: { $exists: false } }] }
       : { approvalStatus: stage };
-    const records = await AttendanceRecord.find(filter).sort({ attendedAt: -1 }).limit(5000).lean();
+    const records = await AttendanceRecord.find(stageFilter).sort({ attendedAt: -1 }).lean();
+    const closureMap = await attendanceClosureMapFor(records);
+    const reviewableRecords = records.filter((record) => isAttendanceActivityEnded(record.eventDate)
+      || closureMap.has(attendanceActivityKey(record)));
     const clubIds = [...new Set(records.map((record) => Number(record.clubId)))];
     const clubsById = new Map((await Club.find({ id: { $in: clubIds } }).select('id name image').lean()).map((club) => [Number(club.id), club]));
     const reviews = new Map();
-    records.forEach((record) => {
+    reviewableRecords.forEach((record) => {
       const itemType = record.itemType === 'booth' ? 'booth' : 'event';
       const key = `${record.clubId}:${itemType}:${record.eventRequestId}`;
       const club = clubsById.get(Number(record.clubId));
       if (!reviews.has(key)) reviews.set(key, {
         clubId: Number(record.clubId), clubName: club?.name || `Club ${record.clubId}`, clubImage: club?.image || '',
-        itemType, eventRequestId: record.eventRequestId, eventTitle: record.eventTitle,
-        eventDate: record.eventDate || '', eventTime: record.eventTime || '', records: []
+        itemType, eventRequestId: record.eventRequestId, eventTitle: record.eventTitle, attendanceEnded: true,
+        attendanceEndedAt: closureMap.get(attendanceActivityKey(record))?.endedAt || null,
+        eventDate: record.eventDate || '', eventTime: record.eventTime || '', records: [], notes: []
       });
-      reviews.get(key).records.push({
+      const review = reviews.get(key);
+      review.records.push({
         name: record.name, email: record.email, note: record.note || '', attendedAt: record.attendedAt
+      });
+      (record.approvalHistory || []).filter((entry) => entry.note).forEach((entry) => {
+        const note = {
+          role: entry.role, email: entry.email || '', action: entry.action, text: entry.note,
+          createdAt: entry.createdAt || record.updatedAt || record.attendedAt
+        };
+        const noteKey = `${note.role}:${note.email}:${new Date(note.createdAt).getTime()}:${note.text}`;
+        if (!review.notes.some((saved) => `${saved.role}:${saved.email}:${new Date(saved.createdAt).getTime()}:${saved.text}` === noteKey)) {
+          review.notes.push(note);
+        }
       });
     });
     res.setHeader('Cache-Control', 'no-store');
@@ -2198,23 +2966,41 @@ app.post('/api/committee/attendance-reviews/:clubId/:itemType/:eventRequestId/ap
   const clubId = Number(req.params.clubId);
   const eventRequestId = Number(req.params.eventRequestId);
   const itemType = req.params.itemType;
+  const action = ['approve', 'reject', 'note'].includes(req.body.action) ? req.body.action : 'approve';
+  const note = cleanText(req.body.note, 500);
   if (!Number.isSafeInteger(clubId) || !Number.isSafeInteger(eventRequestId) || !['event', 'booth'].includes(itemType)) {
     return res.status(400).json({ message: 'Choose a valid event or booth review.' });
   }
+  if (action === 'note' && !note) return res.status(400).json({ message: 'Write a note before saving it.' });
+  if (action === 'reject' && !note) return res.status(400).json({ message: 'Add a short reason before rejecting this attendance list.' });
   const reviewFilter = { clubId, itemType, eventRequestId };
   const stageFilter = role === 'pr'
     ? { $or: [{ approvalStatus: stage }, { approvalStatus: { $exists: false } }] }
     : { approvalStatus: stage };
   try {
     if (!requireLiveDatabase(res)) return;
-    const result = await AttendanceRecord.updateMany(
-      { ...reviewFilter, ...stageFilter },
-      { $set: { approvalStatus: role === 'dean' ? 'approved' : role === 'pr' ? 'pending_sso' : 'pending_dean' },
-        $push: { approvalHistory: { role, email: req.clubAccount.email, action: 'approved', createdAt: new Date() } } }
-    );
+    const pendingRecords = await AttendanceRecord.find({ ...reviewFilter, ...stageFilter })
+      .select('clubId itemType eventRequestId eventDate').read('primary').readConcern('majority').lean();
+    if (!pendingRecords.length) return res.status(409).json({ message: `This activity is no longer waiting for ${attendanceApprovalNames[role]} approval.` });
+    const closureMap = await attendanceClosureMapFor(pendingRecords);
+    if (pendingRecords.some((record) => !isAttendanceActivityEnded(record.eventDate)
+      && !closureMap.has(attendanceActivityKey(record)))) {
+      return res.status(409).json({ message: 'The club must end attendance before this list can be reviewed.' });
+    }
+    const update = { $push: { approvalHistory: {
+      role, email: req.clubAccount.email,
+      action: action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : 'noted',
+      note, createdAt: new Date()
+    } } };
+    if (action === 'approve') update.$set = { approvalStatus: role === 'dean' ? 'approved' : role === 'pr' ? 'pending_sso' : 'pending_dean' };
+    if (action === 'reject') update.$set = { approvalStatus: 'rejected' };
+    const result = await AttendanceRecord.updateMany({ ...reviewFilter, ...stageFilter }, update);
     if (!result.modifiedCount) return res.status(409).json({ message: `This activity is no longer waiting for ${attendanceApprovalNames[role]} approval.` });
     res.setHeader('Cache-Control', 'no-store');
-    res.json({ approved: true, nextStage: role === 'dean' ? 'complete' : role === 'pr' ? 'sso' : 'dean', recordsUpdated: result.modifiedCount });
+    res.json({
+      action, nextStage: action === 'approve' ? (role === 'dean' ? 'complete' : role === 'pr' ? 'sso' : 'dean') : '',
+      recordsUpdated: result.modifiedCount
+    });
   } catch (error) {
     console.error('Attendance review could not be approved:', error.name);
     res.status(503).json({ message: 'Approval was not saved. Please try again.' });
@@ -2378,6 +3164,7 @@ function buildPublishedItem(record, club) {
     image: record.image || club.image,
     createdAt: record.createdAt
   };
+  if (record.type === 'event') item.registrationEnabled = record.registrationEnabled !== false;
   if (record.type === 'sponsor') {
     Object.assign(item, {
       sponsorName: record.sponsorName,
@@ -2503,7 +3290,13 @@ app.get('/api/club/content', requireClubAuth, async (req, res) => {
   }
   try {
     if (!mongoReady) return res.status(503).json({ message: 'Content storage needs MongoDB.' });
-    const records = await ContentRequest.find({ clubId: req.clubAccount.clubId }).sort({ id: -1 }).lean();
+    const filter = { clubId: req.clubAccount.clubId };
+    if (req.clubAccount.role === 'head') {
+      filter.assignedHeadEmail = req.clubAccount.email;
+      filter.type = { $ne: 'entry_permit' };
+      filter.status = { $in: ['draft', 'changes_requested', 'rejected'] };
+    }
+    const records = await ContentRequest.find(filter).sort({ id: -1 }).lean();
     res.json(records.map(shapeClubContentRecord));
   } catch (error) {
     console.error('Database operation failed:', error.name);
@@ -2511,12 +3304,41 @@ app.get('/api/club/content', requireClubAuth, async (req, res) => {
   }
 });
 
+app.patch('/api/club/content/:id/assignment', requireClubAuth, async (req, res) => {
+  if (req.clubAccount.role !== 'president') {
+    return res.status(403).json({ message: 'Only the club president can assign a content task.' });
+  }
+  const email = cleanText(req.body.email, 254).toLowerCase();
+  try {
+    if (!mongoReady) return res.status(503).json({ message: 'Content storage needs MongoDB.' });
+    const record = await ContentRequest.findOne({ id: Number(req.params.id), clubId: req.clubAccount.clubId });
+    if (!record) return res.status(404).json({ message: 'Content not found.' });
+    if (email) {
+      const head = await ClubAccount.findOne({ clubId: req.clubAccount.clubId, role: 'head', email }).select('_id').lean();
+      if (!head) return res.status(400).json({ message: 'Choose a committee head from this club.' });
+      if (record.type === 'entry_permit') return res.status(403).json({ message: 'Entry Permits can only be managed by the club president.' });
+      if (!['draft', 'changes_requested', 'rejected'].includes(record.status)) {
+        return res.status(409).json({ message: 'Only items that need club updates can be assigned to a committee head.' });
+      }
+    }
+    record.assignedHeadEmail = email;
+    await record.save();
+    res.json({ id: record.id, assignedHeadEmail: record.assignedHeadEmail });
+  } catch (error) {
+    console.error('Content task assignment failed:', error.name);
+    res.status(503).json({ message: 'Could not update the task assignment.' });
+  }
+});
+
 app.post('/api/club/content', requireClubAuth, async (req, res) => {
-  if (!['president', 'head'].includes(req.clubAccount.role)) {
-    return res.status(403).json({ message: 'Only club presidents and heads can manage content.' });
+  if (req.clubAccount.role !== 'president') {
+    return res.status(403).json({ message: 'Only the club president can create content. Heads can edit only items assigned to them.' });
   }
   if (!isContentType(req.body.type)) {
     return res.status(400).json({ message: `Choose a valid content type: ${CONTENT_TYPES.join(', ')}.` });
+  }
+  if (req.clubAccount.role === 'head' && req.body.type === 'entry_permit') {
+    return res.status(403).json({ message: 'Only the club president can create Entry Permits.' });
   }
   return createContentRequest(req, res, req.body.type);
 });
@@ -2524,8 +3346,11 @@ app.post('/api/club/content', requireClubAuth, async (req, res) => {
 // Each module assigns its own content type automatically.
 for (const moduleType of CONTENT_TYPES) {
   app.post(`/api/club/content/${moduleType}`, requireClubAuth, async (req, res) => {
-    if (!['president', 'head'].includes(req.clubAccount.role)) {
-      return res.status(403).json({ message: 'Only club presidents and heads can manage content.' });
+    if (req.clubAccount.role !== 'president') {
+      return res.status(403).json({ message: 'Only the club president can create content. Heads can edit only items assigned to them.' });
+    }
+    if (req.clubAccount.role === 'head' && moduleType === 'entry_permit') {
+      return res.status(403).json({ message: 'Only the club president can create Entry Permits.' });
     }
     return createContentRequest(req, res, moduleType);
   });
@@ -2563,6 +3388,7 @@ async function createContentRequest(req, res, type) {
       description,
       date: type === 'booth' ? (cleanText(req.body.boothOpenDate, 40) || cleanText(req.body.date, 40)) : cleanText(req.body.date, 40),
       time: cleanText(req.body.time, 40),
+      ...(type === 'event' ? { registrationEnabled: req.body.registrationEnabled === undefined ? true : req.body.registrationEnabled === true } : {}),
       location: type === 'booth' ? (cleanText(req.body.boothLocation, 140) || cleanText(req.body.location, 120)) : cleanText(req.body.location, 120),
       budget: cleanText(req.body.budget, 80),
       image: typeof req.body.image === 'string' ? req.body.image.slice(0, 4 * 1024 * 1024) : '',
@@ -2582,12 +3408,15 @@ async function createContentRequest(req, res, type) {
 
 app.put('/api/club/content/:id', requireClubAuth, async (req, res) => {
   if (!['president', 'head'].includes(req.clubAccount.role)) {
-    return res.status(403).json({ message: 'Only club presidents and heads can manage content.' });
+    return res.status(403).json({ message: 'Only club presidents and assigned committee heads can manage this content.' });
   }
   try {
     if (!mongoReady) return res.status(503).json({ message: 'Content storage needs MongoDB.' });
     const record = await ContentRequest.findOne({ id: Number(req.params.id), clubId: req.clubAccount.clubId });
     if (!record) return res.status(404).json({ message: 'Content not found.' });
+    if (req.clubAccount.role === 'head' && (record.type === 'entry_permit' || record.assignedHeadEmail !== req.clubAccount.email)) {
+      return res.status(403).json({ message: 'This content item has not been assigned to your account.' });
+    }
     if (!['draft', 'changes_requested', 'rejected'].includes(record.status)) {
       return res.status(409).json({ message: 'This content is already under review or published.' });
     }
@@ -2604,6 +3433,9 @@ app.put('/api/club/content/:id', requireClubAuth, async (req, res) => {
     }
     if (req.body.date !== undefined) record.date = cleanText(req.body.date, 40);
     if (req.body.time !== undefined) record.time = cleanText(req.body.time, 40);
+    if (type === 'event' && req.body.registrationEnabled !== undefined) {
+      record.registrationEnabled = req.body.registrationEnabled === true;
+    }
     if (req.body.location !== undefined) record.location = cleanText(req.body.location, 120);
     if (req.body.budget !== undefined) record.budget = cleanText(req.body.budget, 80);
     if (typeof req.body.image === 'string') record.image = req.body.image.slice(0, 4 * 1024 * 1024);
@@ -2647,6 +3479,7 @@ app.put('/api/club/content/:id', requireClubAuth, async (req, res) => {
       record.clubNotice = `${isFirstSubmission ? 'Club submitted a new' : 'Club resubmitted the updated'} ${contentSingularLabel(type)}. Waiting for ${nextReviewer} review.`;
       appendWorkflowEvent(record, 'club', isFirstSubmission ? 'submitted' : 'resubmitted', fromStatus, targetStage, '', req.clubAccount);
       record.editRequestedBy = '';
+      record.assignedHeadEmail = '';
     } else {
       record.status = 'draft';
     }
@@ -2660,8 +3493,8 @@ app.put('/api/club/content/:id', requireClubAuth, async (req, res) => {
 });
 
 app.delete('/api/club/content/:id', requireClubAuth, async (req, res) => {
-  if (!['president', 'head'].includes(req.clubAccount.role)) {
-    return res.status(403).json({ message: 'Only club presidents and heads can manage content.' });
+  if (req.clubAccount.role !== 'president') {
+    return res.status(403).json({ message: 'Only the club president can delete content.' });
   }
   try {
     if (!mongoReady) return res.status(503).json({ message: 'Content storage needs MongoDB.' });
@@ -3167,6 +4000,76 @@ app.get('/api/student-auth/session', requireStudentAuth, (req, res) => {
   res.json({ authenticated: true, name: req.studentAccount.name, email: req.studentAccount.email });
 });
 
+function toStudentProfile(account) {
+  return {
+    name: account.name || '',
+    email: account.email || '',
+    universityId: account.universityId || '',
+    major: account.major || '',
+    phone: account.phone || '',
+    age: account.age || ''
+  };
+}
+
+app.get('/api/student-auth/profile', requireStudentAuth, (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(toStudentProfile(req.studentAccount));
+});
+
+app.put('/api/student-auth/profile', requireStudentAuth, async (req, res) => {
+  const submittedProfile = req.body || {};
+  const profile = {
+    name: cleanText(submittedProfile.name, 160) || req.studentAccount.name,
+    universityId: cleanText(submittedProfile.universityId, 40),
+    major: cleanText(submittedProfile.major, 120),
+    phone: cleanText(submittedProfile.phone, 40),
+    age: cleanText(submittedProfile.age, 3)
+  };
+  if (profile.age && (!/^\d{1,3}$/.test(profile.age) || Number(profile.age) < 16 || Number(profile.age) > 100)) {
+    return res.status(422).json({ message: 'Enter an age between 16 and 100.' });
+  }
+  try {
+    if (!requireLiveDatabase(res)) return;
+    const updated = await StudentAccount.findOneAndUpdate(
+      { email: req.studentAccount.email, sessionVersion: req.studentAccount.sessionVersion },
+      { $set: profile },
+      { new: true, runValidators: true, writeConcern: { w: 'majority' } }
+    ).read('primary').readConcern('majority').lean();
+    if (!updated) return res.status(401).json({ message: 'Your session ended. Sign in again to save your profile.' });
+    if (updated.name !== profile.name || updated.universityId !== profile.universityId
+      || updated.major !== profile.major || updated.phone !== profile.phone || updated.age !== profile.age) {
+      return res.status(503).json({ message: 'Your profile could not be verified as saved. Please try again.' });
+    }
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(toStudentProfile(updated));
+  } catch (error) {
+    console.error('Student profile save failed:', error.name);
+    res.status(503).json({ message: 'Your profile was not saved. Please try again.' });
+  }
+});
+
+app.post('/api/student-auth/logout', async (req, res) => {
+  const secure = secureCookieSuffix(req);
+  try {
+    if (!mongoReady || mongoose.connection.readyState !== 1) throw new Error('DATABASE_UNAVAILABLE');
+    const account = await getStudentAccountFromRequest(req);
+    if (account) {
+      const result = await StudentAccount.updateOne(
+        { email: account.email, sessionVersion: account.sessionVersion },
+        { $inc: { sessionVersion: 1 } },
+        { writeConcern: { w: 'majority' } }
+      );
+      if (!result.modifiedCount) throw new Error('SESSION_REVOCATION_NOT_CONFIRMED');
+    }
+    res.setHeader('Set-Cookie', `miu_student=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/;${secure}`);
+    res.status(204).end();
+  } catch (error) {
+    console.error('Student logout could not be verified:', error.name);
+    res.setHeader('Set-Cookie', `miu_student=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/;${secure}`);
+    res.status(503).json({ message: 'This browser was signed out, but the session could not be revoked on the server. Try again when the database is available.' });
+  }
+});
+
 app.post('/api/auth/login', async (req, res) => {
   if (await checkLoginSourceLock(req, res)) return;
   const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
@@ -3228,17 +4131,21 @@ app.post('/api/auth/login', async (req, res) => {
   return res.status(401).json({ message: 'Incorrect email or password.' });
 });
 
-app.post('/api/admin/setup', (req, res) => {
-  if (hasAdminPassword()) {
-    return res.status(409).json({ message: 'Admin password is already configured.' });
-  }
+app.post('/api/admin/setup', async (req, res) => {
+  const replacingConfiguredAccount = hasAdminPassword();
   if (!isLoopbackRequest(req)) {
-    return res.status(403).json({ message: 'Initial admin setup is only allowed from this computer.' });
+    return res.status(403).json({ message: 'Admin account setup is only allowed from this computer.' });
+  }
+  if (process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD) {
+    return res.status(409).json({ message: 'The admin account is managed by environment settings and cannot be changed here.' });
+  }
+  if (!mongoReady) {
+    return res.status(503).json({ message: 'The admin account was not changed because the database is unavailable. Try again after it reconnects.' });
   }
 
   const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
   const { password, confirmPassword } = req.body;
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return res.status(400).json({ message: 'Enter a valid admin email address.' });
   }
   if (typeof password !== 'string' || password.length < 12 || password.length > 200 || password !== confirmPassword) {
@@ -3246,16 +4153,50 @@ app.post('/api/admin/setup', (req, res) => {
   }
 
   const salt = crypto.randomBytes(16).toString('hex');
-  sessionSecret = process.env.ADMIN_SESSION_SECRET || crypto.randomBytes(32).toString('hex');
-  adminCredentials = {
+  const nextSessionVersion = (Number(adminAuthState?.sessionVersion) || 0) + 1;
+  const nextCredentials = {
     email,
     salt,
     passwordHash: crypto.scryptSync(password, salt, 64).toString('hex'),
-    sessionSecret
+    sessionSecret: adminCredentials?.sessionSecret || sessionSecret
   };
-  writeJsonFile(adminCredentialsFile, adminCredentials);
+  let savedAccount = null;
+  if (mongoReady) {
+    const databaseSession = await mongoose.startSession();
+    try {
+      await databaseSession.withTransaction(async () => {
+        await AdminAuthState.deleteMany({}).session(databaseSession);
+        await PasswordResetToken.deleteMany({ accountType: 'admin' }).session(databaseSession);
+        await AdminAuthState.create([{
+          email,
+          salt,
+          passwordHash: nextCredentials.passwordHash,
+          sessionVersion: nextSessionVersion,
+          passwordChangedAt: new Date(),
+          lastLoginAt: null
+        }], { session: databaseSession });
+      }, { writeConcern: { w: 'majority' } });
+      savedAccount = await AdminAuthState.findOne({ email }).read('primary').readConcern('majority').lean();
+      if (!savedAccount || !matchesScryptPassword(password, savedAccount.salt, savedAccount.passwordHash)) {
+        throw new Error('ADMIN_CREDENTIAL_VERIFICATION_FAILED');
+      }
+    } catch (error) {
+      console.error('Admin account setup could not be confirmed in the database:', error.name);
+      return res.status(503).json({ message: 'The database could not confirm the final account state. Refresh the admin page and check the new login before trying again.' });
+    } finally {
+      await databaseSession.endSession();
+    }
+  }
+
+  adminCredentials = nextCredentials;
+  adminAuthState = savedAccount;
+  try {
+    writeJsonFile(adminCredentialsFile, adminCredentials);
+  } catch (error) {
+    console.error('Admin credential cache update failed:', error.name);
+  }
   setAdminSessionCookie(req, res);
-  res.status(201).json({ authenticated: true });
+  res.status(replacingConfiguredAccount ? 200 : 201).json({ authenticated: true, email, savedToDatabase: true });
 });
 
 app.post('/api/admin/login', async (req, res) => {
@@ -3369,16 +4310,66 @@ async function limitPasswordResetRequests(req, res, next) {
 }
 
 async function findRecoverableAccount(email) {
-  const isAdmin = hasAdminPassword() && emailMatches(email);
-  const studentAccount = mongoReady ? await StudentAccount.findOne({ email }).select('email').lean() : null;
-  const clubAccount = mongoReady
-    ? await ClubAccount.findOne({ email }).select('email').lean()
-    : clubAccounts.find((account) => account.email === email);
-  if (isAdmin && (clubAccount || studentAccount)) return null;
-  if (isAdmin) return 'admin';
-  if (studentAccount && clubAccount) return null;
-  if (studentAccount) return 'student';
-  return clubAccount ? 'club' : null;
+  const [studentAccount, clubAccount] = await Promise.all([
+    StudentAccount.findOne({ email }).select('_id').read('primary').lean(),
+    ClubAccount.findOne({ email }).select('_id').read('primary').lean()
+  ]);
+  if (studentAccount || !clubAccount) return null;
+  return 'club';
+}
+
+async function requestClubPasswordReset(email) {
+  if (!mongoReady) throw new Error('Password recovery is temporarily unavailable. Please try again later.');
+  const [studentAccount, clubAccount] = await Promise.all([
+    StudentAccount.findOne({ email }).select('_id').read('primary').lean(),
+    ClubAccount.findOne({ email }).select('email role').read('primary').readConcern('majority').lean()
+  ]);
+  if (studentAccount) return { status: 'student' };
+  if (!clubAccount) return { status: 'not_found' };
+
+  const transporter = getPasswordRecoveryTransport();
+  const baseUrl = getPasswordResetBaseUrl();
+  if (!transporter || !baseUrl) throw new Error('Password recovery email is not configured. Ask the site administrator to configure email delivery.');
+
+  const token = crypto.randomBytes(32).toString('base64url');
+  const tokenHash = hashResetToken(token);
+  const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MS);
+  try {
+    await PasswordResetToken.findOneAndUpdate(
+      { accountType: 'club', email },
+      { $set: { accountType: 'club', email, tokenHash, expiresAt } },
+      { upsert: true, new: true, runValidators: true, writeConcern: { w: 'majority' } }
+    );
+  } catch (error) {
+    if (error.code !== 11000) throw error;
+    await PasswordResetToken.findOneAndUpdate(
+      { accountType: 'club', email },
+      { $set: { tokenHash, expiresAt } },
+      { new: true, runValidators: true, writeConcern: { w: 'majority' } }
+    );
+  }
+
+  const savedToken = await PasswordResetToken.findOne({ accountType: 'club', email, tokenHash })
+    .read('primary').readConcern('majority').lean();
+  if (!savedToken || savedToken.expiresAt <= new Date()) throw new Error('The reset request could not be confirmed in the database.');
+
+  const resetUrl = new URL('/pages/reset-password.html', baseUrl);
+  resetUrl.searchParams.set('token', token);
+  try {
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM,
+      to: email,
+      subject: 'Reset Your MIU Club Dashboard Password',
+      text: `Hello,\n\nA password reset was requested for your MIU club or dashboard account.\n\nUse this link to create and confirm a new password:\n${resetUrl.toString()}\n\nThis link expires in 20 minutes and can only be used once. If you did not request this, you can safely ignore this email.`,
+      html: `<p>Hello,</p><p>A password reset was requested for your MIU club or dashboard account.</p><p><a href="${resetUrl.toString()}">Create a new password</a></p><p>This link expires in 20 minutes and can only be used once. If you did not request this, you can safely ignore this email.</p>`
+    });
+  } catch (error) {
+    await PasswordResetToken.deleteOne({ accountType: 'club', email, tokenHash }).catch((cleanupError) => {
+      console.error('Failed password reset cleanup:', cleanupError.name);
+    });
+    throw error;
+  }
+  return { status: 'sent', email };
 }
 
 app.post('/api/password-reset/request', limitPasswordResetRequests, async (req, res) => {
@@ -3407,15 +4398,21 @@ app.post('/api/password-reset/request', limitPasswordResetRequests, async (req, 
       await PasswordResetToken.findOneAndUpdate(
         { accountType, email },
         { $set: { accountType, email, tokenHash, expiresAt } },
-        { upsert: true, new: true, runValidators: true }
+        { upsert: true, new: true, runValidators: true, writeConcern: { w: 'majority' } }
       );
     } catch (error) {
       if (error.code !== 11000) throw error;
       await PasswordResetToken.findOneAndUpdate(
         { accountType, email },
         { $set: { tokenHash, expiresAt } },
-        { new: true, runValidators: true }
+        { new: true, runValidators: true, writeConcern: { w: 'majority' } }
       );
+    }
+
+    const savedToken = await PasswordResetToken.findOne({ accountType, email, tokenHash })
+      .read('primary').readConcern('majority').lean();
+    if (!savedToken || savedToken.expiresAt <= new Date()) {
+      throw new Error('PASSWORD_RESET_NOT_CONFIRMED');
     }
 
     const resetUrl = new URL('/pages/reset-password.html', baseUrl);
@@ -3469,6 +4466,10 @@ app.post('/api/password-reset/confirm', limitPasswordResetRequests, async (req, 
       await PasswordResetToken.deleteOne({ _id: tokenRecord._id });
       return res.status(400).json({ message: 'This password reset link has expired. Please request a new one.' });
     }
+    if (tokenRecord.accountType !== 'club') {
+      await PasswordResetToken.deleteOne({ _id: tokenRecord._id });
+      return res.status(422).json({ message: 'This reset link is not for a club or dashboard account. Students use Google sign-in or can contact the MIU IT Office.' });
+    }
 
     const salt = crypto.randomBytes(16).toString('hex');
     const passwordHash = crypto.scryptSync(newPassword, salt, 64).toString('hex');
@@ -3485,36 +4486,18 @@ app.post('/api/password-reset/confirm', limitPasswordResetRequests, async (req, 
           throw invalidTokenError;
         }
 
-        if (tokenRecord.accountType === 'club') {
-          updatedAccount = await ClubAccount.findOneAndUpdate(
-            { email: tokenRecord.email },
-            { $set: { salt, passwordHash, passwordChangedAt: now }, $inc: { sessionVersion: 1 } },
-            { new: true, session }
-          ).lean();
-          if (!updatedAccount) throw new Error('RESET_ACCOUNT_UNAVAILABLE');
-        } else if (tokenRecord.accountType === 'student') {
-          updatedAccount = await StudentAccount.findOneAndUpdate(
-            { email: tokenRecord.email },
-            { $set: { salt, passwordHash }, $inc: { sessionVersion: 1 } },
-            { new: true, session }
-          ).lean();
-          if (!updatedAccount) throw new Error('RESET_ACCOUNT_UNAVAILABLE');
-        } else if (tokenRecord.accountType === 'admin'
-          && hasAdminPassword() && emailMatches(tokenRecord.email)) {
-          updatedAccount = await AdminAuthState.findOneAndUpdate(
-            { email: tokenRecord.email },
-            { $set: { email: tokenRecord.email, salt, passwordHash, passwordChangedAt: now }, $inc: { sessionVersion: 1 } },
-            { upsert: true, new: true, session, runValidators: true }
-          ).lean();
-        } else {
-          throw new Error('RESET_ACCOUNT_UNAVAILABLE');
-        }
-      });
+        updatedAccount = await ClubAccount.findOneAndUpdate(
+          { email: tokenRecord.email },
+          { $set: { salt, passwordHash, passwordChangedAt: now }, $inc: { sessionVersion: 1 } },
+          { new: true, session }
+        ).lean();
+        if (!updatedAccount || !clubPasswordMatches(newPassword, updatedAccount)) throw new Error('RESET_ACCOUNT_UNAVAILABLE');
+      }, { writeConcern: { w: 'majority' } });
     } finally {
       await session.endSession();
     }
 
-    if (tokenRecord.accountType === 'club' && updatedAccount) {
+    if (updatedAccount) {
       const accountIndex = clubAccounts.findIndex((account) => account.email === updatedAccount.email);
       if (accountIndex >= 0) clubAccounts[accountIndex] = updatedAccount;
       try {
@@ -3522,10 +4505,8 @@ app.post('/api/password-reset/confirm', limitPasswordResetRequests, async (req, 
       } catch (error) {
         console.error('Club credential cache update failed:', error.name);
       }
-    } else if (tokenRecord.accountType === 'admin' && updatedAccount) {
-      adminAuthState = updatedAccount;
     }
-    res.json({ message: 'Your password has been reset successfully. Please sign in with your new password.' });
+    res.json({ message: 'Password updated successfully. Your previous password is no longer valid. Sign in to the Club Dashboard with your new password.' });
   } catch (error) {
     if (error.code === 'RESET_TOKEN_UNAVAILABLE') {
       return res.status(400).json({ message: 'This password reset link is no longer valid. Please request a new one.' });
@@ -3536,6 +4517,159 @@ app.post('/api/password-reset/confirm', limitPasswordResetRequests, async (req, 
 });
 
 app.use('/api/admin', requireAdmin);
+
+app.post('/api/admin/accounts/password-reset', limitPasswordResetRequests, async (req, res) => {
+  const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+  if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ message: 'Enter a valid account email address.' });
+  }
+  try {
+    const result = await requestClubPasswordReset(email);
+    if (result.status === 'student') {
+      return res.status(422).json({ message: 'Student accounts use Google sign-in. The student must use Google or contact the MIU IT Office.' });
+    }
+    if (result.status === 'not_found') {
+      return res.status(404).json({ message: 'No club or dashboard account was found for this email.' });
+    }
+    return res.json({ message: `A password reset link was sent to ${result.email}. The account owner must use it to choose and confirm a new password.` });
+  } catch (error) {
+    console.error('Admin password reset request failed:', error.name);
+    return res.status(503).json({ message: error.message || 'The reset request could not be confirmed. Please try again.' });
+  }
+});
+
+app.post('/api/admin/accounts/password', limitPasswordResetRequests, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+  const { password, confirmPassword } = req.body;
+  if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ message: 'Enter a valid club or dashboard email address.' });
+  }
+  if (typeof password !== 'string' || password.length < 12 || password.length > 200) {
+    return res.status(400).json({ message: 'Use a password between 12 and 200 characters.' });
+  }
+  if (password !== confirmPassword) return res.status(400).json({ message: 'The passwords do not match.' });
+  if (!requireLiveDatabase(res)) return;
+
+  try {
+    const studentAccount = await StudentAccount.findOne({ email }).select('_id').read('primary').lean();
+    if (studentAccount) {
+      return res.status(422).json({ message: 'Student accounts use Google sign-in. They cannot have a portal password set here; contact the MIU IT Office for access help.' });
+    }
+
+    const salt = crypto.randomBytes(16).toString('hex');
+    const passwordHash = crypto.scryptSync(password, salt, 64).toString('hex');
+    const updatedAccount = await ClubAccount.findOneAndUpdate(
+      { email },
+      { $set: { salt, passwordHash, passwordChangedAt: new Date() }, $inc: { sessionVersion: 1 } },
+      { new: true, runValidators: true, writeConcern: { w: 'majority' } }
+    ).read('primary').readConcern('majority').lean();
+    if (!updatedAccount) return res.status(404).json({ message: 'No club or dashboard account was found for this email.' });
+
+    const verifiedAccount = await ClubAccount.findOne({ email }).read('primary').readConcern('majority').lean();
+    if (!verifiedAccount || verifiedAccount.passwordHash !== passwordHash || verifiedAccount.salt !== salt
+      || !clubPasswordMatches(password, verifiedAccount)) {
+      return res.status(503).json({ message: 'The database could not confirm the new password. Do not treat it as saved; try again after checking the account.' });
+    }
+
+    const accountIndex = clubAccounts.findIndex((account) => account.email === email);
+    if (accountIndex >= 0) clubAccounts[accountIndex] = verifiedAccount;
+    writePrivateClubAccountsFile();
+    return res.json({ message: 'The new password was saved and verified in the database. Share it with the account owner through a secure channel.' });
+  } catch (error) {
+    console.error('Admin direct account password update failed:', error.name);
+    return res.status(503).json({ message: 'The password was not confirmed in the database. Please try again.' });
+  }
+});
+
+app.get('/api/admin/university-content', async (req, res) => {
+  try {
+    if (!requireLiveDatabase(res)) return;
+    res.setHeader('Cache-Control', 'no-store');
+    const records = await UniversityContent.find().read('primary').readConcern('majority').sort({ createdAt: -1, id: -1 }).lean();
+    res.json(records.map(toApiRecord));
+  } catch (error) {
+    console.error('Admin university content read failed:', error.name);
+    res.status(503).json({ message: 'Could not load university posts right now.' });
+  }
+});
+
+app.post('/api/admin/university-content', async (req, res) => {
+  if (!requireLiveDatabase(res)) return;
+  const type = ['event', 'announcement'].includes(req.body.type) ? req.body.type : '';
+  const title = cleanText(req.body.title, 140);
+  const description = cleanText(req.body.description, 2000);
+  const date = cleanText(req.body.date, 40);
+  const time = cleanText(req.body.time, 40);
+  const location = cleanText(req.body.location, 160);
+  const useCustomImage = req.body.imageChoice === 'custom';
+  if (!type || !title || !description) {
+    return res.status(400).json({ message: 'Enter a title and description.' });
+  }
+  let image = '/assets/img/pics/logo.svg.png';
+  let imagePublicId = '';
+  if (useCustomImage) {
+    const match = typeof req.body.imageData === 'string'
+      ? req.body.imageData.match(/^data:image\/(png|jpeg|webp);base64,([a-zA-Z0-9+/]+=*)$/)
+      : null;
+    if (!match) return res.status(400).json({ message: 'Choose a PNG, JPG, or WebP image up to 5 MB.' });
+    if (Buffer.from(match[2], 'base64').length > 5 * 1024 * 1024) {
+      return res.status(400).json({ message: 'The image must be 5 MB or smaller.' });
+    }
+    if (!cloudinaryConfigured) return res.status(503).json({ message: 'Custom image uploads are unavailable. Choose the MIU logo or try again later.' });
+    try {
+      const uploaded = await cloudinary.uploader.upload(req.body.imageData, {
+        folder: 'miu-university-content', resource_type: 'image',
+        transformation: [{ width: 1600, height: 1200, crop: 'limit', quality: 'auto', fetch_format: 'auto' }]
+      });
+      image = uploaded.secure_url;
+      imagePublicId = uploaded.public_id;
+    } catch (error) {
+      console.error('University image upload failed:', error.name);
+      return res.status(503).json({ message: 'The image could not be uploaded. Please try again.' });
+    }
+  }
+  try {
+    const last = await UniversityContent.findOne().read('primary').readConcern('majority').sort({ id: -1 }).select('id').lean();
+    const record = new UniversityContent({
+      id: (last?.id || 0) + 1, type, title, description, date, time,
+      registrationEnabled: type === 'event' && req.body.registrationEnabled === true,
+      location,
+      image, imagePublicId, publishedBy: getConfiguredAdminEmail() || 'MIU Admin'
+    });
+    await record.save({ w: 'majority' });
+    const persistedRecord = await UniversityContent.findById(record._id).read('primary').readConcern('majority').lean();
+    if (!persistedRecord) throw new Error('University post was not confirmed in the database.');
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(201).json(toApiRecord(persistedRecord));
+  } catch (error) {
+    if (imagePublicId && cloudinaryConfigured) cloudinary.uploader.destroy(imagePublicId, { resource_type: 'image' }).catch(() => {});
+    console.error('University content publish failed:', error.name);
+    res.status(503).json({ message: 'Could not publish this update. Please try again.' });
+  }
+});
+
+app.delete('/api/admin/university-content/:id', async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id < 1) return res.status(400).json({ message: 'Choose a valid university post.' });
+  try {
+    if (!requireLiveDatabase(res)) return;
+    const record = await UniversityContent.findOne({ id }).read('primary').lean();
+    if (!record) return res.status(404).json({ message: 'University post not found.' });
+    const deletion = await UniversityContent.deleteOne({ id }, { writeConcern: { w: 'majority' } });
+    if (deletion.deletedCount !== 1) throw new Error('University post deletion was not confirmed.');
+    const stillExists = await UniversityContent.exists({ id }).read('primary').readConcern('majority');
+    if (stillExists) throw new Error('University post deletion was not confirmed.');
+    if (record.imagePublicId && cloudinaryConfigured) {
+      cloudinary.uploader.destroy(record.imagePublicId, { resource_type: 'image' }).catch(() => {});
+    }
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(204).end();
+  } catch (error) {
+    console.error('University content delete failed:', error.name);
+    res.status(503).json({ message: 'Could not delete this university post.' });
+  }
+});
 
 app.get('/api/admin/visitor-analytics', async (req, res) => {
   if (!mongoReady || mongoose.connection.readyState !== 1) {
@@ -3598,7 +4732,7 @@ app.get('/api/admin/system/data-status', async (req, res) => {
       contentByType, contentByStatus, attendanceByStatus, eventRegistrations,
       attendanceSessions, clubAccounts, studentAccounts, studentEmailCodes,
       passwordResetTokens, loginAttempts, auditLogs, siteSettings, adminAccounts,
-      namedMemberProfiles, memberTotals
+      namedMemberProfiles, memberTotals, acceptedMemberProfiles
     ] = await Promise.all([
       Club.countDocuments(),
       Club.countDocuments({ $or: [{ archivedAt: null }, { archivedAt: { $exists: false } }] }),
@@ -3613,7 +4747,8 @@ app.get('/api/admin/system/data-status', async (req, res) => {
       PasswordResetToken.countDocuments(), LoginAttempt.countDocuments(), AuditLog.countDocuments(),
       SiteSetting.countDocuments(), AdminAuthState.countDocuments(),
       Club.aggregate([{ $unwind: '$memberRoster' }, { $count: 'count' }]),
-      Club.aggregate([{ $group: { _id: null, total: { $sum: { $ifNull: ['$members', 0] } } } }])
+      Club.aggregate([{ $group: { _id: null, total: { $sum: { $ifNull: ['$members', 0] } } } }]),
+      Application.countDocuments({ status: 'accepted' })
     ]);
 
     const countMap = (rows) => Object.fromEntries(rows.map((row) => [row._id || 'unknown', row.count]));
@@ -3624,7 +4759,7 @@ app.get('/api/admin/system/data-status', async (req, res) => {
       database: { connected: true, state: 'connected' },
       sections: [
         { title: 'Clubs and homepage', count: totalClubs, detail: `${activeClubs} active · ${archivedClubs} archived`, methods: 'GET /api/clubs · GET/PUT /api/admin/homepage · POST /api/admin/clubs · PATCH /api/admin/clubs/:id · archive/restore/order routes' },
-        { title: 'Club members', count: namedMemberProfiles[0]?.count || 0, detail: `${memberTotals[0]?.total || 0} total members across club rosters`, methods: 'GET /api/admin/club-members · GET/POST /api/club/members (club login required)' },
+        { title: 'Club members', count: (namedMemberProfiles[0]?.count || 0) + acceptedMemberProfiles, detail: `${(memberTotals[0]?.total || 0) + acceptedMemberProfiles} total members across club rosters, including accepted applicants`, methods: 'GET /api/admin/club-members · GET/POST /api/club/members (club login required)' },
         { title: 'Applications', count: Object.values(countMap(applicationsByStatus)).reduce((sum, value) => sum + value, 0), detail: Object.entries(countMap(applicationsByStatus)).map(([key, value]) => `${key}: ${value}`).join(' · ') || 'No applications', methods: 'GET /api/admin/applications · POST /api/applications · PATCH status · DELETE application' },
         { title: 'Events, booths, posts, and sponsors', count: Object.values(embeddedContent).reduce((sum, value) => sum + value, 0), detail: `Events ${embeddedContent.events} · booths ${embeddedContent.booths} · posts ${embeddedContent.posts} · sponsors ${embeddedContent.sponsors}; ${Object.values(countMap(contentByType)).reduce((sum, value) => sum + value, 0)} workflow requests`, methods: 'GET /api/clubs · GET/POST /api/club/content · POST event/feed/sponsor/booth · PUT/DELETE content item' },
         { title: 'Content approval workflow', count: Object.values(countMap(contentByStatus)).reduce((sum, value) => sum + value, 0), detail: Object.entries(countMap(contentByStatus)).map(([key, value]) => `${key}: ${value}`).join(' · ') || 'No requests', methods: 'GET /api/committee/requests · POST /api/committee/requests/:id/action · Entry Permits: PR → Security Office → Dean; other content: PR → English → Dean' },
@@ -3668,10 +4803,11 @@ app.get('/api/admin/event-analytics', async (req, res) => {
     return res.status(503).json({ message: 'Live database analytics are unavailable while MongoDB is disconnected.' });
   }
   try {
-    const [clubRecords, registrations, attendance] = await Promise.all([
+    const [clubRecords, registrations, attendance, studentInterests] = await Promise.all([
       Club.find({ archivedAt: null }).select('id name events').sort({ name: 1 }).lean(),
       EventRegistration.find({}).select('clubId eventIndex eventTitle').lean(),
-      AttendanceRecord.find({ itemType: 'event' }).select('clubId eventRequestId eventTitle').lean()
+      AttendanceRecord.find({ itemType: 'event' }).select('clubId eventRequestId eventTitle').lean(),
+      StudentInterest.find({}).select('clubId eventIndex registered').read('primary').readConcern('majority').lean()
     ]);
     const registrationCounts = new Map();
     for (const registration of registrations) {
@@ -3689,8 +4825,16 @@ app.get('/api/admin/event-analytics', async (req, res) => {
         attendanceCounts.set(requestKey, (attendanceCounts.get(requestKey) || 0) + 1);
       }
     }
+    const studentInterestCounts = new Map();
+    const studentRegistrationCounts = new Map();
+    for (const interest of studentInterests) {
+      const key = `${Number(interest.clubId)}:${Number(interest.eventIndex)}`;
+      studentInterestCounts.set(key, (studentInterestCounts.get(key) || 0) + 1);
+      if (interest.registered) studentRegistrationCounts.set(key, (studentRegistrationCounts.get(key) || 0) + 1);
+    }
     const events = clubRecords.flatMap((club) => (Array.isArray(club.events) ? club.events : []).map((event, eventIndex) => {
       const title = String(event.title || 'Untitled event');
+      const eventKey = `${Number(club.id)}:${eventIndex}`;
       const requestId = Number(event.requestId);
       const checkIns = requestId > 0
         ? attendanceCounts.get(`${Number(club.id)}:request:${requestId}`) || 0
@@ -3699,17 +4843,21 @@ app.get('/api/admin/event-analytics', async (req, res) => {
         clubId: Number(club.id), clubName: club.name || 'Club', eventIndex,
         title, date: String(event.date || ''),
         views: Math.max(0, Number(eventViews[requestId > 0 ? `${Number(club.id)}:request:${requestId}` : `${Number(club.id)}:${eventIndex}`]) || 0),
-        registrations: registrationCounts.get(`${Number(club.id)}:${eventIndex}`) || 0,
+        registrations: registrationCounts.get(eventKey) || 0,
+        studentInterest: studentInterestCounts.get(eventKey) || 0,
+        studentRegistrations: studentRegistrationCounts.get(eventKey) || 0,
         checkIns
       };
     }));
     res.setHeader('Cache-Control', 'no-store');
-    res.json({
-      totals: events.reduce((total, event) => ({
+    const totals = events.reduce((total, event) => ({
         views: total.views + event.views,
         registrations: total.registrations + event.registrations,
         checkIns: total.checkIns + event.checkIns
-      }), { views: 0, registrations: 0, checkIns: 0 }),
+      }), { views: 0, registrations: 0, checkIns: 0 });
+    totals.studentsInterested = new Set(studentInterests.map((interest) => interest.studentEmail)).size;
+    res.json({
+      totals,
       events: events.sort((a, b) => b.views - a.views || b.registrations - a.registrations || a.title.localeCompare(b.title))
     });
   } catch (error) {
@@ -3730,10 +4878,10 @@ app.get('/api/admin/club-members', async (req, res) => {
 
 app.get('/api/admin/clubs/archived', async (req, res) => {
   try {
+    if (!requireLiveDatabase(res)) return;
     res.setHeader('Cache-Control', 'no-store');
-    const records = mongoReady
-      ? (await Club.find({ archivedAt: { $ne: null } }).sort({ archivedAt: -1, name: 1 }).lean()).map(toApiRecord)
-      : clubs.filter((club) => Boolean(club.archivedAt)).sort((a, b) => String(b.archivedAt).localeCompare(String(a.archivedAt)));
+    const records = (await Club.find({ archivedAt: { $ne: null } }).read('primary').readConcern('majority')
+      .sort({ archivedAt: -1, name: 1 }).lean()).map(toApiRecord);
     res.json(records);
   } catch (error) {
     console.error('Database operation failed:', error.name);
@@ -3743,9 +4891,9 @@ app.get('/api/admin/clubs/archived', async (req, res) => {
 
 app.get('/api/admin/applications', async (req, res) => {
   try {
-    const records = mongoReady
-      ? (await Application.find().sort({ id: -1 }).lean()).map(toApiRecord)
-      : applications.map(toApiRecord);
+    if (!requireLiveDatabase(res)) return;
+    const records = (await Application.find().read('primary').readConcern('majority').sort({ id: -1 }).lean())
+      .map(toApiRecord);
     res.setHeader('Cache-Control', 'no-store');
     res.json(records);
   } catch (error) {
@@ -3964,11 +5112,11 @@ app.get('/admin/global', requireAdmin, (req, res) => {
 
 app.get('/api/admin/homepage', async (req, res) => {
   try {
-    if (mongoReady) {
-      const settings = await SiteSetting.findOne({ key: 'homepage' }).lean();
-      if (settings) homepageSettings = { title: settings.title, subtitle: settings.subtitle };
-    }
-    res.json(homepageSettings);
+    if (!requireLiveDatabase(res)) return;
+    const settings = await SiteSetting.findOne({ key: 'homepage' }).read('primary').readConcern('majority').lean();
+    res.json(settings
+      ? { title: settings.title, subtitle: settings.subtitle }
+      : { title: 'University Clubs', subtitle: 'Explore all clubs and apply to the ones that match your interests.' });
   } catch (error) {
     console.error('Database operation failed:', error.name);
     res.status(503).json({ message: 'The data store is temporarily unavailable.' });
@@ -4181,9 +5329,9 @@ app.post('/api/admin/clubs/:id/restore', async (req, res) => {
 app.get('/api/club/applications', requireClubAuth, async (req, res) => {
   const clubId = req.clubAccount.clubId;
   try {
-    const records = mongoReady
-      ? (await Application.find({ clubId, ...(req.clubAccount.role === 'head' ? { committee: req.clubAccount.committee } : {}) }).sort({ id: 1 }).lean()).map(toApiRecord)
-      : applications.filter((application) => accountCanReviewApplication(req.clubAccount, application)).map(toApiRecord);
+    if (!requireLiveDatabase(res)) return;
+    const records = (await Application.find({ clubId, ...(req.clubAccount.role === 'head' ? { committee: req.clubAccount.committee } : {}) })
+      .read('primary').readConcern('majority').sort({ id: 1 }).lean()).map(toApiRecord);
     res.json(records);
   } catch (error) {
     console.error('Database operation failed:', error.name);
@@ -4195,9 +5343,9 @@ app.get('/api/club/:id/applications', requireClubAuth, async (req, res) => {
   const clubId = Number(req.params.id);
   if (clubId !== req.clubAccount.clubId) return res.status(403).json({ message: 'This club account cannot access another club.' });
   try {
-    const filtered = mongoReady
-      ? (await Application.find({ clubId, ...(req.clubAccount.role === 'head' ? { committee: req.clubAccount.committee } : {}) }).sort({ id: 1 }).lean()).map(toApiRecord)
-      : applications.filter((application) => accountCanReviewApplication(req.clubAccount, application)).map(toApiRecord);
+    if (!requireLiveDatabase(res)) return;
+    const filtered = (await Application.find({ clubId, ...(req.clubAccount.role === 'head' ? { committee: req.clubAccount.committee } : {}) })
+      .read('primary').readConcern('majority').sort({ id: 1 }).lean()).map(toApiRecord);
     res.json(filtered);
   } catch (error) {
     console.error('Database operation failed:', error.name);
@@ -4207,9 +5355,9 @@ app.get('/api/club/:id/applications', requireClubAuth, async (req, res) => {
 
 app.get('/api/applications', requireAdmin, async (req, res) => {
   try {
-    const records = mongoReady
-      ? (await Application.find().sort({ id: 1 }).lean()).map(toApiRecord)
-      : applications.map(toApiRecord);
+    if (!requireLiveDatabase(res)) return;
+    const records = (await Application.find().read('primary').readConcern('majority').sort({ id: 1 }).lean())
+      .map(toApiRecord);
     res.json(records);
   } catch (error) {
     console.error('Database operation failed:', error.name);
@@ -4222,9 +5370,8 @@ app.post('/api/applications', async (req, res) => {
   const clubId = Number(payload.clubId);
   let selectedClub;
   try {
-    selectedClub = mongoReady
-      ? await Club.findOne({ id: clubId, archivedAt: null }).lean()
-      : clubs.find((club) => club.id === clubId && !club.archivedAt);
+    if (!requireLiveDatabase(res)) return;
+    selectedClub = await Club.findOne({ id: clubId, archivedAt: null }).read('primary').readConcern('majority').lean();
   } catch (error) {
     console.error('Database operation failed:', error.name);
     return res.status(503).json({ message: 'The data store is temporarily unavailable.' });
@@ -4298,6 +5445,25 @@ app.post('/api/applications', async (req, res) => {
 
   try {
     if (!requireLiveDatabase(res)) return;
+    const signedInStudent = await getStudentAccountFromRequest(req, res);
+    if (signedInStudent && cleanText(payload.email, 254).toLowerCase() === signedInStudent.email) {
+      const profile = {
+        name: cleanText(payload.studentName, 160),
+        universityId: cleanText(payload.universityId, 40),
+        major: cleanText(payload.major, 120),
+        phone: cleanText(payload.phone, 40),
+        age: cleanText(payload.age, 3)
+      };
+      const savedProfile = await StudentAccount.findOneAndUpdate(
+        { email: signedInStudent.email, sessionVersion: signedInStudent.sessionVersion },
+        { $set: profile },
+        { new: true, runValidators: true, writeConcern: { w: 'majority' } }
+      ).read('primary').readConcern('majority').lean();
+      if (!savedProfile || savedProfile.name !== profile.name || savedProfile.universityId !== profile.universityId
+        || savedProfile.major !== profile.major || savedProfile.phone !== profile.phone || savedProfile.age !== profile.age) {
+        return res.status(503).json({ message: 'Your profile could not be verified as saved. Your application was not submitted.' });
+      }
+    }
     await Application.create(newApplication);
     applications.unshift(newApplication);
     res.status(201).json({ application: toApiRecord(newApplication), managementToken });
@@ -4463,8 +5629,8 @@ app.patch('/api/applications/:id/status', requireClubAuth, async (req, res) => {
         ? await Club.findOne({ id: req.clubAccount.clubId }).select('interviewForms').lean()
         : clubs.find((item) => item.id === req.clubAccount.clubId);
       const scope = getInterviewFormScope(req.clubAccount);
-      const form = (club?.interviewForms || []).find((item) => item.scope === scope);
-      const questions = (form?.sections || []).flatMap((section) => section.questions || []);
+      const questions = getInterviewFormSections(club?.interviewForms, scope)
+        .flatMap((section) => section.questions || []);
       const submittedAnswers = new Map(req.body.interviewAnswers.map((answer) => [String(answer.key), answer.value]));
       const interviewAnswers = questions.map((question) => ({
         key: question.key,
@@ -4531,26 +5697,75 @@ app.get('/attendance', (req, res) => res.sendFile(path.join(__dirname, 'public',
 
 app.use(express.static(path.join(__dirname, 'public')));
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[character]);
+}
+
+function sendHttpErrorPage(res, status, title, detail) {
+  const retryButton = status >= 500
+    ? '<button class="retry-action" type="button" onclick="location.reload()">Try again</button>'
+    : '';
+  const html = fs.readFileSync(path.join(__dirname, 'private', 'error-page.html'), 'utf8')
+    .replaceAll('{{STATUS}}', escapeHtml(status))
+    .replaceAll('{{TITLE}}', escapeHtml(title))
+    .replaceAll('{{DETAIL}}', escapeHtml(detail))
+    .replace('{{RETRY_BUTTON}}', retryButton);
+  return res.status(status).type('html').send(html);
+}
+
 app.use((req, res) => {
   if (req.path.startsWith('/api/')) {
-    return res.status(404).json({ message: 'API endpoint not found.' });
+    return res.status(404).json({ status: 404, code: 'API_NOT_FOUND', message: 'This API endpoint was not found.' });
   }
-  res.status(404).sendFile(path.join(__dirname, 'public', '404.html'));
+  return sendHttpErrorPage(res, 404, 'We couldn’t find that page', 'The address may be incorrect, or the page may have moved.');
 });
 
 app.use((error, req, res, next) => {
   if (res.headersSent) return next(error);
   const isMalformedJson = error instanceof SyntaxError && error.status === 400 && Object.hasOwn(error, 'body');
-  const status = isMalformedJson ? 400 : error.status === 413 ? 413 : 500;
+  const isPayloadTooLarge = error.status === 413 || error.statusCode === 413 || error.type === 'entity.too.large'
+    || error.code === 'LIMIT_FILE_SIZE';
+  const isDuplicate = error.code === 11000;
+  const isValidation = error.name === 'ValidationError' || error.name === 'CastError';
+  const status = isMalformedJson ? 400 : isPayloadTooLarge ? 413 : isDuplicate ? 409
+    : isValidation ? 422 : [400, 401, 403, 404, 408, 409, 413, 422, 429, 503].includes(error.status) ? error.status : 500;
   if (status === 500) console.error('Request failed:', error.name || 'Error');
+  const code = ({ 400: 'INVALID_REQUEST', 401: 'SIGN_IN_REQUIRED', 403: 'ACCESS_DENIED', 404: 'NOT_FOUND',
+    408: 'REQUEST_TIMEOUT', 409: 'CONFLICT', 413: 'PAYLOAD_TOO_LARGE', 422: 'VALIDATION_FAILED',
+    429: 'TOO_MANY_REQUESTS', 500: 'INTERNAL_ERROR', 503: 'SERVICE_UNAVAILABLE' })[status] || 'REQUEST_FAILED';
+  const message = isMalformedJson ? 'The request could not be read. Check the submitted form and try again.'
+    : isPayloadTooLarge ? 'This upload is larger than the allowed limit. Choose a smaller file or remove large attachments.'
+    : isDuplicate ? `This information already exists${Object.keys(error.keyPattern || {}).length ? ` (${Object.keys(error.keyPattern).join(', ')}).` : '. Check for a duplicate name or email address.'}`
+    : isValidation ? `Some submitted information needs to be corrected${details.length ? `: ${details.map((item) => item.field.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[._-]+/g, ' ')).join(', ')}.` : '.'}`
+    : status === 409 ? 'This action conflicts with the latest saved information. Refresh and try again.'
+    : status === 503 ? 'The service is temporarily unavailable. Your changes have not been confirmed as saved.'
+    : 'Something went wrong while processing this request. Please try again.';
+  const details = isMalformedJson
+    ? [{ field: 'request', message: 'The form data was incomplete or incorrectly formatted.' }]
+    : isPayloadTooLarge
+      ? [{ field: 'upload', message: 'Reduce the file size and submit again.' }]
+      : isDuplicate
+        ? Object.keys(error.keyPattern || {}).map((field) => ({ field, message: 'This value is already in use.' }))
+        : error.name === 'ValidationError'
+          ? Object.values(error.errors || {}).map((fieldError) => ({
+            field: fieldError.path,
+            message: fieldError.kind === 'required' ? 'This field is required.' : 'Check the value entered for this field.'
+          }))
+          : error.name === 'CastError' ? [{ field: error.path, message: 'Use a valid value for this field.' }] : [];
   if (req.path.startsWith('/api/')) {
-    const message = isMalformedJson ? 'The request contains invalid JSON.'
-      : status === 413 ? 'The uploaded data is too large.'
-      : 'Something went wrong. Please try again.';
-    return res.status(status).json({ message });
+    return res.status(status).json({ status, code, message, ...(details.length ? { details } : {}) });
   }
-  if (isMalformedJson) return res.status(status).send('The request contains invalid JSON.');
-  res.status(status).sendFile(path.join(__dirname, 'public', '500.html'));
+  const pageTitle = status === 413 ? 'Your request is too large'
+    : status === 422 ? 'Check the information you entered'
+    : status === 409 ? 'This action needs an update'
+    : status === 503 ? 'The service is temporarily unavailable'
+    : status === 400 ? 'The request could not be read'
+    : 'Something went wrong';
+  const pageDetail = details.length ? details.map((item) => `${item.field}: ${item.message}`).join(' ')
+    : message;
+  return sendHttpErrorPage(res, status, pageTitle, pageDetail);
 });
 
 const connectMongo = async () => {
@@ -4560,7 +5775,12 @@ const connectMongo = async () => {
       return;
     }
 
-    await mongoose.connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 8000 });
+    await mongoose.connect(process.env.MONGO_URI, {
+      serverSelectionTimeoutMS: 8000,
+      readPreference: 'primary',
+      readConcern: { level: 'majority' },
+      writeConcern: { w: 'majority' }
+    });
     await initializeMongoData();
     mongoReady = true;
     console.log('MongoDB connected successfully');

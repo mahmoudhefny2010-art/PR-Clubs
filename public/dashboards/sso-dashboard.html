@@ -3,12 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="/assets/js/site-loading.js?v=20261010scrolltop1"></script>
     <meta name="robots" content="noindex, nofollow, noarchive" />
     <title>Student Support Office | Attendance Reviews</title>
-    <link rel="stylesheet" href="/assets/css/base.css?v=20261009e" />
-    <link rel="stylesheet" href="/assets/css/responsive.css?v=20261009b" />
+    <link rel="stylesheet" href="/assets/css/base.css?v=20261010loading2" />
+    <link rel="stylesheet" href="/assets/css/responsive.css?v=20261010navpolish1" />
     <link rel="stylesheet" href="/assets/css/dark.css?v=20261009c" />
-    <link rel="stylesheet" href="/assets/css/features.css?v=20261009au" />
+    <link rel="stylesheet" href="/assets/css/features.css?v=20261010eventcards3" />
     <link rel="icon" href="/assets/img/pics/logo.svg.png" type="image/png" />
     <link rel="stylesheet" href="/assets/css/pages/sso-dashboard.css?v=1" />
   </head>
@@ -17,23 +18,35 @@
     <main class="sso-page committee-dashboard-layout">
       <aside class="committee-sidebar" data-unread-scope="sso" aria-label="SSO dashboard navigation">
         <h2>DASHBOARD</h2><a class="committee-sidebar-link is-active" href="#ssoOverviewPanel" data-dashboard-panel="ssoOverviewPanel">Overview</a>
-        <h3>ATTENDANCE</h3><button id="openAttendanceReviewBtn" class="committee-sidebar-link" data-dashboard-panel="attendanceReviewDialog" type="button">Attendance approvals <span class="sidebar-unread-badge" data-unread-badge="attendanceApprovals" hidden></span></button>
+        <h3>ATTENDANCE</h3><button id="openAttendanceReviewBtn" class="committee-sidebar-link" data-dashboard-panel="attendanceReviewDialog" type="button">Attendance approvals <span class="sidebar-unread-badge" data-unread-badge="attendanceApprovals" hidden></span></button><button id="openCommitteeAttendanceBtn" class="committee-sidebar-link" data-dashboard-panel="committeeAttendanceDialog" type="button">All attendance history <span class="sidebar-unread-badge" data-unread-badge="eventAttendance" hidden></span></button>
       </aside>
       <div class="sso-content">
       <section id="ssoOverviewPanel" class="sso-hero committee-overview-panel">
-        <div><span class="committee-label">STUDENT SUPPORT OFFICE</span><h1>Overview</h1><p>Attendance approved by PR and waiting for SSO review.</p><div class="committee-overview-stats overview-grid-1"><button class="overview-stat-card" type="button" id="overviewReviewsBtn"><span>Pending SSO reviews</span><strong data-overview-count="attendanceApprovals">—</strong><small>Open attendance approval queue</small></button></div></div>
+        <div><span class="committee-label">STUDENT SUPPORT OFFICE</span><h1>Overview</h1><p>Complete event attendance lists approved by PR and waiting for SSO review.</p><div class="committee-overview-stats overview-grid-1"><button class="overview-stat-card" type="button" id="overviewReviewsBtn"><span>Pending SSO reviews</span><strong data-overview-count="attendanceApprovals">&#8212;</strong><small>Open attendance approval queue</small></button></div></div>
         <div class="top-actions"><a class="secondary-btn" href="/">Back</a><button id="ssoLogoutBtn" class="logout-btn" type="button">Logout</button></div>
       </section>
 
       </div>
     </main>
     <dialog id="attendanceReviewDialog" class="attendance-review-dialog" aria-labelledby="attendanceReviewTitle">
-      <section class="attendance-review-panel"><header><div><span class="committee-label">PR APPROVED</span><h2 id="attendanceReviewTitle">Pending SSO review</h2><p>Approve the attendance records to send them to the Dean.</p></div><div class="attendance-review-actions"><button class="secondary-btn" type="button" data-refresh-attendance-reviews>Refresh</button><button class="calendar-close-btn" type="button" data-close-attendance-reviews aria-label="Close attendance reviews">&times;</button></div></header><p data-attendance-review-message role="status" aria-live="polite"></p><div data-attendance-review-list></div></section>
+      <section class="attendance-review-panel"><header><div><span class="committee-label">PR APPROVED</span><h2 id="attendanceReviewTitle">Pending SSO review</h2><p>PR-approved check-in lists are grouped by event. Approve the full list to send it to the Dean.</p></div><div class="attendance-review-actions"><button class="secondary-btn" type="button" data-refresh-attendance-reviews>Refresh</button><button class="calendar-close-btn" type="button" data-close-attendance-reviews aria-label="Close attendance reviews">&times;</button></div></header><p data-attendance-review-message role="status" aria-live="polite"></p><div data-attendance-review-list></div></section>
+    </dialog>
+    <dialog id="committeeAttendanceDialog" class="committee-attendance-dialog" aria-labelledby="committeeAttendanceTitle">
+      <div class="committee-attendance-inner">
+        <header class="committee-attendance-header">
+          <div><span class="admin-eyebrow">EVENT ATTENDANCE</span><h2 id="committeeAttendanceTitle">Attendance by event</h2><p>Review check-ins grouped by event or booth after the club ends attendance.</p></div>
+          <button class="calendar-close-btn" type="button" data-close-committee-attendance aria-label="Close attendance history">&times;</button>
+        </header>
+        <label class="committee-attendance-search">Search events, clubs, or attendees<input id="committeeAttendanceSearch" type="search" placeholder="Search by event, club, name, or email"></label>
+        <p id="committeeAttendanceFeedback" class="admin-feedback" role="status" aria-live="polite"></p>
+        <div id="committeeAttendanceRecords" class="committee-attendance-records" aria-live="polite"></div>
+      </div>
     </dialog>
     <div id="site-footer"></div>
-    <script src="/assets/js/committee-sidebar.js?v=13"></script>
-    <script src="/assets/js/attendance-approval-workflow.js?v=9"></script>
-    <script src="/assets/js/layout.js?v=11" defer></script>
+    <script src="/assets/js/committee-sidebar.js?v=20261010unreadbadges1"></script>
+    <script src="/assets/js/committee-attendance.js?v=20261010eventcards3"></script>
+    <script src="/assets/js/attendance-approval-workflow.js?v=20261010eventreview2"></script>
+    <script src="/assets/js/layout.js?v=20261010passwordeye1" defer></script>
     <script src="/assets/js/theme.js?v=20261009c" defer></script>
   </body>
 </html>

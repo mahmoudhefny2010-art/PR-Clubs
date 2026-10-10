@@ -20,6 +20,7 @@ function respond(url, method, referer, body, scenario = '') {
   const p = url.pathname;
   const role = /security-dashboard/.test(referer) ? 'security' : /english-dashboard/.test(referer) ? 'english' : /dean-dashboard|__audit\/dean-entry-permit/.test(referer) ? 'dean' : /pr-dashboard/.test(referer) ? 'pr' : /sso-dashboard/.test(referer) ? 'sso' : 'president';
   if (p === '/api/site/visitor-ping' || /\/view$/.test(p)) return [200, { ok: true }];
+  if (p === '/api/site/account-session') return [200, /\/admin\/global/.test(referer) ? { authenticated: true, type: 'admin' } : { authenticated: false }];
   if (p === '/api/clubs') return [200, clubs];
   if (p === '/api/admin/homepage') return [200, { title: 'University Clubs', subtitle: 'Explore all clubs and apply to the ones that match your interests.' }];
   if (p === '/api/club-auth/session') return [200, { authenticated: true, club: { id: ['pr', 'english', 'security', 'dean', 'sso'].includes(role) ? 0 : 1, clubId: 1, name: role === 'dean' ? 'Dean' : role === 'security' ? 'Security Office' : role.toUpperCase() === 'PRESIDENT' ? 'MUN' : role.toUpperCase(), email: 'fixture@example.test', role, committee: 'All Committees', image: clubs[0].image } }];
@@ -82,6 +83,19 @@ function respond(url, method, referer, body, scenario = '') {
   if (p === '/api/admin/club-views') return [200, { totalViews: 4, clubs: [{ clubId: 1, views: 4 }] }];
   if (p === '/api/admin/event-analytics') return [200, { totals: { views: 4, registrations: 2, checkins: 1 }, events: [{ ...event, clubName: 'MUN', clubId: 1, views: 4, registrations: 2, checkins: 1 }] }];
   if (p === '/api/admin/visitor-analytics') return [200, { onlineNow: 1, signedInAccounts: 1, uniqueVisitors: 1, uniqueIps: 1, activePeople: [], deviceTypes: {}, onlineWindowMinutes: 5 }];
+  if (p === '/api/admin/university-content' && method === 'GET') return [200, [
+    { id: 701, type: 'announcement', title: 'MIU community update', description: 'A university announcement shown to students.', image: '/assets/img/pics/logo.svg.png', createdAt: '2026-10-09T10:00:00.000Z' },
+    { id: 702, type: 'event', title: 'University welcome event', description: 'A sample university event.', date: '2026-10-20', time: '10:30', location: 'Main Hall', image: '/assets/img/pics/logo.svg.png', createdAt: '2026-10-09T10:00:00.000Z' }
+  ]];
+  if (p === '/api/admin/university-content' && method === 'POST') {
+    if (scenario === 'admin-university-save-failure') return [503, { message: 'Database write could not be confirmed.' }];
+    return [201, { id: 703, createdAt: '2026-10-09T11:00:00Z', ...body }];
+  }
+  if (/^\/api\/admin\/university-content\/\d+$/.test(p) && method === 'DELETE') return [204, null];
+  if (p === '/api/university-content') return [200, [
+    { id: 701, type: 'announcement', title: 'MIU community update', description: 'A university announcement shown to students.', image: '/assets/img/pics/logo.svg.png', createdAt: '2026-10-09T10:00:00.000Z' },
+    { id: 702, type: 'event', title: 'University welcome event', description: 'A sample university event.', date: '2026-10-20', time: '10:30', location: 'Main Hall', image: '/assets/img/pics/logo.svg.png', createdAt: '2026-10-09T10:00:00.000Z' }
+  ]];
   if (p.startsWith('/api/attendance/')) return [200, { eventTitle: event.title, clubName: 'MUN', eventDate: event.date, eventTime: event.time, itemType: 'event', message: 'Attendance recorded.' }];
   if (/\/registrations$/.test(p)) return [200, { registered: false, count: 0 }];
   return [404, { message: `No audit fixture for ${method} ${p}` }];

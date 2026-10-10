@@ -1,5 +1,58 @@
 /* Responsive Layout & Mobile Drawer Styles */
 
+@media (max-width: 1120px) {
+  .topbar-container {
+    height: 64px;
+    padding: 0 16px;
+  }
+
+  .brand-logo { height: 40px; }
+  .brand-text { display: none; }
+
+  .mobile-menu-toggle {
+    display: flex;
+    flex: 0 0 42px;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    padding: 8px;
+  }
+
+  .nav-links {
+    position: absolute;
+    top: 64px;
+    left: 0;
+    right: 0;
+    z-index: 101;
+    display: none;
+    padding: 12px 16px 16px;
+    border-bottom: 1px solid var(--border-color);
+    background-color: var(--bg-panel);
+    box-shadow: var(--shadow-lg);
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+  }
+
+  .nav-links.open { display: flex; }
+  .nav-link { width: 100%; min-height: 44px; padding: 10px 14px; font-size: .96rem; }
+  .brand-link { order: 1; }
+  .nav-right { order: 2; margin-left: auto; }
+  .mobile-menu-toggle { order: 3; margin-left: 4px; }
+}
+
+@media (max-width: 520px) {
+  .topbar-container { padding: 0 12px; gap: 8px; }
+  .brand-logo { height: 36px; max-width: 112px; }
+  .nav-right { gap: 7px; }
+  .nav-signin-btn { min-height: 40px; padding: 9px 11px; gap: 6px; font-size: .82rem; }
+  .nav-signin-btn svg { width: 16px; height: 16px; }
+  .nav-signout-btn { min-height: 40px; padding: 9px 10px; font-size: .76rem; }
+  .topbar-container .nav-right .site-theme-toggle { flex-basis: 34px; width: 34px; height: 34px; }
+  .mobile-menu-toggle { flex-basis: 40px; width: 40px; height: 40px; margin-left: 0; }
+}
+
 @media (max-width: 900px) {
   .topbar-container {
     height: 64px;
@@ -94,6 +147,11 @@
     grid-template-columns: 1fr;
   }
 
+  .applicant-filter-bar { grid-template-columns: 1fr; }
+  .head-applicant-details { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .head-applicant-actions .preview-btn, .head-applicant-actions .delete-btn { min-height: 44px; }
+  .applicant-list-heading { align-items: flex-start; }
+
   .welcome-box,
   .committee-card,
   .app-form-card,
@@ -122,8 +180,13 @@
     align-items: stretch;
   }
 
-  .committee-head-form .primary-btn {
+  .interview-section-heading > .delete-btn { justify-self: start; }
+  .application-question-controls { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .interview-form-panel { padding: 16px; }
+
+  .committee-head-form > .primary-btn {
     grid-column: auto;
+    justify-self: stretch;
   }
 
   .committee-head-row {
@@ -251,4 +314,19 @@
     flex-basis: 54px;
   }
 
+}
+
+@media (max-width: 1000px) {
+  .head-applicant-details { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 480px) {
+  .head-applicant-card { padding: 14px; }
+  .head-applicant-header { align-items: flex-start; gap: 10px; }
+  .head-applicant-header > .badge { padding: 5px 8px; font-size: .72rem; }
+  .head-applicant-details { gap: 8px; }
+  .head-applicant-details > div { padding: 9px; }
+  .head-applicant-details strong { font-size: .82rem; }
+  .head-applicant-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .head-applicant-actions .preview-btn, .head-applicant-actions .delete-btn { width: 100%; }
 }

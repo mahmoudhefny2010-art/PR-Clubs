@@ -65,7 +65,9 @@ function renderMemberDirectory() {
         details.append(name, meta);
         const level = document.createElement('span');
         level.className = 'member-directory-level';
-        level.textContent = member.memberType === 'senior' ? 'Senior member' : 'New member';
+        level.textContent = member.source === 'accepted-application'
+          ? 'Accepted applicant'
+          : member.memberType === 'senior' ? 'Senior member' : 'New member';
         row.append(details, level);
         list.append(row);
       });
@@ -85,11 +87,19 @@ async function openMemberDirectory(mode) {
   if (!memberDirectoryDialog || !memberDirectoryClubSelect || !memberDirectoryList) return;
   memberDirectoryMode = mode;
   const isPrView = mode === 'pr';
+  const isHeadView = mode === 'head';
   const description = document.getElementById('memberDirectoryDescription');
   if (description) description.textContent = isPrView
     ? 'Choose a club to view its member roster.'
-    : 'Browse member rosters across every club.';
-  if (window.dashboardPanels) window.dashboardPanels.show('memberDirectoryDialog');
+    : isHeadView ? 'Members accepted into your committee, plus its named roster.'
+      : 'Browse member rosters across every club.';
+  const filter = memberDirectoryClubSelect.closest('.member-directory-filter');
+  if (filter) {
+    filter.hidden = isHeadView;
+    filter.classList.toggle('hidden', isHeadView);
+  }
+  if (isHeadView) memberDirectoryDialog.showModal();
+  else if (window.dashboardPanels) window.dashboardPanels.show('memberDirectoryDialog');
   else memberDirectoryDialog.showModal();
   memberDirectoryList.replaceChildren();
   const loading = document.createElement('p');
@@ -117,18 +127,31 @@ async function openMemberDirectory(mode) {
           members: Array.isArray(roster?.members) ? roster.members : []
         };
       });
+    } else if (isHeadView) {
+      const response = await fetch('/api/club/members', { cache: 'no-store', credentials: 'same-origin' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Could not load your committee members.');
+      memberDirectoryClubs = [{
+        id: result.clubId,
+        name: `${result.clubName} · ${result.committee}`,
+        members: Array.isArray(result.members) ? result.members : [],
+        totalCount: Number(result.totalCount) || 0
+      }];
     } else {
       const response = await fetch('/api/admin/club-members', { cache: 'no-store' });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message || 'Could not load the member directory.');
       memberDirectoryClubs = Array.isArray(result) ? result : Array.isArray(result.clubs) ? result.clubs : [];
     }
-    if (isPrView) updateClubMemberUnreadCount(memberDirectoryClubs);
+    if (isPrView || isHeadView) updateClubMemberUnreadCount(memberDirectoryClubs);
     memberDirectoryClubSelect.replaceChildren();
     if (isPrView) {
       memberDirectoryClubSelect.add(new Option('Choose a club', ''));
       memberDirectoryClubs.forEach((club) => memberDirectoryClubSelect.add(new Option(club.name, String(club.id))));
       memberDirectoryClubSelect.value = '';
+    } else if (isHeadView) {
+      memberDirectoryClubSelect.add(new Option(memberDirectoryClubs[0]?.name || 'My committee', String(memberDirectoryClubs[0]?.id || '')));
+      memberDirectoryClubSelect.value = String(memberDirectoryClubs[0]?.id || '');
     } else {
       memberDirectoryClubSelect.add(new Option('All clubs', 'all'));
       memberDirectoryClubs.forEach((club) => memberDirectoryClubSelect.add(new Option(club.name, String(club.id))));
@@ -173,9 +196,12 @@ document.querySelectorAll('[data-open-member-directory]').forEach((button) => {
   button.addEventListener('click', () => openMemberDirectory(button.dataset.openMemberDirectory));
 });
 document.querySelectorAll('[data-close-member-directory]').forEach((button) => {
-  button.addEventListener('click', () => window.dashboardPanels ? window.dashboardPanels.showOverview() : memberDirectoryDialog?.close());
+  button.addEventListener('click', () => memberDirectoryMode === 'head'
+    ? memberDirectoryDialog?.close()
+    : window.dashboardPanels ? window.dashboardPanels.showOverview() : memberDirectoryDialog?.close());
 });
 memberDirectoryClubSelect?.addEventListener('change', renderMemberDirectory);
+window.openClubMemberDirectory = openMemberDirectory;
 refreshClubMemberUnreadCount();
 window.addEventListener('dashboard:refresh', refreshClubMemberUnreadCount);
 window.setInterval(() => {

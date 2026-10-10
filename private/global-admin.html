@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <script src="/assets/js/site-loading.js?v=20261010scrolltop1"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow, noarchive">
   <title>Global Admin</title>
@@ -11,6 +12,7 @@
   <link rel="stylesheet" href="/assets/css/features.css?v=20261009b" />
   <link rel="icon" href="/assets/img/pics/logo.svg.png" type="image/png">
   <style>
+    main.app-container { max-width: 1600px; }
     .section { margin-bottom: 28px; }
     .section-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
     .section-heading h2 { margin: 0; font-size: clamp(1.2rem, 3vw, 1.6rem); }
@@ -62,6 +64,35 @@
     .active-person-details strong { overflow: hidden; color: var(--text-main); font-size: .8rem; text-overflow: ellipsis; white-space: nowrap; }
     .active-person-details span, .active-person-seen { color: var(--text-muted); font-size: .68rem; }
     .active-person-seen { white-space: nowrap; }
+    .account-reset-panel { margin-top: 14px; padding: 16px; border: 1px solid var(--border-color); border-radius: 14px; background: var(--bg-panel); }
+    .account-reset-panel h3 { margin: 0 0 5px; font-size: .95rem; }
+    .account-reset-panel > p { margin: 0 0 12px; color: var(--text-muted); font-size: .8rem; }
+    .account-reset-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 10px; }
+    .account-reset-form label { display: grid; gap: 5px; font-size: .8rem; font-weight: 700; }
+    .account-reset-form input { width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-panel); color: var(--text-main); font: inherit; }
+    .account-reset-message { min-height: 1.4em; margin: 8px 0 0 !important; font-size: .78rem !important; }
+    @media (max-width: 520px) { .account-reset-form { grid-template-columns: 1fr; } .account-reset-form button { width: 100%; } }
+    .account-direct-password { margin-top: 12px; border-top: 1px solid var(--border-color); padding-top: 10px; }
+    .account-direct-password summary { width: fit-content; color: var(--text-main); font-size: .82rem; font-weight: 750; cursor: pointer; }
+    .account-direct-password form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+    .account-direct-password label { display: grid; gap: 5px; font-size: .78rem; font-weight: 700; }
+    .account-direct-password input { width: 100%; min-width: 0; padding: 9px 11px; border: 1px solid var(--border-color); border-radius: 9px; background: var(--bg-panel); color: var(--text-main); font: inherit; }
+    .account-direct-password button, .account-direct-password .message { grid-column: 1 / -1; }
+    @media (max-width: 520px) { .account-direct-password form { grid-template-columns: 1fr; } }
+    .university-publisher { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(260px, .85fr); gap: 18px; align-items: start; }
+    .university-publisher-form { display: grid; gap: 12px; padding: 18px; border: 1px solid var(--border-color); border-radius: 16px; background: var(--bg-panel); }
+    .university-publisher-form h3 { margin: 0; }
+    .university-publisher-form label { display: grid; gap: 6px; color: var(--text-main); font-size: .86rem; font-weight: 700; }
+    .university-publisher-form input, .university-publisher-form select, .university-publisher-form textarea { width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-panel); color: var(--text-main); font: inherit; }
+    .university-publisher-form textarea { min-height: 110px; resize: vertical; }
+    .university-publisher-form [hidden] { display: none !important; }
+    .university-image-options { display: flex; gap: 14px; flex-wrap: wrap; }
+    .university-image-options label { display: inline-flex; align-items: center; gap: 7px; }
+    .university-image-options input { width: auto; }
+    .university-publisher-preview { display: grid; justify-items: center; gap: 12px; padding: 18px; border: 1px dashed var(--border-color); border-radius: 16px; background: var(--bg-soft); text-align: center; }
+    .university-publisher-preview img { width: min(100%, 260px); max-height: 210px; aspect-ratio: 1.3; object-fit: contain; border-radius: 12px; background: #fff; padding: 8px; }
+    .university-publisher-preview p { margin: 0; color: var(--text-muted); font-size: .82rem; }
+    @media (max-width: 740px) { .university-publisher { grid-template-columns: 1fr; } }
     .activity-history { margin-top: 12px; border-top: 1px solid var(--border-color); padding-top: 10px; }
     .activity-history summary { width: fit-content; color: var(--text-muted); font-size: .73rem; font-weight: 700; cursor: pointer; }
     .activity-history-content { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 9px; }
@@ -118,20 +149,33 @@
     .analysis-empty { color: var(--text-muted); text-align: center; padding: 20px; }
     .analysis-refresh-button { white-space: nowrap; }
     .analysis-row.view-analysis-row { border-left: 3px solid #7c3aed; }
-    .event-analysis-heading { align-items: center; margin: 30px 0 8px; }
+    .analysis-panel { min-width: 0; margin-top: 18px; padding: 18px; border: 1px solid var(--border-color); border-radius: 16px; background: var(--bg-soft); }
+    .analysis-panel-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px 20px; flex-wrap: wrap; margin-bottom: 12px; }
+    .analysis-panel-heading .analysis-title { margin: 0 0 4px; font-size: 1.02rem; }
+    .analysis-panel-heading .analysis-sub { margin: 0; }
+    #clubViewsMessage { margin: 2px 0 0; font-size: .76rem; }
+    .analysis-breakdown-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 16px; margin-top: 18px; }
+    .analysis-breakdown-grid .analysis-panel { margin-top: 0; }
+    .analysis-breakdown-grid .analysis-panel:last-child { grid-column: 1 / -1; }
+    .analysis-breakdown-grid .analysis-panel .analysis-list { gap: 8px; }
+    .analysis-breakdown-grid .analysis-row { padding: 11px 13px; }
+    .event-analysis-heading { align-items: center; margin: 0 0 8px; }
     .event-analysis-heading .analysis-title { margin: 0; }
     .event-analysis-summary { margin: 12px 0; }
     .event-analysis-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
     .event-analysis-actions button { white-space: nowrap; }
-    .event-performance-row { display: grid; grid-template-columns: minmax(170px, .9fr) minmax(330px, 1.5fr); align-items: center; gap: 14px; padding: 10px 12px; border-left: 3px solid #2563eb; }
-    .event-performance-info { display: grid; min-width: 0; gap: 3px; }
-    .event-performance-info strong { overflow-wrap: anywhere; font-size: .92rem; }
-    .event-performance-info span { overflow-wrap: anywhere; color: var(--text-muted); font-size: .73rem; font-weight: 650; }
-    .event-performance-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
-    .event-performance-metrics div { display: flex; align-items: baseline; justify-content: space-between; gap: 7px; min-width: 0; padding: 8px 10px; border-radius: 9px; background: var(--bg-soft); color: var(--text-muted); font-size: .72rem; white-space: nowrap; }
-    .event-performance-metrics b { color: var(--text-main); font-size: .88rem; font-variant-numeric: tabular-nums; }
-    @media (max-width: 820px) { .event-performance-row { grid-template-columns: 1fr; gap: 8px; } }
-    @media (max-width: 540px) { .event-performance-metrics { gap: 5px; } .event-performance-metrics div { align-items: flex-start; flex-direction: column; gap: 1px; padding: 7px; font-size: .66rem; white-space: normal; } }
+    .event-analytics-more { min-height: 0; padding: 7px 11px; border-radius: 9px; font-size: .76rem; }
+    .event-performance-row { display: grid; grid-template-columns: minmax(190px, .72fr) minmax(0, 1.8fr); align-items: center; gap: 18px; padding: 13px 15px; border-left: 3px solid #2563eb; border-radius: 13px; }
+    .event-performance-info { display: grid; min-width: 0; gap: 5px; }
+    .event-performance-info strong { overflow-wrap: anywhere; color: var(--text-main); font-size: .98rem; line-height: 1.35; }
+    .event-performance-info span { overflow-wrap: anywhere; color: var(--text-muted); font-size: .8rem; font-weight: 650; }
+    .event-performance-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+    .event-performance-metrics div { display: flex; min-width: 0; min-height: 62px; flex-direction: column-reverse; align-items: flex-start; justify-content: center; gap: 4px; padding: 9px 12px; border: 1px solid color-mix(in srgb, var(--border-color) 65%, transparent); border-radius: 10px; background: var(--bg-panel); color: var(--text-muted); font-size: .76rem; line-height: 1.25; }
+    .event-performance-metrics b { color: var(--text-main); font-size: 1.12rem; line-height: 1; font-variant-numeric: tabular-nums; }
+    @media (max-width: 820px) { .event-performance-row { grid-template-columns: 1fr; gap: 10px; } }
+    @media (max-width: 540px) { .event-performance-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; } .event-performance-metrics div { min-height: 54px; padding: 8px; font-size: .67rem; } }
+    @media (max-width: 340px) { .event-performance-metrics { grid-template-columns: 1fr; } }
+    @media (max-width: 760px) { .analysis-breakdown-grid { grid-template-columns: 1fr; } .analysis-breakdown-grid .analysis-panel:last-child { grid-column: auto; } .analysis-panel { padding: 14px; } }
     .committee-availability-dialog { width: min(560px, calc(100% - 32px)); max-height: 85vh; padding: 24px; border: 1px solid var(--border-color); border-radius: 18px; background: var(--bg-panel); color: var(--text-main); box-shadow: var(--shadow-xl); }
     .committee-availability-dialog::backdrop { background: rgba(15, 23, 42, .55); }
     .committee-availability-dialog header, .committee-availability-dialog footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -166,6 +210,7 @@
         <button class="tab-btn" data-tab="heads" type="button">Club Heads</button>
         <button class="tab-btn" data-tab="clubs" type="button">Clubs</button>
         <button class="tab-btn" data-tab="analysis" type="button">Analysis</button>
+        <button class="tab-btn" data-tab="university" type="button">MIU Posts</button>
         <button class="tab-btn" data-tab="applications" type="button">Applications</button>
       </div>
 
@@ -200,6 +245,76 @@
             </div>
           </details>
         </section>
+        <section class="account-reset-panel" aria-labelledby="accountResetTitle">
+          <h3 id="accountResetTitle">Club and dashboard password reset</h3>
+          <p>Send a one-time password setup link to the account email. Students use Google sign-in or contact the MIU IT Office.</p>
+          <form id="adminAccountResetForm" class="account-reset-form">
+            <label for="adminAccountResetEmail">Club or dashboard email
+              <input id="adminAccountResetEmail" name="email" type="email" maxlength="254" autocomplete="off" required placeholder="account@miuegypt.edu.eg" />
+            </label>
+            <button id="adminAccountResetButton" class="secondary-btn" type="submit">Send reset link</button>
+          </form>
+          <p id="adminAccountResetMessage" class="account-reset-message" role="status" aria-live="polite"></p>
+          <details class="account-direct-password">
+            <summary>Set a new password directly</summary>
+            <form id="adminDirectPasswordForm">
+              <label for="adminDirectPasswordEmail">Club or dashboard email
+                <input id="adminDirectPasswordEmail" name="email" type="email" maxlength="254" autocomplete="off" required placeholder="security@miu.local" />
+              </label>
+              <label for="adminDirectPassword">New password
+                <input id="adminDirectPassword" name="password" type="password" minlength="12" maxlength="200" autocomplete="new-password" required />
+              </label>
+              <label for="adminDirectPasswordConfirm">Confirm new password
+                <input id="adminDirectPasswordConfirm" name="confirmPassword" type="password" minlength="12" maxlength="200" autocomplete="new-password" required />
+              </label>
+              <button id="adminDirectPasswordSubmit" class="primary-btn" type="submit">Save new password</button>
+            </form>
+            <p id="adminDirectPasswordMessage" class="account-reset-message" role="status" aria-live="polite"></p>
+          </details>
+        </section>
+      </section>
+
+      <section class="section tab-panel" id="tab-university">
+        <div class="section-heading">
+          <div><h2>Publish as MIU</h2><p>Post university announcements and events directly to the public website. Published items sync from the database.</p></div>
+          <button class="secondary-btn" id="refreshUniversityPostsBtn" type="button">Refresh from database</button>
+        </div>
+        <div class="university-publisher">
+          <form id="universityPostForm" class="university-publisher-form">
+            <h3>New university update</h3>
+            <label for="universityPostType">Post type
+              <select id="universityPostType" name="type"><option value="announcement">Announcement</option><option value="event">Event</option></select>
+            </label>
+            <label for="universityPostTitle">Title<input id="universityPostTitle" name="title" required maxlength="140" placeholder="e.g. University registration is open" /></label>
+            <label for="universityPostDescription">Details<textarea id="universityPostDescription" name="description" required maxlength="2000" placeholder="Write the information students need to know"></textarea></label>
+            <div class="form-row" id="universityEventFields" hidden>
+              <label for="universityPostDate">Event date (optional)<input id="universityPostDate" name="date" type="date" /></label>
+              <label for="universityPostTime">Time (optional)<input id="universityPostTime" name="time" type="time" /></label>
+              <label for="universityPostLocation">Location<input id="universityPostLocation" name="location" maxlength="160" placeholder="Building or venue" /></label>
+              <label for="universityPostRegistration">Event registration
+                <select id="universityPostRegistration" name="registrationEnabled"><option value="false" selected>No registration</option><option value="true">Allow students to register</option></select>
+              </label>
+            </div>
+            <fieldset style="border:0;padding:0;margin:0;">
+              <legend style="margin-bottom:8px;font-size:.86rem;font-weight:700;">Image shown with the post</legend>
+              <div class="university-image-options">
+                <label><input type="radio" name="imageChoice" value="logo" checked /> MIU logo</label>
+                <label><input type="radio" name="imageChoice" value="custom" /> Upload my image</label>
+              </div>
+            </fieldset>
+            <label id="universityImageField" for="universityPostImage" hidden>Upload image<input id="universityPostImage" type="file" accept="image/png,image/jpeg,image/webp" /></label>
+            <button id="publishUniversityPostBtn" class="primary-btn" type="submit">Publish to website</button>
+            <p id="universityPostMessage" class="message" role="status" aria-live="polite"></p>
+          </form>
+          <aside class="university-publisher-preview">
+            <img id="universityPostPreview" src="/assets/img/pics/logo.svg.png" alt="MIU post image preview" />
+            <strong>Misr International University</strong>
+            <p>Published updates appear in the public Events &amp; News and Community Feed pages.</p>
+          </aside>
+        </div>
+        <h3 class="analysis-title">Published by MIU</h3>
+        <p id="universityPostListMessage" class="message" role="status"></p>
+        <div id="universityPostRecords" class="records"></div>
       </section>
 
       <section class="section tab-panel" id="tab-clubs">
@@ -223,37 +338,49 @@
           <div class="stat-card accent-purple"><strong id="statTotalClubViews">0</strong><span>Total club views</span></div>
         </div>
 
-        <h3 class="analysis-title">Most viewed clubs</h3>
-        <p class="analysis-sub">Views are counted whenever a visitor opens a club with the View button.</p>
-        <p id="clubViewsMessage" class="analysis-sub" role="status" aria-live="polite"></p>
-        <div id="topViewedClubs" class="analysis-list"></div>
-
-        <div class="section-heading event-analysis-heading">
-          <div><h3 class="analysis-title">Event interest &amp; attendance</h3><p class="analysis-sub">Event detail opens, registrations, and QR check-ins across active clubs.</p></div>
-          <div class="event-analysis-actions">
-            <button class="secondary-btn" id="toggleEventAnalyticsBtn" type="button" hidden>Show all events</button>
-            <button class="secondary-btn analysis-refresh-button" id="refreshEventAnalyticsBtn" type="button">Refresh event analytics</button>
+        <section class="analysis-panel" aria-labelledby="clubViewsHeading">
+          <div class="analysis-panel-heading">
+            <div><h3 class="analysis-title" id="clubViewsHeading">Most viewed clubs</h3><p class="analysis-sub">Ranked by club detail page views.</p></div>
+            <p id="clubViewsMessage" class="analysis-sub" role="status" aria-live="polite"></p>
           </div>
+          <div id="topViewedClubs" class="analysis-list"></div>
+        </section>
+
+        <section class="analysis-panel" aria-labelledby="eventAnalyticsHeading">
+          <div class="section-heading event-analysis-heading">
+            <div><h3 class="analysis-title" id="eventAnalyticsHeading">Event interest &amp; attendance</h3><p class="analysis-sub">Views, registrations, student interest, and QR check-ins.</p></div>
+            <div class="event-analysis-actions">
+              <button class="secondary-btn event-analytics-more" id="toggleEventAnalyticsBtn" type="button" hidden>View more</button>
+              <button class="secondary-btn analysis-refresh-button" id="refreshEventAnalyticsBtn" type="button">Refresh event analytics</button>
+            </div>
+          </div>
+          <p id="eventAnalyticsMessage" class="analysis-sub" role="status" aria-live="polite"></p>
+          <div class="analysis-summary event-analysis-summary">
+            <div class="stat-card accent-purple"><strong id="statEventViews">0</strong><span>Event detail views</span></div>
+            <div class="stat-card accent-blue"><strong id="statEventRegistrations">0</strong><span>Registrations</span></div>
+            <div class="stat-card accent-amber"><strong id="statStudentInterest">0</strong><span>Students interested</span></div>
+            <div class="stat-card accent-green"><strong id="statEventCheckIns">0</strong><span>QR check-ins</span></div>
+          </div>
+          <p class="analysis-sub">Student interest counts signed-in students who viewed or registered for an event. Names and email addresses are not displayed.</p>
+          <div id="eventAnalyticsList" class="analysis-list"></div>
+        </section>
+
+        <div class="analysis-breakdown-grid">
+          <section class="analysis-panel" aria-labelledby="capacityAnalysisHeading">
+            <div class="analysis-panel-heading"><div><h3 class="analysis-title" id="capacityAnalysisHeading">Capacity &amp; demand</h3><p class="analysis-sub">Applications, members, and available seats.</p></div></div>
+            <div id="clubAnalysis" class="analysis-list"></div>
+          </section>
+
+          <section class="analysis-panel" aria-labelledby="acceptanceAnalysisHeading">
+            <div class="analysis-panel-heading"><div><h3 class="analysis-title" id="acceptanceAnalysisHeading">Acceptance by club</h3><p class="analysis-sub">Accepted applications as a share of submitted applications.</p></div></div>
+            <div id="clubAcceptance" class="analysis-list"></div>
+          </section>
+
+          <section class="analysis-panel" aria-labelledby="topClubsHeading">
+            <div class="analysis-panel-heading"><div><h3 class="analysis-title" id="topClubsHeading">Top clubs by applicants</h3><p class="analysis-sub">Clubs with the most submitted applications.</p></div></div>
+            <div id="topClubs" class="analysis-list"></div>
+          </section>
         </div>
-        <p id="eventAnalyticsMessage" class="analysis-sub" role="status" aria-live="polite"></p>
-        <div class="analysis-summary event-analysis-summary">
-          <div class="stat-card accent-purple"><strong id="statEventViews">0</strong><span>Event detail views</span></div>
-          <div class="stat-card accent-blue"><strong id="statEventRegistrations">0</strong><span>Registrations</span></div>
-          <div class="stat-card accent-green"><strong id="statEventCheckIns">0</strong><span>QR check-ins</span></div>
-        </div>
-        <div id="eventAnalyticsList" class="analysis-list"></div>
-
-        <h3 class="analysis-title">Capacity &amp; demand per club</h3>
-        <p class="analysis-sub">How many applied, how many are members, and how many seats each club has.</p>
-        <div id="clubAnalysis" class="analysis-list"></div>
-
-        <h3 class="analysis-title">Acceptance by club</h3>
-        <p class="analysis-sub">Percentage of applications accepted per club.</p>
-        <div id="clubAcceptance" class="analysis-list"></div>
-
-        <h3 class="analysis-title">Top clubs by applicants</h3>
-        <p class="analysis-sub">The clubs with the most applications.</p>
-        <div id="topClubs" class="analysis-list"></div>
       </section>
 
       <section class="section tab-panel" id="tab-heads">
@@ -313,6 +440,59 @@
       if (!response.ok) throw new Error(result.message || 'Request failed.');
       return result;
     }
+    byId('adminAccountResetForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const button = byId('adminAccountResetButton');
+      const email = byId('adminAccountResetEmail').value.trim();
+      button.disabled = true;
+      setMessage('adminAccountResetMessage', 'Checking the account and saving a one-time reset request…');
+      try {
+        const result = await request('/api/admin/accounts/password-reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+        setMessage('adminAccountResetMessage', result.message);
+        form.reset();
+      } catch (error) {
+        setMessage('adminAccountResetMessage', error.message, true);
+      } finally {
+        button.disabled = false;
+      }
+    });
+    byId('adminDirectPasswordForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const button = byId('adminDirectPasswordSubmit');
+      const password = byId('adminDirectPassword').value;
+      const confirmPassword = byId('adminDirectPasswordConfirm').value;
+      if (password !== confirmPassword) {
+        setMessage('adminDirectPasswordMessage', 'The passwords do not match.', true);
+        byId('adminDirectPasswordConfirm').focus();
+        return;
+      }
+      button.disabled = true;
+      setMessage('adminDirectPasswordMessage', 'Saving the password and verifying it in the database…');
+      try {
+        const result = await request('/api/admin/accounts/password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: byId('adminDirectPasswordEmail').value.trim(),
+            password,
+            confirmPassword
+          })
+        });
+        setMessage('adminDirectPasswordMessage', result.message);
+        byId('adminDirectPassword').value = '';
+        byId('adminDirectPasswordConfirm').value = '';
+      } catch (error) {
+        setMessage('adminDirectPasswordMessage', error.message, true);
+      } finally {
+        button.disabled = false;
+      }
+    });
     function renderActivePeople(people) {
       const list = byId('activePeopleList');
       list.replaceChildren();
@@ -390,6 +570,132 @@
         select.appendChild(opt);
       }
     }
+    let universityPostsLoaded = false;
+    let universityPostsRequestId = 0;
+    async function loadUniversityPosts() {
+      const requestId = ++universityPostsRequestId;
+      const list = byId('universityPostRecords');
+      const message = byId('universityPostListMessage');
+      message.textContent = 'Loading published posts…';
+      try {
+        const posts = await request('/api/admin/university-content');
+        if (requestId !== universityPostsRequestId) return;
+        universityPostsLoaded = true;
+        message.textContent = posts.length ? `${posts.length} update${posts.length === 1 ? '' : 's'} published by MIU.` : 'No MIU posts published yet.';
+        list.innerHTML = posts.map((post) => `
+          <article class="record">
+            <div class="record-head">
+              <div>
+                <h3 class="record-title">${escapeHtml(post.title)}</h3>
+                <p class="record-meta">${post.type === 'event' ? 'Event' : 'Announcement'}${post.date ? ` · ${escapeHtml(post.date)}` : post.type === 'event' ? ' · Date to be announced' : ''}${post.time ? ` · ${escapeHtml(window.formatSiteTime ? window.formatSiteTime(post.time) : post.time)}` : ''}${post.location ? ` · ${escapeHtml(post.location)}` : ''}${post.type === 'event' ? (post.registrationEnabled ? ' · Registration open' : ' · No registration') : ''}</p>
+              </div>
+              <div class="record-actions"><button class="danger" type="button" data-delete-university-post="${Number(post.id)}">Delete</button></div>
+            </div>
+            <p>${escapeHtml(post.description)}</p>
+          </article>`).join('') || '<p class="empty">No university posts have been published.</p>';
+        list.querySelectorAll('[data-delete-university-post]').forEach((button) => button.addEventListener('click', async () => {
+          if (!confirm('Remove this MIU post from the public website?')) return;
+          button.disabled = true;
+          try {
+            await request(`/api/admin/university-content/${button.dataset.deleteUniversityPost}`, { method: 'DELETE' });
+            await loadUniversityPosts();
+          } catch (error) {
+            setMessage('universityPostListMessage', error.message, true);
+            button.disabled = false;
+          }
+        }));
+      } catch (error) {
+        if (requestId !== universityPostsRequestId) return;
+        universityPostsLoaded = false;
+        setMessage('universityPostListMessage', error.message, true);
+        list.replaceChildren();
+      }
+    }
+    byId('refreshUniversityPostsBtn').addEventListener('click', loadUniversityPosts);
+    window.setInterval(() => {
+      const activeTab = document.getElementById('tab-university');
+      if (document.visibilityState === 'visible' && activeTab?.classList.contains('active')) loadUniversityPosts();
+    }, 30_000);
+    function readSelectedImage(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(new Error('Could not read the selected image.'));
+        reader.readAsDataURL(file);
+      });
+    }
+    const universityEventFields = byId('universityEventFields');
+    const universityEventDate = byId('universityPostDate');
+    const universityImageInput = byId('universityPostImage');
+    const universityPreview = byId('universityPostPreview');
+    let universityPreviewUrl = '';
+    byId('universityPostType').addEventListener('change', (event) => {
+      const isEvent = event.currentTarget.value === 'event';
+      universityEventFields.hidden = !isEvent;
+      universityEventDate.required = false;
+    });
+    document.querySelectorAll('input[name="imageChoice"]').forEach((radio) => radio.addEventListener('change', (event) => {
+      const isCustom = event.currentTarget.value === 'custom';
+      byId('universityImageField').hidden = !isCustom;
+      if (!isCustom) {
+        universityImageInput.value = '';
+        if (universityPreviewUrl) URL.revokeObjectURL(universityPreviewUrl);
+        universityPreviewUrl = '';
+        universityPreview.src = '/assets/img/pics/logo.svg.png';
+      }
+    }));
+    universityImageInput.addEventListener('change', () => {
+      const file = universityImageInput.files[0];
+      if (!file) return;
+      if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024) {
+        universityImageInput.value = '';
+        setMessage('universityPostMessage', 'Choose a PNG, JPG, or WebP image up to 5 MB.', true);
+        return;
+      }
+      if (universityPreviewUrl) URL.revokeObjectURL(universityPreviewUrl);
+      universityPreviewUrl = URL.createObjectURL(file);
+      universityPreview.src = universityPreviewUrl;
+      setMessage('universityPostMessage', '', false);
+    });
+    byId('universityPostForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const button = byId('publishUniversityPostBtn');
+      const message = byId('universityPostMessage');
+      message.textContent = 'Publishing…';
+      message.classList.remove('error');
+      button.disabled = true;
+      try {
+        const imageChoice = form.elements.imageChoice.value;
+        const imageFile = universityImageInput.files[0];
+        if (imageChoice === 'custom' && !imageFile) throw new Error('Choose an image to upload, or select the MIU logo.');
+        const payload = {
+          type: byId('universityPostType').value,
+          title: byId('universityPostTitle').value.trim(),
+          description: byId('universityPostDescription').value.trim(),
+          date: universityEventDate.value,
+          time: byId('universityPostTime').value,
+          location: byId('universityPostLocation').value.trim(),
+          registrationEnabled: byId('universityPostRegistration').value === 'true',
+          imageChoice
+        };
+        if (imageChoice === 'custom') payload.imageData = await readSelectedImage(imageFile);
+        await request('/api/admin/university-content', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+        });
+        form.reset();
+        universityEventFields.hidden = true;
+        universityEventDate.required = false;
+        byId('universityImageField').hidden = true;
+        universityPreview.src = '/assets/img/pics/logo.svg.png';
+        message.textContent = 'Published. It is now visible to students on the public website.';
+        await loadUniversityPosts();
+      } catch (error) {
+        setMessage('universityPostMessage', error.message, true);
+      } finally {
+        button.disabled = false;
+      }
+    });
     function updateStats() {
       byId('statTotalClubs').textContent = clubs.length;
       byId('statTotalHeads').textContent = heads.length;
@@ -448,6 +754,7 @@
           renderClubViews();
           renderEventAnalytics();
         }
+        if (btn.dataset.tab === 'university' && !universityPostsLoaded) loadUniversityPosts();
       });
     });
 
@@ -495,19 +802,44 @@
     byId('refreshClubViewsBtn').addEventListener('click', renderClubViews);
     let eventAnalyticsEvents = [];
     let eventAnalyticsExpanded = false;
-    const eventAnalyticsPreviewCount = 6;
+    function cairoDateKey(date = new Date()) {
+      const parts = new Intl.DateTimeFormat('en', {
+        timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit'
+      }).formatToParts(date);
+      const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+      return `${values.year}-${values.month}-${values.day}`;
+    }
+    function eventDateKey(value) {
+      const raw = String(value || '').trim();
+      const isoDate = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+      if (isoDate) return isoDate[1];
+      const parsed = new Date(raw);
+      return Number.isNaN(parsed.getTime()) ? '' : cairoDateKey(parsed);
+    }
     function renderEventAnalyticsRows() {
       const list = byId('eventAnalyticsList');
       const message = byId('eventAnalyticsMessage');
       const toggle = byId('toggleEventAnalyticsBtn');
-      const activity = (event) => Number(event.views || 0) + Number(event.registrations || 0) + Number(event.checkIns || 0);
+      const activity = (event) => Number(event.views || 0) + Number(event.registrations || 0) + Number(event.studentInterest || 0) + Number(event.checkIns || 0);
       const rankedEvents = [...eventAnalyticsEvents].sort((a, b) => activity(b) - activity(a) || String(a.title).localeCompare(String(b.title)));
-      const visibleEvents = eventAnalyticsExpanded ? rankedEvents : rankedEvents.slice(0, eventAnalyticsPreviewCount);
+      const today = cairoDateKey();
+      const todayEvents = rankedEvents.filter((event) => eventDateKey(event.date) === today);
+      const visibleEvents = eventAnalyticsExpanded ? rankedEvents : todayEvents;
+      const eventAnalyticsPreviewCount = todayEvents.length;
       toggle.hidden = rankedEvents.length <= eventAnalyticsPreviewCount;
-      toggle.textContent = eventAnalyticsExpanded ? 'Show fewer events' : `Show all ${rankedEvents.length} events`;
+      toggle.textContent = eventAnalyticsExpanded ? 'Show less' : 'View more';
       message.textContent = rankedEvents.length > eventAnalyticsPreviewCount
         ? `${rankedEvents.length} active events · showing the ${visibleEvents.length} with the most activity.`
         : `${rankedEvents.length} active event${rankedEvents.length === 1 ? '' : 's'} across the clubs.`;
+      message.textContent = eventAnalyticsExpanded
+        ? `Showing all ${rankedEvents.length} events.`
+        : todayEvents.length
+          ? `${todayEvents.length} event${todayEvents.length === 1 ? '' : 's'} scheduled for today.`
+          : 'No events scheduled for today.';
+      if (!visibleEvents.length) {
+        list.innerHTML = '<p class="analysis-empty">No events today. Use View more to browse the full event list.</p>';
+        return;
+      }
       list.innerHTML = visibleEvents.map((event) => `
         <article class="analysis-row event-performance-row">
           <div class="event-performance-info">
@@ -517,6 +849,7 @@
           <div class="event-performance-metrics">
             <div><b>${Number(event.views).toLocaleString()}</b><span>Views</span></div>
             <div><b>${Number(event.registrations).toLocaleString()}</b><span>Registrations</span></div>
+            <div><b>${Number(event.studentInterest || 0).toLocaleString()}</b><span>Students interested</span></div>
             <div><b>${Number(event.checkIns).toLocaleString()}</b><span>QR check-ins</span></div>
           </div>
         </article>`).join('');
@@ -539,6 +872,7 @@
         eventAnalyticsExpanded = false;
         byId('statEventViews').textContent = (Number(totals.views) || 0).toLocaleString();
         byId('statEventRegistrations').textContent = (Number(totals.registrations) || 0).toLocaleString();
+        byId('statStudentInterest').textContent = (Number(totals.studentsInterested) || 0).toLocaleString();
         byId('statEventCheckIns').textContent = (Number(totals.checkIns) || 0).toLocaleString();
         if (!eventAnalyticsEvents.length) {
           byId('toggleEventAnalyticsBtn').hidden = true;

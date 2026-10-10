@@ -4,12 +4,13 @@
 
   const scope = sidebar.dataset.unreadScope || location.pathname;
   const storageKey = `miu-dashboard-unread:${scope}`;
+  const panelStorageKey = `miu-dashboard-panel:${scope}`;
   const seen = new Map();
   const current = new Map();
   const syncSucceeded = new Set();
   const actionableSections = new Set(['requests', 'attendanceApprovals', 'applicants']);
-  if (scope === 'english') actionableSections.add('allRequests');
-  if (scope === 'security') actionableSections.add('allRequests');
+  if (['english', 'pr', 'security'].includes(scope)) actionableSections.add('allRequests');
+  if (['pr', 'security'].includes(scope)) actionableSections.add('entryPermits');
   let activeSection = '';
 
   try {
@@ -58,6 +59,9 @@
     const panels = layout ? [...layout.querySelectorAll('.committee-overview-panel, .committee-requests-section, .sso-hero, .committee-inline-panel')] : [];
     const target = panels.find((panel) => panel.id === panelId);
     if (!target) return;
+    try {
+      if (!(target instanceof HTMLDialogElement)) localStorage.setItem(panelStorageKey, panelId);
+    } catch { /* The selected panel still works when storage is unavailable. */ }
     panels.forEach((panel) => {
       const active = panel === target;
       panel.hidden = !active;
@@ -160,7 +164,19 @@
     }
   });
 
-  const initialPanel = sidebar.querySelector('[data-dashboard-panel].is-active')?.dataset.dashboardPanel;
+  let savedPanel = '';
+  try { savedPanel = localStorage.getItem(panelStorageKey) || ''; } catch { /* Use the page default. */ }
+  const savedPanelLink = [...sidebar.querySelectorAll('[data-dashboard-panel]')]
+    .find((link) => link.dataset.dashboardPanel === savedPanel);
+  const savedPanelExists = savedPanelLink && document.getElementById(savedPanel);
+  if (savedPanelExists) {
+    sidebar.querySelectorAll('.committee-sidebar-link, .president-sidebar-action, [data-dashboard-section]')
+      .forEach((item) => item.classList.toggle('is-active', item === savedPanelLink));
+    savedPanelLink.setAttribute('aria-current', 'page');
+  }
+  const initialPanel = savedPanelExists
+    ? savedPanel
+    : sidebar.querySelector('[data-dashboard-panel].is-active')?.dataset.dashboardPanel;
   if (initialPanel) showPanel(initialPanel);
   const initialSection = sidebar.querySelector('.committee-sidebar-link.is-active[data-unread-section], .president-sidebar-action.is-active[data-unread-section], [data-dashboard-section].is-active[data-unread-section]')?.dataset.unreadSection
     || sidebar.querySelector('.committee-sidebar-link.is-active [data-unread-badge]')?.dataset.unreadBadge;

@@ -3,18 +3,20 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="/assets/js/site-loading.js?v=20261010scrolltop1"></script>
     <script>if(['/admin','/club-login','/club-dashboard'].includes(location.pathname))document.documentElement.classList.add('auth-route-pending');</script>
     <title>Club Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/assets/css/base.css?v=20261009q" />
-    <link rel="stylesheet" href="/assets/css/responsive.css?v=20261006e" />
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" /></noscript>
+    <link rel="stylesheet" href="/assets/css/base.css?v=20261010interviewquestionlayout2" />
+    <link rel="stylesheet" href="/assets/css/responsive.css?v=20261010interviewpreview2" />
     <link rel="stylesheet" href="/assets/css/dark.css?v=20261009c" />
-    <link rel="stylesheet" href="/assets/css/features.css?v=20261010permitpicker1" />
-    <link rel="stylesheet" href="/assets/css/event-modal.css?v=3" />
+    <link rel="stylesheet" href="/assets/css/features.css?v=20261010manualend1" />
+    <link rel="stylesheet" href="/assets/css/event-modal.css?v=4" />
     <link rel="icon" href="/assets/img/pics/logo.svg.png" type="image/png">
-    <link rel="stylesheet" href="/assets/css/pages/home.css?v=1" />
+    <link rel="stylesheet" href="/assets/css/pages/home.css?v=20261010clubstats" />
 </head>
   <body>
     <div class="page-shell">
@@ -105,7 +107,7 @@
               </div>
               <div class="field-group">
                 <label for="adminPasswordInput">Password</label>
-                <input id="adminPasswordInput" name="password" type="password" autocomplete="current-password" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" required />
+                <input id="adminPasswordInput" name="password" type="password" autocomplete="current-password" placeholder="••••••••" required />
               </div>
               <div id="adminConfirmRow" class="field-group hidden">
                 <label for="adminConfirmInput">Confirm password</label>
@@ -115,6 +117,8 @@
             </form>
             <p id="adminLoginFeedback" class="admin-feedback" aria-live="polite"></p>
             <p id="adminLoginForgotWrap"><a class="text-button" href="/pages/forgot-password.html">Forgot Password?</a></p>
+            <button id="adminResetAccessBtn" class="text-button" type="button" hidden>Set a new admin email and password</button>
+            <button id="adminResetBackBtn" class="text-button" type="button" hidden>Back to admin sign in</button>
             <p class="login-foot">Back to homepage? <button id="adminLoginBackBtn" class="login-foot-link" type="button">Click here</button></p>
           </div>
         </section>
@@ -234,7 +238,7 @@
                     <div class="admin-section-heading">
                       <div>
                         <h3 id="clubLoginCredentialsHeading">Club Login Credentials</h3>
-                        <p class="admin-form-hint">Create the initial sign-in for this clubâ€™s dashboard.</p>
+                        <p class="admin-form-hint">Create the initial sign-in for this club’s dashboard.</p>
                       </div>
                     </div>
                     <div class="form-row">
@@ -303,11 +307,15 @@
         <section id="myFormsView" class="view">
           <div class="admin-panel my-forms-panel">
             <div class="admin-header">
-              <div><span class="admin-eyebrow">APPLICANT PORTAL</span><h2>My Forms</h2><p>Manage your application before the interview starts.</p></div>
+              <div><span class="admin-eyebrow">STUDENT DASHBOARD</span><h2>My Dashboard</h2><p>Applications and club attendance assignments linked to your MIU account.</p></div>
               <button id="myFormsBackHomeBtn" class="secondary-btn" type="button">Back to home</button>
             </div>
             <p id="myFormsFeedback" class="admin-feedback" role="status"></p>
             <div id="myFormsList" class="my-forms-list"></div>
+            <section class="member-assignment-panel" aria-labelledby="memberAssignmentsTitle">
+              <div class="member-assignment-heading"><div><span class="admin-eyebrow">CLUB MEMBERS</span><h3 id="memberAssignmentsTitle">Event attendance assignments</h3><p>Requests assigned to your signed-in MIU email appear here.</p></div><button id="refreshMemberAssignmentsBtn" class="secondary-btn" type="button">Refresh</button></div>
+              <div id="memberAssignmentsList" class="member-assignment-list" aria-live="polite"><p class="member-assignment-empty">Sign in to load your member assignments.</p></div>
+            </section>
           </div>
         </section>
 
@@ -426,7 +434,7 @@
                 </div>
               </div>
               <div class="top-actions">
-                <a class="secondary-btn" href="/pages/club-content.html">Open Content Studio</a>
+                <a id="openContentStudioBtn" class="secondary-btn" href="/pages/club-content.html">Open Content Studio</a>
                 <button id="backHomeBtn" class="secondary-btn" type="button">Back to Clubs</button>
                 <button id="logoutBtn" class="logout-btn" type="button">Log out</button>
               </div>
@@ -452,7 +460,7 @@
             <dialog id="approvalCheckpointMoreDialog" class="approval-checkpoint-more-dialog" aria-labelledby="approvalCheckpointMoreTitle">
               <div class="approval-checkpoint-more-inner">
                 <header class="approval-checkpoint-more-header">
-                  <div><span class="admin-eyebrow">APPLICATION WORKFLOW</span><h2 id="approvalCheckpointMoreTitle">Other club requests</h2></div>
+                  <div><span class="admin-eyebrow">WORKFLOW TRACKING</span><h2 id="approvalCheckpointMoreTitle">All requests</h2><p class="approval-checkpoint-more-intro">Requests in progress stay active. Approved requests move to history after their scheduled day.</p></div>
                   <button id="closeApprovalCheckpointMoreBtn" class="calendar-close-btn" type="button" aria-label="Close requests">&times;</button>
                 </header>
                 <div id="approvalCheckpointMoreList" class="approval-checkpoint-more-list"></div>
@@ -464,13 +472,16 @@
                 <span class="president-sidebar-title">Dashboard</span>
                 <a href="#presidentOverviewPanel" data-dashboard-section="presidentOverviewPanel">Overview</a>
                 <a href="#presidentHeadManager" data-dashboard-section="presidentHeadManager" data-unread-section="committeeHeads" data-president-only>Committee heads <span class="sidebar-unread-badge" data-unread-badge="committeeHeads" hidden></span></a>
+                <span class="president-sidebar-group-title">Applications</span>
                 <a href="#presidentFormManager" data-dashboard-section="presidentFormManager" data-president-only>Application form</a>
-                <a href="#interviewFormManager" data-dashboard-section="interviewFormManager" data-president-only>Interview questions</a>
-                <a href="#presidentApplicantsPanel" data-dashboard-section="presidentApplicantsPanel" data-unread-section="applicants" data-president-only>Applicants <span class="sidebar-unread-badge" data-unread-badge="applicants" hidden></span></a>
+                <a href="#interviewFormManager" data-dashboard-section="interviewFormManager">Interview questions</a>
+                <a href="#presidentApplicantsPanel" data-dashboard-section="presidentApplicantsPanel" data-unread-section="applicants">Applicants <span class="sidebar-unread-badge" data-unread-badge="applicants" hidden></span></a>
                 <span class="president-sidebar-group-title">Club operations</span>
                 <button id="openMemberManagerBtn" class="president-sidebar-action hidden" data-unread-section="clubMembers" type="button">Club members <span class="sidebar-unread-badge" data-unread-badge="clubMembers" hidden></span></button>
                 <button id="openAttendanceManagerBtn" class="president-sidebar-action hidden" data-unread-section="eventAttendance" type="button">Event attendance <span class="sidebar-unread-badge" data-unread-badge="eventAttendance" hidden></span></button>
                 <button id="openEntryPermitDialogBtn" class="president-sidebar-action hidden" type="button">Entry permits</button>
+                <span class="president-sidebar-group-title" data-president-only>Requests</span>
+                <button id="openClubRequestHistoryBtn" class="president-sidebar-action hidden" data-president-only type="button">All requests</button>
               </nav>
               <div class="president-dashboard-main">
             <section id="presidentHeadManager" class="committee-head-manager hidden">
@@ -518,10 +529,10 @@
               <div class="admin-section-heading">
                 <div>
                   <span class="admin-eyebrow">PUBLIC APPLICATION FORM</span>
-                  <h3>Manage your clubâ€™s form</h3>
+                  <h3>Manage your club’s form</h3>
                 </div>
               </div>
-              <p>Changes here appear on your clubâ€™s application page. Add, edit, or remove questions, then save.</p>
+              <p>Changes here appear on your club’s application page. Add, edit, or remove questions, then save.</p>
               <form id="presidentFormEditor" class="president-form-editor">
                 <div class="field-group">
                   <label for="presidentApplicationIntro">Form introduction</label>
@@ -540,9 +551,6 @@
               </form>
             </section>
 
-            <button id="toggleInterviewFormBtn" class="secondary-btn interview-form-toggle" type="button" aria-expanded="false" aria-controls="interviewFormManager">
-              Manage interview questions
-            </button>
             <section id="interviewFormManager" class="committee-head-manager interview-form-panel hidden">
               <div class="admin-section-heading">
                 <div>
@@ -565,6 +573,9 @@
                   <span class="admin-eyebrow">CLUB DASHBOARD</span>
                   <h3>Overview</h3>
                 </div>
+                <button id="toggleInterviewFormBtn" class="secondary-btn interview-form-toggle" type="button" aria-expanded="false" aria-controls="interviewFormManager">
+                  Manage interview questions
+                </button>
               </div>
               <div class="stats-row">
                 <div class="stat-box">
@@ -591,7 +602,28 @@
             </div>
 
             <div id="presidentApplicantsPanel" class="president-applicants-panel">
-            <div id="applicationsList" class="applications-list"></div>
+              <div class="applicant-list-heading">
+                <div><span class="admin-eyebrow">APPLICATIONS</span><h3>Applicants</h3></div>
+                <span id="applicantResultsCount" class="admin-club-count" aria-live="polite">Loading applicants…</span>
+              </div>
+              <div class="applicant-filter-bar" role="search" aria-label="Filter applicants">
+                <label>Search applicants
+                  <input id="applicantSearchFilter" type="search" placeholder="Name, email, or student ID" autocomplete="off" />
+                </label>
+                <label>Status
+                  <select id="applicantStatusFilter">
+                    <option value="all">All statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="processing">Interviewed · pending</option>
+                    <option value="accepted">Accepted</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
+                </label>
+                <label>Committee
+                  <select id="applicantCommitteeFilter"><option value="all">All committees</option></select>
+                </label>
+              </div>
+              <div id="applicationsList" class="applications-list" aria-live="polite"></div>
             </div>
               </div>
             </div>
@@ -606,17 +638,18 @@
             <div>
               <span class="admin-eyebrow">PRESIDENT DASHBOARD</span>
               <h2 id="memberManagerTitle">Club members</h2>
-              <p>View your roster and assign each member to a committee and position.</p>
+              <p>Add each member’s MIU email so they can receive committee tasks in their student dashboard.</p>
             </div>
             <button id="closeMemberManagerBtn" class="calendar-close-btn" type="button" aria-label="Close club members">&times;</button>
           </header>
           <div class="member-dialog-toolbar">
-            <span id="memberRosterCount">Loading membersâ€¦</span>
+            <span id="memberRosterCount">Loading members…</span>
             <button id="showMemberFormBtn" class="primary-btn" type="button">Add member</button>
           </div>
           <form id="clubMemberForm" class="member-add-form hidden">
             <div class="member-form-grid">
               <label>Full name<input name="name" maxlength="120" autocomplete="name" required /></label>
+              <label>MIU email for Google sign-in<input name="email" type="email" maxlength="254" autocomplete="email" placeholder="member@miu.edu" required /></label>
               <label>Committee<select name="committee" id="clubMemberCommittee" required><option value="">Choose a committee</option></select></label>
               <label>Position in committee<input name="position" id="clubMemberPosition" maxlength="100" placeholder="Enter their committee position" required /></label>
               <label>Member level<select name="memberType" required><option value="">Choose member level</option><option value="new">New member</option><option value="senior">Senior member</option></select></label>
@@ -654,22 +687,47 @@
       <dialog id="attendanceQrDialog" class="member-manager-dialog attendance-qr-dialog" aria-labelledby="attendanceDialogTitle">
         <div class="member-dialog-inner attendance-qr-dialog-inner">
           <header class="member-dialog-header">
-            <div><span class="admin-eyebrow">CLUB OPERATIONS</span><h2 id="attendanceDialogTitle">Event attendance</h2><p>QR codes are available only for events and booths scheduled today. Codes refresh every 20 seconds.</p></div>
+            <div><span class="admin-eyebrow">CLUB OPERATIONS</span><h2 id="attendanceDialogTitle">Event attendance</h2><p id="attendanceDialogDescription">QR codes are available only for events and booths scheduled today. Codes refresh every 20 seconds.</p></div>
             <button id="closeAttendanceQrBtn" class="calendar-close-btn" type="button" aria-label="Close QR code">&times;</button>
           </header>
           <form id="attendanceQrForm" class="attendance-qr-form">
             <label>Event or booth happening today
-              <select id="attendanceEventSelect" required><option value="">Loading activitiesâ€¦</option></select>
+              <select id="attendanceEventSelect" required><option value="">Loading activities…</option></select>
             </label>
             <button id="createAttendanceQrBtn" class="primary-btn" type="submit">Show attendance QR</button>
           </form>
+          <section class="attendance-activity-manager" aria-labelledby="attendanceActivityManagerTitle">
+            <div class="attendance-activity-manager-heading"><h3 id="attendanceActivityManagerTitle">Today’s events and booths</h3><p>End attendance when check-in is complete. PR can then review the full list.</p></div>
+            <div id="attendanceActivityList" class="attendance-activity-list"></div>
+          </section>
+          <form id="attendanceSelfCheckinForm" class="attendance-self-checkin-form hidden">
+            <div class="attendance-self-checkin-heading"><strong>Check in for yourself</strong><span>One check-in per account and device.</span></div>
+            <label>Your name<input id="attendanceSelfCheckinName" name="name" type="text" maxlength="160" autocomplete="name" required placeholder="Enter your name"></label>
+            <label>Today’s event or booth<select id="attendanceSelfCheckinEvent" required><option value="">Loading activities…</option></select></label>
+            <button id="attendanceSelfCheckinBtn" class="primary-btn" type="submit">Record my attendance</button>
+            <p id="attendanceSelfCheckinFeedback" class="admin-feedback" aria-live="polite"></p>
+          </form>
+          <details id="attendanceDelegationPanel" class="attendance-delegation-panel attendance-delegation-details hidden">
+            <summary aria-labelledby="attendanceDelegationTitle">
+              <span class="attendance-delegation-summary-copy"><strong id="attendanceDelegationTitle">Assign attendance</strong><small>Send today’s check-in request to an eligible club member.</small></span>
+              <span class="attendance-delegation-tag">IT committee</span>
+            </summary>
+            <div class="attendance-delegation-content">
+            <form id="attendanceDelegationForm" class="attendance-delegation-form">
+              <label>Member<select id="attendanceDelegationMember" required><option value="">Load members…</option></select></label>
+              <label>Event or booth<select id="attendanceDelegationEvent" required><option value="">Load today’s activities…</option></select></label>
+              <button id="sendAttendanceDelegationBtn" class="primary-btn" type="submit">Send request</button>
+            </form>
+              <p id="attendanceDelegationFeedback" class="admin-feedback" aria-live="polite"></p>
+            </div>
+          </details>
           <p id="attendanceManagerFeedback" class="admin-feedback" aria-live="polite"></p>
           <section id="attendanceQrResult" class="attendance-qr-result hidden" aria-live="polite">
             <h3 id="attendanceQrEventTitle"></h3>
             <div id="attendanceQrCanvas" class="attendance-qr-canvas"></div>
             <p id="attendanceQrRefreshStatus" role="status">This code changes every 20 seconds. Attendees must sign in with a verified MIU account.</p>
           </section>
-          <details class="attendance-records-details">
+          <details id="attendanceRecordsDetails" class="attendance-records-details">
             <summary>Attendance records</summary>
             <div class="attendance-records-toolbar">
               <label class="attendance-record-filter">Activity
@@ -802,6 +860,8 @@
           </div>
         </div>
 
+        <div id="modalInterviewQuestions" class="modal-interview-questions hidden"></div>
+
         <div class="form-row">
           <div class="modal-field">
             <label>How old are you</label>
@@ -840,7 +900,6 @@
           </div>
         </div>
 
-        <div id="modalInterviewQuestions" class="modal-interview-questions hidden"></div>
         <p id="modalInterviewFeedback" class="application-feedback" aria-live="polite"></p>
         <div id="modalCustomAnswers" class="modal-custom-answers hidden"></div>
 
@@ -854,17 +913,17 @@
 
     <div id="site-footer"></div>
 
-    <script src="/assets/js/event-modal.js?v=2"></script>
-    <script src="/assets/js/committee-sidebar.js?v=13"></script>
-    <script src="/assets/js/app-home.js?v=20261010sidebar1"></script>
-    <script src="/assets/js/app-admin.js?v=20261009c"></script>
-    <script src="/assets/js/app-dashboard.js?v=20261009x"></script>
+    <script src="/assets/js/event-modal.js?v=5" defer></script>
+    <script src="/assets/js/committee-sidebar.js?v=13" defer></script>
+    <script src="/assets/js/member-dashboard.js?v=20261010todayattendance1" defer></script>
+    <script src="/assets/js/app-home.js?v=20261010headcontentassignment1" defer></script>
+    <script src="/assets/js/app-admin.js?v=20261010adminreset1" defer></script>
+    <script src="/assets/js/app-dashboard.js?v=20261010interviewquestionlayout1" defer></script>
     <script src="/assets/js/admin-data-status.js?v=2" defer></script>
-    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js" defer></script>
-    <script src="/assets/js/attendance-dashboard.js?v=20261009attendance1" defer></script>
+    <script src="/assets/js/attendance-dashboard.js?v=20261010selfattendance4" defer></script>
     <script src="/assets/js/entry-permit-dashboard.js?v=20261010permitpicker1" defer></script>
-    <script src="/assets/js/member-directory.js?v=20261009s"></script>
-    <script src="/assets/js/layout.js?v=11" defer></script>
+    <script src="/assets/js/member-directory.js?v=20261010headmembers1" defer></script>
+    <script src="/assets/js/layout.js?v=20261010memberattendance1" defer></script>
     <script src="/assets/js/theme.js?v=20261009c" defer></script>
   </body>
 </html>
