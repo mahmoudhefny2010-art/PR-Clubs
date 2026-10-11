@@ -316,6 +316,68 @@
 
 }
 
+/* Shared small-screen guardrails for public pages and dashboards. */
+@media (max-width: 900px) {
+  .topbar-nav { isolation: isolate; }
+  .topbar-container { min-width: 0; }
+  .nav-links {
+    top: 100%;
+    max-height: calc(100dvh - 64px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
+@media (max-width: 700px) {
+  html, body { max-width: 100%; overflow-x: clip; }
+  .app-container { min-width: 0; padding: 18px 14px 36px; }
+  .page-shell, .view, main, section, article, .panel, .content-card { min-width: 0; }
+  img, video, canvas, iframe { max-width: 100%; }
+  :is(h1, h2, h3, h4, p, a, strong, span, label, td, th) { overflow-wrap: anywhere; }
+  .hero-panel { padding: 22px 18px; }
+  .hero-panel h1 { font-size: clamp(1.55rem, 7vw, 2.15rem); line-height: 1.15; }
+  .hero-panel p { font-size: .96rem; line-height: 1.55; }
+  .club-card-header { align-items: flex-start; flex-wrap: wrap; }
+  .club-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .entry-permit-table-wrap, .attendance-records-list { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .modal, .calendar-modal { align-items: flex-end; padding: 8px; }
+  .modal-card, .calendar-panel {
+    width: 100%;
+    max-width: none;
+    max-height: calc(100dvh - 16px);
+    overflow-y: auto;
+    padding: 20px 16px;
+    border-radius: 18px;
+  }
+  input, select, textarea { max-width: 100%; font-size: 16px; }
+  button, [role="button"], .primary-btn, .secondary-btn { touch-action: manipulation; }
+}
+
+@media (max-width: 520px) {
+  .topbar-container { height: 60px; padding: 0 12px; gap: 8px; }
+  .nav-links { top: 60px; max-height: calc(100dvh - 60px); }
+  .brand-link { flex: 0 1 auto; min-width: 0; }
+  .brand-logo { display: block; width: auto; height: 36px; max-width: min(112px, 28vw); object-fit: contain; }
+  .nav-right { gap: 6px; }
+  .nav-signin-btn { min-height: 40px; padding: 9px 10px; font-size: .78rem; }
+  .nav-signout-btn { min-height: 40px; padding: 8px 9px; font-size: .74rem; }
+  .mobile-menu-toggle { flex: 0 0 40px; width: 40px; height: 40px; margin-left: 0; }
+  .app-container { padding: 16px 12px 30px; }
+  .welcome-box, .committee-card, .app-form-card, .admin-panel, .admin-login-panel, .club-login-panel { padding: 18px 14px; }
+  .card-actions, .modal-actions { display: grid; grid-template-columns: 1fr; }
+  .card-actions > *, .modal-actions > * { width: 100%; min-width: 0; }
+  .club-actions { gap: 8px; }
+  .club-actions > button, .club-actions > a { min-height: 46px; padding: 8px; font-size: .84rem; }
+}
+
+@media (max-width: 360px) {
+  .app-container { padding-right: 10px; padding-left: 10px; }
+  .topbar-container { padding-right: 9px; padding-left: 9px; }
+  .nav-signout-btn { max-width: 76px; overflow: hidden; text-overflow: ellipsis; }
+  .stats-summary, #homeView .stats-summary { grid-template-columns: 1fr; }
+  .club-actions { grid-template-columns: 1fr; }
+}
+
 @media (max-width: 1000px) {
   .head-applicant-details { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
