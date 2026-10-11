@@ -4301,10 +4301,9 @@ app.get('/api/student-auth/google-config', (req, res) => {
 });
 
 function demoStudentLoginEnabled(req) {
-  return process.env.ENABLE_DEMO_STUDENT_LOGIN === 'true'
-    && process.env.NODE_ENV !== 'production'
-    && !process.env.VERCEL
-    && isLoopbackRequest(req);
+  if (process.env.ENABLE_DEMO_STUDENT_LOGIN !== 'true') return false;
+  if (process.env.VERCEL) return true;
+  return process.env.NODE_ENV !== 'production' && isLoopbackRequest(req);
 }
 
 app.get('/api/student-auth/demo-config', (req, res) => {
@@ -4315,7 +4314,7 @@ app.get('/api/student-auth/demo-config', (req, res) => {
 app.post('/api/student-auth/demo', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   if (!demoStudentLoginEnabled(req)) return res.status(404).json({ message: 'Not found.' });
-  if (!mongoReady) return res.status(503).json({ message: 'The local demo account requires the database.' });
+  if (!mongoReady) return res.status(503).json({ message: 'The demo student account requires the database.' });
   const email = 'demo.student@example.test';
   try {
     let account = await StudentAccount.findOne({ email }).lean();
@@ -4328,8 +4327,8 @@ app.post('/api/student-auth/demo', async (req, res) => {
       });
       account = account.toObject();
     }
-    // This reserved .test address is used only by the loopback-only local demo flow.
-    // Reuse an existing record so stale local demo profile fields do not block sign-in.
+    // The reserved .test address can only be used through the explicitly enabled demo flow.
+    // Reuse an existing record so stale demo profile fields do not block sign-in.
     setStudentSessionCookie(req, res, account);
     res.json({ authenticated: true, role: 'student', demo: true });
   } catch (error) {
