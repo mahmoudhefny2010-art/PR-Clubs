@@ -7,7 +7,6 @@
   const closeButton = document.querySelector('[data-close-attendance-reviews]');
   if (!list || !message || !dialog || !openButton) return;
 
-  let refreshTimer = 0;
   let loading = false;
   let authorized = false;
   const htmlDate = (value) => {
@@ -29,6 +28,8 @@
   }
 
   function renderReviews(reviews, stage) {
+    const openSheets = new Set([...list.querySelectorAll('.attendance-review-sheet[open]')]
+      .map((sheet) => sheet.dataset.reviewKey));
     list.replaceChildren();
     if (!reviews.length) {
       const empty = document.createElement('p');
@@ -95,6 +96,8 @@
       });
       const sheet = document.createElement('details');
       sheet.className = 'attendance-review-sheet';
+      sheet.dataset.reviewKey = `${review.clubId}:${review.itemType}:${review.eventRequestId}`;
+      sheet.open = openSheets.has(sheet.dataset.reviewKey);
       const sheetSummary = document.createElement('summary');
       sheetSummary.textContent = `View all attendance sheet · ${review.records.length} attendee${review.records.length === 1 ? '' : 's'}`;
       sheet.append(sheetSummary, people);
@@ -130,8 +133,6 @@
 
   async function loadReviews() {
     if (!dialog.open || loading) return;
-    window.clearTimeout(refreshTimer);
-    refreshTimer = 0;
     loading = true;
     window.dashboardSync?.report('attendanceApprovals', 'loading');
     try {
@@ -148,7 +149,6 @@
       message.classList.add('is-error');
     } finally {
       loading = false;
-      if (dialog.open && document.visibilityState === 'visible') refreshTimer = window.setTimeout(loadReviews, 3000);
     }
   }
 
@@ -204,7 +204,6 @@
   }
 
   refreshButton?.addEventListener('click', () => {
-    window.clearTimeout(refreshTimer);
     loadReviews();
   });
   openButton.addEventListener('click', () => {
@@ -218,16 +217,6 @@
   });
   document.getElementById('overviewReviewsBtn')?.addEventListener('click', () => openButton.click());
   closeButton?.addEventListener('click', () => window.dashboardPanels?.showOverview());
-  dialog.addEventListener('close', () => {
-    window.clearTimeout(refreshTimer);
-    refreshTimer = 0;
-  });
-  document.addEventListener('visibilitychange', () => {
-    if (dialog.open && document.visibilityState === 'visible') {
-      window.clearTimeout(refreshTimer);
-      loadReviews();
-    }
-  });
   document.getElementById('ssoLogoutBtn')?.addEventListener('click', async () => {
     await fetch('/api/club-auth/logout', { method: 'POST' });
     window.location.assign('/');

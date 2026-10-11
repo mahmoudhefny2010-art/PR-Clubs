@@ -5,13 +5,13 @@
   const feedback = document.getElementById('committeeAttendanceFeedback');
   const recordsList = document.getElementById('committeeAttendanceRecords');
   const searchInput = document.getElementById('committeeAttendanceSearch');
+  const downloadButton = document.getElementById('downloadCommitteeAttendanceBtn');
+  const refreshButton = document.getElementById('refreshCommitteeAttendanceBtn');
   if (!openButton || !dialog || !recordsList) return;
 
   let attendanceRecords = [];
   let currentRole = '';
-  let pollTimer = 0;
   let recordsRequestPending = false;
-  let pollInFlight = false;
 
   const approvalStatusLabels = {
     pending_pr: 'Waiting for PR', pending_sso: 'Waiting for SSO',
@@ -77,18 +77,45 @@
     return statuses.length === 1 ? statuses[0] : 'mixed';
   }
 
+  function downloadCsv() {
+    const query = String(searchInput?.value || '').trim().toLowerCase();
+    const rows = attendanceRecords.filter((record) => {
+      if (!query) return true;
+      return [record.clubName, record.eventTitle, record.itemType, record.name, record.email]
+        .some((value) => String(value || '').toLowerCase().includes(query));
+    });
+    if (!rows.length) return;
+    const columns = [
+      ['Club', 'clubName'], ['Activity', 'eventTitle'], ['Type', 'itemType'], ['Date', 'eventDate'],
+      ['Name', 'name'], ['Email', 'email'], ['Checked in', 'attendedAt'], ['Approval status', 'approvalStatus']
+    ];
+    const escapeCsv = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+    const csv = [columns.map(([label]) => escapeCsv(label)).join(','), ...rows.map((record) =>
+      columns.map(([, key]) => escapeCsv(key === 'attendedAt' ? formatDateTime(record[key]) : record[key])).join(','))].join('\r\n');
+    const url = URL.createObjectURL(new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `attendance-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
   function renderRecords() {
     const query = String(searchInput?.value || '').trim().toLowerCase();
+    const openSheets = new Set([...recordsList.querySelectorAll('.attendance-activity-sheet[open]')]
+      .map((sheet) => sheet.dataset.attendanceGroup));
     const groups = makeGroups(attendanceRecords).filter((group) => !query || [
       group.clubName, group.eventTitle, group.itemType,
       ...group.records.flatMap((record) => [record.name, record.email])
     ].some((value) => String(value || '').toLowerCase().includes(query)));
+    const scrollTop = recordsList.scrollTop;
     recordsList.replaceChildren();
     if (!groups.length) {
       const empty = document.createElement('p');
       empty.className = 'committee-attendance-empty';
       empty.textContent = attendanceRecords.length ? 'No event or booth matches your search.' : 'No attendance has been recorded for an event or booth yet.';
       recordsList.append(empty);
+      recordsList.scrollTop = scrollTop;
       return;
     }
 
@@ -138,6 +165,8 @@
 
       const sheet = document.createElement('details');
       sheet.className = 'attendance-activity-sheet';
+      sheet.dataset.attendanceGroup = group.key;
+      sheet.open = openSheets.has(group.key);
       const sheetSummary = document.createElement('summary');
       sheetSummary.textContent = `View all attendance sheet · ${group.records.length} attendee${group.records.length === 1 ? '' : 's'}`;
       const people = document.createElement('div');
@@ -199,6 +228,8 @@
       cardList.append(card);
     });
     recordsList.append(cardList);
+    recordsList.scrollTop = scrollTop;
+    if (downloadButton) downloadButton.disabled = !attendanceRecords.length;
   }
 
   async function decide(group, action, buttons, noteField) {
@@ -236,6 +267,7 @@
     if (showLoading) feedback.textContent = 'Loading event attendance…';
     try {
       attendanceRecords = await apiJson('/api/committee/attendance-records?clubId=all');
+      if (downloadButton) downloadButton.disabled = !attendanceRecords.length;
       window.dashboardUnread?.update('eventAttendance', attendanceRecords.map((record) => `${record.clubId}:${record.itemType}:${record.eventRequestId}:${record.email}:${record.attendedAt}`));
       renderRecords();
       feedback.textContent = '';
@@ -256,17 +288,6 @@
     currentRole = session.club.role;
   }
 
-  async function pollRecords() {
-    if (!dialog.open || pollInFlight) return;
-    pollInFlight = true;
-    try {
-      if (document.visibilityState === 'visible') await loadRecords();
-    } finally {
-      pollInFlight = false;
-      if (dialog.open) pollTimer = window.setTimeout(pollRecords, 5000);
-    }
-  }
-
   async function openAttendance() {
     window.dashboardPanels?.show('committeeAttendanceDialog');
     feedback.textContent = 'Loading event attendance…';
@@ -274,7 +295,6 @@
     try {
       await loadRole();
       await loadRecords(true);
-      pollTimer = window.setTimeout(pollRecords, 5000);
     } catch (error) {
       feedback.textContent = error.message;
       feedback.classList.add('is-error');
@@ -293,22 +313,16 @@
   }
 
   openButton.addEventListener('click', openAttendance);
+  downloadButton?.addEventListener('click', downloadCsv);
+  refreshButton?.addEventListener('click', async () => {
+    if (!refreshButton || recordsRequestPending) return;
+    refreshButton.disabled = true;
+    try { await loadRecords(true); }
+    finally { refreshButton.disabled = false; }
+  });
   document.getElementById('overviewAttendanceBtn')?.addEventListener('click', openAttendance);
   closeButton?.addEventListener('click', () => window.dashboardPanels?.showOverview());
   searchInput?.addEventListener('input', renderRecords);
-  dialog.addEventListener('close', () => {
-    window.clearTimeout(pollTimer);
-    pollTimer = 0;
-  });
-  document.addEventListener('visibilitychange', () => {
-    if (dialog.open && document.visibilityState === 'visible' && !pollInFlight) {
-      window.clearTimeout(pollTimer);
-      pollRecords();
-    }
-  });
   refreshAttendanceBadge();
   window.addEventListener('dashboard:refresh', refreshAttendanceBadge);
-  window.setInterval(() => {
-    if (document.visibilityState === 'visible' && !dialog.open) refreshAttendanceBadge();
-  }, 10000);
 })();

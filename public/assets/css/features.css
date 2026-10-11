@@ -175,6 +175,9 @@
 .committee-inline-panel[open] .attendance-review-panel { max-height: none; overflow: visible; }
 .committee-inline-panel[open] .member-directory-inner { max-height: none; overflow: visible; }
 .committee-attendance-dialog:not(.committee-inline-panel), .attendance-review-dialog { overflow: hidden; }
+.committee-attendance-dialog.committee-inline-panel { box-sizing: border-box; width: 100%; max-height: none; margin: 16px 0 0; overflow: visible; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.committee-attendance-dialog.committee-inline-panel[hidden] { display: none !important; }
+.committee-attendance-dialog.committee-inline-panel .committee-attendance-inner { max-height: none; overflow: visible; }
 .committee-attendance-inner { box-sizing: border-box; display: flex; max-height: min(88vh, 88dvh); flex-direction: column; overflow: hidden; padding: 22px; }
 .entry-permit-dialog .committee-attendance-inner { overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
 .committee-attendance-dialog .committee-attendance-records { flex: 1 1 auto; min-height: 0; max-height: none; overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
@@ -182,6 +185,9 @@
 .committee-attendance-header h2 { margin: 4px 0; }
 .committee-attendance-header p { margin: 0; color: var(--text-muted); }
 .committee-attendance-search { display: grid; gap: 6px; max-width: 520px; margin: 16px 0 12px; color: var(--text-muted); font-size: .9rem; font-weight: 700; }
+.committee-attendance-toolbar { display: flex; align-items: end; gap: 12px; }
+.committee-attendance-toolbar .committee-attendance-search { flex: 1 1 auto; min-width: 0; }
+.committee-attendance-toolbar > button { flex: 0 0 auto; min-height: 44px; margin: 0 0 12px; white-space: nowrap; }
 .committee-attendance-search input { box-sizing: border-box; width: 100%; min-height: 44px; padding: 9px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-panel); color: var(--text-main); font: inherit; }
 .committee-attendance-records { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
 .committee-attendance-records > p { margin: 0; padding: 18px; color: var(--text-muted); }
@@ -210,8 +216,8 @@
 .attendance-activity-sheet { border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-soft); }
 .attendance-activity-sheet > summary { padding: 9px 12px; color: var(--primary-700); font-size: .94rem; font-weight: 700; cursor: pointer; }
 .attendance-activity-sheet[open] > summary { border-bottom: 1px solid var(--border-color); }
-.attendance-activity-people { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; max-height: 280px; overflow: auto; padding: 10px; }
-.attendance-activity-person { display: grid; gap: 3px; min-width: 0; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-panel); overflow-wrap: anywhere; }
+.attendance-activity-people { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 4px 8px; max-height: 220px; overflow: auto; padding: 8px; }
+.attendance-activity-person { display: grid; gap: 1px; min-width: 0; padding: 6px 9px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-panel); overflow-wrap: anywhere; font-size: .9rem; }
 .attendance-activity-person small { color: var(--text-muted); }
 .attendance-activity-notes { display: grid; gap: 6px; }
 .attendance-activity-notes p { margin: 0; padding: 9px 12px; border-left: 3px solid #d97706; border-radius: 6px; background: #fffbeb; color: #78350f; }
@@ -481,6 +487,8 @@
   #attendanceQrDialog[open] .attendance-qr-result { display: block !important; margin: 8vh auto; border: 0; }
 }
 @media (max-width: 600px) {
+  .committee-attendance-toolbar { align-items: stretch; flex-direction: column; gap: 0; }
+  .committee-attendance-toolbar > button { margin: 0 0 10px; }
   .request-dialog .dialog-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .committee-approval-row { align-items: flex-start; }
   .committee-approval-row > strong { text-align: center; }

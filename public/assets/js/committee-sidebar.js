@@ -66,7 +66,11 @@
       const active = panel === target;
       panel.hidden = !active;
       panel.classList.toggle('is-active-panel', active);
-      if (panel instanceof HTMLDialogElement) {
+      if (panel instanceof HTMLDialogElement && panel.classList.contains('committee-inline-panel')) {
+        // Inline panels are dialogs in markup for accessibility, but are not
+        // modal dialogs. The native show() method is only for modal dialogs.
+        panel.toggleAttribute('open', active);
+      } else if (panel instanceof HTMLDialogElement) {
         if (active && !panel.open) panel.show();
         else if (!active && panel.open) panel.close();
       }

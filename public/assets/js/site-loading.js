@@ -1,10 +1,11 @@
 (() => {
   const root = document.documentElement;
-  // Start documents at the top on normal navigation and Back/Forward restores.
-  // In-page hash navigation remains available for dashboard sections.
+  // A newly loaded document always starts at the top, including links that
+  // carry a fragment. Hash changes made after load still navigate in-page.
   if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual';
   window.addEventListener('pageshow', () => {
-    if (!window.location.hash) window.scrollTo(0, 0);
+    window.scrollTo(0, 0);
+    window.requestAnimationFrame(() => window.scrollTo(0, 0));
   });
   const nativeFetch = window.fetch.bind(window);
   let pendingRequests = 0;
