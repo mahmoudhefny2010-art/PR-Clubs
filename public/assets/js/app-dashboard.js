@@ -111,6 +111,8 @@ function openReviewModal(appId) {
   state.selectedApplication = app;
   reviewModal.dataset.reviewMode = app.interviewed ? 'preview' : 'interview';
   reviewModal.querySelector('.modal-header h3').textContent = app.interviewed ? 'Interview Preview' : 'Applicant Interview';
+  if (state.pendingInterviewPhotoPreview) URL.revokeObjectURL(state.pendingInterviewPhotoPreview);
+  state.pendingInterviewPhotoPreview = '';
   state.pendingInterviewPhoto = '';
   document.getElementById('modalPhoto').value = '';
   modalName.textContent = app.studentName;
@@ -576,7 +578,8 @@ async function saveInterviewReview(status) {
   const modalPhotoInput = document.getElementById('modalPhoto');
   if (modalPhotoInput.files[0] && !state.pendingInterviewPhoto) {
     try {
-      state.pendingInterviewPhoto = await readImageFile(modalPhotoInput.files[0]);
+      const uploadedPhoto = await window.uploadImageToCloudinary(modalPhotoInput.files[0], 'applicant');
+      state.pendingInterviewPhoto = uploadedPhoto;
     } catch (error) {
       document.getElementById('modalInterviewFeedback').textContent = error.message;
       return;
@@ -590,7 +593,10 @@ async function saveInterviewReview(status) {
       notes: modalNotes.value,
       rating: Number(modalRating.value),
       interviewAnswers,
-      ...(state.pendingInterviewPhoto ? { photo: state.pendingInterviewPhoto } : {})
+      ...(state.pendingInterviewPhoto ? {
+        photo: state.pendingInterviewPhoto.url,
+        photoPublicId: state.pendingInterviewPhoto.publicId
+      } : {})
     })
   });
   if (!response.ok) {
@@ -598,7 +604,9 @@ async function saveInterviewReview(status) {
     document.getElementById('modalInterviewFeedback').textContent = result.message || 'Could not save this interview.';
     return;
   }
-  if (state.pendingInterviewPhoto) state.selectedApplication.photo = state.pendingInterviewPhoto;
+  if (state.pendingInterviewPhoto) state.selectedApplication.photo = state.pendingInterviewPhoto.url;
+  if (state.pendingInterviewPhotoPreview) URL.revokeObjectURL(state.pendingInterviewPhotoPreview);
+  state.pendingInterviewPhotoPreview = '';
   state.pendingInterviewPhoto = '';
   reviewModal.classList.add('hidden');
   await loadApplications();
@@ -788,10 +796,12 @@ clubEditorForm.addEventListener('submit', async (event) => {
 
   try {
     if (imageFile) {
-      if (!['image/png', 'image/jpeg', 'image/webp'].includes(imageFile.type) || imageFile.size > 5 * 1024 * 1024) {
-        throw new Error('Choose a PNG, JPG, or WebP image up to 5 MB.');
+      if (!['image/png', 'image/jpeg', 'image/webp'].includes(imageFile.type) || imageFile.size > 10 * 1024 * 1024) {
+        throw new Error('Choose a PNG, JPG, or WebP image up to 10 MB.');
       }
-      payload.imageData = await readImageFile(imageFile);
+      const uploadedImage = await window.uploadImageToCloudinary(imageFile, 'club');
+      payload.imageUrl = uploadedImage.url;
+      payload.imagePublicId = uploadedImage.publicId;
     } else if (!currentClub?.image) {
       throw new Error('Choose a photo or logo for this club card.');
     }
@@ -818,9 +828,9 @@ document.getElementById('cancelClubEditBtn').addEventListener('click', resetClub
 clubImageInput.addEventListener('change', () => {
   const file = clubImageInput.files[0];
   if (!file) return;
-  if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024) {
+  if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 10 * 1024 * 1024) {
     clubImageInput.value = '';
-    setAdminFeedback('Choose a PNG, JPG, or WebP image up to 5 MB.', true);
+    setAdminFeedback('Choose a PNG, JPG, or WebP image up to 10 MB.', true);
     return;
   }
 
@@ -836,21 +846,19 @@ document.getElementById('modalPhoto').addEventListener('change', (event) => {
   const input = event.currentTarget;
   const file = input.files[0];
   if (!file) return;
-  if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024) {
+  if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 10 * 1024 * 1024) {
     input.value = '';
-    document.getElementById('modalInterviewFeedback').textContent = 'Choose a PNG, JPG, or WebP photo up to 5 MB.';
+    document.getElementById('modalInterviewFeedback').textContent = 'Choose a PNG, JPG, or WebP photo up to 10 MB.';
     return;
   }
-  readImageFile(file).then((photo) => {
-    state.pendingInterviewPhoto = photo;
-    modalApplicantPhoto.src = photo;
-    modalApplicantPhoto.classList.remove('hidden');
-    modalApplicantAvatar.classList.add('hidden');
-    photoName.textContent = file.name;
-    document.getElementById('modalInterviewFeedback').textContent = 'New photo selected. Save the interview to update the application photo.';
-  }).catch((error) => {
-    document.getElementById('modalInterviewFeedback').textContent = error.message;
-  });
+  if (state.pendingInterviewPhotoPreview) URL.revokeObjectURL(state.pendingInterviewPhotoPreview);
+  state.pendingInterviewPhoto = '';
+  state.pendingInterviewPhotoPreview = URL.createObjectURL(file);
+  modalApplicantPhoto.src = state.pendingInterviewPhotoPreview;
+  modalApplicantPhoto.classList.remove('hidden');
+  modalApplicantAvatar.classList.add('hidden');
+  photoName.textContent = file.name;
+  document.getElementById('modalInterviewFeedback').textContent = 'New photo selected. Save the interview to upload and apply it.';
 });
 
 const lastAppViewStorageKey = 'miu-last-app-view';

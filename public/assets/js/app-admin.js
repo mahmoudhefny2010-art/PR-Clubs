@@ -617,15 +617,6 @@ async function restoreClub(clubId) {
   setAdminFeedback(`${club.name} restored to active clubs.`);
 }
 
-function readImageFile(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.addEventListener('load', () => resolve(reader.result));
-    reader.addEventListener('error', () => reject(new Error('Could not read the selected image.')));
-    reader.readAsDataURL(file);
-  });
-}
-
 function parseClubContentDate(value) {
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
@@ -793,7 +784,7 @@ async function openApplicationForm(clubId, allowClosedClub = false) {
   applicationForm.reset();
   clearApplicantPhotoPreview();
   applicantPhotoInput.required = true;
-  applicationForm.querySelector('.applicant-photo-field small').textContent = 'PNG, JPG, or WebP. Maximum size: 5 MB.';
+  applicationForm.querySelector('.applicant-photo-field small').textContent = 'PNG, JPG, or WebP. Maximum size: 10 MB.';
   applicationForm.querySelector('[type="submit"]').textContent = 'Submit Application';
   applicationFeedback.textContent = '';
   applicationFeedback.classList.remove('is-error');
@@ -896,10 +887,10 @@ applicantPhotoInput.addEventListener('change', () => {
     clearApplicantPhotoPreview();
     return;
   }
-  if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024) {
+  if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 10 * 1024 * 1024) {
     applicantPhotoInput.value = '';
     clearApplicantPhotoPreview();
-    applicationFeedback.textContent = 'Choose a PNG, JPG, or WebP photo up to 5 MB.';
+    applicationFeedback.textContent = 'Choose a PNG, JPG, or WebP photo up to 10 MB.';
     applicationFeedback.classList.add('is-error');
     return;
   }
@@ -954,8 +945,8 @@ applicationForm.addEventListener('submit', async (event) => {
     applicationFeedback.classList.add('is-error');
     return;
   }
-  if (applicantPhoto && (!['image/png', 'image/jpeg', 'image/webp'].includes(applicantPhoto.type) || applicantPhoto.size > 5 * 1024 * 1024)) {
-    applicationFeedback.textContent = 'Choose a PNG, JPG, or WebP photo up to 5 MB.';
+  if (applicantPhoto && (!['image/png', 'image/jpeg', 'image/webp'].includes(applicantPhoto.type) || applicantPhoto.size > 10 * 1024 * 1024)) {
+    applicationFeedback.textContent = 'Choose a PNG, JPG, or WebP photo up to 10 MB.';
     applicationFeedback.classList.add('is-error');
     return;
   }
@@ -986,7 +977,11 @@ applicationForm.addEventListener('submit', async (event) => {
       clearTimeout(studentProfileSaveTimer);
       await saveStudentProfileFromForm();
     }
-    if (applicantPhoto) payload.photo = await readImageFile(applicantPhoto);
+    if (applicantPhoto) {
+      const uploadedPhoto = await window.uploadImageToCloudinary(applicantPhoto, 'applicant');
+      payload.photo = uploadedPhoto.url;
+      payload.photoPublicId = uploadedPhoto.publicId;
+    }
     if (!state.editingMyForm && !payload.photo) throw new Error('Upload your photo before submitting.');
     const editing = state.editingMyForm;
     const response = await fetch(editing ? `/api/my-forms/${encodeURIComponent(editing.id)}` : '/api/applications', {

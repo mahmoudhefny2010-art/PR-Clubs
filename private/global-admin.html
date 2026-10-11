@@ -235,7 +235,7 @@
           <div class="active-people-panel">
             <div class="active-people-heading"><h3>Who is online</h3><span id="activePeopleCount">Checking activity…</span></div>
             <div class="active-people-list" id="activePeopleList" aria-live="polite"></div>
-            <p class="activity-privacy-note">Signed-in users show their account name and email. Guests remain anonymous; browser type is only an estimate.</p>
+            <p class="activity-privacy-note">Signed-in users show their account name and email. Anonymous visitors show a browser code, estimated device and browser. The code identifies this browser cookie, not a person or a physical device; clearing cookies or changing browsers creates a new code.</p>
           </div>
           <details class="activity-history">
             <summary>Historical traffic totals · these count browsers and networks, not people</summary>
@@ -425,6 +425,7 @@
 
   <script src="/assets/js/layout.js?v=11" defer></script>
   <script src="/assets/js/theme.js?v=20261009c" defer></script>
+  <script src="/assets/js/cloudinary-upload.js?v=2"></script>
   <script>
     const clubs = [];
     let heads = [];
@@ -516,8 +517,11 @@
         const identity = document.createElement('span');
         identity.textContent = person.email
           ? `${person.email} · ${person.label}`
-          : `Anonymous guest · ${person.deviceType || 'unknown'} browser`;
+          : `Anonymous device · ${person.deviceName || person.deviceType || 'unknown'} · ${person.browserName || 'unknown browser'}`;
         details.append(name, identity);
+        const ipAddress = document.createElement('span');
+        ipAddress.textContent = `IP: ${person.ipAddress || 'unavailable'}`;
+        details.append(ipAddress);
         const seen = document.createElement('span');
         seen.className = 'active-person-seen';
         const lastSeen = new Date(person.lastSeenAt);
@@ -616,14 +620,6 @@
       const activeTab = document.getElementById('tab-university');
       if (document.visibilityState === 'visible' && activeTab?.classList.contains('active')) loadUniversityPosts();
     }, 30_000);
-    function readSelectedImage(file) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result || ''));
-        reader.onerror = () => reject(new Error('Could not read the selected image.'));
-        reader.readAsDataURL(file);
-      });
-    }
     const universityEventFields = byId('universityEventFields');
     const universityEventDate = byId('universityPostDate');
     const universityImageInput = byId('universityPostImage');
@@ -647,9 +643,9 @@
     universityImageInput.addEventListener('change', () => {
       const file = universityImageInput.files[0];
       if (!file) return;
-      if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024) {
+      if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 10 * 1024 * 1024) {
         universityImageInput.value = '';
-        setMessage('universityPostMessage', 'Choose a PNG, JPG, or WebP image up to 5 MB.', true);
+        setMessage('universityPostMessage', 'Choose a PNG, JPG, or WebP image up to 10 MB.', true);
         return;
       }
       if (universityPreviewUrl) URL.revokeObjectURL(universityPreviewUrl);
@@ -679,7 +675,11 @@
           registrationEnabled: byId('universityPostRegistration').value === 'true',
           imageChoice
         };
-        if (imageChoice === 'custom') payload.imageData = await readSelectedImage(imageFile);
+        if (imageChoice === 'custom') {
+          const uploadedImage = await window.uploadImageToCloudinary(imageFile, 'university');
+          payload.imageUrl = uploadedImage.url;
+          payload.imagePublicId = uploadedImage.publicId;
+        }
         await request('/api/admin/university-content', {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
         });

@@ -11,7 +11,12 @@
   let previousQuestions = [];
   let pending = false;
   let lastFailedQuestion = '';
+  let hasConversation = false;
   const escapePath = (value) => typeof value === 'string' && value.startsWith('/') && !value.startsWith('//') ? value : '/pages/help.html';
+
+  function updateClearButton() {
+    clearButton.disabled = pending || !hasConversation;
+  }
 
   fetch('/api/ask-ai/status', { cache: 'no-store' })
     .then((response) => response.ok ? response.json() : null)
@@ -68,7 +73,7 @@
     article.append(body);
     messages.append(article);
     messages.scrollTop = messages.scrollHeight;
-    clearButton.disabled = pending || messages.querySelectorAll('.user-message').length === 0;
+    updateClearButton();
     return article;
   }
 
@@ -87,6 +92,7 @@
     if (!value || pending) return;
     const context = previousQuestions.slice(-6);
     if (addToChat) {
+      hasConversation = true;
       appendMessage('user', value);
       previousQuestions.push(value);
       previousQuestions = previousQuestions.slice(-6);
@@ -125,7 +131,7 @@
       pending = false;
       sendButton.disabled = false;
       input.disabled = false;
-      clearButton.disabled = messages.querySelectorAll('.user-message').length === 0;
+      updateClearButton();
       input.focus();
     }
   }
@@ -155,6 +161,7 @@
     if (pending) return;
     previousQuestions = [];
     lastFailedQuestion = '';
+    hasConversation = false;
     messages.replaceChildren();
     suggestions.hidden = false;
     appendMessage('assistant', 'Hi! I can help you explore the clubs website. Ask me about joining a club, upcoming events, recent announcements, or finding an application.');

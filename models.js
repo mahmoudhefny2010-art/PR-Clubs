@@ -69,6 +69,7 @@ const applicationSchema = new mongoose.Schema({
   interviewEvaluations: { type: [mongoose.Schema.Types.Mixed], default: [] },
   status: { type: String, enum: ['pending', 'accepted', 'rejected'], default: 'pending' },
   photo: { type: String, default: '' },
+  photoPublicId: { type: String, default: '' },
   managementTokenHash: { type: String, default: '' },
   answers: { type: mongoose.Schema.Types.Mixed, default: () => [] }
 }, { timestamps: true });
@@ -96,6 +97,8 @@ const universityContentSchema = new mongoose.Schema({
 const siteVisitorSchema = new mongoose.Schema({
   visitorId: { type: String, required: true, unique: true, index: true },
   deviceType: { type: String, enum: ['mobile', 'tablet', 'desktop', 'unknown'], default: 'unknown', index: true },
+  deviceName: { type: String, default: 'Unknown device' },
+  browserName: { type: String, default: 'Unknown browser' },
   accountType: { type: String, enum: ['guest', 'admin', 'club', 'student'], default: 'guest', index: true },
   accountEmail: { type: String, default: '', lowercase: true, trim: true, index: true },
   accountName: { type: String, default: '' },
@@ -108,6 +111,12 @@ const siteNetworkSchema = new mongoose.Schema({
   ipHash: { type: String, required: true, unique: true, index: true },
   firstSeenAt: { type: Date, required: true },
   lastSeenAt: { type: Date, required: true }
+}, { versionKey: false });
+
+const siteVisitorPresenceSchema = new mongoose.Schema({
+  visitorId: { type: String, required: true, unique: true, index: true },
+  ipAddress: { type: String, default: '' },
+  expiresAt: { type: Date, required: true, index: { expires: 0 } }
 }, { versionKey: false });
 
 const clubAccountSchema = new mongoose.Schema({
@@ -387,6 +396,7 @@ const SiteSetting = mongoose.models.SiteSetting || mongoose.model('SiteSetting',
 const UniversityContent = mongoose.models.UniversityContent || mongoose.model('UniversityContent', universityContentSchema);
 const SiteVisitor = mongoose.models.SiteVisitor || mongoose.model('SiteVisitor', siteVisitorSchema);
 const SiteNetwork = mongoose.models.SiteNetwork || mongoose.model('SiteNetwork', siteNetworkSchema);
+const SiteVisitorPresence = mongoose.models.SiteVisitorPresence || mongoose.model('SiteVisitorPresence', siteVisitorPresenceSchema);
 const ClubAccount = mongoose.models.ClubAccount || mongoose.model('ClubAccount', clubAccountSchema);
 const ContentRequest = mongoose.models.ContentRequest || mongoose.model('ContentRequest', contentRequestSchema);
 const AuditLog = mongoose.models.AuditLog || mongoose.model('AuditLog', auditLogSchema);
@@ -398,6 +408,7 @@ module.exports = {
   UniversityContent,
   SiteVisitor,
   SiteNetwork,
+  SiteVisitorPresence,
   ClubAccount,
   ContentRequest,
   AuditLog,
