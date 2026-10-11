@@ -9,6 +9,7 @@ const cloudinary = require('cloudinary').v2;
 const { createAskAiRouter } = require('./services/ask-ai');
 const { describeVisitorDevice, createVisitorDeviceCode } = require('./services/visitor-device');
 const { getVisitorIpAddress } = require('./services/visitor-network');
+const { parseInteraction, registerFeedbackRoutes } = require('./services/student-feedback');
 const {
   Club,
   Application,
@@ -1291,10 +1292,31 @@ app.get('/api/clubs', async (req, res) => {
         .sort({ sortOrder: 1, id: 1 }).lean(),
       getClubMemberDirectory()
     ]);
+    const applicationWindows = clubsFromDatabase.map((club) => ({
+      clubId: club.id,
+      ...(club.applicationCycleStartedAt ? { createdAt: { $gte: club.applicationCycleStartedAt } } : {})
+    }));
+    const applicationTotals = applicationWindows.length
+      ? await Application.aggregate([
+        { $match: { $or: applicationWindows } },
+        { $group: { _id: '$clubId', count: { $sum: 1 } } }
+      ])
+      : [];
     const membersByClub = new Map(memberDirectory.map((club) => [club.id, club.totalCount]));
+    const applicantsByClub = new Map(applicationTotals.map((club) => [Number(club._id), club.count]));
+    const { StudentFeedback: feedbackModel } = require('./services/student-feedback');
+    await feedbackModel.init();
+    const ratings = await feedbackModel.aggregate([
+      { $match: { kind: 'club' } },
+      { $group: { _id: '$targetKey', average: { $avg: '$value' }, count: { $sum: 1 } } }
+    ]);
+    const ratingByClub = new Map(ratings.map((row) => [row._id, row]));
     const records = clubsFromDatabase.map((club) => ({
       ...toPublicClubRecord(club),
-      members: membersByClub.get(club.id) ?? (Number(club.members) || 0)
+      members: membersByClub.get(club.id) ?? (Number(club.members) || 0),
+      applicants: applicantsByClub.get(club.id) || 0,
+      ratingAverage: ratingByClub.get(String(club._id))?.average || 0,
+      ratingCount: ratingByClub.get(String(club._id))?.count || 0
     }));
     res.setHeader('Cache-Control', 'no-store');
     res.json(records);
@@ -1311,6 +1333,7 @@ app.get('/api/university-content', async (req, res) => {
     const records = await UniversityContent.find().read('primary').readConcern('majority').sort({ createdAt: -1, id: -1 }).lean();
     res.json(records.map((record) => ({
       id: record.id, type: record.type, title: record.title, description: record.description,
+      interaction: record.interaction || 'none', question: record.question || '', options: record.options || [],
       date: record.date, time: record.time, location: record.location, image: record.image,
       registrationEnabled: record.type === 'event' && record.registrationEnabled === true,
       createdAt: record.createdAt
@@ -1351,7 +1374,7 @@ app.get('/api/admin/session', async (req, res) => {
 app.get('/api/site/account-session', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   try {
-    if (await isAdminSessionValid(req)) return res.json({ authenticated: true, type: 'admin' });
+    if (await isAdminSessionValid(req)) return res.json({ authenticated: true, type: 'admin', email: getConfiguredAdminEmail() || '' });
     const clubAccount = await getClubAccountFromRequest(req);
     if (clubAccount) {
       const club = clubs.find((item) => Number(item.id) === Number(clubAccount.clubId));
@@ -1359,13 +1382,14 @@ app.get('/api/site/account-session', async (req, res) => {
         authenticated: true,
         type: 'club',
         role: clubAccount.role,
+        email: clubAccount.email || '',
         name: ['pr', 'english', 'security', 'sso', 'dean'].includes(clubAccount.role)
           ? `${committeeRoleLabels[clubAccount.role] || clubAccount.role} Dashboard`
           : club?.name || ''
       });
     }
     const studentAccount = await getStudentAccountFromRequest(req, res);
-    if (studentAccount) return res.json({ authenticated: true, type: 'student', name: studentAccount.name || '' });
+    if (studentAccount) return res.json({ authenticated: true, type: 'student', name: studentAccount.name || '', email: studentAccount.email || '' });
     return res.json({ authenticated: false });
   } catch (error) {
     console.error('Site account session check failed:', error.name);
@@ -1449,6 +1473,7 @@ app.get('/api/club-auth/session', async (req, res) => {
       id: club.id,
       name: club.name,
       image: club.image,
+      status: club.status,
       role: account.role,
       committee: account.committee || '',
       hasAssignedContent
@@ -1490,6 +1515,7 @@ app.post('/api/club-auth/login', async (req, res) => {
       id: club.id,
       name: club.name,
       image: club.image,
+      status: club.status,
       role: account.role,
       committee: account.committee || club.committee || ''
     } : null
@@ -1509,11 +1535,54 @@ app.get('/api/club/dashboard', requireClubAuth, (req, res) => {
     name: club.name,
     committee: req.clubAccount.committee || club.committee,
     role: req.clubAccount.role,
-    image: club.image
+    image: club.image,
+    status: club.status
   });
 });
 
 // Public event registration — saved to MongoDB, one registration per email per event.
+app.patch('/api/club/status', requireClubAuth, async (req, res) => {
+  if (req.clubAccount.role !== 'president') {
+    return res.status(403).json({ message: 'Only the club president can change club status.' });
+  }
+  const clubId = Number(req.clubAccount.clubId);
+  const status = typeof req.body.status === 'string' ? req.body.status : '';
+  if (!Number.isSafeInteger(clubId) || clubId < 1 || !['open', 'opening-soon', 'full', 'closed'].includes(status)) {
+    return res.status(400).json({ message: 'Choose Open, Opening soon, Full, or Closed.' });
+  }
+  try {
+    if (!requireLiveDatabase(res)) return;
+    const currentClub = await Club.findOne({ id: clubId, archivedAt: null })
+      .select('id status applicationCycleStartedAt')
+      .read('primary').readConcern('majority').lean();
+    if (!currentClub) return res.status(404).json({ message: 'Your club could not be found.' });
+    const statusUpdate = { status };
+    if (status === 'open' && currentClub.status !== 'open') {
+      statusUpdate.applicationCycleStartedAt = new Date();
+    }
+    const saved = await Club.findOneAndUpdate(
+      { id: clubId, archivedAt: null, status: currentClub.status },
+      { $set: statusUpdate },
+      { new: true, runValidators: true, writeConcern: { w: 'majority' } }
+    ).select('id status applicationCycleStartedAt').read('primary').lean();
+    if (!saved) return res.status(409).json({ message: 'The club status changed. Refresh and try again.' });
+    const applicationQuery = { clubId };
+    if (saved.applicationCycleStartedAt) applicationQuery.createdAt = { $gte: saved.applicationCycleStartedAt };
+    const applicantCount = await Application.countDocuments(applicationQuery).read('primary').readConcern('majority');
+    const clubIndex = clubs.findIndex((item) => Number(item.id) === clubId);
+    if (clubIndex >= 0) clubs[clubIndex] = {
+      ...clubs[clubIndex],
+      status: saved.status,
+      applicationCycleStartedAt: saved.applicationCycleStartedAt
+    };
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ savedToDatabase: true, clubId, status: saved.status, applicants: applicantCount });
+  } catch (error) {
+    console.error('Club president status update failed:', error.name);
+    res.status(503).json({ message: 'Could not save your club status. Please try again.' });
+  }
+});
+
 app.post('/api/events/:clubId/:eventIndex/registrations', async (req, res) => {
   const clubId = Number(req.params.clubId);
   const eventIndex = Number(req.params.eventIndex);
@@ -1759,9 +1828,10 @@ app.post('/api/attendance/admin-self-checkin', requireClubAuth, async (req, res)
       clubId, itemType, eventRequestId,
       $or: [{ email }, { deviceHash }]
     }).select('+deviceHash email').read('primary').readConcern('majority').lean();
-    if (existing) return res.status(409).json({ message: existing.email === email
-      ? 'Your account has already checked in for this event or booth.'
-      : 'Attendance has already been recorded from this device for this event or booth.' });
+    if (String(existing?.email || '').trim().toLowerCase() === email) {
+      return res.json({ savedToDatabase: true, alreadyRecorded: true, message: 'Your attendance is already recorded for this event or booth.' });
+    }
+    if (existing) return res.status(409).json({ message: 'Attendance has already been recorded from this device for this event or booth.' });
     if (await isAttendanceActivityManuallyEnded(clubId, itemType, eventRequestId)) return res.status(409).json({ message: 'Attendance has ended for this event or booth.' });
 
     // Keep a database session reference for the record without opening or
@@ -1785,9 +1855,12 @@ app.post('/api/attendance/admin-self-checkin', requireClubAuth, async (req, res)
     } catch (error) {
       if (error.code === 11000) {
         await AttendanceSession.deleteOne({ _id: session._id }).catch(() => {});
-        return res.status(409).json({ message: error.keyPattern?.deviceHash
-          ? 'Attendance has already been recorded from this device for this event or booth.'
-          : 'Your account has already checked in for this event or booth.' });
+        const accountRecord = await AttendanceRecord.findOne({ clubId, itemType, eventRequestId, email })
+          .select('email').read('primary').readConcern('majority').lean();
+        if (error.keyPattern?.email || accountRecord) {
+          return res.json({ savedToDatabase: true, alreadyRecorded: true, message: 'Your attendance is already recorded for this event or booth.' });
+        }
+        return res.status(409).json({ message: 'Attendance has already been recorded from this device for this event or booth.' });
       }
       throw error;
     }
@@ -1848,7 +1921,10 @@ app.post('/api/club/attendance-sessions', requireClubAuth, async (req, res) => {
       createdBy: req.clubAccount.email
     });
     try {
-      await AttendanceSession.updateMany({ clubId, itemType, eventRequestId, active: true, _id: { $ne: session._id } }, { $set: { active: false } });
+      await AttendanceSession.updateMany({
+        clubId, itemType, eventRequestId, active: true,
+        assignedMemberEmail: { $in: ['', null] }, _id: { $ne: session._id }
+      }, { $set: { active: false } });
     } catch (error) {
       await AttendanceSession.deleteOne({ _id: session._id }).catch(() => {});
       throw error;
@@ -1869,6 +1945,8 @@ app.post('/api/member/attendance-assignments/:id/session', requireStudentAuth, a
     if (!assignment || String(assignment._id) !== req.params.id || assignment.status !== 'accepted') {
       return res.status(403).json({ message: 'Accept your current attendance task before opening its check-in QR.' });
     }
+    const assignedDeviceHash = await bindMemberAttendanceDevice(assignment, req.studentAccount.email, req, res);
+    if (!assignedDeviceHash) return res.status(403).json({ message: 'This attendance task is tied to the device where you accepted it.' });
     if (!isActivityScheduledToday(assignment.eventDate)) return res.status(409).json({ message: 'The attendance QR is available only on the event or booth date.' });
     const club = await Club.findOne({ id: assignment.clubId, archivedAt: null }).select('id name events booths').read('primary').readConcern('majority').lean();
     const items = assignment.itemType === 'event' ? club?.events : club?.booths;
@@ -1891,19 +1969,23 @@ app.post('/api/member/attendance-assignments/:id/session', requireStudentAuth, a
     const session = await AttendanceSession.create({
       clubId: assignment.clubId, itemType: assignment.itemType, eventRequestId: assignment.eventRequestId,
       eventTitle: title, eventDate: assignment.eventDate, eventTime: assignment.eventTime,
-      tokenHash: attendanceTokenHash(token), createdBy: req.studentAccount.email
+      tokenHash: attendanceTokenHash(token), createdBy: req.studentAccount.email,
+      assignedMemberEmail: String(assignment.memberEmail || '').trim().toLowerCase(), assignedDeviceHash
     });
     try {
       await AttendanceSession.updateMany({
-        clubId: assignment.clubId, itemType: assignment.itemType,
-        eventRequestId: assignment.eventRequestId, active: true, _id: { $ne: session._id }
-      }, { $set: { active: false } });
+        clubId: assignment.clubId, itemType: assignment.itemType, eventRequestId: assignment.eventRequestId,
+        assignedMemberEmail: String(assignment.memberEmail || '').trim().toLowerCase(), active: true,
+        _id: { $ne: session._id }
+      }, { $set: { active: false } }, { writeConcern: { w: 'majority' } });
     } catch (error) {
       await AttendanceSession.deleteOne({ _id: session._id }).catch(() => {});
       throw error;
     }
     const confirmed = await AttendanceSession.findById(session._id).read('primary').readConcern('majority').lean();
-    if (!confirmed || confirmed.tokenHash !== attendanceTokenHash(token) || confirmed.createdBy !== req.studentAccount.email) {
+    if (!confirmed || confirmed.tokenHash !== attendanceTokenHash(token) || confirmed.createdBy !== req.studentAccount.email
+      || confirmed.assignedMemberEmail !== String(assignment.memberEmail || '').trim().toLowerCase()
+      || confirmed.assignedDeviceHash !== assignedDeviceHash) {
       await AttendanceSession.deleteOne({ _id: session._id }).catch(() => {});
       return res.status(503).json({ message: 'The check-in QR session could not be confirmed in the database.' });
     }
@@ -1971,6 +2053,41 @@ function attendanceDeviceHash(id) {
   return crypto.createHmac('sha256', sessionSecret).update(`attendance-record-device.${id}`).digest('hex');
 }
 
+function memberAttendanceDeviceId(req) {
+  const cookie = requestCookie(req, 'miu_member_attendance_device');
+  const [id, signature] = cookie.split('.');
+  if (!/^[A-Za-z0-9_-]{40,60}$/.test(id || '') || !/^[a-f0-9]{64}$/.test(signature || '')) return '';
+  const expected = crypto.createHmac('sha256', sessionSecret).update(`member-attendance-device.${id}`).digest('hex');
+  return crypto.timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expected, 'hex')) ? id : '';
+}
+
+function ensureMemberAttendanceDeviceCookie(req, res) {
+  const existingId = memberAttendanceDeviceId(req);
+  if (existingId) return existingId;
+  const id = crypto.randomBytes(32).toString('base64url');
+  const signature = crypto.createHmac('sha256', sessionSecret).update(`member-attendance-device.${id}`).digest('hex');
+  const secure = secureCookieSuffix(req);
+  appendAttendanceCookie(res, `miu_member_attendance_device=${id}.${signature}; Max-Age=31536000; HttpOnly; SameSite=Strict; Path=/api/;${secure}`);
+  return id;
+}
+
+async function bindMemberAttendanceDevice(assignment, email, req, res) {
+  const deviceHash = attendanceDeviceHash(ensureMemberAttendanceDeviceCookie(req, res));
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  if (assignment.checkInDeviceHash) return assignment.checkInDeviceHash === deviceHash ? deviceHash : '';
+  const updated = await AttendanceAssignment.findOneAndUpdate({
+    _id: assignment._id,
+    memberEmail: normalizedEmail,
+    status: 'accepted',
+    $or: [{ checkInDeviceHash: '' }, { checkInDeviceHash: { $exists: false } }]
+  }, { $set: { checkInDeviceHash: deviceHash } }, { new: true, writeConcern: { w: 'majority' } })
+    .read('primary').readConcern('majority').lean();
+  if (updated?.checkInDeviceHash === deviceHash) return deviceHash;
+  const current = await AttendanceAssignment.findOne({ _id: assignment._id, memberEmail: normalizedEmail, status: 'accepted' })
+    .select('checkInDeviceHash').read('primary').readConcern('majority').lean();
+  return current?.checkInDeviceHash === deviceHash ? deviceHash : '';
+}
+
 function hasAttendanceScanProof(req, sessionId) {
   const cookie = String(req.headers.cookie || '').split(';').map((part) => part.trim()).find((part) => part.startsWith('miu_attendance_scan='));
   if (!cookie) return false;
@@ -2015,7 +2132,7 @@ app.post('/api/member/attendance-qr-challenge', requireStudentAuth, async (req, 
   try {
     if (!requireLiveDatabase(res)) return;
     const session = await AttendanceSession.findOne({ tokenHash: attendanceTokenHash(token), active: true })
-      .select('clubId itemType eventRequestId eventDate createdBy').read('primary').readConcern('majority').lean();
+      .select('clubId itemType eventRequestId eventDate createdBy assignedMemberEmail assignedDeviceHash').read('primary').readConcern('majority').lean();
     if (!session || session.createdBy !== req.studentAccount.email || !isActivityScheduledToday(session.eventDate)) {
       return res.status(403).json({ message: 'This QR session is no longer available to your account.' });
     }
@@ -2024,7 +2141,10 @@ app.post('/api/member/attendance-qr-challenge', requireStudentAuth, async (req, 
     }
     const assignment = await currentMemberAttendanceAssignment(req.studentAccount.email);
     if (!assignment || assignment.status !== 'accepted' || assignment.clubId !== session.clubId
-      || assignment.itemType !== session.itemType || assignment.eventRequestId !== session.eventRequestId) {
+      || assignment.itemType !== session.itemType || assignment.eventRequestId !== session.eventRequestId
+      || String(session.assignedMemberEmail || session.createdBy).trim().toLowerCase() !== String(req.studentAccount.email || '').trim().toLowerCase()
+      || !session.assignedDeviceHash || session.assignedDeviceHash !== attendanceDeviceHash(memberAttendanceDeviceId(req))
+      || session.assignedDeviceHash !== assignment.checkInDeviceHash) {
       return res.status(403).json({ message: 'This account no longer has this attendance assignment.' });
     }
     res.setHeader('Cache-Control', 'no-store');
@@ -2032,6 +2152,91 @@ app.post('/api/member/attendance-qr-challenge', requireStudentAuth, async (req, 
   } catch (error) {
     console.error('Member attendance QR challenge could not be created:', error.name);
     res.status(503).json({ message: 'A fresh attendance QR code could not be created.' });
+  }
+});
+
+app.post('/api/member/attendance-assignments/:id/check-in', requireStudentAuth, async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ message: 'This attendance assignment could not be found.' });
+  const email = String(req.studentAccount.email || '').trim().toLowerCase();
+  try {
+    if (!requireLiveDatabase(res)) return;
+    const assignment = await currentMemberAttendanceAssignment(email);
+    if (!assignment || String(assignment._id) !== req.params.id || assignment.status !== 'accepted') {
+      return res.status(403).json({ message: 'Only the member who accepted this attendance task can check in.' });
+    }
+    if (!isActivityScheduledToday(assignment.eventDate)) return res.status(409).json({ message: 'You can check in only on the event or booth date.' });
+    if (await isAttendanceActivityManuallyEnded(assignment.clubId, assignment.itemType, assignment.eventRequestId)) {
+      return res.status(410).json({ message: 'Attendance has ended for this event or booth.' });
+    }
+
+    const assignedDeviceHash = await bindMemberAttendanceDevice(assignment, email, req, res);
+    if (!assignedDeviceHash) return res.status(403).json({ message: 'This attendance task is tied to the device where you accepted it.' });
+    const [club, acceptedApplication] = await Promise.all([
+      Club.findOne({ id: assignment.clubId, archivedAt: null }).select('id name memberRoster events booths').read('primary').readConcern('majority').lean(),
+      Application.findOne({ clubId: assignment.clubId, status: 'accepted', email }).select('id').read('primary').readConcern('majority').lean()
+    ]);
+    const rosterMember = (club?.memberRoster || []).find((member) => String(member.email || '').trim().toLowerCase() === email);
+    if (!club || (!rosterMember && !acceptedApplication)) {
+      return res.status(403).json({ message: 'Attendance is limited to current members of this club.' });
+    }
+    const items = assignment.itemType === 'booth' ? club.booths : club.events;
+    let selected = assignment.eventRequestId > 0
+      ? (items || []).find((item) => Number(item.requestId) === assignment.eventRequestId)
+      : null;
+    if (assignment.eventRequestId < 0) {
+      const legacyOffset = assignment.itemType === 'booth' ? 1_000_000 : 0;
+      const itemIndex = -assignment.eventRequestId - legacyOffset - 1;
+      selected = itemIndex >= 0 ? items?.[itemIndex] : null;
+      if (selected?.requestId) selected = null;
+    }
+    const eventTitle = cleanText(selected?.title || selected?.boothName, 140);
+    const eventDate = cleanText(selected?.date || selected?.boothOpenDate, 80);
+    if (!selected || eventTitle !== assignment.eventTitle || !isActivityScheduledToday(eventDate)) {
+      return res.status(404).json({ message: 'The assigned event or booth is no longer available.' });
+    }
+    const existing = await AttendanceRecord.findOne({
+      clubId: assignment.clubId, itemType: assignment.itemType, eventRequestId: assignment.eventRequestId,
+      $or: [{ email }, { deviceHash: assignedDeviceHash }]
+    }).select('+deviceHash email').read('primary').readConcern('majority').lean();
+    if (existing?.email === email) {
+      return res.json({ savedToDatabase: true, alreadyRecorded: true, message: 'Your attendance is already recorded for this event or booth.' });
+    }
+    if (existing) return res.status(409).json({ message: 'Attendance has already been recorded from this device for this event or booth.' });
+    if (await isAttendanceActivityManuallyEnded(assignment.clubId, assignment.itemType, assignment.eventRequestId)) {
+      return res.status(410).json({ message: 'Attendance has ended for this event or booth.' });
+    }
+
+    const session = await AttendanceSession.create({
+      clubId: assignment.clubId, itemType: assignment.itemType, eventRequestId: assignment.eventRequestId,
+      eventTitle, eventDate: assignment.eventDate, eventTime: assignment.eventTime,
+      tokenHash: attendanceTokenHash(crypto.randomBytes(32).toString('base64url')),
+      active: false, createdBy: email, assignedMemberEmail: email, assignedDeviceHash
+    });
+    try {
+      const record = await AttendanceRecord.create({
+        sessionId: session._id, clubId: assignment.clubId, itemType: assignment.itemType,
+        eventRequestId: assignment.eventRequestId, eventTitle, eventDate: assignment.eventDate,
+        eventTime: assignment.eventTime, name: cleanText(rosterMember?.name || assignment.memberName, 160),
+        email, deviceHash: assignedDeviceHash, attendedAt: new Date()
+      });
+      const confirmed = await AttendanceRecord.findById(record._id).select('email clubId itemType eventRequestId')
+        .read('primary').readConcern('majority').lean();
+      if (!confirmed || confirmed.email !== email || confirmed.clubId !== assignment.clubId
+        || confirmed.itemType !== assignment.itemType || confirmed.eventRequestId !== assignment.eventRequestId) {
+        throw new Error('Member self check-in could not be confirmed in the database.');
+      }
+    } catch (error) {
+      await AttendanceSession.deleteOne({ _id: session._id }).catch(() => {});
+      if (error.code === 11000) return res.status(409).json({ message: error.keyPattern?.deviceHash
+        ? 'Attendance has already been recorded from this device for this event or booth.'
+        : 'Your attendance is already recorded for this event or booth.' });
+      throw error;
+    }
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(201).json({ savedToDatabase: true, message: 'Your attendance was recorded from your assigned MIU account.' });
+  } catch (error) {
+    console.error('Member self check-in failed:', error.name);
+    res.status(503).json({ message: 'Attendance was not saved. Please try again.' });
   }
 });
 
@@ -2227,6 +2432,7 @@ app.post('/api/attendance/:token', requireStudentAuth, async (req, res) => {
       return res.status(410).json({ message: 'Attendance has ended for this event or booth.' });
     }
     const normalizedEmail = String(email || '').trim().toLowerCase();
+    const assignedMemberEmail = String(session.assignedMemberEmail || '').trim().toLowerCase();
     const [activityClub, acceptedApplication] = await Promise.all([
       Club.findOne({ id: session.clubId, archivedAt: null })
         .select('memberRoster').read('primary').readConcern('majority').lean(),
@@ -2251,9 +2457,8 @@ app.post('/api/attendance/:token', requireStudentAuth, async (req, res) => {
     }).select('+deviceHash').lean();
     if (existing) {
       clearAttendanceScanProofCookie(req, res);
-      return res.status(409).json({ message: existing.email === email
-        ? 'Attendance is already recorded for this account.'
-        : 'Attendance has already been recorded from this device for this event.' });
+      if (existing.email === email) return res.json({ alreadyRecorded: true, message: 'You are already checked in for this event or booth.' });
+      return res.status(409).json({ message: 'Attendance has already been recorded from this device for this event.' });
     }
     if (await isAttendanceActivityManuallyEnded(session.clubId, itemType, session.eventRequestId)) {
       clearAttendanceScanProofCookie(req, res);
@@ -2286,9 +2491,12 @@ app.post('/api/attendance/:token', requireStudentAuth, async (req, res) => {
   } catch (error) {
     if (error.code === 11000) {
       clearAttendanceScanProofCookie(req, res);
-      return res.status(409).json({ message: error.keyPattern?.deviceHash
-        ? 'Attendance has already been recorded from this device for this event.'
-        : 'Attendance is already recorded for this account.' });
+      const accountRecord = await AttendanceRecord.findOne({
+        clubId: session.clubId, itemType: session.itemType || 'event', eventRequestId: session.eventRequestId,
+        email: normalizedEmail
+      }).select('email').read('primary').readConcern('majority').lean();
+      if (error.keyPattern?.email || accountRecord) return res.json({ alreadyRecorded: true, message: 'You are already checked in for this event or booth.' });
+      return res.status(409).json({ message: 'Attendance has already been recorded from this device for this event.' });
     }
     console.error('Attendance was not saved:', error.name);
     res.status(503).json({ message: 'Attendance was not saved. Please try again.' });
@@ -2393,7 +2601,17 @@ async function currentMemberAttendanceAssignment(email) {
   const assignments = await AttendanceAssignment.find({
     memberEmail: email, status: { $in: ['assigned', 'accepted'] }
   }).read('primary').readConcern('majority').sort({ createdAt: -1 }).limit(1000).lean();
-  return assignments.find((assignment) => isActivityScheduledToday(assignment.eventDate)) || null;
+  const todayAssignments = assignments.filter((assignment) => isActivityScheduledToday(assignment.eventDate));
+  if (!todayAssignments.length) return null;
+  const closures = await AttendanceActivityClosure.find({
+    $or: todayAssignments.map((assignment) => ({
+      clubId: Number(assignment.clubId),
+      itemType: assignment.itemType === 'booth' ? 'booth' : 'event',
+      eventRequestId: Number(assignment.eventRequestId)
+    }))
+  }).select('clubId itemType eventRequestId').read('primary').readConcern('majority').lean();
+  const closedKeys = new Set(closures.map(attendanceActivityKey));
+  return todayAssignments.find((assignment) => !closedKeys.has(attendanceActivityKey(assignment))) || null;
 }
 
 app.get('/api/club/attendance-assignment-options', requireClubAuth, async (req, res) => {
@@ -2528,8 +2746,12 @@ app.get('/api/member/attendance-assignments', requireStudentAuth, async (req, re
     const assignment = await currentMemberAttendanceAssignment(req.studentAccount.email);
     res.setHeader('Cache-Control', 'no-store');
     if (!assignment) return res.json([]);
-    const { _id, __v, activeMemberDayKey, ...publicAssignment } = assignment;
-    res.json([{ ...publicAssignment, id: String(_id) }]);
+    const { _id, __v, activeMemberDayKey, checkInDeviceHash, ...publicAssignment } = assignment;
+    const attendanceRecorded = Boolean(await AttendanceRecord.exists({
+      clubId: assignment.clubId, itemType: assignment.itemType,
+      eventRequestId: assignment.eventRequestId, email: req.studentAccount.email
+    }));
+    res.json([{ ...publicAssignment, id: String(_id), attendanceRecorded }]);
   } catch (error) {
     console.error('Member attendance tasks could not be loaded:', error.name);
     res.status(503).json({ message: 'Could not load your club attendance tasks.' });
@@ -2658,8 +2880,8 @@ function acceptedApplicationsAsMembers(applicationsForClub) {
     name: application.studentName,
     email: application.email || '',
     committee: application.committee,
-    position: 'Member',
-    memberType: 'new',
+    position: application.memberPosition || 'Member',
+    memberType: application.memberType || 'new',
     source: 'accepted-application',
     createdAt: application.updatedAt
   }));
@@ -2724,6 +2946,48 @@ app.get('/api/club/members', requireClubAuth, async (req, res) => {
   } catch (error) {
     console.error('Database operation failed:', error.name);
     res.status(503).json({ message: 'Could not load club members right now.' });
+  }
+});
+
+app.patch('/api/club/members/:memberId', requireClubAuth, async (req, res) => {
+  if (!['president', 'head'].includes(req.clubAccount.role)) {
+    return res.status(403).json({ message: 'Only club presidents and committee heads can edit member roles.' });
+  }
+  const memberId = cleanText(req.params.memberId, 100);
+  const position = cleanText(req.body.position, 100);
+  const memberType = req.body.memberType;
+  if (!position) return res.status(400).json({ message: 'Enter the member role.' });
+  if (!['new', 'senior'].includes(memberType)) return res.status(400).json({ message: 'Choose New member or Senior member.' });
+  try {
+    if (!requireLiveDatabase(res)) return;
+    if (memberId.startsWith('application-')) {
+      const applicationId = Number(memberId.slice('application-'.length));
+      if (!Number.isSafeInteger(applicationId)) return res.status(400).json({ message: 'Invalid member.' });
+      const filter = {
+        id: applicationId,
+        clubId: req.clubAccount.clubId,
+        status: 'accepted',
+        ...(req.clubAccount.role === 'head' ? { committee: req.clubAccount.committee } : {})
+      };
+      const application = await Application.findOneAndUpdate(filter, {
+        $set: { memberPosition: position, memberType }
+      }, { new: true, runValidators: true }).read('primary');
+      if (!application) return res.status(404).json({ message: 'Accepted member not found in your committee.' });
+      return res.json({ member: { id: memberId, name: application.studentName, email: application.email, committee: application.committee, position: application.memberPosition, memberType: application.memberType } });
+    }
+
+    const club = await Club.findOne({ id: req.clubAccount.clubId }).select('memberRoster').read('primary');
+    if (!club) return res.status(404).json({ message: 'Club not found.' });
+    const member = club.memberRoster.find((item) => item.id === memberId
+      && (req.clubAccount.role !== 'head' || String(item.committee || '').trim().toLowerCase() === String(req.clubAccount.committee || '').trim().toLowerCase()));
+    if (!member) return res.status(404).json({ message: 'Member not found in your committee.' });
+    member.position = position;
+    member.memberType = memberType;
+    await club.save();
+    return res.json({ member: { id: member.id, name: member.name, email: member.email, committee: member.committee, position: member.position, memberType: member.memberType } });
+  } catch (error) {
+    console.error('Database operation failed:', error.name);
+    return res.status(503).json({ message: 'Could not update this member right now.' });
   }
 });
 
@@ -4036,6 +4300,44 @@ app.get('/api/student-auth/google-config', (req, res) => {
   res.json({ enabled: true, clientId, nonce });
 });
 
+function demoStudentLoginEnabled(req) {
+  return process.env.ENABLE_DEMO_STUDENT_LOGIN === 'true'
+    && process.env.NODE_ENV !== 'production'
+    && !process.env.VERCEL
+    && isLoopbackRequest(req);
+}
+
+app.get('/api/student-auth/demo-config', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ enabled: demoStudentLoginEnabled(req) && mongoReady });
+});
+
+app.post('/api/student-auth/demo', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  if (!demoStudentLoginEnabled(req)) return res.status(404).json({ message: 'Not found.' });
+  if (!mongoReady) return res.status(503).json({ message: 'The local demo account requires the database.' });
+  const email = 'demo.student@example.test';
+  try {
+    let account = await StudentAccount.findOne({ email }).lean();
+    if (!account) {
+      account = await StudentAccount.create({
+        email,
+        name: 'Demo Student',
+        universityId: 'DEMO-0001',
+        major: 'Demo account'
+      });
+      account = account.toObject();
+    }
+    // This reserved .test address is used only by the loopback-only local demo flow.
+    // Reuse an existing record so stale local demo profile fields do not block sign-in.
+    setStudentSessionCookie(req, res, account);
+    res.json({ authenticated: true, role: 'student', demo: true });
+  } catch (error) {
+    console.error('Demo student sign-in failed:', error.name);
+    res.status(503).json({ message: 'Could not open the demo student account.' });
+  }
+});
+
 app.post('/api/student-auth/google', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   if (await checkLoginSourceLock(req, res)) return;
@@ -4608,6 +4910,7 @@ app.post('/api/password-reset/confirm', limitPasswordResetRequests, async (req, 
   }
 });
 
+registerFeedbackRoutes(app, { Club, UniversityContent, requireStudentAuth, isAdminSessionValid, getClubAccountFromRequest, requireLiveDatabase });
 app.use('/api/admin', requireAdmin);
 
 app.post('/api/admin/accounts/password-reset', limitPasswordResetRequests, async (req, res) => {
@@ -4688,6 +4991,9 @@ app.get('/api/admin/university-content', async (req, res) => {
 
 app.post('/api/admin/university-content', async (req, res) => {
   if (!requireLiveDatabase(res)) return;
+  let interactionFields;
+  try { interactionFields = parseInteraction(req.body); }
+  catch (error) { return res.status(400).json({ message: error.message }); }
   const type = ['event', 'announcement'].includes(req.body.type) ? req.body.type : '';
   const title = cleanText(req.body.title, 140);
   const description = cleanText(req.body.description, 2000);
@@ -4714,6 +5020,7 @@ app.post('/api/admin/university-content', async (req, res) => {
   try {
     const last = await UniversityContent.findOne().read('primary').readConcern('majority').sort({ id: -1 }).select('id').lean();
     const record = new UniversityContent({
+      ...interactionFields,
       id: (last?.id || 0) + 1, type, title, description, date, time,
       registrationEnabled: type === 'event' && req.body.registrationEnabled === true,
       location,
@@ -5819,7 +6126,12 @@ app.use((error, req, res, next) => {
   const isValidation = error.name === 'ValidationError' || error.name === 'CastError';
   const status = isMalformedJson ? 400 : isPayloadTooLarge ? 413 : isDuplicate ? 409
     : isValidation ? 422 : [400, 401, 403, 404, 408, 409, 413, 422, 429, 503].includes(error.status) ? error.status : 500;
-  if (status === 500) console.error('Request failed:', error.name || 'Error');
+  if (status === 500) {
+    console.error('Request failed:', error.name || 'Error');
+    if (req.path === '/api/uploads/cloudinary-signature') {
+      console.error('Cloudinary signature failure location:', String(error.stack || '').split('\n').slice(1, 7).join(' | '));
+    }
+  }
   const code = ({ 400: 'INVALID_REQUEST', 401: 'SIGN_IN_REQUIRED', 403: 'ACCESS_DENIED', 404: 'NOT_FOUND',
     408: 'REQUEST_TIMEOUT', 409: 'CONFLICT', 413: 'PAYLOAD_TOO_LARGE', 422: 'VALIDATION_FAILED',
     429: 'TOO_MANY_REQUESTS', 500: 'INTERNAL_ERROR', 503: 'SERVICE_UNAVAILABLE' })[status] || 'REQUEST_FAILED';

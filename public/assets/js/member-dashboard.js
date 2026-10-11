@@ -3,9 +3,13 @@
   if (!list) return;
 
   let assignments = [];
-  let activeToken = '';
-  let activeQrDate = '';
+  let savedQr = {};
+  try { savedQr = JSON.parse(window.sessionStorage.getItem('memberAttendanceQr') || '{}') || {}; } catch {}
+  let activeToken = String(savedQr.token || '');
+  let activeAssignmentId = String(savedQr.assignmentId || '');
+  let activeQrDate = String(savedQr.eventDate || '');
   let activeQrTimer = 0;
+  let activeQrCountdown = 0;
 
   const todayInCairo = () => {
     const parts = new Intl.DateTimeFormat('en', {
@@ -32,6 +36,11 @@
 
   function render() {
     list.replaceChildren();
+    const attendanceCount = String(assignments.length);
+    const dashboardAttendanceCount = document.getElementById('studentDashboardAttendanceCount');
+    const sidebarAttendanceCount = document.getElementById('studentSidebarAttendanceCount');
+    if (dashboardAttendanceCount) dashboardAttendanceCount.textContent = attendanceCount;
+    if (sidebarAttendanceCount) sidebarAttendanceCount.textContent = attendanceCount;
     if (!assignments.length) {
       const empty = document.createElement('p');
       empty.className = 'member-assignment-empty';
@@ -57,14 +66,18 @@
       const isToday = String(assignment.eventDate || '').slice(0, 10) === todayInCairo();
       const isPast = String(assignment.eventDate || '').slice(0, 10) < todayInCairo();
       status.className = `member-assignment-status${assignment.status === 'assigned' ? ' is-new' : ''}`;
-      status.textContent = isPast ? 'Event date passed' : assignment.status === 'accepted' ? 'Accepted' : 'New request';
+      status.textContent = assignment.attendanceRecorded ? 'Attendance recorded'
+        : isPast ? 'Event date passed' : assignment.status === 'accepted' ? 'Accepted' : 'New request';
       const actions = document.createElement('div');
       actions.className = 'member-assignment-actions';
 
       if (assignment.status === 'assigned') {
         actions.append(button('Accept request', 'primary-btn', () => acceptAssignment(assignment.id)));
       } else if (!isPast && isToday) {
-        actions.append(button('Open attendance QR', 'primary-btn', () => openQr(assignment, card)));
+        if (!assignment.attendanceRecorded) {
+          actions.append(button('Record my attendance', 'primary-btn', () => checkInAssignment(assignment, card)));
+        }
+        actions.append(button('Open attendance QR', 'secondary-btn', () => openQr(assignment, card)));
       } else if (!isPast) {
         const note = document.createElement('span');
         note.className = 'member-assignment-meta';
@@ -77,6 +90,10 @@
       qr.setAttribute('aria-live', 'polite');
       card.append(qr);
       list.append(card);
+      if (assignment.id === activeAssignmentId && activeToken) {
+        qr.classList.remove('hidden');
+        refreshQr(qr, activeToken, activeQrDate);
+      }
     });
   }
 
@@ -92,6 +109,12 @@
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.message || 'Could not load member attendance requests.');
       assignments = Array.isArray(payload) ? payload : [];
+      if (activeQrDate && activeQrDate !== todayInCairo()) {
+        activeToken = '';
+        activeAssignmentId = '';
+        activeQrDate = '';
+        window.sessionStorage.removeItem('memberAttendanceQr');
+      }
       render();
     } catch (error) {
       list.replaceChildren();
@@ -112,6 +135,24 @@
     }
   }
 
+  async function checkInAssignment(assignment, card) {
+    const actionButtons = card.querySelectorAll('.member-assignment-actions button');
+    actionButtons.forEach((button) => { button.disabled = true; });
+    const message = document.createElement('p');
+    message.className = 'member-assignment-meta';
+    message.textContent = 'Recording your attendance from this account and device…';
+    card.querySelector('.member-assignment-actions')?.append(message);
+    try {
+      const result = await apiJson(`/api/member/attendance-assignments/${encodeURIComponent(assignment.id)}/check-in`, { method: 'POST' });
+      if (result.savedToDatabase !== true) throw new Error('Your attendance was not confirmed in the database.');
+      await loadAssignments();
+    } catch (error) {
+      message.textContent = error.message;
+      message.classList.add('is-error');
+      actionButtons.forEach((button) => { button.disabled = false; });
+    }
+  }
+
   function loadQrLibrary() {
     if (typeof window.QRCode === 'function') return Promise.resolve();
     return new Promise((resolve, reject) => {
@@ -126,9 +167,12 @@
 
   async function refreshQr(qr, token, eventDate) {
     if (activeToken !== token || !qr.isConnected) return;
+    window.clearInterval(activeQrCountdown);
     if (String(eventDate || '').slice(0, 10) !== todayInCairo()) {
       activeToken = '';
+      activeAssignmentId = '';
       activeQrDate = '';
+      window.sessionStorage.removeItem('memberAttendanceQr');
       window.clearTimeout(activeQrTimer);
       qr.classList.add('hidden');
       await loadAssignments();
@@ -139,22 +183,40 @@
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token })
       });
       if (activeToken !== token || !qr.isConnected) return;
+      window.clearInterval(activeQrCountdown);
       const scanUrl = new URL('/attendance', window.location.origin);
       scanUrl.searchParams.set('token', token);
       scanUrl.searchParams.set('code', challenge.code);
       qr.replaceChildren();
       new window.QRCode(qr, { text: scanUrl.toString(), width: 220, height: 220, colorDark: '#102a43', colorLight: '#ffffff', correctLevel: window.QRCode.CorrectLevel.M });
       const note = document.createElement('p');
-      note.textContent = 'This check-in code refreshes every 20 seconds. Students scan it with their MIU account.';
+      const updateCountdown = () => {
+        const expiresAt = typeof challenge.expiresAt === 'number' ? challenge.expiresAt : Date.parse(challenge.expiresAt);
+        const secondsRemaining = Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000));
+        note.textContent = `This check-in code refreshes in ${secondsRemaining} seconds. It is tied to your MIU account; keep this account signed in on this device.`;
+      };
       qr.append(note);
+      updateCountdown();
+      activeQrCountdown = window.setInterval(updateCountdown, 250);
       window.clearTimeout(activeQrTimer);
       activeQrTimer = window.setTimeout(() => refreshQr(qr, token, eventDate), Math.max(500, challenge.expiresAt - Date.now() + 100));
     } catch (error) {
       if (String(eventDate || '').slice(0, 10) !== todayInCairo()) {
         activeToken = '';
+        activeAssignmentId = '';
         activeQrDate = '';
+        window.sessionStorage.removeItem('memberAttendanceQr');
         window.clearTimeout(activeQrTimer);
         qr.classList.add('hidden');
+        await loadAssignments();
+        return;
+      }
+      if (/attendance has ended|event day is over|no longer available/i.test(error.message)) {
+        activeToken = '';
+        activeAssignmentId = '';
+        activeQrDate = '';
+        window.clearTimeout(activeQrTimer);
+        window.sessionStorage.removeItem('memberAttendanceQr');
         await loadAssignments();
         return;
       }
@@ -169,13 +231,17 @@
     qr.classList.remove('hidden');
     qr.textContent = 'Creating an attendance session…';
     window.clearTimeout(activeQrTimer);
+    window.clearInterval(activeQrCountdown);
     activeToken = '';
+    activeAssignmentId = assignment.id;
     try {
       await loadQrLibrary();
       const result = await apiJson(`/api/member/attendance-assignments/${encodeURIComponent(assignment.id)}/session`, { method: 'POST' });
       if (!result.token) throw new Error('The database did not return a saved QR session.');
       activeToken = result.token;
+      activeAssignmentId = assignment.id;
       activeQrDate = assignment.eventDate;
+      window.sessionStorage.setItem('memberAttendanceQr', JSON.stringify({ token: activeToken, assignmentId: activeAssignmentId, eventDate: activeQrDate }));
       await refreshQr(qr, activeToken, activeQrDate);
     } catch (error) {
       qr.textContent = error.message;

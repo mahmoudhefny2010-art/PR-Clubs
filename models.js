@@ -33,6 +33,7 @@ const clubSchema = new mongoose.Schema({
   imagePublicId: { type: String, default: '' },
   imageFit: { type: String, enum: ['contain', 'cover'], default: 'contain' },
   status: { type: String, enum: ['open', 'opening-soon', 'full', 'closed'], default: 'open' },
+  applicationCycleStartedAt: { type: Date, default: null },
   archivedAt: { type: Date, default: null, index: true },
   pinned: { type: Boolean, default: false },
   seats: { type: Number, min: 0, default: 0 },
@@ -61,6 +62,8 @@ const applicationSchema = new mongoose.Schema({
   slot: { type: String, default: '' },
   clubId: { type: Number, required: true, index: true },
   committee: { type: String, default: '' },
+  memberPosition: { type: String, default: 'Member', trim: true, maxlength: 100 },
+  memberType: { type: String, enum: ['new', 'senior'], default: 'new' },
   age: { type: String, default: '' },
   motivation: { type: String, default: '' },
   notes: { type: String, default: '' },
@@ -81,6 +84,9 @@ const siteSettingSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 const universityContentSchema = new mongoose.Schema({
+  interaction: { type: String, enum: ['none', 'poll', 'evaluation'], default: 'none' },
+  question: { type: String, default: '', maxlength: 300 },
+  options: { type: [String], default: [] },
   id: { type: Number, required: true, unique: true, index: true },
   type: { type: String, enum: ['event', 'announcement'], required: true, index: true },
   title: { type: String, required: true, trim: true, maxlength: 140 },
@@ -238,7 +244,9 @@ const attendanceSessionSchema = new mongoose.Schema({
   eventTime: { type: String, default: '' },
   tokenHash: { type: String, required: true, unique: true },
   active: { type: Boolean, default: true, index: true },
-  createdBy: { type: String, required: true, lowercase: true, trim: true }
+  createdBy: { type: String, required: true, lowercase: true, trim: true },
+  assignedMemberEmail: { type: String, default: '', lowercase: true, trim: true, index: true },
+  assignedDeviceHash: { type: String, default: '' }
 }, { timestamps: true });
 attendanceSessionSchema.index({ clubId: 1, itemType: 1, eventRequestId: 1, active: 1 });
 
@@ -263,6 +271,7 @@ const attendanceAssignmentSchema = new mongoose.Schema({
   eventDate: { type: String, default: '' },
   eventTime: { type: String, default: '' },
   memberEmail: { type: String, required: true, lowercase: true, trim: true, index: true },
+  checkInDeviceHash: { type: String, default: '' },
   activeMemberDayKey: { type: String, default: undefined },
   memberName: { type: String, required: true, trim: true },
   committee: { type: String, required: true, trim: true },

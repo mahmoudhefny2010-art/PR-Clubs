@@ -5,6 +5,8 @@
   const scope = sidebar.dataset.unreadScope || location.pathname;
   const storageKey = `miu-dashboard-unread:${scope}`;
   const panelStorageKey = `miu-dashboard-panel:${scope}`;
+  const navigationEntry = window.performance?.getEntriesByType?.('navigation')?.[0];
+  const isReloadNavigation = navigationEntry?.type === 'reload' || (!navigationEntry && window.performance?.navigation?.type === 1);
   const seen = new Map();
   const current = new Map();
   const syncSucceeded = new Set();
@@ -169,7 +171,9 @@
   });
 
   let savedPanel = '';
-  try { savedPanel = localStorage.getItem(panelStorageKey) || ''; } catch { /* Use the page default. */ }
+  if (isReloadNavigation) {
+    try { savedPanel = localStorage.getItem(panelStorageKey) || ''; } catch { /* Use the page default. */ }
+  }
   const savedPanelLink = [...sidebar.querySelectorAll('[data-dashboard-panel]')]
     .find((link) => link.dataset.dashboardPanel === savedPanel);
   const savedPanelExists = savedPanelLink && document.getElementById(savedPanel);

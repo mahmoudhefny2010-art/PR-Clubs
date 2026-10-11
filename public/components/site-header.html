@@ -52,7 +52,20 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" x2="3" y1="12" y2="12"/></svg>
         <span>Sign In</span>
       </a>
-      <button class="nav-signout-btn" id="headerStudentSignoutBtn" type="button" hidden>Sign out</button>
+      <div class="nav-profile-menu" id="headerStudentProfileMenu" hidden>
+        <button class="nav-profile-trigger" id="headerStudentProfileTrigger" type="button" aria-label="Open account menu" aria-expanded="false" aria-controls="headerStudentProfileDropdown">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+        </button>
+        <div class="nav-profile-dropdown" id="headerStudentProfileDropdown" role="menu" hidden>
+          <div class="nav-profile-account" role="group" aria-label="My Account">
+            <span class="nav-profile-avatar" id="headerStudentAvatar" aria-hidden="true">S</span>
+            <span class="nav-profile-account-copy"><strong>My Account</strong><span id="headerStudentName">Student account</span><span id="headerStudentEmail"></span></span>
+          </div>
+          <a class="nav-profile-item" id="headerAccountDashboardLink" href="/?myForms=1" role="menuitem">Dashboard</a>
+          <a class="nav-profile-item" id="headerStudentFormsLink" href="/?myForms=1&amp;section=forms" role="menuitem">Forms</a>
+          <button class="nav-profile-item" id="headerStudentSignoutBtn" type="button" role="menuitem">Logout</button>
+        </div>
+      </div>
     </div>
   </div>
 </header>

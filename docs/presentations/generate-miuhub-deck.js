@@ -34,7 +34,7 @@ function flow(slide, label, x, y, w, h, accent) {
 function base(title, subtitle = '') {
   const s = { bg: C.soft, items: [] };
   box(s, 0, 0, W, 7, C.red, '', false);
-  text(s, 'Ø¨ÙˆØ§Ø¨Ø© Ø£Ù†Ø¯ÙŠØ© Ø¬Ø§Ù…Ø¹Ø© Ù…ØµØ± Ø§Ù„Ø¯ÙˆÙ„ÙŠØ©  Â·  Ø¹Ø±Ø¶ ØªØ¹Ø±ÙŠÙÙŠ', 44, 17, 872, 20, 10, C.red, true);
+  text(s, 'بوابة أندية جامعة مصر الدولية · عرض تعريفي', 44, 17, 872, 20, 10, C.red, true);
   text(s, title, 44, 43, 872, 42, 27, C.ink, true);
   if (subtitle) text(s, subtitle, 44, 87, 872, 27, 13, '65738A');
   rule(s, 44, 505, 916, 505, 'DEE4EC', 1);

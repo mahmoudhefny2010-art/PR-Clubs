@@ -5,6 +5,8 @@
   let entries = [];
   let loadedClubs = [];
   let activeFilter = 'all';
+  const requestedPost = Number(new URLSearchParams(window.location.search).get('post'));
+  let requestedPostFocused = false;
   let universityRefreshId = 0;
 
   const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
@@ -70,6 +72,7 @@
     status.hidden = true;
     list.innerHTML = visible.map((entry) => {
       const { club, item } = entry;
+      const interaction = entry.university ? window.studentFeedbackForm('university', item.id, item.interaction, item.question, item.options) : '';
       const title = String(item.title || '').trim();
       const message = String(item.text || item.description || '').trim();
       const image = item.image && item.image !== club.image
@@ -83,13 +86,22 @@
           <header class="feed-timeline-header">${avatar}<span class="feed-timeline-meta"><span class="feed-timeline-club">${escapeHtml(club.name || '')}</span>${dateText}</span><span class="feed-post-type type-event">${escapeHtml(entry.label)}</span></header>
           <div class="feed-timeline-body"><h2 class="feed-timeline-title">${escapeHtml(title)}</h2>${meta ? `<p class="feed-timeline-date feed-event-meta">${escapeHtml(meta)}</p>` : ''}${image}
             <div class="feed-event-footer">${message ? `<p class="feed-timeline-text">${escapeHtml(message)}</p>` : '<span></span>'}<a class="primary-btn feed-post-action" href="${entry.university ? `/pages/event.html?university=${encodeURIComponent(item.id)}` : `/pages/event.html?club=${encodeURIComponent(club.id)}&event=${encodeURIComponent(entry.index)}`}">View event details</a></div>
-          </div></article>`;
+          ${interaction}</div></article>`;
       }
-      return `<article class="feed-post-card">
+        return `<article class="feed-post-card"${entry.university ? ` data-university-content-id="${escapeHtml(item.id)}"` : ''}>
         <header class="feed-timeline-header">${avatar}<span class="feed-timeline-meta"><span class="feed-timeline-club">${escapeHtml(club.name || '')}</span>${dateText}</span><span class="feed-post-type type-feed">${escapeHtml(entry.label)}</span></header>
-        <div class="feed-timeline-body">${title ? `<h2 class="feed-timeline-title">${escapeHtml(title)}</h2>` : ''}${message ? `<p class="feed-timeline-text">${escapeHtml(message)}</p>` : ''}${image}</div>
+        <div class="feed-timeline-body">${title ? `<h2 class="feed-timeline-title">${escapeHtml(title)}</h2>` : ''}${message ? `<p class="feed-timeline-text">${escapeHtml(message)}</p>` : ''}${image}${interaction}</div>
       </article>`;
     }).join('');
+    if (!requestedPostFocused && Number.isSafeInteger(requestedPost) && requestedPost > 0) {
+      const requestedCard = list.querySelector(`[data-university-content-id="${requestedPost}"]`);
+      if (requestedCard) {
+        requestedPostFocused = true;
+        requestedCard.tabIndex = -1;
+        requestedCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        requestedCard.focus({ preventScroll: true });
+      }
+    }
   }
 
   filters.forEach((button) => button.addEventListener('click', () => {

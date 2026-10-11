@@ -53,3 +53,172 @@
 @media (max-width: 360px) {
   #homeView .stats-summary { grid-template-columns: 1fr; }
 }
+
+#applicationView .app-form-card { position: relative; }
+#applicationView .app-form-card > .application-exit {
+  position: absolute;
+  z-index: 2;
+  top: 18px;
+  right: 18px;
+}
+
+@media (max-width: 640px) {
+  #applicationView .app-form-card > .application-exit { top: 12px; right: 12px; }
+}
+
+/* Keep the featured event readable and balanced across viewport sizes. */
+#homeView > .events-slideshow {
+  box-sizing: border-box;
+  min-height: 150px;
+  padding: 11px 52px 8px 20px;
+  border-color: rgba(185, 28, 28, .16);
+  background: linear-gradient(115deg, #fff 0%, #fff 72%, #fff8f8 100%);
+  box-shadow: 0 8px 24px rgba(31, 41, 55, .045);
+}
+
+#homeView .events-slideshow-track { min-height: 78px; }
+
+#homeView .events-slideshow-head h2 {
+  margin-bottom: 4px;
+  color: var(--text-main);
+  font-size: 1.08rem;
+  letter-spacing: -.015em;
+}
+
+#homeView .event-slide {
+  min-height: 78px;
+  gap: 14px;
+}
+
+#homeView .event-slide img {
+  width: 84px !important;
+  height: 66px !important;
+  flex: 0 0 84px;
+  border: 1px solid rgba(31, 41, 55, .07);
+  border-radius: 14px;
+  background: #fff;
+  object-fit: cover;
+}
+
+#homeView .event-slide img.university-brand-image { object-fit: contain !important; }
+
+#homeView .event-slide-copy {
+  grid-template-columns: fit-content(240px) max-content minmax(0, 1fr);
+  grid-template-areas: "club badge ." "title title title" "meta meta meta" "description description cta";
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 2px;
+}
+
+#homeView .event-slide-club {
+  min-width: 0;
+  color: var(--primary-800);
+  font-size: .72rem;
+  letter-spacing: .055em;
+  overflow-wrap: anywhere;
+}
+
+#homeView .event-slide-copy h3 {
+  min-width: 0;
+  color: var(--text-main);
+  font-size: 1.05rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+#homeView .event-slide-copy .content-type-badge {
+  max-width: 220px;
+  margin: 0;
+  justify-self: start;
+  text-align: center;
+}
+
+#homeView .event-slide-meta,
+#homeView .event-slide-copy > p:not(.event-slide-meta) {
+  min-width: 0;
+  font-size: .8rem;
+  line-height: 1.4;
+}
+
+#homeView .event-slide-copy .event-slide-cta {
+  justify-self: end;
+  align-self: end;
+  padding: 0;
+  background: transparent;
+  font-size: .72rem;
+}
+
+#homeView .events-slideshow-dots { margin-top: 4px; }
+
+@media (max-width: 640px) {
+  #homeView .events-slideshow-track { touch-action: pan-y; }
+  #homeView .events-slideshow .slide-arrow { display: none !important; }
+  #homeView > .events-slideshow {
+    box-sizing: border-box;
+    height: 184px;
+    min-height: 184px;
+    max-height: 184px;
+    overflow: hidden;
+    padding: 11px 14px 8px;
+  }
+  #homeView .events-slideshow-track { height: 119px; }
+  #homeView .events-slideshow-head h2 { font-size: 1rem; }
+  #homeView .event-slide {
+    box-sizing: border-box;
+    width: 100%;
+    height: 119px;
+    min-height: 119px;
+    max-height: 119px;
+    min-width: 0;
+    overflow: hidden;
+    gap: 9px;
+    padding-inline: 8px;
+  }
+  #homeView .event-slide img { width: 54px !important; height: 54px !important; flex-basis: 54px; }
+  #homeView .event-slide-copy {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 100%;
+    justify-items: start;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "club" "badge" "title" "meta" "description" "cta";
+    grid-template-rows: 12px 20px 19px 16px minmax(0, 1fr) 14px;
+    row-gap: 3px;
+  }
+  #homeView .event-slide-copy > :not(.event-slide-cta) {
+    justify-self: start;
+    max-width: 100%;
+    margin-inline: 0;
+    text-align: left;
+  }
+  #homeView .event-slide-club {
+    max-width: 100%;
+    overflow: hidden;
+    font-size: .65rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  #homeView .event-slide-copy h3 {
+    overflow: hidden;
+    font-size: .92rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  #homeView .event-slide-copy .content-type-badge { justify-self: start; max-width: 100%; }
+  #homeView .event-slide-meta,
+  #homeView .event-slide-copy > p:not(.event-slide-meta) { font-size: .76rem; }
+  #homeView .event-slide-meta,
+  #homeView .event-slide-copy > p:not(.event-slide-meta) {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  #homeView .event-slide-copy > p:not(.event-slide-meta) {
+    display: -webkit-box;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  #homeView .event-slide-copy .event-slide-cta { justify-self: end; align-self: end; }
+}

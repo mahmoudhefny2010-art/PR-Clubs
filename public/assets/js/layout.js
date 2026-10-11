@@ -171,12 +171,38 @@ document.addEventListener('DOMContentLoaded', () => {
     // 3. Replace Sign In with the right account destination for an active session.
     const authBtn = document.getElementById('headerAuthBtn');
     const studentSignoutBtn = document.getElementById('headerStudentSignoutBtn');
+    const studentProfileMenu = document.getElementById('headerStudentProfileMenu');
+    const studentProfileTrigger = document.getElementById('headerStudentProfileTrigger');
+    const studentProfileDropdown = document.getElementById('headerStudentProfileDropdown');
+    const studentProfileName = document.getElementById('headerStudentName');
+    const studentProfileEmail = document.getElementById('headerStudentEmail');
+    const studentProfileAvatar = document.getElementById('headerStudentAvatar');
+    const accountDashboardLink = document.getElementById('headerAccountDashboardLink');
+    const studentFormsLink = document.getElementById('headerStudentFormsLink');
+    let currentHeaderSession = null;
+    const closeStudentProfileMenu = () => {
+      if (!studentProfileDropdown || !studentProfileTrigger) return;
+      studentProfileDropdown.hidden = true;
+      studentProfileTrigger.setAttribute('aria-expanded', 'false');
+    };
+    studentProfileTrigger?.addEventListener('click', () => {
+      const open = studentProfileDropdown?.hidden;
+      if (!studentProfileDropdown) return;
+      studentProfileDropdown.hidden = !open;
+      studentProfileTrigger.setAttribute('aria-expanded', String(Boolean(open)));
+    });
+    document.addEventListener('click', (event) => {
+      if (studentProfileMenu && !studentProfileMenu.contains(event.target)) closeStudentProfileMenu();
+    });
+    studentProfileDropdown?.querySelectorAll('a').forEach((link) => link.addEventListener('click', closeStudentProfileMenu));
+    document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeStudentProfileMenu(); });
     if (authBtn) {
       const refreshHeaderAccountState = async () => {
         try {
           const response = await fetch('/api/site/account-session', { cache: 'no-store' });
           if (!response.ok) return;
           const session = await response.json();
+          currentHeaderSession = session;
           const destinations = {
             admin: { label: 'Dashboard', href: '/admin' },
             president: { label: 'Dashboard', href: '/club-dashboard' },
@@ -205,7 +231,25 @@ document.addEventListener('DOMContentLoaded', () => {
             const span = authBtn.querySelector('span');
             if (span) span.textContent = 'Sign In';
           }
-          if (studentSignoutBtn) studentSignoutBtn.hidden = session?.type !== 'student' || !session?.authenticated;
+          const isAuthenticated = Boolean(account && session?.authenticated);
+          const isStudent = session?.type === 'student' && isAuthenticated;
+          if (studentProfileMenu) studentProfileMenu.hidden = !isAuthenticated;
+          if (authBtn) authBtn.hidden = isAuthenticated;
+          if (studentSignoutBtn) studentSignoutBtn.hidden = !isAuthenticated;
+          if (accountDashboardLink && account) {
+            accountDashboardLink.href = account.href;
+            accountDashboardLink.textContent = account.label;
+          }
+          if (studentFormsLink) studentFormsLink.hidden = !isStudent;
+          if (isAuthenticated) {
+            const accountName = String(session.name || account.label || 'My Account').trim();
+            const accountIdentity = String(session.email || accountName);
+            if (studentProfileName) studentProfileName.textContent = accountIdentity;
+            if (studentProfileEmail) studentProfileEmail.textContent = '';
+            if (studentProfileAvatar) studentProfileAvatar.textContent = accountName.charAt(0).toUpperCase() || 'A';
+            if (studentProfileTrigger) studentProfileTrigger.setAttribute('aria-label', `Account menu for ${accountName}`);
+          }
+          if (!isAuthenticated) closeStudentProfileMenu();
         } catch (error) {
           // Keep the last known header state if the session endpoint is temporarily unavailable.
         }
@@ -218,12 +262,16 @@ document.addEventListener('DOMContentLoaded', () => {
     studentSignoutBtn?.addEventListener('click', async () => {
       studentSignoutBtn.disabled = true;
       try {
-        const response = await fetch('/api/student-auth/logout', { method: 'POST', cache: 'no-store' });
+        const logoutPath = currentHeaderSession?.type === 'student'
+          ? '/api/student-auth/logout'
+          : currentHeaderSession?.type === 'admin' ? '/api/admin/logout' : '/api/club-auth/logout';
+        const response = await fetch(logoutPath, { method: 'POST', cache: 'no-store' });
         if (!response.ok) {
           const result = await response.json().catch(() => ({}));
           throw new Error(result.message || 'Could not sign out right now. Please try again.');
         }
         sessionStorage.removeItem('miu-last-app-view');
+        closeStudentProfileMenu();
         await window.refreshHeaderAccountState?.();
         window.location.replace('/');
       } catch (error) {

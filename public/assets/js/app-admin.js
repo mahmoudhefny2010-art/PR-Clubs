@@ -709,9 +709,10 @@ function renderClubContentSections(club) {
 }
 
 function openClubDetail(clubId) {
-  const club = state.clubs.find((item) => item.id === clubId);
+  const normalizedClubId = Number(clubId);
+  const club = state.clubs.find((item) => Number(item.id) === normalizedClubId);
   if (!club) return;
-  fetch(`/api/clubs/${clubId}/view`, { method: 'POST', cache: 'no-store' }).catch(() => {});
+  fetch(`/api/clubs/${encodeURIComponent(normalizedClubId)}/view`, { method: 'POST', cache: 'no-store' }).catch(() => {});
   const canApply = club.status === 'open';
 
   state.selectedClub = club;
@@ -728,7 +729,10 @@ function openClubDetail(clubId) {
         <div class="detail-meta">${escapeHtml(club.committee)}</div>
         <span class="status-pill status-${escapeHtml(club.status)}">${escapeHtml(getClubStatusLabel(club.status))}</span>
         ${club.pinned ? '<span class="detail-pinned-label">Featured club</span>' : ''}
-        <button class="primary-btn club-detail-apply" data-action="apply-club" data-id="${club.id}" ${canApply ? '' : 'disabled'}>${canApply ? 'Apply Now' : escapeHtml(getClubActionLabel(club.status))}</button>
+        <div class="club-detail-actions">
+          <button class="primary-btn club-detail-apply" data-action="apply-club" data-id="${club.id}" ${canApply ? '' : 'disabled'}>${canApply ? 'Apply Now' : escapeHtml(getClubActionLabel(club.status))}</button>
+          <button class="secondary-btn club-rate-button" data-action="rate-club" type="button" aria-haspopup="dialog"><span aria-hidden="true">&#9734;</span> Rate this club</button>
+        </div>
       </div>
     </div>
     <section class="detail-section">
@@ -756,12 +760,24 @@ function openClubDetail(clubId) {
       <p>${escapeHtml(club.requirements)}</p>
     </section>
 
+    <dialog class="club-rating-dialog" aria-label="Rate ${escapeHtml(club.name)}">
+      <button class="club-detail-close" data-action="close-rating" type="button" aria-label="Close club rating">&times;</button>
+      ${window.studentFeedbackForm('club', club.id)}
+    </dialog>
     ${renderClubContentSections(club)}
 
   `;
 
-  clubDetail.querySelector('[data-action="apply-club"]').addEventListener('click', () => openApplicationForm(clubId));
+  clubDetail.querySelector('[data-action="apply-club"]').addEventListener('click', () => openApplicationForm(normalizedClubId));
   clubDetail.querySelector('[data-action="go-home"]').addEventListener('click', () => showView('home'));
+  const ratingDialog = clubDetail.querySelector('.club-rating-dialog');
+  clubDetail.querySelector('[data-action="rate-club"]').addEventListener('click', () => ratingDialog.showModal());
+  clubDetail.querySelector('[data-action="close-rating"]').addEventListener('click', () => ratingDialog.close());
+  ratingDialog.addEventListener('click', (event) => {
+    if (event.target !== ratingDialog) return;
+    const bounds = ratingDialog.getBoundingClientRect();
+    if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) ratingDialog.close();
+  });
 
   clubDetail.querySelectorAll('.event-info-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -772,7 +788,6 @@ function openClubDetail(clubId) {
   });
 
   showView('club');
-  window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
 }
 
 async function openApplicationForm(clubId, allowClosedClub = false) {
@@ -798,9 +813,14 @@ async function openApplicationForm(clubId, allowClosedClub = false) {
   const [profile] = await Promise.all([loadStudentProfile(), loadApplicationCommittees(clubId)]);
   state.studentProfile = profile;
   if (profile) {
-    const nameParts = String(profile.name || '').trim().split(/\s+/);
+    const emailLocalPart = String(profile.email || '').split('@')[0];
+    const miuEmailMatch = /@miuegypt\.edu\.eg$/i.test(String(profile.email || ''))
+      ? emailLocalPart.match(/^([a-z]+)(\d{5,})$/i)
+      : null;
+    const nameParts = String(profile.name || '').trim().split(/\s+/).filter(Boolean);
     const defaults = {
-      firstName: nameParts.shift() || '', lastName: nameParts.join(' '), universityId: profile.universityId,
+      firstName: nameParts.shift() || miuEmailMatch?.[1] || '', lastName: nameParts.join(' '),
+      universityId: profile.universityId || miuEmailMatch?.[2] || '',
       major: profile.major, email: profile.email, phone: profile.phone, age: profile.age
     };
     for (const [field, value] of Object.entries(defaults)) {

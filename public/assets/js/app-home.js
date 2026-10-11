@@ -137,6 +137,11 @@ async function loadMyForms() {
 
 function renderMyForms() {
   myFormsList.replaceChildren();
+  const applicationCount = String(state.myForms.length);
+  const dashboardApplicationCount = document.getElementById('studentDashboardApplicationCount');
+  const sidebarApplicationCount = document.getElementById('studentSidebarApplicationCount');
+  if (dashboardApplicationCount) dashboardApplicationCount.textContent = applicationCount;
+  if (sidebarApplicationCount) sidebarApplicationCount.textContent = applicationCount;
   if (!state.myForms.length) {
     const empty = document.createElement('div');
     empty.className = 'empty my-forms-empty';
@@ -423,9 +428,9 @@ function groupAttendanceApprovalRecords(records) {
 }
 
 function createAttendanceApprovalCheckpoint(review) {
-  const labels = ['Club check-ins', 'PR review', 'SSO review', 'Dean approval'];
+  const labels = ['Club check-ins', 'PR review', 'SSO review', 'Dean approval', 'Approved'];
   const roles = { pending_pr: 'PR', pending_sso: 'SSO', pending_dean: 'Dean' };
-  const index = { pending_pr: 1, pending_sso: 2, pending_dean: 3, approved: 3 }[review.status] ?? 1;
+  const index = { pending_pr: 1, pending_sso: 2, pending_dean: 3, approved: 4 }[review.status] ?? 1;
   const isApproved = review.status === 'approved';
   const card = document.createElement('article');
   card.className = `approval-request-checkpoint is-attendance${isApproved ? ' is-approved' : ''}`;
@@ -595,7 +600,7 @@ async function loadClubReviewNotifications(showNotifications = true) {
       .map((event) => ({
         item,
         event,
-        key: `${item.id}:${event.action}:${new Date(event.createdAt || 0).getTime()}`
+        key: `${item.id}:${event._id || event.id || `${event.action}:${new Date(event.createdAt || 0).getTime()}`}`
       })))
       .sort((left, right) => new Date(right.event.createdAt || 0) - new Date(left.event.createdAt || 0));
     const storageKey = `miu-club-notifications-seen:${state.clubAccount?.id || 'unknown'}`;
@@ -614,7 +619,11 @@ async function loadClubReviewNotifications(showNotifications = true) {
     }
     const seenSet = new Set(seenKeys);
     const latestUpdate = actionableUpdates[0];
-    if (!latestUpdate || seenSet.has(latestUpdate.key) || new Date(latestUpdate.event.createdAt || 0).getTime() <= seenThrough) return;
+    if (!latestUpdate) return;
+    const dismissedKey = `${storageKey}:dismissed:${encodeURIComponent(latestUpdate.key)}`;
+    let wasDismissed = false;
+    try { wasDismissed = localStorage.getItem(dismissedKey) === '1'; } catch { /* Use the seen list if storage reads are unavailable. */ }
+    if (wasDismissed || seenSet.has(latestUpdate.key) || new Date(latestUpdate.event.createdAt || 0).getTime() <= seenThrough) return;
 
     const roleLabels = { pr: 'PR', english: 'English Department', security: 'Security Office', dean: 'Dean' };
     const actionLabels = {
@@ -647,6 +656,7 @@ async function loadClubReviewNotifications(showNotifications = true) {
         );
         const nextSeenKeys = [...new Set([...savedKeys, ...pendingKeys])].slice(-100);
         localStorage.setItem(storageKey, JSON.stringify({ seenThrough: nextSeenThrough, keys: nextSeenKeys }));
+        for (const key of pendingKeys) localStorage.setItem(`${storageKey}:dismissed:${encodeURIComponent(key)}`, '1');
       } catch { /* Keep the dialog usable if browser storage is unavailable. */ }
       dialog.close();
     };
@@ -747,6 +757,11 @@ async function openClubPortal(initialSession = null) {
       ? 'PRESIDENT DASHBOARD - ALL COMMITTEES'
       : `${club.committee} - HEAD DASHBOARD`;
     const isPresident = club.role === 'president';
+    document.getElementById('presidentClubStatusPanel')?.classList.toggle('hidden', !isPresident);
+    const presidentStatusSelect = document.getElementById('presidentClubStatusSelect');
+    if (presidentStatusSelect) presidentStatusSelect.value = ['open', 'opening-soon', 'full', 'closed'].includes(club.status) ? club.status : 'open';
+    const presidentStatusFeedback = document.getElementById('presidentClubStatusFeedback');
+    if (presidentStatusFeedback) presidentStatusFeedback.textContent = '';
     const contentStudioButton = document.getElementById('openContentStudioBtn');
     if (contentStudioButton) {
       const hasAssignedContent = isPresident || club.hasAssignedContent === true;
@@ -790,9 +805,13 @@ async function openClubPortal(initialSession = null) {
     toggleInterviewFormBtn.setAttribute('aria-expanded', 'false');
     toggleInterviewFormBtn.textContent = 'Manage interview questions';
     if (club.role === 'president') {
-      const allowedSections = new Set(['presidentOverviewPanel', 'presidentHeadManager', 'presidentFormManager', 'interviewFormManager', 'presidentApplicantsPanel']);
+      const allowedSections = new Set(['presidentOverviewPanel', 'presidentClubStatusPanel', 'presidentHeadManager', 'presidentFormManager', 'interviewFormManager', 'presidentApplicantsPanel']);
       let savedSection = '';
-      try { savedSection = localStorage.getItem(`miu-club-dashboard-section:${club.id}`) || ''; } catch { /* Start at Overview when storage is unavailable. */ }
+      const navigationEntry = window.performance?.getEntriesByType?.('navigation')?.[0];
+      const isReloadNavigation = navigationEntry?.type === 'reload' || (!navigationEntry && window.performance?.navigation?.type === 1);
+      if (isReloadNavigation) {
+        try { savedSection = localStorage.getItem(`miu-club-dashboard-section:${club.id}`) || ''; } catch { /* Start at Overview when storage is unavailable. */ }
+      }
       setPresidentDashboardSection(allowedSections.has(savedSection) ? savedSection : 'presidentOverviewPanel');
     } else {
       setPresidentDashboardSection('presidentOverviewPanel');
@@ -825,7 +844,7 @@ async function openClubPortal(initialSession = null) {
 }
 
 function setPresidentDashboardSection(sectionId) {
-  const sectionIds = ['presidentOverviewPanel', 'presidentHeadManager', 'presidentFormManager', 'interviewFormManager', 'presidentApplicantsPanel'];
+  const sectionIds = ['presidentOverviewPanel', 'presidentClubStatusPanel', 'presidentHeadManager', 'presidentFormManager', 'interviewFormManager', 'presidentApplicantsPanel'];
   if (state.clubAccount?.role === 'president' && sectionIds.includes(sectionId)) {
     try { localStorage.setItem(`miu-club-dashboard-section:${state.clubAccount.id}`, sectionId); } catch { /* The section still changes for this visit. */ }
   }
@@ -935,7 +954,9 @@ function renderClubGrid() {
             <div class="club-tagline">${escapeHtml(club.tagline || club.category)}</div>
 
             <div class="club-metrics">
-              <div><strong>${Number(club.members) || 0}</strong> Members</div>
+              <div class="club-rating-summary" role="img" aria-label="Average rating ${Number(club.ratingAverage || 0).toFixed(1)} out of 5 from ${Number(club.ratingCount) || 0} student ratings" title="${Number(club.ratingCount) ? `${Number(club.ratingAverage).toFixed(1)} out of 5 · ${Number(club.ratingCount)} ratings` : 'No student ratings yet'}">
+                <span class="club-rating-stars" aria-hidden="true">${[1, 2, 3, 4, 5].map((star) => `<span class="club-rating-star${Number(club.ratingAverage || 0) >= star ? ' is-filled' : Number(club.ratingAverage || 0) >= star - 0.5 ? ' is-half' : ''}">★</span>`).join('')}</span>
+              </div>
               <div><strong>${Number(club.applicants) || 0}</strong> Applicants</div>
             </div>
 
@@ -954,7 +975,12 @@ function renderClubGrid() {
   });
 
   clubGrid.querySelectorAll('[data-action="view-club"]').forEach((btn) => {
-    btn.addEventListener('click', () => openClubDetail(Number(btn.dataset.id)));
+    btn.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const clubId = Number(btn.dataset.id);
+      if (Number.isSafeInteger(clubId) && typeof openClubDetail === 'function') openClubDetail(clubId);
+    });
   });
 
   clubGrid.querySelectorAll('[data-action="apply-club"]').forEach((btn) => {
@@ -1098,17 +1124,52 @@ function renderTodayEvents() {
 
 let slideIndex = 0;
 let slideTimer = null;
+let suppressSlideClickUntil = 0;
 
 function renderEventsSlideshow() {
   const track = document.getElementById('eventsSlideshowTrack');
   const dots = document.getElementById('eventsSlideshowDots');
   if (!track || !dots) return;
+  if (!track.dataset.swipeReady) {
+    track.dataset.swipeReady = 'true';
+    let swipeStart = null;
+    track.addEventListener('pointerdown', (event) => {
+      if (event.pointerType !== 'touch' && event.pointerType !== 'pen') return;
+      swipeStart = { x: event.clientX, y: event.clientY };
+    }, { passive: true });
+    track.addEventListener('pointerup', (event) => {
+      if (!swipeStart) return;
+      const deltaX = event.clientX - swipeStart.x;
+      const deltaY = event.clientY - swipeStart.y;
+      swipeStart = null;
+      if (Math.abs(deltaX) < 45 || Math.abs(deltaX) < Math.abs(deltaY) * 1.25) return;
+      suppressSlideClickUntil = Date.now() + 500;
+      const slideCount = track.querySelectorAll('.event-slide').length;
+      if (slideCount < 2) return;
+      slideIndex = (slideIndex + (deltaX < 0 ? 1 : -1) + slideCount) % slideCount;
+      renderEventsSlideshow();
+    }, { passive: true });
+    track.addEventListener('pointercancel', () => { swipeStart = null; }, { passive: true });
+    track.addEventListener('click', (event) => {
+      if (Date.now() >= suppressSlideClickUntil) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }, true);
+  }
   const todayStart = startOfLocalDay(new Date());
   const tomorrowStart = new Date(todayStart);
   tomorrowStart.setDate(tomorrowStart.getDate() + 1);
-  const items = getAllEvents()
+  const universityItems = (state.universityContent || []).map((item) => ({
+    ...item, contentType: item.type === 'event' ? 'event' : 'feed',
+    clubId: 0, clubName: 'Misr International University',
+    clubImage: '/assets/img/pics/logo.svg.png', university: true,
+    universityContentId: item.id, index: item.id,
+    parsedDate: parseEventDate(item.createdAt || item.date) || todayStart
+  }));
+  const items = getAllEvents().filter((event) => !event.university)
     .map((event) => ({ ...event, contentType: 'event', index: event.eventIndex, parsedDate: parseEventDate(event.date) }))
     .filter((event) => event.parsedDate && event.parsedDate < tomorrowStart)
+    .concat(universityItems)
     .sort((left, right) => {
       const leftDay = startOfLocalDay(left.parsedDate);
       const rightDay = startOfLocalDay(right.parsedDate);
@@ -1116,7 +1177,7 @@ function renderEventsSlideshow() {
       return left.parsedDate - right.parsedDate;
     });
   if (!items.length) {
-    track.innerHTML = '<p class="events-empty">No events today or earlier.</p>';
+    track.innerHTML = '<p class="events-empty">No events or MIU updates yet.</p>';
     dots.innerHTML = '';
     dots.hidden = true;
     document.getElementById('slidePrev')?.setAttribute('hidden', '');
@@ -1128,6 +1189,9 @@ function renderEventsSlideshow() {
   if (slideIndex >= items.length) slideIndex = 0;
   track.innerHTML = items.map((item, i) => {
     const isToday = startOfLocalDay(item.parsedDate).getTime() === todayStart.getTime();
+    const badge = item.university
+      ? ({ poll: 'MIU POLL', evaluation: 'MIU EVALUATION' }[item.interaction] || (item.type === 'event' ? 'MIU EVENT' : 'MIU ANNOUNCEMENT'))
+      : (isToday ? 'TODAY ? NEW' : 'PAST EVENT');
     const metaLine = item.contentType === 'sponsor'
       ? [item.sponsorType, item.sponsorAmount].filter(Boolean).join(' · ')
       : `${item.date || ''}${item.location ? ' · ' + escapeHtml(item.location) : ''}`;
@@ -1137,7 +1201,7 @@ function renderEventsSlideshow() {
       <div class="event-slide-copy">
         <span class="event-slide-club">${escapeHtml(item.clubName || '')}</span>
         <h3>${escapeHtml(item.title || 'Event')}</h3>
-        <span class="content-type-badge ${escapeHtml(item.contentType)}">${isToday ? 'TODAY · NEW' : 'PAST EVENT'}</span>
+        <span class="content-type-badge ${escapeHtml(item.contentType)}">${badge}</span>
         <p class="event-slide-meta">${escapeHtml(metaLine)}</p>
         <p>${escapeHtml(item.description || '')}</p>
         <span class="event-slide-cta">View details →</span>
@@ -1146,7 +1210,15 @@ function renderEventsSlideshow() {
   }).join('');
   track.querySelectorAll('.event-slide').forEach((slide) => {
     slide.addEventListener('click', () => {
+      if (Date.now() < suppressSlideClickUntil) return;
       const contentType = slide.dataset.type;
+      const universityItem = items.find((item) => item.university && Number(slide.dataset.club) === 0 && item.index === Number(slide.dataset.idx));
+      if (universityItem) {
+        window.location.href = universityItem.type === 'event'
+          ? '/pages/event.html?university=' + universityItem.id
+          : '/pages/feed.html?post=' + universityItem.id;
+        return;
+      }
       if (contentType === 'sponsor') { window.location.href = '/pages/sponsors.html'; return; }
       if (contentType === 'booth') { window.location.href = '/pages/booths.html'; return; }
       const event = items.find((item) => item.contentType === 'event' && Number(item.clubId) === Number(slide.dataset.club) && item.index === Number(slide.dataset.idx));
@@ -1163,7 +1235,7 @@ function renderEventsSlideshow() {
   if (prev) prev.onclick = () => { slideIndex = (slideIndex - 1 + items.length) % items.length; renderEventsSlideshow(); };
   if (next) next.onclick = () => { slideIndex = (slideIndex + 1) % items.length; renderEventsSlideshow(); };
   if (slideTimer) clearInterval(slideTimer);
-  slideTimer = items.length > 1 ? setInterval(() => { slideIndex = (slideIndex + 1) % items.length; renderEventsSlideshow(); }, 5000) : null;
+  slideTimer = items.length > 1 ? setInterval(() => { slideIndex = (slideIndex + 1) % items.length; renderEventsSlideshow(); }, 2500) : null;
 }
 
 document.addEventListener('DOMContentLoaded', () => {

@@ -3,14 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <script src="/assets/js/site-loading.js?v=20261011scrolltop2"></script>
+    <script src="/assets/js/site-loading.js?v=20261011scrollrestore2"></script>
     <title>MIU Student Sign In</title>
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" /></noscript>
     <link rel="stylesheet" href="/assets/css/base.css?v=20261010passwordeye1" />
-    <link rel="stylesheet" href="/assets/css/responsive.css?v=20261011mobilelayout1" />
+    <link rel="stylesheet" href="/assets/css/responsive.css?v=20261011allprofilemenus1" />
     <link rel="stylesheet" href="/assets/css/dark.css?v=20261011darkloaderlogo3" />
-    <link rel="stylesheet" href="/assets/css/features.css?v=20261008g" />
+    <link rel="stylesheet" href="/assets/css/features.css?v=20261011responsiveall1" />
     <link rel="icon" href="/assets/img/pics/logo.svg.png" type="image/png">
     <link rel="stylesheet" href="/assets/css/pages/applicant-login.css?v=1" />
   </head>
@@ -34,6 +34,8 @@
             </div>
             <button class="primary-btn" type="submit" style="width:100%">Sign In</button>
           </form>
+          <button id="demoStudentLoginButton" class="secondary-btn" type="button" hidden style="width:100%;margin-top:12px">Continue as demo student (local testing)</button>
+          <p id="demoStudentLoginFeedback" class="admin-feedback" aria-live="polite"></p>
           <p class="login-foot" style="text-align:right;margin-top:10px"><a href="/pages/forgot-password.html">Forgot password?</a></p>
           <p id="loginFeedback" class="admin-feedback" aria-live="polite"></p>
           <div id="googleLoginArea">
@@ -51,8 +53,8 @@
     </div>
 
     <div id="site-footer"></div>
-    <script src="/assets/js/pages/applicant-login.js?v=1"></script>
-    <script src="/assets/js/layout.js?v=20261010passwordeye1" defer></script>
+    <script src="/assets/js/pages/applicant-login.js?v=2"></script>
+    <script src="/assets/js/layout.js?v=20261011accountidentity1" defer></script>
     <script src="/assets/js/theme.js?v=20261009c" defer></script>
   </body>
 </html>

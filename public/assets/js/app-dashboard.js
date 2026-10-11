@@ -352,7 +352,16 @@ async function loadClubMembers() {
         ? 'Accepted applicant'
         : member.memberType === 'senior' ? 'Senior member' : 'New member';
       details.append(name, meta);
-      card.append(details, type);
+      const actions = document.createElement('div');
+      actions.className = 'member-roster-actions';
+      actions.append(type);
+      const editButton = document.createElement('button');
+      editButton.type = 'button';
+      editButton.className = 'secondary-btn member-role-edit-btn';
+      editButton.textContent = 'Edit role';
+      editButton.addEventListener('click', () => showMemberRoleEditor(card, member));
+      actions.append(editButton);
+      card.append(details, actions);
       list.append(card);
     });
     const note = document.getElementById('clubMemberCountNote');
@@ -366,6 +375,65 @@ async function loadClubMembers() {
     message.textContent = error.message;
     list.append(message);
   }
+}
+
+function showMemberRoleEditor(card, member) {
+  const form = document.createElement('form');
+  form.className = 'member-role-edit-form';
+  const positionLabel = document.createElement('label');
+  positionLabel.textContent = 'Role in committee';
+  const positionInput = document.createElement('input');
+  positionInput.name = 'position';
+  positionInput.maxLength = 100;
+  positionInput.required = true;
+  positionInput.value = member.position || 'Member';
+  positionLabel.append(positionInput);
+  const levelLabel = document.createElement('label');
+  levelLabel.textContent = 'Member level';
+  const levelSelect = document.createElement('select');
+  levelSelect.name = 'memberType';
+  levelSelect.add(new Option('New member', 'new'));
+  levelSelect.add(new Option('Senior member', 'senior'));
+  levelSelect.value = member.memberType === 'senior' ? 'senior' : 'new';
+  levelLabel.append(levelSelect);
+  const actions = document.createElement('div');
+  actions.className = 'member-role-edit-actions';
+  const save = document.createElement('button');
+  save.type = 'submit';
+  save.className = 'primary-btn';
+  save.textContent = 'Save';
+  const cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.className = 'secondary-btn';
+  cancel.textContent = 'Cancel';
+  cancel.addEventListener('click', () => loadClubMembers());
+  actions.append(save, cancel);
+  form.append(positionLabel, levelLabel, actions);
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    save.disabled = true;
+    try {
+      const response = await fetch(`/api/club/members/${encodeURIComponent(member.id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ position: positionInput.value, memberType: levelSelect.value })
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Could not update this member.');
+      await loadClubMembers();
+    } catch (error) {
+      let feedback = card.querySelector('.member-role-edit-error');
+      if (!feedback) {
+        feedback = document.createElement('p');
+        feedback.className = 'member-role-edit-error';
+        form.append(feedback);
+      }
+      feedback.textContent = error.message;
+      save.disabled = false;
+    }
+  });
+  card.replaceChildren(form);
+  positionInput.focus();
 }
 
 const memberManagerDialog = document.getElementById('memberManagerDialog');
@@ -557,6 +625,30 @@ document.getElementById('saveReviewBtn').addEventListener('click', async () => {
 
 document.getElementById('myFormsButton')?.addEventListener('click', () => {});
 document.getElementById('myFormsBackHomeBtn').addEventListener('click', () => showView('home'));
+function setStudentDashboardSection(sectionName, { updateUrl = true } = {}) {
+  const section = ['overview', 'applications', 'attendance'].includes(sectionName) ? sectionName : 'overview';
+  document.querySelectorAll('[data-student-panel]').forEach((panel) => {
+    panel.hidden = panel.dataset.studentPanel !== section;
+  });
+  document.querySelectorAll('.student-dashboard-nav [data-student-section]').forEach((button) => {
+    const active = button.dataset.studentSection === section;
+    button.classList.toggle('is-active', active);
+    if (active) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  });
+  if (updateUrl) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('myForms', '1');
+    if (section === 'overview') url.searchParams.delete('section');
+    else url.searchParams.set('section', section === 'applications' ? 'forms' : section);
+    url.hash = '';
+    window.history.replaceState({}, '', url);
+  }
+}
+window.setStudentDashboardSection = setStudentDashboardSection;
+document.querySelectorAll('[data-student-section]').forEach((button) => {
+  button.addEventListener('click', () => setStudentDashboardSection(button.dataset.studentSection));
+});
 document.getElementById('applicationBackHomeBtn').addEventListener('click', () => {
   state.editingMyForm = null;
   showView('home');
@@ -622,6 +714,44 @@ document.getElementById('logoutBtn').addEventListener('click', async () => {
 
 document.getElementById('backHomeBtn').addEventListener('click', () => {
   showView('home');
+});
+
+document.getElementById('presidentClubStatusForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const select = document.getElementById('presidentClubStatusSelect');
+  const feedback = document.getElementById('presidentClubStatusFeedback');
+  const saveButton = form.querySelector('button[type="submit"]');
+  if (state.clubAccount?.role !== 'president') {
+    feedback.textContent = 'Only the club president can change club status.';
+    return;
+  }
+  saveButton.disabled = true;
+  feedback.textContent = 'Saving club status…';
+  feedback.classList.remove('is-error');
+  try {
+    const response = await fetch('/api/club/status', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: select.value })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || result.savedToDatabase !== true) throw new Error(result.message || 'Could not save club status.');
+    state.clubAccount.status = result.status;
+    const club = state.clubs.find((item) => Number(item.id) === Number(result.clubId));
+    if (club) {
+      club.status = result.status;
+      if (Number.isFinite(Number(result.applicants))) club.applicants = Number(result.applicants);
+    }
+    if (typeof renderClubGrid === 'function') renderClubGrid();
+    const labels = { open: 'Open', 'opening-soon': 'Opening soon', full: 'Full', closed: 'Closed' };
+    feedback.textContent = `Club status saved as ${labels[result.status] || result.status}.`;
+  } catch (error) {
+    feedback.textContent = error.message;
+    feedback.classList.add('is-error');
+  } finally {
+    saveButton.disabled = false;
+  }
 });
 
 document.getElementById('adminLoginForm').addEventListener('submit', async (event) => {
@@ -889,6 +1019,7 @@ function showView(viewName) {
   Object.entries(views).forEach(([key, view]) => {
     view.classList.toggle('active', key === viewName);
   });
+  window.resetPageScroll();
   if (viewName !== 'authLoading') {
     document.documentElement.classList.remove('auth-route-pending');
     persistCurrentViewState();
@@ -974,9 +1105,24 @@ async function init() {
     if (query.get('myForms') === '1') {
       await loadMyForms();
       showView('myForms');
+      const requestedSection = query.get('section') === 'forms' ? 'applications' : query.get('section');
+      setStudentDashboardSection(requestedSection, { updateUrl: false });
       return;
     }
-    if (await restoreLastAppView()) return;
+    if (query.get('explore') === 'clubs') {
+      showView('home');
+      requestAnimationFrame(() => {
+        const clubGrid = document.getElementById('clubGrid');
+        if (!clubGrid) return;
+        const stickyHeaderHeight = document.querySelector('.topbar-nav')?.getBoundingClientRect().height || 0;
+        const targetTop = clubGrid.getBoundingClientRect().top + window.scrollY - stickyHeaderHeight - 16;
+        window.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+      });
+      return;
+    }
+    const navigationEntry = window.performance?.getEntriesByType?.('navigation')?.[0];
+    const isReload = navigationEntry?.type === 'reload' || (!navigationEntry && window.performance?.navigation?.type === 1);
+    if (isReload && await restoreLastAppView()) return;
     showView('home');
   }
 }

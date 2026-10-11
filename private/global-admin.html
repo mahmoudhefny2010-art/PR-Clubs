@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <script src="/assets/js/site-loading.js?v=20261011scrolltop2"></script>
+  <script src="/assets/js/site-loading.js?v=20261011scrollrestore1"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow, noarchive">
   <title>Global Admin</title>
@@ -118,6 +118,43 @@
     .tab-btn { padding: 10px 18px; border: 1px solid var(--border-color); border-radius: 999px; background: var(--bg-panel); color: var(--text-muted); font-weight: 700; cursor: pointer; transition: all .15s ease; }
     .tab-btn:hover { border-color: var(--primary-700); color: var(--primary-700); }
     .tab-btn.active { background: var(--primary-800); color: #fff; border-color: var(--primary-800); }
+    .club-feedback-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin: 14px 0 18px; }
+    .club-feedback-filters label { display: grid; min-width: min(240px, 100%); gap: 6px; color: var(--text-muted); font-size: .84rem; font-weight: 700; }
+    .club-feedback-filters input, .club-feedback-filters select { box-sizing: border-box; min-height: 42px; padding: 9px 12px; border: 1px solid var(--border-color); border-radius: 11px; background: var(--bg-panel); color: var(--text-main); font: inherit; }
+    .club-feedback-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr)); gap: 14px; }
+    .club-feedback-card { min-width: 0; padding: 17px; border: 1px solid var(--border-color); border-top: 3px solid var(--primary-700); border-radius: 16px; background: var(--bg-panel); box-shadow: var(--shadow-sm); }
+    .club-feedback-card[hidden] { display: none !important; }
+    .club-feedback-card-main { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+    .club-feedback-card h4 { margin: 0 0 9px; color: var(--text-main); font-size: 1.08rem; overflow-wrap: anywhere; }
+    .club-feedback-card p { margin: 7px 0 0; color: var(--text-muted); font-size: .88rem; }
+    .club-feedback-rating { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; }
+    .club-feedback-rating .feedback-star { color: #cbd2dc; font-size: 1.08rem; }
+    .club-feedback-rating .feedback-star.is-filled { color: #e5a800; }
+    .club-feedback-rating > span:last-child { margin-left: 5px; color: var(--text-muted); font-size: .82rem; font-weight: 700; }
+    .club-feedback-details { flex: 0 0 auto; }
+    .club-feedback-details summary { display: inline-flex; min-height: 38px; align-items: center; padding: 7px 13px; border: 1px solid var(--border-color); border-radius: 999px; background: var(--bg-soft); color: var(--text-main); font-size: .84rem; font-weight: 750; cursor: pointer; list-style: none; }
+    .club-feedback-details summary::-webkit-details-marker { display: none; }
+    .club-feedback-detail-button { min-height: 40px; padding: 8px 16px; border: 1px solid var(--border-color); border-radius: 999px; background: var(--bg-soft); color: var(--text-main); font: inherit; font-size: .88rem; font-weight: 750; cursor: pointer; }
+    .club-feedback-detail-button:hover { border-color: var(--primary-700); color: var(--primary-700); }
+    .club-feedback-dialog { box-sizing: border-box; width: min(680px, calc(100vw - 28px)); max-width: none; max-height: min(80dvh, 720px); margin: auto; padding: 22px; overflow: auto; border: 1px solid var(--border-color); border-radius: 18px; background: var(--bg-panel); color: var(--text-main); box-shadow: var(--shadow-lg); }
+    .club-feedback-dialog::backdrop { background: rgba(15, 23, 42, .58); backdrop-filter: blur(3px); }
+    .club-feedback-dialog-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .club-feedback-dialog-heading h3 { margin: 0; overflow-wrap: anywhere; }
+    .club-feedback-dialog-close { display: grid; flex: 0 0 40px; width: 40px; height: 40px; place-items: center; border: 1px solid var(--border-color); border-radius: 50%; background: var(--bg-soft); color: var(--text-main); font-size: 1.5rem; cursor: pointer; }
+    .club-feedback-dialog-responses { display: grid; gap: 10px; margin-top: 16px; }
+    .club-feedback-response { padding: 13px 14px; border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-soft); overflow-wrap: anywhere; }
+    .club-feedback-response strong { color: var(--text-main); }
+    .club-feedback-response p { margin: 6px 0 0; color: var(--text-muted); white-space: pre-wrap; }
+    .miu-feedback-card { margin: 14px 0; padding: 18px; border: 1px solid var(--border-color); border-left: 4px solid var(--primary-700); border-radius: 15px; background: var(--bg-panel); box-shadow: var(--shadow-sm); }
+    .miu-feedback-card-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+    .miu-feedback-card-heading h3 { margin: 0; color: var(--text-main); overflow-wrap: anywhere; }
+    .miu-feedback-card-heading > span { padding: 5px 10px; border-radius: 999px; background: var(--primary-50); color: var(--primary-800); font-size: .7rem; font-weight: 800; letter-spacing: .04em; }
+    .miu-feedback-question { color: var(--text-muted); }
+    .miu-feedback-count { font-weight: 750; }
+    .miu-feedback-option { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-soft); overflow-wrap: anywhere; }
+    .miu-feedback-card details { margin-top: 12px; }
+    .miu-feedback-card details summary { color: var(--primary-800); font-weight: 700; cursor: pointer; }
+    @media (max-width: 540px) { .club-feedback-card-main { align-items: flex-start; flex-direction: column; } .club-feedback-dialog { padding: 17px; } }
     .tab-panel { display: none; }
     .tab-panel.active { display: block; animation: fadeIn .25s ease; }
 
@@ -188,6 +225,7 @@
     .committee-availability-dialog footer { justify-content: flex-end; margin-top: 16px; }
     @media (max-width: 480px) { .committee-availability-row { align-items: stretch; flex-direction: column; } }
   </style>
+  <script src="/assets/js/student-feedback.js?v=6"></script>
 </head>
 <body>
   <div class="page-shell">
@@ -211,6 +249,8 @@
         <button class="tab-btn" data-tab="clubs" type="button">Clubs</button>
         <button class="tab-btn" data-tab="analysis" type="button">Analysis</button>
         <button class="tab-btn" data-tab="university" type="button">MIU Posts</button>
+        <button class="tab-btn" data-tab="feedback" type="button">Student feedback</button>
+        <button class="tab-btn" data-tab="miu-feedback" type="button">MIU polls &amp; evaluations</button>
         <button class="tab-btn" data-tab="applications" type="button">Applications</button>
       </div>
 
@@ -287,6 +327,10 @@
             </label>
             <label for="universityPostTitle">Title<input id="universityPostTitle" name="title" required maxlength="140" placeholder="e.g. University registration is open" /></label>
             <label for="universityPostDescription">Details<textarea id="universityPostDescription" name="description" required maxlength="2000" placeholder="Write the information students need to know"></textarea></label>
+            <label>Student response<select id="universityInteraction"><option value="none">No response</option><option value="poll">Poll — choose one option</option><option value="evaluation">Evaluation — rate from 1 to 5</option></select></label>
+            <label id="universityQuestionField" hidden>Poll or evaluation question<input id="universityQuestion" maxlength="300" placeholder="Who would you like at the welcome party?" /></label>
+            <label id="universityOptionsField" hidden>Poll options (one per line, 2–20 options)<textarea id="universityOptions" placeholder="Artist one&#10;Artist two"></textarea></label>
+            <p>Students can update their response. Results are visible only to admin and PR.</p>
             <div class="form-row" id="universityEventFields" hidden>
               <label for="universityPostDate">Event date (optional)<input id="universityPostDate" name="date" type="date" /></label>
               <label for="universityPostTime">Time (optional)<input id="universityPostTime" name="time" type="time" /></label>
@@ -315,6 +359,22 @@
         <h3 class="analysis-title">Published by MIU</h3>
         <p id="universityPostListMessage" class="message" role="status"></p>
         <div id="universityPostRecords" class="records"></div>
+      </section>
+
+      <section class="section tab-panel" id="tab-feedback">
+        <div class="section-heading">
+          <div><h2>Student feedback</h2><p>Club ratings and responses to polls and evaluations published by MIU.</p></div>
+          <button class="secondary-btn" id="refreshStudentFeedbackBtn" type="button">Refresh results</button>
+        </div>
+        <div id="studentFeedbackResults" class="feedback-results" aria-live="polite">Open this tab to load the latest club ratings.</div>
+      </section>
+
+      <section class="section tab-panel" id="tab-miu-feedback">
+        <div class="section-heading">
+          <div><h2>MIU polls &amp; evaluations</h2><p>Student responses to polls and evaluations published by MIU.</p></div>
+          <button class="secondary-btn" id="refreshMiuFeedbackBtn" type="button">Refresh results</button>
+        </div>
+        <div id="miuFeedbackResults" class="feedback-results" aria-live="polite">Open this tab to load the latest MIU responses.</div>
       </section>
 
       <section class="section tab-panel" id="tab-clubs">
@@ -574,6 +634,14 @@
         select.appendChild(opt);
       }
     }
+    function updateInteractionFields() {
+      const mode = byId('universityInteraction').value;
+      byId('universityQuestionField').hidden = mode === 'none';
+      byId('universityQuestion').required = mode !== 'none';
+      byId('universityOptionsField').hidden = mode !== 'poll';
+      byId('universityOptions').required = mode === 'poll';
+    }
+    byId('universityInteraction').addEventListener('change', updateInteractionFields);
     let universityPostsLoaded = false;
     let universityPostsRequestId = 0;
     async function loadUniversityPosts() {
@@ -638,6 +706,7 @@
         if (universityPreviewUrl) URL.revokeObjectURL(universityPreviewUrl);
         universityPreviewUrl = '';
         universityPreview.src = '/assets/img/pics/logo.svg.png';
+        updateInteractionFields();
       }
     }));
     universityImageInput.addEventListener('change', () => {
@@ -667,6 +736,9 @@
         if (imageChoice === 'custom' && !imageFile) throw new Error('Choose an image to upload, or select the MIU logo.');
         const payload = {
           type: byId('universityPostType').value,
+          interaction: byId('universityInteraction').value,
+          question: byId('universityQuestion').value.trim(),
+          options: byId('universityOptions').value.split('\n').map(value => value.trim()).filter(Boolean),
           title: byId('universityPostTitle').value.trim(),
           description: byId('universityPostDescription').value.trim(),
           date: universityEventDate.value,
@@ -746,6 +818,7 @@
     const tabButtons = document.querySelectorAll('#adminTabs .tab-btn');
     tabButtons.forEach((btn) => {
       btn.addEventListener('click', () => {
+        try { sessionStorage.setItem('miu-global-admin-tab', btn.dataset.tab); } catch {}
         tabButtons.forEach((b) => b.classList.remove('active'));
         btn.classList.add('active');
         document.querySelectorAll('.tab-panel').forEach((p) => p.classList.remove('active'));
@@ -757,6 +830,11 @@
         if (btn.dataset.tab === 'university' && !universityPostsLoaded) loadUniversityPosts();
       });
     });
+    try {
+      const savedTab = sessionStorage.getItem('miu-global-admin-tab');
+      const savedTabButton = Array.from(tabButtons).find((button) => button.dataset.tab === savedTab);
+      if (savedTabButton) savedTabButton.click();
+    } catch {}
 
     /* ---- Analysis ---- */
     async function renderClubViews() {

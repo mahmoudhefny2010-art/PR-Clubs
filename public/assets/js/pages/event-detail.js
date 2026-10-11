@@ -85,6 +85,7 @@
         titleEl.textContent = event.title || 'University event';
         metaEl.textContent = [event.date ? formatDate(event.date) : 'Date to be announced', window.formatSiteTime ? window.formatSiteTime(event.time) : event.time, event.location].filter(Boolean).join(' · ');
         descriptionEl.textContent = event.description || '';
+        contentEl.insertAdjacentHTML('beforeend', window.studentFeedbackForm('university', event.id, event.interaction, event.question, event.options));
         registrationForm.hidden = event.registrationEnabled !== true;
         statusEl.hidden = true;
         contentEl.hidden = false;

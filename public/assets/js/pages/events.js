@@ -144,6 +144,7 @@
             <h3 class="feed-timeline-title">${escapeHtml(feed.title || 'Feed post')}</h3>
             <span class="content-type-badge feed">Latest Feed</span>
             <p class="feed-timeline-text">${escapeHtml(feed.text || feed.description || '')}</p>
+            ${feed.university ? window.studentFeedbackForm('university', feed.id, feed.interaction, feed.question, feed.options) : ''}
             ${feed.image && feed.image !== feed.clubImage ? '<img src="' + escapeHtml(feed.image) + '" alt="' + escapeHtml(feed.title || 'Feed image') + '" class="feed-timeline-image" />' : ''}
           </div>
         </div>

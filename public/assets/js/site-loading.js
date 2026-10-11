@@ -1,12 +1,37 @@
 (() => {
   const root = document.documentElement;
+  const navigationEntry = window.performance?.getEntriesByType?.('navigation')?.[0];
+  const isPageReload = navigationEntry?.type === 'reload' || (!navigationEntry && window.performance?.navigation?.type === 1);
   // A newly loaded document always starts at the top, including links that
   // carry a fragment. Hash changes made after load still navigate in-page.
-  if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual';
-  window.addEventListener('pageshow', () => {
-    window.scrollTo(0, 0);
-    window.requestAnimationFrame(() => window.scrollTo(0, 0));
-  });
+  if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'auto';
+  let scrollResetFrame = 0;
+  window.resetPageScroll = () => {
+    window.cancelAnimationFrame(scrollResetFrame);
+    // Override the site's smooth scrolling when opening a page or app view.
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    scrollResetFrame = window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    });
+  };
+  const scrollPositionKey = `miu-scroll-position:${window.location.pathname}${window.location.search}${window.location.hash}`;
+  let scrollSaveTimer = 0;
+  const saveScrollPosition = () => {
+    try { sessionStorage.setItem(scrollPositionKey, JSON.stringify({ x: window.scrollX, y: window.scrollY })); } catch {}
+  };
+  window.addEventListener('scroll', () => {
+    window.clearTimeout(scrollSaveTimer);
+    scrollSaveTimer = window.setTimeout(saveScrollPosition, 80);
+  }, { passive: true });
+  window.addEventListener('pagehide', saveScrollPosition);
+  window.addEventListener('load', () => {
+    if (!isPageReload) return;
+    let saved;
+    try { saved = JSON.parse(sessionStorage.getItem(scrollPositionKey) || 'null'); } catch { saved = null; }
+    if (!saved || !Number.isFinite(saved.y)) return;
+    // App views may finish restoring after load; restore once they have rendered.
+    window.setTimeout(() => window.scrollTo({ left: saved.x || 0, top: saved.y, behavior: 'instant' }), 700);
+  }, { once: true });
   const nativeFetch = window.fetch.bind(window);
   let pendingRequests = 0;
   let pendingInitialRequests = 0;
