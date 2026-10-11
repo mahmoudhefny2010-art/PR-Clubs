@@ -1,0 +1,12 @@
+node_modules/
+.git/
+.vercel/
+.frontend-audit/
+tests/
+docs/
+scripts/
+.env*
+*.xlsx
+*.pptx
+dev.js
+seed.js
