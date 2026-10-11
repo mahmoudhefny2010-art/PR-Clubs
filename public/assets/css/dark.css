@@ -116,6 +116,13 @@
   color: var(--text-main) !important;
 }
 :root[data-theme="dark"] body :is(.topbar-nav, .brand-wrap) { background-color: rgba(17, 27, 43, .94) !important; backdrop-filter: blur(14px); }
+:root[data-theme="dark"] body .brand-link .brand-logo {
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .16);
+  transform: scaleX(.85);
+  transform-origin: center;
+}
 :root[data-theme="dark"] body :is(.committee-sidebar-link, .president-sidebar-action) { color: var(--text-muted); }
 :root[data-theme="dark"] body :is(.committee-sidebar-link:hover, .president-sidebar-action:hover, .secondary-btn:hover) { background-color: var(--bg-soft) !important; color: #ff9299 !important; }
 :root[data-theme="dark"] body :is(.committee-sidebar-link.is-active, .president-sidebar-action.is-active) { color: #ff9299 !important; }
