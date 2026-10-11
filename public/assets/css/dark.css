@@ -123,6 +123,14 @@
   transform: scaleX(.85);
   transform-origin: center;
 }
+:root[data-theme="dark"] body .site-loading-logo img {
+  box-sizing: border-box;
+  width: 68px;
+  height: 68px;
+  padding: 4px;
+  border-radius: 50%;
+  background: #fff;
+}
 :root[data-theme="dark"] body :is(.committee-sidebar-link, .president-sidebar-action) { color: var(--text-muted); }
 :root[data-theme="dark"] body :is(.committee-sidebar-link:hover, .president-sidebar-action:hover, .secondary-btn:hover) { background-color: var(--bg-soft) !important; color: #ff9299 !important; }
 :root[data-theme="dark"] body :is(.committee-sidebar-link.is-active, .president-sidebar-action.is-active) { color: #ff9299 !important; }
