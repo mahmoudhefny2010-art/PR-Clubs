@@ -7,6 +7,8 @@ const path = require('path');
 const nodemailer = require('nodemailer');
 const cloudinary = require('cloudinary').v2;
 const { createAskAiRouter } = require('./services/ask-ai');
+const { describeVisitorDevice, createVisitorDeviceCode } = require('./services/visitor-device');
+const { getVisitorIpAddress } = require('./services/visitor-network');
 const {
   Club,
   Application,
@@ -14,6 +16,7 @@ const {
   UniversityContent,
   SiteVisitor,
   SiteNetwork,
+  SiteVisitorPresence,
   ClubAccount,
   ContentRequest,
   EventRegistration,
@@ -34,23 +37,47 @@ require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 1111;
-const cloudinaryConfigured = Boolean(
-  process.env.CLOUDINARY_CLOUD_NAME
-  && process.env.CLOUDINARY_API_KEY
-  && process.env.CLOUDINARY_API_SECRET
-);
+function getCloudinaryCredentials() {
+  if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
+    return {
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET
+    };
+  }
+  try {
+    const accountUrl = new URL(process.env.CLOUDINARY_URL || '');
+    if (accountUrl.protocol !== 'cloudinary:' || !accountUrl.hostname || !accountUrl.username || !accountUrl.password) return null;
+    return {
+      cloud_name: accountUrl.hostname,
+      api_key: decodeURIComponent(accountUrl.username),
+      api_secret: decodeURIComponent(accountUrl.password)
+    };
+  } catch {
+    return null;
+  }
+}
+const cloudinaryCredentials = getCloudinaryCredentials();
+const cloudinaryConfigured = Boolean(cloudinaryCredentials);
+const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024;
+const cloudinaryFolders = Object.freeze({
+  club: 'miu-clubs',
+  applicant: 'miu-applicants',
+  university: 'miu-university-content'
+});
+const uploadSignatureAttempts = new Map();
 
 if (cloudinaryConfigured) {
   cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
+    ...cloudinaryCredentials,
     secure: true
   });
 }
 
 app.use(cors());
-app.use(express.json({ limit: '8mb' }));
+// Base64 expands binary images by roughly one third, so allow enough JSON
+// request space for an image whose decoded size is capped at 10 MiB.
+app.use(express.json({ limit: '15mb' }));
 // API responses are always revalidated against their source of truth. In
 // particular, browsers and intermediary caches must not reuse old dashboards.
 app.use('/api', (req, res, next) => {
@@ -59,6 +86,90 @@ app.use('/api', (req, res, next) => {
   next();
 });
 app.use(express.urlencoded({ extended: true }));
+
+function signCloudinaryUpload(folder) {
+  const timestamp = Math.floor(Date.now() / 1000);
+  const publicId = `${folder}-${crypto.randomUUID()}`;
+  const params = {
+    folder,
+    timestamp,
+    public_id: publicId,
+    overwrite: false
+  };
+  return {
+    cloudName: cloudinaryCredentials.cloud_name,
+    apiKey: cloudinaryCredentials.api_key,
+    signature: cloudinary.utils.api_sign_request(params, cloudinaryCredentials.api_secret),
+    timestamp,
+    folder,
+    publicId
+  };
+}
+
+async function readCloudinaryAsset(url, publicId, expectedFolder) {
+  if (typeof url !== 'string' || typeof publicId !== 'string') return null;
+  try {
+    const parsed = new URL(url);
+    const cloudName = cloudinaryCredentials?.cloud_name;
+    if (parsed.protocol !== 'https:' || parsed.hostname !== 'res.cloudinary.com'
+      || !parsed.pathname.startsWith(`/${cloudName}/image/upload/`)
+      || !publicId.split('/').pop().startsWith(`${expectedFolder}-`)) return null;
+    const asset = await cloudinary.api.resource(publicId, { resource_type: 'image', type: 'upload' });
+    if (asset.bytes > MAX_IMAGE_UPLOAD_BYTES || !['png', 'jpg', 'jpeg', 'webp'].includes(asset.format)
+      || asset.secure_url !== parsed.href) return null;
+    return { url: parsed.href, publicId };
+  } catch {
+    return null;
+  }
+}
+
+async function getApplicantPhoto(payload) {
+  if (payload?.photoPublicId) {
+    return readCloudinaryAsset(payload.photo, payload.photoPublicId, cloudinaryFolders.applicant);
+  }
+  const match = typeof payload?.photo === 'string'
+    ? payload.photo.match(/^data:image\/(png|jpeg|webp);base64,([a-zA-Z0-9+/]+=*)$/)
+    : null;
+  if (!match) return null;
+  const image = Buffer.from(match[2], 'base64');
+  if (!image.length || image.length > MAX_IMAGE_UPLOAD_BYTES) return null;
+  return { url: payload.photo, publicId: '' };
+}
+
+app.post('/api/uploads/cloudinary-signature', async (req, res) => {
+  if (!cloudinaryConfigured) {
+    return res.status(503).json({ message: 'Cloudinary uploads are not configured. Add the Cloudinary credentials to the server environment.' });
+  }
+  const purpose = req.body?.purpose;
+  if (!Object.hasOwn(cloudinaryFolders, purpose)) return res.status(400).json({ message: 'Unsupported image upload.' });
+  try {
+    if (purpose === 'applicant') {
+      const now = Date.now();
+      const ip = getVisitorIpAddress(req) || 'unknown';
+      const recent = (uploadSignatureAttempts.get(ip) || []).filter((time) => now - time < 10 * 60 * 1000);
+      if (recent.length >= 10) return res.status(429).json({ message: 'Too many photo uploads. Wait a few minutes and try again.' });
+      recent.push(now);
+      uploadSignatureAttempts.set(ip, recent);
+      if (uploadSignatureAttempts.size > 2000) {
+        for (const [key, times] of uploadSignatureAttempts) {
+          if (!times.length || now - times[times.length - 1] > 10 * 60 * 1000) uploadSignatureAttempts.delete(key);
+        }
+      }
+    }
+    if (purpose === 'university') {
+      if (!await isAdminSessionValid(req)) return res.status(401).json({ message: 'Admin login required.' });
+    } else if (purpose === 'club') {
+      const account = await getClubAccountFromRequest(req);
+      if (!account || !['president', 'pr', 'english', 'security', 'sso', 'dean'].includes(account.role)) {
+        return res.status(403).json({ message: 'This account cannot upload club images.' });
+      }
+    }
+    return res.json({ ...signCloudinaryUpload(cloudinaryFolders[purpose]), maxBytes: MAX_IMAGE_UPLOAD_BYTES });
+  } catch (error) {
+    console.error('Cloudinary signature generation failed:', error.name);
+    return res.status(503).json({ message: 'Could not prepare the image upload. Please try again.' });
+  }
+});
 
 const defaultClubs = [
   {
@@ -436,33 +547,11 @@ async function makeClub(payload, existing, id) {
     return null;
   }
 
-  if (payload.imageData) {
-    const imageMatch = String(payload.imageData).match(/^data:image\/(png|jpeg|webp);base64,([a-zA-Z0-9+/]+=*)$/);
-    if (!imageMatch) {
-      return null;
-    }
-
-    const imageBuffer = Buffer.from(imageMatch[2], 'base64');
-    if (!imageBuffer.length || imageBuffer.length > 5 * 1024 * 1024) {
-      return null;
-    }
-
-    if (cloudinaryConfigured) {
-      const uploadedImage = await cloudinary.uploader.upload(payload.imageData, {
-        folder: 'miu-clubs',
-        public_id: `club-${id}`,
-        overwrite: true,
-        resource_type: 'image'
-      });
-      club.image = uploadedImage.secure_url;
-      club.imagePublicId = uploadedImage.public_id;
-    } else {
-      const extension = imageMatch[1] === 'jpeg' ? 'jpg' : imageMatch[1];
-      const imageName = `club-${id}.${extension}`;
-      fs.writeFileSync(path.join(picsDirectory, imageName), imageBuffer);
-      club.image = `/assets/img/pics/${imageName}`;
-      club.imagePublicId = '';
-    }
+  if (payload.imageUrl || payload.imagePublicId) {
+    const uploadedImage = await readCloudinaryAsset(payload.imageUrl, payload.imagePublicId, cloudinaryFolders.club);
+    if (!uploadedImage) return null;
+    club.image = uploadedImage.url;
+    club.imagePublicId = uploadedImage.publicId;
   }
 
   return club;
@@ -487,6 +576,16 @@ async function removeClubImage(club) {
   }
 
   removeManagedImage(club?.image);
+}
+
+async function removeApplicantPhoto(publicId) {
+  if (!cloudinaryConfigured || typeof publicId !== 'string'
+    || !publicId.split('/').pop().startsWith(`${cloudinaryFolders.applicant}-`)) return;
+  try {
+    await cloudinary.uploader.destroy(publicId, { resource_type: 'image', type: 'upload' });
+  } catch (error) {
+    console.error('Cloudinary applicant photo cleanup failed:', error.name);
+  }
 }
 
 function hasAdminPassword() {
@@ -792,14 +891,6 @@ function getVisitorToken(req) {
   return cookie?.[1] || crypto.randomUUID();
 }
 
-function getVisitorDevice(req) {
-  const userAgent = String(req.headers['user-agent'] || '').toLowerCase();
-  const deviceType = /ipad|tablet/.test(userAgent) ? 'tablet'
-    : /mobile|iphone|ipod|android/.test(userAgent) ? 'mobile'
-    : userAgent ? 'desktop' : 'unknown';
-  return deviceType;
-}
-
 function getVisitorTrackingSecret() {
   return process.env.VISITOR_TRACKING_SECRET || process.env.ADMIN_SESSION_SECRET || process.env.MONGO_URI || sessionSecret;
 }
@@ -830,12 +921,9 @@ async function identifySiteVisitor(req) {
   return { accountType: 'guest', accountEmail: '', accountName: '', accountLabel: 'Not signed in' };
 }
 
-function getVisitorIpHash(req) {
-  const forwarded = String(req.headers['x-vercel-forwarded-for'] || req.headers['x-forwarded-for'] || '').split(',')[0].trim();
-  const address = forwarded || req.ip || req.socket?.remoteAddress || '';
-  if (!address || address === 'unknown') return '';
-  const normalizedAddress = address.startsWith('::ffff:') ? address.slice(7) : address;
-  return crypto.createHmac('sha256', getVisitorTrackingSecret()).update(`visitor-ip:${normalizedAddress}`).digest('hex');
+function getVisitorIpHash(ipAddress) {
+  if (!ipAddress) return '';
+  return crypto.createHmac('sha256', getVisitorTrackingSecret()).update(`visitor-ip:${ipAddress}`).digest('hex');
 }
 
 app.post('/api/site/visitor-ping', async (req, res) => {
@@ -845,14 +933,15 @@ app.post('/api/site/visitor-ping', async (req, res) => {
   const visitorToken = getVisitorToken(req);
   const visitorId = crypto.createHmac('sha256', getVisitorTrackingSecret())
     .update(`visitor-token:${visitorToken}`).digest('hex');
-  const ipHash = getVisitorIpHash(req);
-  const deviceType = getVisitorDevice(req);
+  const ipAddress = getVisitorIpAddress(req);
+  const ipHash = getVisitorIpHash(ipAddress);
+  const device = describeVisitorDevice(req.headers['user-agent']);
   const identity = await identifySiteVisitor(req);
   const now = new Date();
   try {
     const visitorUpdate = {
       $setOnInsert: { firstSeenAt: now },
-      $set: { lastSeenAt: now, deviceType, ...identity }
+      $set: { lastSeenAt: now, ...device, ...identity }
     };
     const writes = [SiteVisitor.updateOne({ visitorId }, visitorUpdate, { upsert: true })];
     if (ipHash) writes.push(SiteNetwork.updateOne(
@@ -860,6 +949,9 @@ app.post('/api/site/visitor-ping', async (req, res) => {
       { $setOnInsert: { firstSeenAt: now }, $set: { lastSeenAt: now } },
       { upsert: true }
     ));
+    writes.push(SiteVisitorPresence.updateOne({ visitorId }, {
+      $set: { ipAddress, expiresAt: new Date(now.getTime() + 6 * 60 * 1000) }
+    }, { upsert: true }));
     await Promise.all(writes);
     // Merge records created before visitor tokens were hashed so one browser
     // does not appear twice after the tracking format changes.
@@ -1109,7 +1201,7 @@ function canManageMyForm(application, token) {
 
 async function initializeMongoData() {
   await Promise.all([
-    Club.init(), Application.init(), SiteSetting.init(), UniversityContent.init(), SiteVisitor.init(), SiteNetwork.init(), EventRegistration.init(), AttendanceSession.init(), AttendanceAssignment.init(), AttendanceRecord.init(), LoginAttempt.init(),
+    Club.init(), Application.init(), SiteSetting.init(), UniversityContent.init(), SiteVisitor.init(), SiteNetwork.init(), SiteVisitorPresence.init(), EventRegistration.init(), AttendanceSession.init(), AttendanceAssignment.init(), AttendanceRecord.init(), LoginAttempt.init(),
     PasswordResetToken.init(), PasswordRecoveryRateLimit.init(), AdminAuthState.init()
   ]);
   const clubAccountCollectionName = ClubAccount.collection.collectionName;
@@ -4609,21 +4701,11 @@ app.post('/api/admin/university-content', async (req, res) => {
   let image = '/assets/img/pics/logo.svg.png';
   let imagePublicId = '';
   if (useCustomImage) {
-    const match = typeof req.body.imageData === 'string'
-      ? req.body.imageData.match(/^data:image\/(png|jpeg|webp);base64,([a-zA-Z0-9+/]+=*)$/)
-      : null;
-    if (!match) return res.status(400).json({ message: 'Choose a PNG, JPG, or WebP image up to 5 MB.' });
-    if (Buffer.from(match[2], 'base64').length > 5 * 1024 * 1024) {
-      return res.status(400).json({ message: 'The image must be 5 MB or smaller.' });
-    }
-    if (!cloudinaryConfigured) return res.status(503).json({ message: 'Custom image uploads are unavailable. Choose the MIU logo or try again later.' });
+    const uploadedImage = await readCloudinaryAsset(req.body.imageUrl, req.body.imagePublicId, cloudinaryFolders.university);
+    if (!uploadedImage) return res.status(400).json({ message: 'Choose a valid PNG, JPG, or WebP image up to 10 MB.' });
     try {
-      const uploaded = await cloudinary.uploader.upload(req.body.imageData, {
-        folder: 'miu-university-content', resource_type: 'image',
-        transformation: [{ width: 1600, height: 1200, crop: 'limit', quality: 'auto', fetch_format: 'auto' }]
-      });
-      image = uploaded.secure_url;
-      imagePublicId = uploaded.public_id;
+      image = uploadedImage.url;
+      imagePublicId = uploadedImage.publicId;
     } catch (error) {
       console.error('University image upload failed:', error.name);
       return res.status(503).json({ message: 'The image could not be uploaded. Please try again.' });
@@ -4681,9 +4763,16 @@ app.get('/api/admin/visitor-analytics', async (req, res) => {
       SiteVisitor.countDocuments(),
       SiteNetwork.countDocuments(),
       SiteVisitor.find({ lastSeenAt: { $gte: activeSince } })
-        .select('visitorId deviceType accountType accountEmail accountName accountLabel lastSeenAt')
+        .select('visitorId deviceType deviceName browserName accountType accountEmail accountName accountLabel lastSeenAt')
         .sort({ lastSeenAt: -1 }).lean(),
     ]);
+    const presenceRecords = activeRecords.length
+      ? await SiteVisitorPresence.find({
+        visitorId: { $in: activeRecords.map((record) => record.visitorId) },
+        expiresAt: { $gt: new Date() }
+      }).select('visitorId ipAddress').lean()
+      : [];
+    const ipByVisitor = new Map(presenceRecords.map((record) => [record.visitorId, record.ipAddress]));
     const peopleByIdentity = new Map();
     for (const record of activeRecords) {
       const accountType = record.accountType || 'guest';
@@ -4691,12 +4780,17 @@ app.get('/api/admin/visitor-analytics', async (req, res) => {
       const identityKey = accountType !== 'guest' && accountEmail ? `account:${accountEmail}` : `guest:${record.visitorId}`;
       let person = peopleByIdentity.get(identityKey);
       if (!person) {
+        const deviceCode = createVisitorDeviceCode(record.visitorId);
         person = {
           accountType,
-          name: record.accountName || `Guest visitor ${String(record.visitorId).slice(-6)}`,
+          name: record.accountName || (accountType === 'guest' ? `Device ${deviceCode}` : 'Signed-in account'),
           email: accountEmail,
           label: record.accountLabel || (accountType === 'guest' ? 'Not signed in' : 'Signed in'),
           deviceType: record.deviceType || 'unknown',
+          deviceName: record.deviceName || 'Unknown device',
+          browserName: record.browserName || 'Unknown browser',
+          deviceCode,
+          ipAddress: ipByVisitor.get(record.visitorId) || '',
           lastSeenAt: record.lastSeenAt
         };
         peopleByIdentity.set(identityKey, person);
@@ -4935,6 +5029,7 @@ app.delete('/api/admin/applications/:id', async (req, res) => {
     if (!requireLiveDatabase(res)) return;
     const result = await Application.deleteOne({ id: appId });
     if (!result.deletedCount) return res.status(404).json({ message: 'Application not found.' });
+    await removeApplicantPhoto(applications[applicationIndex].photoPublicId);
     applications.splice(applicationIndex, 1);
     res.status(204).end();
   } catch (error) {
@@ -5395,15 +5490,9 @@ app.post('/api/applications', async (req, res) => {
       : 'This committee is closed and is not accepting applications.' });
   }
 
-  const photoMatch = typeof payload.photo === 'string'
-    ? payload.photo.match(/^data:image\/(png|jpeg|webp);base64,([a-zA-Z0-9+/]+=*)$/)
-    : null;
-  if (!photoMatch) {
+  const applicantPhoto = await getApplicantPhoto(payload);
+  if (!applicantPhoto) {
     return res.status(400).json({ message: 'A PNG, JPG, or WebP applicant photo is required.' });
-  }
-  const photoBuffer = Buffer.from(photoMatch[2], 'base64');
-  if (!photoBuffer.length || photoBuffer.length > 5 * 1024 * 1024) {
-    return res.status(400).json({ message: 'Applicant photo must be 5 MB or smaller.' });
   }
 
   const submittedAnswers = Array.isArray(payload.answers) ? payload.answers : [];
@@ -5436,7 +5525,8 @@ app.post('/api/applications', async (req, res) => {
     rating: payload.rating || 0,
     interviewed: false,
     status: 'pending',
-    photo: payload.photo || '',
+    photo: applicantPhoto.url,
+    photoPublicId: applicantPhoto.publicId,
     answers
   };
 
@@ -5544,15 +5634,10 @@ app.patch('/api/my-forms/:id', limitMyFormAccessAttempts, async (req, res) => {
     }
   }
   if (req.body.photo !== undefined) {
-    const photoMatch = typeof req.body.photo === 'string'
-      ? req.body.photo.match(/^data:image\/(png|jpeg|webp);base64,([a-zA-Z0-9+/]+=*)$/)
-      : null;
-    if (!photoMatch) return res.status(400).json({ message: 'Choose a PNG, JPG, or WebP photo.' });
-    const photoBuffer = Buffer.from(photoMatch[2], 'base64');
-    if (!photoBuffer.length || photoBuffer.length > 5 * 1024 * 1024) {
-      return res.status(400).json({ message: 'Applicant photo must be 5 MB or smaller.' });
-    }
-    updates.photo = req.body.photo;
+    const applicantPhoto = await getApplicantPhoto(req.body);
+    if (!applicantPhoto) return res.status(400).json({ message: 'Choose a valid PNG, JPG, or WebP photo up to 10 MB.' });
+    updates.photo = applicantPhoto.url;
+    updates.photoPublicId = applicantPhoto.publicId;
   }
 
   try {
@@ -5563,6 +5648,9 @@ app.patch('/api/my-forms/:id', limitMyFormAccessAttempts, async (req, res) => {
       { new: true }
     ).lean();
     if (!updated) return res.status(409).json({ message: 'This form can no longer be edited because its interview process has started.' });
+    if (updates.photoPublicId && updates.photoPublicId !== application.photoPublicId) {
+      await removeApplicantPhoto(application.photoPublicId);
+    }
     Object.assign(application, updates);
     return res.json(toApiRecord(updated));
   } catch (error) {
@@ -5588,6 +5676,7 @@ app.delete('/api/my-forms/:id', limitMyFormAccessAttempts, async (req, res) => {
       status: 'pending'
     });
     if (!result.deletedCount) return res.status(409).json({ message: 'This form can no longer be removed because its interview process has started.' });
+    await removeApplicantPhoto(application.photoPublicId);
     applications.splice(applicationIndex, 1);
     res.status(204).end();
   } catch (error) {
@@ -5613,15 +5702,10 @@ app.patch('/api/applications/:id/status', requireClubAuth, async (req, res) => {
   if (notes !== undefined) updates.notes = String(notes).slice(0, 2000);
   if (rating !== undefined) updates.rating = Math.max(0, Math.min(5, Number(rating) || 0));
   if (req.body.photo !== undefined) {
-    const photoMatch = typeof req.body.photo === 'string'
-      ? req.body.photo.match(/^data:image\/(png|jpeg|webp);base64,([a-zA-Z0-9+/]+=*)$/)
-      : null;
-    if (!photoMatch) return res.status(400).json({ message: 'Choose a PNG, JPG, or WebP applicant photo.' });
-    const photoBuffer = Buffer.from(photoMatch[2], 'base64');
-    if (!photoBuffer.length || photoBuffer.length > 5 * 1024 * 1024) {
-      return res.status(400).json({ message: 'Applicant photo must be 5 MB or smaller.' });
-    }
-    updates.photo = req.body.photo;
+    const applicantPhoto = await getApplicantPhoto(req.body);
+    if (!applicantPhoto) return res.status(400).json({ message: 'Choose a valid PNG, JPG, or WebP photo up to 10 MB.' });
+    updates.photo = applicantPhoto.url;
+    updates.photoPublicId = applicantPhoto.publicId;
   }
   try {
     if (Array.isArray(req.body.interviewAnswers)) {
@@ -5656,6 +5740,9 @@ app.patch('/api/applications/:id/status', requireClubAuth, async (req, res) => {
     if (!requireLiveDatabase(res)) return;
     const updatedApplication = await Application.findOneAndUpdate({ id: appId }, { $set: updates }, { new: true }).lean();
     if (!updatedApplication) return res.status(404).json({ message: 'Application not found.' });
+    if (updates.photoPublicId && updates.photoPublicId !== app.photoPublicId) {
+      await removeApplicantPhoto(app.photoPublicId);
+    }
     Object.assign(app, updates);
     return res.json(toApiRecord(updatedApplication));
   } catch (error) {
@@ -5676,6 +5763,7 @@ app.delete('/api/applications/:id', requireClubAuth, async (req, res) => {
     if (!requireLiveDatabase(res)) return;
     const result = await Application.deleteOne({ id: appId });
     if (!result.deletedCount) return res.status(404).json({ message: 'Application not found.' });
+    await removeApplicantPhoto(applications[applicationIndex].photoPublicId);
     applications.splice(applicationIndex, 1);
     res.status(204).end();
   } catch (error) {
