@@ -503,6 +503,16 @@
   .mobile-menu-toggle { margin-right: 8px; }
 }
 .nav-profile-dropdown { box-sizing: border-box; width: min(280px, calc(100vw - 24px)); }
+
+@media (max-width: 520px) {
+  .nav-right .nav-refresh-btn { flex: 0 0 36px; width: 36px; min-height: 36px; gap: 0; padding: 0; border-radius: 10px; }
+  .nav-right .nav-refresh-btn svg { width: 17px; height: 17px; }
+  .nav-right .nav-refresh-btn span { display: none; }
+}
+@media (max-width: 400px) {
+  .nav-right .nav-refresh-btn { flex-basis: 32px; width: 32px; min-height: 32px; }
+  .nav-right .nav-refresh-btn svg { width: 16px; height: 16px; }
+}
 .nav-profile-account { display: flex; min-width: 0; align-items: center; gap: 12px; margin: 2px 3px 5px; padding: 12px 9px 14px; border-bottom: 1px solid var(--border-color); }
 .nav-profile-avatar { display: grid; flex: 0 0 42px; width: 42px; height: 42px; place-items: center; border: 1px solid rgba(185, 28, 28, .14); border-radius: 50%; background: var(--primary-50); color: var(--primary-800); font-size: 1.05rem; font-weight: 800; }
 .nav-profile-account-copy { display: grid; min-width: 0; gap: 3px; }

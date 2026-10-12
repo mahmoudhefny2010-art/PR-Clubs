@@ -454,6 +454,29 @@ html.site-startup-pending::after {
   gap: 8px;
 }
 
+.nav-refresh-btn {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-panel);
+  color: var(--text-main);
+  font: inherit;
+  font-size: .84rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+.nav-refresh-btn:hover { border-color: var(--primary-700); background: var(--primary-50); color: var(--primary-800); }
+.nav-refresh-btn:focus-visible { outline: 3px solid var(--border-focus); outline-offset: 2px; }
+.nav-refresh-btn:disabled { opacity: .65; cursor: progress; }
+.nav-refresh-btn svg { width: 17px; height: 17px; }
+
 .nav-signin-btn {
   display: inline-flex;
   flex: 0 0 auto;
