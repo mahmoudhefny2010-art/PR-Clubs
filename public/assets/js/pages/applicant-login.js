@@ -95,30 +95,6 @@
         }
       }
       configureGoogleSignIn();
-      async function configureDemoStudentSignIn() {
-        const button = document.getElementById('demoStudentLoginButton');
-        const feedback = document.getElementById('demoStudentLoginFeedback');
-        try {
-          const configResponse = await fetch('/api/student-auth/demo-config', { cache: 'no-store' });
-          const config = await configResponse.json();
-          if (!configResponse.ok || !config.enabled) return;
-          button.hidden = false;
-          button.addEventListener('click', async () => {
-            button.disabled = true;
-            feedback.textContent = 'Opening the demo student account…';
-            try {
-              const response = await fetch('/api/student-auth/demo', { method: 'POST', cache: 'no-store' });
-              const result = await response.json();
-              if (!response.ok) throw new Error(result.message || 'Demo sign-in failed.');
-              window.location.assign(studentReturnTarget());
-            } catch (error) {
-              feedback.textContent = error.message || 'Demo sign-in failed.';
-              button.disabled = false;
-            }
-          });
-        } catch { /* Demo access is optional and local-development only. */ }
-      }
-      configureDemoStudentSignIn();
       document.getElementById('googleUnavailableButton').addEventListener('click', () => {
         const feedback = document.getElementById('googleLoginFeedback');
         feedback.textContent = 'Google sign-in is not configured yet. Ask the site administrator to enable it.';

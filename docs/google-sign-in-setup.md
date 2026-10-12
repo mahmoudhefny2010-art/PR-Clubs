@@ -23,7 +23,7 @@ Set this server environment variable in local `.env` and in Vercel Project Setti
 GOOGLE_CLIENT_ID=your-web-client-id.apps.googleusercontent.com
 ```
 
-Use the same Web client ID that was configured in Google Cloud. Add it to the Vercel environments where Google sign-in should appear, then redeploy. Never put a client secret in frontend code. The existing `ENABLE_DEMO_STUDENT_LOGIN` variable is unrelated.
+Use the same Web client ID that was configured in Google Cloud. Add it to the Vercel environments where Google sign-in should appear, then redeploy. Never put a client secret in frontend code.
 
 ## Account policy
 

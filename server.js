@@ -4278,43 +4278,6 @@ app.get('/api/student-auth/google-config', (req, res) => {
   res.json({ enabled: true, clientId, nonce });
 });
 
-function demoStudentLoginEnabled(req) {
-  if (process.env.ENABLE_DEMO_STUDENT_LOGIN !== 'true') return false;
-  if (process.env.VERCEL) return true;
-  return process.env.NODE_ENV !== 'production' && isLoopbackRequest(req);
-}
-
-app.get('/api/student-auth/demo-config', (req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  res.json({ enabled: demoStudentLoginEnabled(req) && mongoReady });
-});
-
-app.post('/api/student-auth/demo', async (req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  if (!demoStudentLoginEnabled(req)) return res.status(404).json({ message: 'Not found.' });
-  if (!mongoReady) return res.status(503).json({ message: 'The demo student account requires the database.' });
-  const email = 'demo.student@example.test';
-  try {
-    let account = await StudentAccount.findOne({ email }).lean();
-    if (!account) {
-      account = await StudentAccount.create({
-        email,
-        name: 'Demo Student',
-        universityId: 'DEMO-0001',
-        major: 'Demo account'
-      });
-      account = account.toObject();
-    }
-    // The reserved .test address can only be used through the explicitly enabled demo flow.
-    // Reuse an existing record so stale demo profile fields do not block sign-in.
-    setStudentSessionCookie(req, res, account);
-    res.json({ authenticated: true, role: 'student', demo: true });
-  } catch (error) {
-    console.error('Demo student sign-in failed:', error.name);
-    res.status(503).json({ message: 'Could not open the demo student account.' });
-  }
-});
-
 app.post('/api/student-auth/google', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   if (!isSameOriginRequest(req)) return res.status(403).json({ message: 'Google sign-in request was blocked. Reload this page and try again.' });
