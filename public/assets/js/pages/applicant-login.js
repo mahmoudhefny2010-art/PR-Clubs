@@ -88,16 +88,17 @@
             const buttonHost = document.getElementById('googleLoginButton');
             let renderedWidth = 0;
             const renderGoogleButton = () => {
-              const availableWidth = buttonHost.parentElement?.getBoundingClientRect().width || buttonHost.getBoundingClientRect().width || 360;
-              const width = Math.max(120, Math.min(400, Math.floor(availableWidth)));
+              const availableWidth = buttonHost.getBoundingClientRect().width;
+              if (availableWidth < 120) return;
+              const width = Math.min(400, Math.floor(availableWidth));
               if (width === renderedWidth) return;
               renderedWidth = width;
               buttonHost.replaceChildren();
               window.google.accounts.id.renderButton(buttonHost, { theme: 'outline', size: 'large', text: linkExistingAccount ? 'continue_with' : 'signin_with', shape: 'rectangular', width });
             };
-            renderGoogleButton();
-            if ('ResizeObserver' in window) new ResizeObserver(renderGoogleButton).observe(buttonHost.parentElement || buttonHost);
             area.classList.remove('hidden');
+            renderGoogleButton();
+            if ('ResizeObserver' in window) new ResizeObserver(renderGoogleButton).observe(buttonHost);
           };
           script.onerror = () => { fallbackButton.hidden = false; area.classList.remove('hidden'); };
           document.head.append(script);
