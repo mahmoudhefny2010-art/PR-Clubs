@@ -14,24 +14,37 @@
   };
   const nativeFetch = window.fetch.bind(window);
   let pendingRequests = 0;
-  let pendingInitialRequests = 0;
   let domReady = document.readyState !== 'loading';
-  let pageLoaded = document.readyState === 'complete';
   let revealTimer = 0;
+  let startupReleaseTimer = 0;
   let indicator = null;
   let startupRing = null;
+  let startupReleased = false;
 
   root.classList.add('site-startup-pending');
 
-  function updateStartupScreen() {
-    root.classList.toggle('site-startup-pending', !domReady || pendingInitialRequests > 0);
+  function releaseStartupScreen() {
+    if (startupReleased) return;
+    startupReleased = true;
+    window.clearTimeout(startupReleaseTimer);
+    root.classList.remove('site-startup-pending');
+  }
+
+  function releaseWhenReady() {
+    window.clearTimeout(startupReleaseTimer);
+    if (!domReady || pendingRequests > 0 || startupReleased) return;
+    // Give chained startup requests (for example session -> dashboard data) time to begin.
+    startupReleaseTimer = window.setTimeout(() => {
+      if (domReady && pendingRequests === 0) releaseStartupScreen();
+    }, 180);
   }
 
   document.addEventListener('DOMContentLoaded', () => {
     domReady = true;
     ensureIndicators();
-    window.setTimeout(updateStartupScreen, 0);
+    releaseWhenReady();
   }, { once: true });
+  if (domReady) releaseWhenReady();
 
   function requestNeedsIndicator(input) {
     try {
@@ -65,39 +78,22 @@
 
   function updateIndicators() {
     if (!ensureIndicators()) return;
-    // The startup pseudo-element already covers initial requests. Keep one
-    // full-screen layer instead of stacking a second blurred loader over it.
-    indicator.classList.toggle('is-visible', pendingRequests > 0 && pendingInitialRequests === 0);
-    updateStartupScreen();
+    indicator.classList.toggle('is-visible', pendingRequests > 0);
   }
 
   window.fetch = function trackedFetch(input, init) {
     if (!requestNeedsIndicator(input)) return nativeFetch(input, init);
-    const isInitialRequest = !pageLoaded;
     pendingRequests += 1;
-    if (isInitialRequest) pendingInitialRequests += 1;
+    window.clearTimeout(startupReleaseTimer);
     window.clearTimeout(revealTimer);
-    if (isInitialRequest) updateIndicators();
-    else revealTimer = window.setTimeout(updateIndicators, 160);
+    revealTimer = window.setTimeout(updateIndicators, 160);
 
     return nativeFetch(input, init).finally(() => {
       pendingRequests = Math.max(0, pendingRequests - 1);
-      if (isInitialRequest) pendingInitialRequests = Math.max(0, pendingInitialRequests - 1);
       window.clearTimeout(revealTimer);
-      updateStartupScreen();
       if (pendingRequests) updateIndicators();
-      else if (indicator) {
-        indicator.classList.remove('is-visible');
-      }
+      else if (indicator) indicator.classList.remove('is-visible');
+      releaseWhenReady();
     });
   };
-
-  window.addEventListener('load', () => {
-    pageLoaded = true;
-    domReady = true;
-    if (!pendingRequests && indicator) {
-      indicator.classList.remove('is-visible');
-    }
-    updateStartupScreen();
-  }, { once: true });
 })();

@@ -260,7 +260,7 @@ html.site-startup-pending::after {
   z-index: 2001;
   width: 120px;
   height: 120px;
-  border: 4px solid rgba(185, 28, 28, .16);
+  border: 4px solid rgba(127, 29, 29, .2);
   border-radius: 50%;
   opacity: 0;
   pointer-events: none;
@@ -270,8 +270,8 @@ html.site-startup-pending::after {
   position: absolute;
   inset: -4px;
   border: 4px solid transparent;
-  border-top-color: var(--primary-700);
-  border-right-color: rgba(185, 28, 28, .5);
+  border-top-color: #7f1d1d;
+  border-right-color: #7f1d1d;
   border-radius: 50%;
   content: "";
 }
@@ -310,6 +310,7 @@ html.site-startup-pending .site-startup-ring::after {
   pointer-events: none;
 }
 .site-loading-indicator.is-visible { opacity: 1; visibility: visible; transform: translate(-50%, 0); }
+html.site-startup-pending .site-loading-indicator { opacity: 0; visibility: hidden; }
 .site-loading-mini-logo { width: 26px; height: 26px; padding: 3px; border: 1px solid rgba(185, 28, 28, .2); border-top-color: var(--primary-700); border-radius: 50%; animation: site-loader-spin .9s linear infinite; }
 .site-loading-mini-logo img { display: block; width: 100%; height: 100%; object-fit: contain; animation: site-loader-counterspin .9s linear infinite; }
 .notification-welcome-dialog {

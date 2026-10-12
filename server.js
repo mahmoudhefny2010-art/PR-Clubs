@@ -1304,20 +1304,21 @@ app.get('/api/clubs', async (req, res) => {
       clubId: club.id,
       ...(club.applicationCycleStartedAt ? { createdAt: { $gte: club.applicationCycleStartedAt } } : {})
     }));
-    const applicationTotals = applicationWindows.length
-      ? await Application.aggregate([
-        { $match: { $or: applicationWindows } },
-        { $group: { _id: '$clubId', count: { $sum: 1 } } }
+    const { StudentFeedback: feedbackModel } = require('./services/student-feedback');
+    const [applicationTotals, ratings] = await Promise.all([
+      applicationWindows.length
+        ? Application.aggregate([
+          { $match: { $or: applicationWindows } },
+          { $group: { _id: '$clubId', count: { $sum: 1 } } }
+        ])
+        : Promise.resolve([]),
+      feedbackModel.aggregate([
+        { $match: { kind: 'club' } },
+        { $group: { _id: '$targetKey', average: { $avg: '$value' }, count: { $sum: 1 } } }
       ])
-      : [];
+    ]);
     const membersByClub = new Map(memberDirectory.map((club) => [club.id, club.totalCount]));
     const applicantsByClub = new Map(applicationTotals.map((club) => [Number(club._id), club.count]));
-    const { StudentFeedback: feedbackModel } = require('./services/student-feedback');
-    await feedbackModel.init();
-    const ratings = await feedbackModel.aggregate([
-      { $match: { kind: 'club' } },
-      { $group: { _id: '$targetKey', average: { $avg: '$value' }, count: { $sum: 1 } } }
-    ]);
     const ratingByClub = new Map(ratings.map((row) => [row._id, row]));
     const records = clubsFromDatabase.map((club) => ({
       ...toPublicClubRecord(club),
