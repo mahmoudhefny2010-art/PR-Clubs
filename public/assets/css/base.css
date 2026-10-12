@@ -215,29 +215,35 @@ html.auth-route-pending #authLoadingView { display: grid; }
 @keyframes auth-loading-spin { to { transform: rotate(360deg); } }
 
 .site-loading-indicator { position: fixed; z-index: 2000; }
+html.site-startup-pending::before,
 html.site-startup-pending::after {
   position: fixed;
   left: 50%;
   z-index: 1998;
   pointer-events: none;
 }
+html.site-startup-pending::before {
+  inset: 0;
+  content: "";
+  background: #fff;
+}
 html.site-startup-pending::after {
   top: 50%;
   z-index: 1999;
   display: grid;
-  width: min(250px, calc(100vw - 40px));
-  min-height: 190px;
+  width: min(310px, calc(100vw - 36px));
+  min-height: 238px;
   place-content: end center;
-  padding: 112px 24px 24px;
+  padding: 132px 24px 25px;
   transform: translate(-50%, -50%);
   border: 1px solid var(--border-color);
   border-top: 3px solid var(--primary-700);
-  border-radius: 22px;
+  border-radius: 24px;
   background-color: var(--bg-panel);
-  background-image: url("/assets/img/pics/logo.svg.png"), radial-gradient(circle at 50% 57px, transparent 37px, rgba(185, 28, 28, .24) 38px 40px, transparent 41px);
+  background-image: url("/assets/img/pics/logo.svg.png"), radial-gradient(circle at 50% 64px, transparent 40px, rgba(185, 28, 28, .24) 41px 43px, transparent 44px);
   background-repeat: no-repeat;
-  background-position: center 20px, center 13px;
-  background-size: 68px 68px, 88px 88px;
+  background-position: center 50px, center 16px;
+  background-size: 84px auto, 96px 96px;
   box-shadow: var(--shadow-lg);
   color: var(--text-main);
   content: "MIU Clubs\A Loading your page...";
@@ -247,6 +253,7 @@ html.site-startup-pending::after {
   text-align: center;
   white-space: pre;
 }
+:root[data-theme="dark"].site-startup-pending::before { background: var(--bg-main); }
 .site-loading-indicator {
   top: 84px;
   left: 50%;
