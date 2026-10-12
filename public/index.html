@@ -16,7 +16,7 @@
     <link rel="stylesheet" href="/assets/css/features.css?v=20261011presidentclubstatus1" />
     <link rel="stylesheet" href="/assets/css/event-modal.css?v=4" />
     <link rel="icon" href="/assets/img/pics/logo.svg.png" type="image/png">
-    <link rel="stylesheet" href="/assets/css/pages/home.css?v=20261012mobileeventleftalign2" />
+    <link rel="stylesheet" href="/assets/css/pages/home.css?v=20261012typewriter3" />
 </head>
   <body>
     <div class="page-shell">
@@ -33,7 +33,46 @@
 
           <section class="events-slideshow" id="eventsSlideshow">
             <div class="events-slideshow-head">
-              <h2>Today &amp; Past Events</h2>
+              <h2><span class="events-heading-typewriter" data-text="Upcoming ..." aria-label="Upcoming ..."></span></h2>
+              <script>
+                (() => {
+                  const heading = document.querySelector('#homeView .events-heading-typewriter');
+                  if (!heading) return;
+                  const characters = Array.from(heading.dataset.text || 'Upcoming ...');
+                  heading.setAttribute('aria-label', characters.join(''));
+                  let typingTimer;
+                  const typeHeading = () => {
+                    window.clearTimeout(typingTimer);
+                    let index = 0;
+                    heading.textContent = '';
+                    heading.classList.add('is-typing');
+                    const typeNext = () => {
+                      if (index >= characters.length) {
+                        heading.classList.remove('is-typing');
+                        return;
+                      }
+                      heading.textContent += characters[index++];
+                      typingTimer = window.setTimeout(typeNext, 200);
+                    };
+                    typeNext();
+                  };
+                  const root = document.documentElement;
+                  const startWhenReady = () => {
+                    if (root.classList.contains('site-startup-pending')) return false;
+                    typeHeading();
+                    return true;
+                  };
+                  if (!startWhenReady()) {
+                    const startupObserver = new MutationObserver(() => {
+                      if (startWhenReady()) startupObserver.disconnect();
+                    });
+                    startupObserver.observe(root, { attributes: true, attributeFilter: ['class'] });
+                  }
+                  window.addEventListener('pageshow', (event) => {
+                    if (event.persisted) startWhenReady();
+                  });
+                })();
+              </script>
             </div>
             <div class="events-slideshow-track" id="eventsSlideshowTrack"></div>
             <button class="slide-arrow slide-prev" id="slidePrev" type="button" aria-label="Previous">&lsaquo;</button>

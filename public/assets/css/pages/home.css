@@ -85,6 +85,24 @@
   letter-spacing: -.015em;
 }
 
+#homeView .events-heading-typewriter {
+  white-space: nowrap;
+}
+
+#homeView .events-heading-typewriter.is-typing::after {
+  display: inline-block;
+  height: .95em;
+  margin-left: 2px;
+  border-right: 2px solid currentColor;
+  content: "";
+  vertical-align: -.08em;
+  animation: events-heading-caret .7s steps(1, end) infinite;
+}
+
+@keyframes events-heading-caret {
+  50% { opacity: 0; }
+}
+
 #homeView .event-slide {
   min-height: 78px;
   gap: 14px;
