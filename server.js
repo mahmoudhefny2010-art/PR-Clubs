@@ -5990,6 +5990,27 @@ app.post('/api/applications', async (req, res) => {
       : 'This committee is closed and is not accepting applications.' });
   }
 
+  const applicantEmail = cleanText(payload.email, 254).toLowerCase();
+  let signedInStudent = null;
+  try {
+    signedInStudent = await getStudentAccountFromRequest(req, res);
+    const duplicateIdentityFilters = [{ email: applicantEmail }];
+    if (signedInStudent) {
+      duplicateIdentityFilters.push(
+        { studentAccountId: signedInStudent._id },
+        { email: String(signedInStudent.email || '').trim().toLowerCase() }
+      );
+    }
+    const existingApplication = await Application.findOne({ clubId, $or: duplicateIdentityFilters })
+      .select('id').read('primary').readConcern('majority').lean();
+    if (existingApplication) {
+      return res.status(409).json({ message: 'You have already submitted an application to this club. Check My Forms for its status.' });
+    }
+  } catch (error) {
+    console.error('Duplicate application check failed:', error.name);
+    return res.status(503).json({ message: 'We could not verify your previous applications. Please try again.' });
+  }
+
   const applicantPhoto = await getApplicantPhoto(payload);
   if (!applicantPhoto) {
     return res.status(400).json({ message: 'A PNG, JPG, or WebP applicant photo is required.' });
@@ -6012,7 +6033,7 @@ app.post('/api/applications', async (req, res) => {
   const newApplication = {
     id: Date.now(),
     studentName: payload.studentName,
-    email: payload.email,
+    email: applicantEmail,
     universityId: payload.universityId,
     major: payload.major,
     phone: payload.phone,
@@ -6035,9 +6056,9 @@ app.post('/api/applications', async (req, res) => {
 
   try {
     if (!requireLiveDatabase(res)) return;
-    const signedInStudent = await getStudentAccountFromRequest(req, res);
-    if (signedInStudent && cleanText(payload.email, 254).toLowerCase() === signedInStudent.email) {
+    if (signedInStudent) {
       newApplication.studentAccountId = signedInStudent._id;
+      newApplication.studentClubKey = `${signedInStudent._id}:${clubId}`;
     }
     if (signedInStudent && cleanText(payload.email, 254).toLowerCase() === signedInStudent.email) {
       const profile = {
@@ -6061,6 +6082,9 @@ app.post('/api/applications', async (req, res) => {
     applications.unshift(newApplication);
     res.status(201).json({ application: toApiRecord(newApplication), managementToken });
   } catch (error) {
+    if (error.code === 11000 && (error.keyPattern?.studentClubKey || error.keyValue?.studentClubKey)) {
+      return res.status(409).json({ message: 'You have already submitted an application to this club. Check My Forms for its status.' });
+    }
     console.error('Database operation failed:', error.name);
     res.status(503).json({ message: 'The data store is temporarily unavailable.' });
   }

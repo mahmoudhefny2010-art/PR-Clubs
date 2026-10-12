@@ -59,6 +59,8 @@ const applicationSchema = new mongoose.Schema({
   // Set only when the application was submitted in an authenticated student session.
   // This is the trusted recipient key for transactional push notifications.
   studentAccountId: { type: mongoose.Schema.Types.ObjectId, ref: 'StudentAccount', default: null, index: true },
+  // Sparse unique key makes duplicate submissions atomic across concurrent requests.
+  studentClubKey: { type: String, default: undefined },
   universityId: { type: String, default: '' },
   major: { type: String, default: '' },
   phone: { type: String, default: '' },
@@ -79,6 +81,7 @@ const applicationSchema = new mongoose.Schema({
   managementTokenHash: { type: String, default: '' },
   answers: { type: mongoose.Schema.Types.Mixed, default: () => [] }
 }, { timestamps: true });
+applicationSchema.index({ studentClubKey: 1 }, { unique: true, sparse: true });
 
 const siteSettingSchema = new mongoose.Schema({
   key: { type: String, required: true, unique: true },

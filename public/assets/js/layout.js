@@ -124,7 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
           initHeader();
           if (!document.querySelector('script[data-miu-push-client]')) {
             const pushClient = document.createElement('script');
-            pushClient.src = '/assets/js/onesignal-notifications.js?v=20261012onesignal2';
+            pushClient.src = '/assets/js/onesignal-notifications.js?v=20261012firstvisit1';
             pushClient.async = true;
             pushClient.dataset.miuPushClient = 'true';
             document.head.appendChild(pushClient);

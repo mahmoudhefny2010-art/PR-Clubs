@@ -974,6 +974,13 @@ applicationForm.addEventListener('submit', async (event) => {
     return;
   }
 
+  const submitButton = applicationForm.querySelector('[type="submit"]');
+  const submitButtonText = submitButton?.textContent || '';
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.textContent = state.editingMyForm ? 'Saving...' : 'Submitting...';
+  }
+
   const payload = {
     clubId: state.selectedClub?.id || 1,
     committee: formData.get('committee'),
@@ -1041,6 +1048,11 @@ applicationForm.addEventListener('submit', async (event) => {
   } catch (error) {
     applicationFeedback.textContent = error.message;
     applicationFeedback.classList.add('is-error');
+  } finally {
+    if (submitButton) {
+      submitButton.disabled = false;
+      submitButton.textContent = submitButtonText;
+    }
   }
 });
 

@@ -14,6 +14,72 @@
   let settingsLoading = false;
   let settingsError = '';
   let sessionRevision = 0;
+  let welcomeDialog = null;
+
+  function welcomeStorageKey() {
+    return 'miu-notification-welcome-seen';
+  }
+
+  function markWelcomeSeen() {
+    const key = welcomeStorageKey();
+    if (!key) return;
+    try { localStorage.setItem(key, 'seen'); }
+    catch (_) { try { sessionStorage.setItem(key, 'seen'); } catch (_) { /* Keep the prompt available when storage is unavailable. */ } }
+  }
+
+  function hasSeenWelcome() {
+    const key = welcomeStorageKey();
+    try { return Boolean(localStorage.getItem(key)); }
+    catch (_) { try { return Boolean(sessionStorage.getItem(key)); } catch (_) { return false; } }
+  }
+
+  function maybeShowNotificationWelcome() {
+    if (!oneSignalInstance || !oneSignalInstance.Notifications.isPushSupported()) return;
+    if (oneSignalInstance.User.PushSubscription.optedIn) return;
+    if (typeof Notification !== 'undefined' && Notification.permission === 'denied') return;
+    if (hasSeenWelcome()) return;
+
+    if (!welcomeDialog) {
+      welcomeDialog = document.createElement('dialog');
+      welcomeDialog.className = 'notification-welcome-dialog';
+      welcomeDialog.setAttribute('aria-labelledby', 'notificationWelcomeTitle');
+      welcomeDialog.innerHTML = `
+        <div class="notification-welcome-icon" aria-hidden="true">🔔</div>
+        <h2 id="notificationWelcomeTitle">Stay up to date with MIU Clubs</h2>
+        <p>Get a notification when a club posts an announcement, event, or update. You can turn this off any time from your account menu.</p>
+        <p class="notification-welcome-feedback" role="status" aria-live="polite"></p>
+        <div class="notification-welcome-actions">
+          <button class="notification-welcome-enable" type="button">Turn on notifications</button>
+          <button class="notification-welcome-later" type="button">Maybe later</button>
+        </div>`;
+      document.body.append(welcomeDialog);
+      welcomeDialog.querySelector('.notification-welcome-later').addEventListener('click', () => {
+        markWelcomeSeen();
+        welcomeDialog.close();
+      });
+      welcomeDialog.addEventListener('cancel', markWelcomeSeen);
+      welcomeDialog.querySelector('.notification-welcome-enable').addEventListener('click', async (event) => {
+        const button = event.currentTarget;
+        const feedback = welcomeDialog.querySelector('.notification-welcome-feedback');
+        button.disabled = true;
+        feedback.textContent = '';
+        try {
+          // Call optIn directly from the user's click so the browser can show its permission prompt.
+          const optIn = oneSignalInstance.User.PushSubscription.optIn();
+          await optIn;
+          markWelcomeSeen();
+          welcomeDialog.close();
+          render();
+        } catch (error) {
+          feedback.textContent = 'Notifications could not be enabled right now. You can try again from your account menu.';
+          button.disabled = false;
+          console.warn('Welcome notification opt-in failed:', error.name || 'Error');
+        }
+      });
+    }
+
+    if (!welcomeDialog.open) welcomeDialog.showModal();
+  }
 
   function withTimeout(promise, milliseconds, code) {
     let timer;
@@ -198,6 +264,7 @@
       if (revision === sessionRevision) {
         settingsLoading = false;
         render();
+        maybeShowNotificationWelcome();
       }
     }
   }
@@ -274,5 +341,22 @@
   };
 
   window.addEventListener('miu:push-account-session-changed', (event) => setSession(event.detail).catch(() => {}));
+  async function prepareFirstVisitPrompt() {
+    if (hasSeenWelcome()) return;
+    try {
+      let session = window.__miuAccountSession;
+      if (!session) {
+        const response = await fetch('/api/site/account-session', { cache: 'no-store', credentials: 'same-origin' });
+        if (response.ok) session = await response.json();
+      }
+      if (session) await setSession(session);
+      const OneSignal = await loadOneSignal();
+      if (OneSignal) maybeShowNotificationWelcome();
+    } catch (error) {
+      console.warn('First-visit notification prompt could not be prepared:', error.name || 'Error');
+    }
+  }
+
   if (window.__miuAccountSession) setSession(window.__miuAccountSession).catch(() => {});
+  prepareFirstVisitPrompt();
 })();

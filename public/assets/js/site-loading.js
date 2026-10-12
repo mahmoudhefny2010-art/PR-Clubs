@@ -19,6 +19,7 @@
   let pageLoaded = document.readyState === 'complete';
   let revealTimer = 0;
   let indicator = null;
+  let startupRing = null;
 
   root.classList.add('site-startup-pending');
 
@@ -28,6 +29,7 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     domReady = true;
+    ensureIndicators();
     window.setTimeout(updateStartupScreen, 0);
   }, { once: true });
 
@@ -44,6 +46,12 @@
 
   function ensureIndicators() {
     if (!document.body) return false;
+    if (!startupRing) {
+      startupRing = document.createElement('span');
+      startupRing.className = 'site-startup-ring';
+      startupRing.setAttribute('aria-hidden', 'true');
+      document.body.append(startupRing);
+    }
     if (indicator) return true;
 
     indicator = document.createElement('div');
