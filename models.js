@@ -56,6 +56,9 @@ const applicationSchema = new mongoose.Schema({
   id: { type: Number, required: true, unique: true, index: true },
   studentName: { type: String, required: true, trim: true },
   email: { type: String, required: true, trim: true, lowercase: true },
+  // Set only when the application was submitted in an authenticated student session.
+  // This is the trusted recipient key for transactional push notifications.
+  studentAccountId: { type: mongoose.Schema.Types.ObjectId, ref: 'StudentAccount', default: null, index: true },
   universityId: { type: String, default: '' },
   major: { type: String, default: '' },
   phone: { type: String, default: '' },
@@ -324,6 +327,7 @@ const studentAccountSchema = new mongoose.Schema({
   salt: { type: String, default: '' },
   passwordHash: { type: String, default: '' },
   googleSub: { type: String, unique: true, sparse: true },
+  emailNotificationsEnabled: { type: Boolean, default: false },
   sessionVersion: { type: Number, default: 0 },
   lastLoginAt: { type: Date, default: null }
 }, { timestamps: true });
@@ -377,6 +381,14 @@ const passwordRecoveryRateLimitSchema = new mongoose.Schema({
 }, { timestamps: true });
 passwordRecoveryRateLimitSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
+const notificationDispatchSchema = new mongoose.Schema({
+  eventKey: { type: String, required: true, unique: true, index: true },
+  status: { type: String, enum: ['sending', 'sent', 'no_recipient', 'failed'], required: true },
+  providerMessageId: { type: String, default: '' },
+  errorCode: { type: String, default: '' },
+  attemptedAt: { type: Date, default: Date.now }
+}, { timestamps: true });
+
 const adminAuthStateSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   salt: { type: String, required: true },
@@ -397,6 +409,7 @@ const StudentEmailCode = mongoose.models.StudentEmailCode || mongoose.model('Stu
 const LoginAttempt = mongoose.models.LoginAttempt || mongoose.model('LoginAttempt', loginAttemptSchema);
 const PasswordResetToken = mongoose.models.PasswordResetToken || mongoose.model('PasswordResetToken', passwordResetTokenSchema);
 const PasswordRecoveryRateLimit = mongoose.models.PasswordRecoveryRateLimit || mongoose.model('PasswordRecoveryRateLimit', passwordRecoveryRateLimitSchema);
+const NotificationDispatch = mongoose.models.NotificationDispatch || mongoose.model('NotificationDispatch', notificationDispatchSchema);
 const AdminAuthState = mongoose.models.AdminAuthState || mongoose.model('AdminAuthState', adminAuthStateSchema);
 
 const Club = mongoose.models.Club || mongoose.model('Club', clubSchema);
@@ -432,5 +445,6 @@ module.exports = {
   LoginAttempt,
   PasswordResetToken,
   PasswordRecoveryRateLimit,
+  NotificationDispatch,
   AdminAuthState
 };

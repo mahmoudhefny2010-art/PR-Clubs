@@ -122,6 +122,13 @@ document.addEventListener('DOMContentLoaded', () => {
         el.innerHTML = await res.text();
         if (id === 'site-header') {
           initHeader();
+          if (!document.querySelector('script[data-miu-push-client]')) {
+            const pushClient = document.createElement('script');
+            pushClient.src = '/assets/js/onesignal-notifications.js?v=20261012onesignal1';
+            pushClient.async = true;
+            pushClient.dataset.miuPushClient = 'true';
+            document.head.appendChild(pushClient);
+          }
         }
       }
     } catch (error) {
@@ -203,6 +210,8 @@ document.addEventListener('DOMContentLoaded', () => {
           if (!response.ok) return;
           const session = await response.json();
           currentHeaderSession = session;
+          window.__miuAccountSession = session;
+          window.dispatchEvent(new CustomEvent('miu:push-account-session-changed', { detail: session }));
           const destinations = {
             admin: { label: 'Dashboard', href: '/admin' },
             president: { label: 'Dashboard', href: '/club-dashboard' },
@@ -241,6 +250,14 @@ document.addEventListener('DOMContentLoaded', () => {
             accountDashboardLink.textContent = account.label;
           }
           if (studentFormsLink) studentFormsLink.hidden = !isStudent;
+          const notificationToggle = document.getElementById('headerNotificationToggle');
+          const notificationStatus = document.getElementById('headerNotificationStatus');
+          const emailNotificationToggle = document.getElementById('headerEmailNotificationToggle');
+          const emailNotificationStatus = document.getElementById('headerEmailNotificationStatus');
+          if (notificationToggle) notificationToggle.hidden = !isStudent;
+          if (emailNotificationToggle) emailNotificationToggle.hidden = !isStudent;
+          if (!isStudent && notificationStatus) notificationStatus.hidden = true;
+          if (!isStudent && emailNotificationStatus) emailNotificationStatus.hidden = true;
           if (isAuthenticated) {
             const accountName = String(session.name || account.label || 'My Account').trim();
             const accountIdentity = String(session.email || accountName);
@@ -265,6 +282,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const logoutPath = currentHeaderSession?.type === 'student'
           ? '/api/student-auth/logout'
           : currentHeaderSession?.type === 'admin' ? '/api/admin/logout' : '/api/club-auth/logout';
+        if (currentHeaderSession?.type === 'student') await window.miuPushNotifications?.logout();
         const response = await fetch(logoutPath, { method: 'POST', cache: 'no-store' });
         if (!response.ok) {
           const result = await response.json().catch(() => ({}));

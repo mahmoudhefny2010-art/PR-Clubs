@@ -11,6 +11,7 @@ const { createAskAiRouter } = require('./services/ask-ai');
 const { describeVisitorDevice, createVisitorDeviceCode } = require('./services/visitor-device');
 const { getVisitorIpAddress } = require('./services/visitor-network');
 const { parseInteraction, registerFeedbackRoutes } = require('./services/student-feedback');
+const { OneSignalApiError, claimOneSignalDispatch, sendOneSignalPush, sendOneSignalEmail } = require('./services/onesignal');
 const {
   Club,
   Application,
@@ -31,6 +32,7 @@ const {
   LoginAttempt,
   PasswordResetToken,
   PasswordRecoveryRateLimit,
+  NotificationDispatch,
   AdminAuthState,
   StudentEmailCode,
   AuditLog
@@ -981,7 +983,7 @@ async function getStudentAccountFromRequest(req, res) {
   if (!crypto.timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expected, 'hex'))) return null;
   let email;
   try { email = Buffer.from(encodedEmail, 'base64url').toString('utf8').toLowerCase(); } catch { return null; }
-  const account = await StudentAccount.findOne({ email }).select('email name universityId major phone age sessionVersion googleSub').read('primary').readConcern('majority').lean();
+  const account = await StudentAccount.findOne({ email }).select('email name universityId major phone age sessionVersion googleSub emailNotificationsEnabled').read('primary').readConcern('majority').lean();
   if (!account || Number(account.sessionVersion || 0) !== Number(versionText)) return null;
   // Browsers cap persistent cookies near 400 days. Renew active student
   // sessions so students remain signed in while they continue using the site.
@@ -1181,7 +1183,7 @@ function canManageMyForm(application, token) {
 async function initializeMongoData() {
   await Promise.all([
     Club.init(), Application.init(), SiteSetting.init(), UniversityContent.init(), SiteVisitor.init(), SiteNetwork.init(), SiteVisitorPresence.init(), EventRegistration.init(), AttendanceSession.init(), AttendanceAssignment.init(), AttendanceRecord.init(), LoginAttempt.init(),
-    PasswordResetToken.init(), PasswordRecoveryRateLimit.init(), AdminAuthState.init()
+    PasswordResetToken.init(), PasswordRecoveryRateLimit.init(), NotificationDispatch.init(), AdminAuthState.init()
   ]);
   const clubAccountCollectionName = ClubAccount.collection.collectionName;
   const accountCollectionExists = await mongoose.connection.db
@@ -1374,6 +1376,164 @@ app.get('/api/site/account-session', async (req, res) => {
     return res.status(503).json({ authenticated: false, message: 'Account status is temporarily unavailable.' });
   }
 });
+
+app.get('/api/notifications/config', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const appId = String(process.env.ONESIGNAL_APP_ID || '').trim();
+  const validAppId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(appId);
+  res.json(validAppId ? { enabled: true, appId } : { enabled: false });
+});
+
+app.get('/api/notifications/identity', requireStudentAuth, (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  // This opaque ID is disclosed only to the authenticated owner of the session.
+  res.json({ externalId: String(req.studentAccount._id), email: req.studentAccount.email, emailNotificationsEnabled: Boolean(req.studentAccount.emailNotificationsEnabled) });
+});
+
+app.put('/api/notifications/email-preference', requireStudentAuth, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  if (!isSameOriginRequest(req)) return res.status(403).json({ message: 'This request could not be verified.' });
+  if (typeof req.body?.enabled !== 'boolean') return res.status(400).json({ message: 'Choose whether email updates are on or off.' });
+  try {
+    const result = await StudentAccount.updateOne({ _id: req.studentAccount._id }, { $set: { emailNotificationsEnabled: req.body.enabled } });
+    if (!result.matchedCount) return res.status(401).json({ message: 'Sign in again to update your preference.' });
+    res.json({ emailNotificationsEnabled: req.body.enabled });
+  } catch (error) {
+    console.error('Email notification preference update failed:', error.name);
+    res.status(503).json({ message: 'Your email preference could not be saved. Please try again.' });
+  }
+});
+
+async function dispatchAcceptedApplicationPush(application) {
+  const appId = String(process.env.ONESIGNAL_APP_ID || '').trim();
+  const apiKey = String(process.env.ONESIGNAL_REST_API_KEY || '').trim();
+  const configuredBaseUrl = String(process.env.ONESIGNAL_SITE_URL || '').trim();
+  const externalId = application?.studentAccountId ? String(application.studentAccountId) : '';
+  if (!appId || !apiKey || !configuredBaseUrl || !externalId) return;
+
+  let notificationUrl;
+  try {
+    const parsedBase = new URL(configuredBaseUrl);
+    const isLoopback = ['localhost', '127.0.0.1'].includes(parsedBase.hostname);
+    if (parsedBase.protocol !== 'https:' && !(isLoopback && parsedBase.protocol === 'http:')) throw new Error('INVALID_ORIGIN');
+    notificationUrl = new URL('/?myForms=1', parsedBase).toString();
+  } catch {
+    return;
+  }
+  const student = await StudentAccount.findById(externalId).select('emailNotificationsEnabled').lean().catch((error) => {
+    console.error('Notification recipient lookup failed:', error.name);
+    return null;
+  });
+  const sendChannel = async (channel, send) => {
+    const eventKey = channel === 'push'
+      ? `application-accepted:${application.id}`
+      : `application-accepted:${application.id}:email`;
+    try {
+      const claimed = await claimOneSignalDispatch(eventKey, (key) => NotificationDispatch.create({ eventKey: key, status: 'sending' }));
+      if (!claimed) return;
+      const result = await send();
+      await NotificationDispatch.updateOne({ eventKey }, {
+        $set: { status: result.messageId ? 'sent' : 'no_recipient', providerMessageId: result.messageId }
+      }).catch((error) => console.error(`${channel} dispatch status update failed:`, error.name));
+    } catch (error) {
+      const errorCode = error instanceof OneSignalApiError
+        ? `HTTP_${error.status}`
+        : error.message === 'ONESIGNAL_INVALID_RECIPIENTS' ? 'RECIPIENT_LIMIT'
+          : error.name === 'TimeoutError' || error.name === 'AbortError' ? 'TIMEOUT' : 'NETWORK_ERROR';
+      await NotificationDispatch.updateOne({ eventKey }, { $set: { status: 'failed', errorCode } }).catch(() => {});
+      console.error(`OneSignal ${channel} dispatch failed:`, errorCode);
+    }
+  };
+  await sendChannel('push', () => sendOneSignalPush({
+    appId,
+    apiKey,
+    externalId,
+    title: 'MIU Clubs',
+    message: 'Your club application status has been updated. Sign in to view it.',
+    url: notificationUrl
+  }));
+  if (student?.emailNotificationsEnabled) {
+    await sendChannel('email', () => sendOneSignalEmail({
+      appId,
+      apiKey,
+      externalId,
+      subject: 'MIU Clubs: application update',
+      message: 'Your club application status has been updated.',
+      url: notificationUrl
+    }));
+  }
+}
+
+async function dispatchPublishedContentNotifications({ source, contentId, revision, type, title }) {
+  const appId = String(process.env.ONESIGNAL_APP_ID || '').trim();
+  const apiKey = String(process.env.ONESIGNAL_REST_API_KEY || '').trim();
+  const configuredBaseUrl = String(process.env.ONESIGNAL_SITE_URL || '').trim();
+  if (!appId || !apiKey || !configuredBaseUrl) return;
+
+  let feedUrl;
+  try {
+    const parsedBase = new URL(configuredBaseUrl);
+    const isLoopback = ['localhost', '127.0.0.1'].includes(parsedBase.hostname);
+    if (parsedBase.protocol !== 'https:' && !(isLoopback && parsedBase.protocol === 'http:')) throw new Error('INVALID_ORIGIN');
+    feedUrl = new URL('/pages/feed.html', parsedBase).toString();
+  } catch {
+    console.error('Published content notification skipped: INVALID_SITE_URL');
+    return;
+  }
+
+  const safeTitle = cleanText(title, 140).replace(/[\r\n\t]+/g, ' ');
+  const kindLabels = { event: 'event', announcement: 'announcement', feed: 'club update', sponsor: 'sponsor update', booth: 'booth update' };
+  if (!safeTitle || !kindLabels[type]) return;
+  const kind = kindLabels[type];
+  let students;
+  try {
+    students = await StudentAccount.find({}).select('_id emailNotificationsEnabled').read('primary').readConcern('majority').lean();
+  } catch (error) {
+    console.error('Published content notification recipients unavailable:', error.name);
+    return;
+  }
+  const allStudentIds = students.map((student) => String(student._id));
+  const emailStudentIds = students.filter((student) => student.emailNotificationsEnabled === true).map((student) => String(student._id));
+  const publishKey = `published-content:${source}:${contentId}:${revision}`;
+  const message = `New ${kind} published: ${safeTitle}. Open the club feed for details.`;
+
+  const sendChannel = async (channel, externalIds, send) => {
+    if (!externalIds.length) return;
+    const eventKey = `${publishKey}:${channel}`;
+    try {
+      const claimed = await claimOneSignalDispatch(eventKey, (key) => NotificationDispatch.create({ eventKey: key, status: 'sending' }));
+      if (!claimed) return;
+      const result = await send();
+      await NotificationDispatch.updateOne({ eventKey }, {
+        $set: { status: result.messageId ? 'sent' : 'no_recipient', providerMessageId: result.messageId }
+      }).catch((error) => console.error(`${channel} broadcast status update failed:`, error.name));
+    } catch (error) {
+      const errorCode = error instanceof OneSignalApiError
+        ? `HTTP_${error.status}`
+        : error.message === 'ONESIGNAL_INVALID_RECIPIENTS' ? 'RECIPIENT_LIMIT'
+          : error.name === 'TimeoutError' || error.name === 'AbortError' ? 'TIMEOUT' : 'NETWORK_ERROR';
+      await NotificationDispatch.updateOne({ eventKey }, { $set: { status: 'failed', errorCode } }).catch(() => {});
+      console.error(`OneSignal ${channel} broadcast failed:`, errorCode);
+    }
+  };
+
+  await sendChannel('push', allStudentIds, () => sendOneSignalPush({
+    appId,
+    apiKey,
+    externalIds: allStudentIds,
+    title: 'MIU Clubs',
+    message,
+    url: feedUrl
+  }));
+  await sendChannel('email', emailStudentIds, () => sendOneSignalEmail({
+    appId,
+    apiKey,
+    externalIds: emailStudentIds,
+    subject: `New ${kind}: ${safeTitle}`,
+    message,
+    url: feedUrl
+  }));
+}
 
 // Count an event detail open as an interest signal (not a unique visitor count).
 app.post('/api/events/:clubId/:eventIndex/view', async (req, res) => {
@@ -4131,6 +4291,15 @@ app.post('/api/committee/requests/:id/action', requireClubAuth, requireCommittee
       }
     }
     await record.save();
+    if (nextStatus === 'published' && record.type !== 'entry_permit') {
+      await dispatchPublishedContentNotifications({
+        source: 'club',
+        contentId: record.id,
+        revision: record.publishedAt?.getTime() || Date.now(),
+        type: record.type,
+        title: record.title
+      });
+    }
     const { _id, __v, ...rest } = record.toObject();
     res.json(rest);
   } catch (error) {
@@ -5013,6 +5182,13 @@ app.post('/api/admin/university-content', async (req, res) => {
     await record.save({ w: 'majority' });
     const persistedRecord = await UniversityContent.findById(record._id).read('primary').readConcern('majority').lean();
     if (!persistedRecord) throw new Error('University post was not confirmed in the database.');
+    await dispatchPublishedContentNotifications({
+      source: 'university',
+      contentId: persistedRecord.id,
+      revision: persistedRecord.createdAt?.getTime() || Date.now(),
+      type: persistedRecord.type,
+      title: persistedRecord.title
+    });
     res.setHeader('Cache-Control', 'no-store');
     res.status(201).json(toApiRecord(persistedRecord));
   } catch (error) {
@@ -5301,10 +5477,15 @@ app.patch('/api/admin/applications/:id/status', async (req, res) => {
 
   try {
     if (!requireLiveDatabase(res)) return;
+    const previousApplication = await Application.findOne({ id: appId }).select('status').lean();
+    if (!previousApplication) return res.status(404).json({ message: 'Application not found.' });
     const updated = await Application.findOneAndUpdate({ id: appId }, { $set: updates }, { new: true }).lean();
     if (!updated) return res.status(404).json({ message: 'Application not found.' });
     const cached = applications.find((item) => item.id === appId);
     if (cached) Object.assign(cached, updates);
+    if (status === 'accepted' && previousApplication.status !== 'accepted') {
+      await dispatchAcceptedApplicationPush(updated);
+    }
     return res.json(toApiRecord(updated));
   } catch (error) {
     console.error('Database operation failed:', error.name);
@@ -5828,6 +6009,9 @@ app.post('/api/applications', async (req, res) => {
     if (!requireLiveDatabase(res)) return;
     const signedInStudent = await getStudentAccountFromRequest(req, res);
     if (signedInStudent && cleanText(payload.email, 254).toLowerCase() === signedInStudent.email) {
+      newApplication.studentAccountId = signedInStudent._id;
+    }
+    if (signedInStudent && cleanText(payload.email, 254).toLowerCase() === signedInStudent.email) {
       const profile = {
         name: cleanText(payload.studentName, 160),
         universityId: cleanText(payload.universityId, 40),
@@ -6029,12 +6213,17 @@ app.patch('/api/applications/:id/status', requireClubAuth, async (req, res) => {
       updates.interviewed = true;
     }
     if (!requireLiveDatabase(res)) return;
+    const previousApplication = await Application.findOne({ id: appId }).select('status').lean();
+    if (!previousApplication) return res.status(404).json({ message: 'Application not found.' });
     const updatedApplication = await Application.findOneAndUpdate({ id: appId }, { $set: updates }, { new: true }).lean();
     if (!updatedApplication) return res.status(404).json({ message: 'Application not found.' });
     if (updates.photoPublicId && updates.photoPublicId !== app.photoPublicId) {
       await removeApplicantPhoto(app.photoPublicId);
     }
     Object.assign(app, updates);
+    if (status === 'accepted' && previousApplication.status !== 'accepted') {
+      await dispatchAcceptedApplicationPush(updatedApplication);
+    }
     return res.json(toApiRecord(updatedApplication));
   } catch (error) {
     console.error('Database operation failed:', error.name);
