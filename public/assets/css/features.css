@@ -597,6 +597,11 @@
 }
 
 /* Keep every close control reachable while its dialog content scrolls. */
+:root { --sticky-site-header-height: 72px; }
+@media (min-width: 1121px) { :root { --sticky-site-header-height: 79px; } }
+@media (max-width: 1120px) { :root { --sticky-site-header-height: 70px; } }
+@media (max-width: 520px) { :root { --sticky-site-header-height: 66px; } }
+
 body :is(button[aria-label*="close" i], button[aria-label*="exit" i], button[title*="close" i], button[class*="close" i], button[id*="close" i], .club-detail-close, .calendar-close-btn, .close-btn, .request-dialog-close, .club-review-notice-close, .club-feedback-dialog-close, .attachment-preview-close):not(.event-modal-close) {
   position: sticky !important;
   top: 8px !important;
@@ -611,6 +616,11 @@ body :is(button[aria-label*="close" i], button[aria-label*="exit" i], button[tit
 
 .club-rating-dialog > .club-detail-close {
   margin: -52px -10px 12px auto;
+}
+
+#clubView .club-detail-card > .club-detail-close,
+#applicationView .app-form-card > .application-exit {
+  top: calc(var(--sticky-site-header-height, 72px) + 8px) !important;
 }
 
 .attachment-preview-dialog .attachment-preview-panel > .attachment-preview-close {
