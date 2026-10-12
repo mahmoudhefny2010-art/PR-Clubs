@@ -1,24 +1,112 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#ffffff">
+  <meta name="theme-color" content="#f8fafc">
   <title>You're offline | MIU Clubs</title>
+  <script>
+    try {
+      const theme = localStorage.getItem('miu-site-theme') === 'dark' ? 'dark' : 'light';
+      document.documentElement.dataset.theme = theme;
+      document.querySelector('meta[name="theme-color"]').content = theme === 'dark' ? '#0b1220' : '#f8fafc';
+    } catch (_) {}
+  </script>
   <style>
-    :root{color-scheme:light dark;font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;background:#f7f8fb;color:#172033}
-    *{box-sizing:border-box}body{min-height:100vh;margin:0;display:grid;place-items:center;padding:24px}
-    main{width:min(100%,440px);padding:32px;border:1px solid #dbe2ec;border-radius:20px;background:Canvas;box-shadow:0 16px 48px #14213a18}
-    img{width:150px;height:auto;display:block;margin:0 auto 24px}h1{font-size:1.6rem;margin:0 0 12px}p{line-height:1.6;color:#657187}
-    button{width:100%;border:0;border-radius:10px;padding:13px 18px;background:#9f1d20;color:#fff;font:inherit;font-weight:700;cursor:pointer}
-    @media(prefers-color-scheme:dark){:root{background:#0b1220;color:#f1f5fb}main{border-color:#29364b}p{color:#b9c5d7}}
+    :root {
+      color-scheme: light;
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+      --page: #f5f7fb;
+      --card: #fff;
+      --text: #172033;
+      --muted: #58677e;
+      --border: #dbe2ec;
+      --accent: #a51f27;
+      --accent-hover: #871a21;
+      --logo-disc: #fff;
+      --shadow: 0 18px 48px rgba(20, 33, 58, .12);
+      background: var(--page);
+      color: var(--text);
+    }
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --page: #0b1220;
+      --card: #111b2b;
+      --text: #edf2f8;
+      --muted: #b2bfd0;
+      --border: #2a3a51;
+      --accent: #c93540;
+      --accent-hover: #e5434e;
+      --logo-disc: #fff;
+      --shadow: 0 20px 52px rgba(0, 0, 0, .35);
+    }
+    * { box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      min-height: 100svh;
+      margin: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: radial-gradient(ellipse at 50% 0, rgba(165, 31, 39, .055), transparent 48%), var(--page);
+    }
+    :root[data-theme="dark"] body {
+      background: radial-gradient(ellipse at 50% 0, rgba(201, 53, 64, .13), transparent 52%), var(--page);
+    }
+    main {
+      width: min(100%, 460px);
+      padding: clamp(24px, 6vw, 38px);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      background: var(--card);
+      box-shadow: var(--shadow);
+    }
+    .offline-logo {
+      width: 156px;
+      height: 156px;
+      display: grid;
+      place-items: center;
+      margin: 0 auto 28px;
+      overflow: hidden;
+      border: 1px solid rgba(165, 31, 39, .16);
+      border-radius: 50%;
+      background: var(--logo-disc);
+      box-shadow: 0 8px 24px rgba(20, 33, 58, .12), 0 0 0 6px rgba(165, 31, 39, .055);
+    }
+    .offline-logo img { width: 100%; height: 100%; display: block; object-fit: cover; }
+    h1 { margin: 0 0 12px; font-size: clamp(1.55rem, 5vw, 1.85rem); line-height: 1.2; letter-spacing: -.025em; }
+    p { margin: 0 0 24px; color: var(--muted); font-size: 1.05rem; line-height: 1.65; }
+    button {
+      width: 100%;
+      min-height: 54px;
+      border: 0;
+      border-radius: 12px;
+      padding: 13px 18px;
+      background: var(--accent);
+      color: #fff;
+      font: inherit;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background-color .15s ease, transform .15s ease;
+    }
+    button:hover { background: var(--accent-hover); }
+    button:active { transform: translateY(1px); }
+    button:focus-visible { outline: 3px solid rgba(229, 67, 78, .35); outline-offset: 3px; }
+    @media (max-width: 380px) {
+      body { padding: 16px; }
+      main { padding: 24px; }
+      .offline-logo { width: 136px; height: 136px; margin-bottom: 24px; }
+    }
+    @media (prefers-reduced-motion: reduce) { button { transition: none; } }
   </style>
 </head>
-<body><main>
-  <img src="/assets/img/pics/pwa-icon-192.png" alt="MIU Clubs">
-  <h1>You're offline</h1>
-  <p>This page needs an internet connection. Reconnect and try again. Forms and other changes cannot be saved while offline.</p>
-  <button type="button" onclick="location.reload()">Try again</button>
-</main></body>
+<body>
+  <main>
+    <div class="offline-logo"><img src="/assets/img/pics/pwa-icon-192.png" alt="MIU 30th anniversary"></div>
+    <h1>You're offline</h1>
+    <p>This page needs an internet connection. Reconnect and try again. Forms and other changes cannot be saved while offline.</p>
+    <button type="button" onclick="location.reload()">Try again</button>
+  </main>
+</body>
 </html>
-

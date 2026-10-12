@@ -11,7 +11,17 @@
   let activeEmail = '';
   let emailEnabled = false;
   let sdkUnavailable = false;
+  let settingsLoading = false;
+  let settingsError = '';
   let sessionRevision = 0;
+
+  function withTimeout(promise, milliseconds, code) {
+    let timer;
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(code)), milliseconds); })
+    ]).finally(() => clearTimeout(timer));
+  }
 
   function announce(message) {
     status.textContent = message;
@@ -26,6 +36,24 @@
       emailToggle.disabled = true;
       emailToggle.textContent = 'Email updates unavailable';
       emailStatus.textContent = 'Email updates are not configured for this site yet.';
+      emailStatus.hidden = false;
+      return;
+    }
+    if (settingsLoading) {
+      toggle.disabled = true;
+      toggle.textContent = 'Preparing notifications...';
+      announce('Loading your secure notification settings...');
+      emailToggle.disabled = true;
+      emailToggle.textContent = 'Preparing email updates...';
+      return;
+    }
+    if (settingsError) {
+      toggle.disabled = true;
+      toggle.textContent = 'Notifications unavailable';
+      announce(settingsError);
+      emailToggle.disabled = true;
+      emailToggle.textContent = 'Email updates unavailable';
+      emailStatus.textContent = settingsError;
       emailStatus.hidden = false;
       return;
     }
@@ -63,7 +91,7 @@
   async function loadOneSignal() {
     if (initialization) return initialization;
     initialization = (async () => {
-      const configResponse = await fetch('/api/notifications/config', { cache: 'no-store' });
+      const configResponse = await withTimeout(fetch('/api/notifications/config', { cache: 'no-store' }), 10000, 'ONESIGNAL_CONFIG_TIMEOUT');
       const config = configResponse.ok ? await configResponse.json() : { enabled: false };
       if (!config.enabled || !config.appId) {
         sdkUnavailable = true;
@@ -94,7 +122,7 @@
       script.async = true;
       script.onerror = () => rejectSdk(new Error('OneSignal SDK failed to load.'));
       document.head.appendChild(script);
-      oneSignalInstance = await sdkReady;
+      oneSignalInstance = await withTimeout(sdkReady, 12000, 'ONESIGNAL_SDK_TIMEOUT');
       oneSignalInstance.User.PushSubscription.addEventListener('change', render);
       oneSignalInstance.Notifications.addEventListener('permissionChange', render);
       render();
@@ -117,35 +145,61 @@
         activeExternalId = '';
         activeEmail = '';
         emailEnabled = false;
-        render();
       }
+      settingsLoading = false;
+      settingsError = '';
+      render();
       return;
     }
 
-    const OneSignal = await loadOneSignal();
-    if (!OneSignal || revision !== sessionRevision) return;
-    const identityResponse = await fetch('/api/notifications/identity', { cache: 'no-store' });
-    if (!identityResponse.ok || revision !== sessionRevision) return;
-    const identity = await identityResponse.json();
-    if (!identity.externalId || revision !== sessionRevision) return;
-    if (identity.externalId !== activeExternalId) {
-      if (activeExternalId && activeEmail) await OneSignal.User.removeEmail(activeEmail).catch(() => {});
-      await OneSignal.login(identity.externalId);
-    }
-    if (revision !== sessionRevision) {
-      await OneSignal.User.PushSubscription.optOut().catch(() => {});
-      await OneSignal.logout().catch(() => {});
-      return;
-    }
-    activeExternalId = identity.externalId;
-    activeEmail = identity.email || '';
-    emailEnabled = Boolean(identity.emailNotificationsEnabled);
-    if (emailEnabled && activeEmail) {
-      await OneSignal.User.addEmail(activeEmail).catch((error) => {
-        console.warn('Email subscription could not be restored:', error.name || 'Error');
-      });
-    }
+    settingsLoading = true;
+    settingsError = '';
     render();
+    try {
+      const OneSignal = await loadOneSignal();
+      if (!OneSignal || revision !== sessionRevision) return;
+      const identityResponse = await withTimeout(fetch('/api/notifications/identity', {
+        cache: 'no-store', credentials: 'same-origin'
+      }), 10000, 'NOTIFICATION_IDENTITY_TIMEOUT');
+      if (!identityResponse.ok) throw new Error(`NOTIFICATION_IDENTITY_HTTP_${identityResponse.status}`);
+      const identity = await identityResponse.json();
+      if (!identity.externalId) throw new Error('NOTIFICATION_IDENTITY_MISSING');
+      if (revision !== sessionRevision) return;
+      if (identity.externalId !== activeExternalId) {
+        if (activeExternalId && activeEmail) await OneSignal.User.removeEmail(activeEmail).catch(() => {});
+        await withTimeout(OneSignal.login(identity.externalId), 10000, 'ONESIGNAL_IDENTITY_TIMEOUT');
+      }
+      if (revision !== sessionRevision) {
+        await OneSignal.User.PushSubscription.optOut().catch(() => {});
+        await OneSignal.logout().catch(() => {});
+        return;
+      }
+      activeExternalId = identity.externalId;
+      activeEmail = identity.email || '';
+      emailEnabled = Boolean(identity.emailNotificationsEnabled);
+      if (emailEnabled && activeEmail) {
+        await withTimeout(OneSignal.User.addEmail(activeEmail), 10000, 'ONESIGNAL_EMAIL_RESTORE_TIMEOUT').catch((error) => {
+          console.warn('Email subscription could not be restored:', error.name || 'Error');
+        });
+      }
+    } catch (error) {
+      if (revision === sessionRevision) {
+        settingsError = 'Notification settings could not be loaded. Check your connection and reload the page to try again.';
+        if (activeExternalId && oneSignalInstance) {
+          await oneSignalInstance.User.PushSubscription.optOut().catch(() => {});
+          await oneSignalInstance.logout().catch(() => {});
+          activeExternalId = '';
+          activeEmail = '';
+          emailEnabled = false;
+        }
+        console.warn('Notification settings could not be loaded:', error.name || 'Error');
+      }
+    } finally {
+      if (revision === sessionRevision) {
+        settingsLoading = false;
+        render();
+      }
+    }
   }
 
   toggle.addEventListener('click', async () => {
