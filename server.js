@@ -6350,6 +6350,11 @@ const connectMongo = async () => {
 
     await mongoose.connect(process.env.MONGO_URI, {
       serverSelectionTimeoutMS: 8000,
+      // Keep each serverless instance's connection footprint small. Vercel can
+      // scale many function instances at once, each with its own Mongo pool.
+      maxPoolSize: 5,
+      minPoolSize: 0,
+      maxIdleTimeMS: 45000,
       readPreference: 'primary',
       readConcern: { level: 'majority' },
       writeConcern: { w: 'majority' }
@@ -6389,8 +6394,17 @@ const startServer = async () => {
 };
 
 let connectPromise = null;
+let lastMongoConnectAttemptAt = 0;
+const MONGO_RETRY_COOLDOWN_MS = 5000;
 function ensureReady() {
-  if (!connectPromise) connectPromise = connectMongo();
+  if (mongoReady && mongoose.connection.readyState === 1) return Promise.resolve(true);
+  if (!process.env.MONGO_URI) return Promise.resolve(false);
+  if (connectPromise) return connectPromise;
+  if (Date.now() - lastMongoConnectAttemptAt < MONGO_RETRY_COOLDOWN_MS) return Promise.resolve(false);
+
+  lastMongoConnectAttemptAt = Date.now();
+  connectPromise = connectMongo().then(() => mongoReady && mongoose.connection.readyState === 1)
+    .finally(() => { connectPromise = null; });
   return connectPromise;
 }
 
