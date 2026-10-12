@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#9f1d20">
+  <title>You're offline | MIU Clubs</title>
+  <style>
+    :root{color-scheme:light dark;font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;background:#f7f8fb;color:#172033}
+    *{box-sizing:border-box}body{min-height:100vh;margin:0;display:grid;place-items:center;padding:24px}
+    main{width:min(100%,440px);padding:32px;border:1px solid #dbe2ec;border-radius:20px;background:Canvas;box-shadow:0 16px 48px #14213a18}
+    img{width:150px;height:auto;display:block;margin:0 auto 24px}h1{font-size:1.6rem;margin:0 0 12px}p{line-height:1.6;color:#657187}
+    button{width:100%;border:0;border-radius:10px;padding:13px 18px;background:#9f1d20;color:#fff;font:inherit;font-weight:700;cursor:pointer}
+    @media(prefers-color-scheme:dark){:root{background:#0b1220;color:#f1f5fb}main{border-color:#29364b}p{color:#b9c5d7}}
+  </style>
+</head>
+<body><main>
+  <img src="/assets/img/pics/pwa-icon-192.png" alt="MIU Clubs">
+  <h1>You're offline</h1>
+  <p>This page needs an internet connection. Reconnect and try again. Forms and other changes cannot be saved while offline.</p>
+  <button type="button" onclick="location.reload()">Try again</button>
+</main></body>
+</html>
+

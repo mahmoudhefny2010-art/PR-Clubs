@@ -1,0 +1,31 @@
+{
+  "id": "/",
+  "name": "Misr International University Clubs",
+  "short_name": "MIU Clubs",
+  "description": "Discover university clubs, events, and activities at Misr International University.",
+  "lang": "en",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "orientation": "any",
+  "theme_color": "#9f1d20",
+  "background_color": "#f7f8fb",
+  "icons": [
+    {
+      "src": "/assets/img/pics/pwa-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/img/pics/pwa-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
