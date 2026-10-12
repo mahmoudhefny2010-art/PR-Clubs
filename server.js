@@ -1295,10 +1295,19 @@ function accountCanReviewApplication(account, application) {
 app.get('/api/clubs', async (req, res) => {
   try {
     if (!requireLiveDatabase(res)) return;
-    const [clubsFromDatabase, memberDirectory] = await Promise.all([
-      Club.find({ archivedAt: null }).read('primary').readConcern('majority')
-        .sort({ sortOrder: 1, id: 1 }).lean(),
-      getClubMemberDirectory()
+    const [clubsFromDatabase, acceptedMemberGroups] = await Promise.all([
+      Club.find({ archivedAt: null })
+        .select('id sortOrder name committee category tagline image imagePublicId imageFit status applicationCycleStartedAt pinned seats members committeeAvailability description requirements applicationIntro applicationFields interviewForms events posts sponsors booths memberRoster.email')
+        .read('primary').readConcern('majority').sort({ sortOrder: 1, id: 1 }).lean(),
+      Application.aggregate([
+        { $match: { status: 'accepted' } },
+        { $project: { clubId: 1, email: { $toLower: { $trim: { input: { $ifNull: ['$email', ''] } } } } } },
+        { $group: {
+          _id: '$clubId',
+          emails: { $addToSet: '$email' },
+          blankEmailCount: { $sum: { $cond: [{ $eq: ['$email', ''] }, 1, 0] } }
+        } }
+      ]).read('primary').readConcern('majority')
     ]);
     const applicationWindows = clubsFromDatabase.map((club) => ({
       clubId: club.id,
@@ -1317,7 +1326,20 @@ app.get('/api/clubs', async (req, res) => {
         { $group: { _id: '$targetKey', average: { $avg: '$value' }, count: { $sum: 1 } } }
       ])
     ]);
-    const membersByClub = new Map(memberDirectory.map((club) => [club.id, club.totalCount]));
+    const acceptedMembersByClub = new Map(acceptedMemberGroups.map((group) => [Number(group._id), group]));
+    const membersByClub = new Map(clubsFromDatabase.map((club) => {
+      const roster = Array.isArray(club.memberRoster) ? club.memberRoster : [];
+      const rosterEmails = new Set(roster.map((member) => String(member.email || '').trim().toLowerCase()).filter(Boolean));
+      const accepted = acceptedMembersByClub.get(Number(club.id));
+      let combinedCount = roster.length + (Number(accepted?.blankEmailCount) || 0);
+      for (const email of accepted?.emails || []) {
+        if (email && !rosterEmails.has(email)) {
+          rosterEmails.add(email);
+          combinedCount += 1;
+        }
+      }
+      return [club.id, Math.max(Number(club.members) || 0, combinedCount)];
+    }));
     const applicantsByClub = new Map(applicationTotals.map((club) => [Number(club._id), club.count]));
     const ratingByClub = new Map(ratings.map((row) => [row._id, row]));
     const records = clubsFromDatabase.map((club) => ({
@@ -1339,7 +1361,9 @@ app.get('/api/university-content', async (req, res) => {
   try {
     if (!mongoReady) return res.status(503).json({ message: 'University updates are temporarily unavailable.' });
     res.setHeader('Cache-Control', 'no-store');
-    const records = await UniversityContent.find().read('primary').readConcern('majority').sort({ createdAt: -1, id: -1 }).lean();
+    const records = await UniversityContent.find()
+      .select('id type title description interaction question options date time location image registrationEnabled createdAt')
+      .read('primary').readConcern('majority').sort({ createdAt: -1, id: -1 }).lean();
     res.json(records.map((record) => ({
       id: record.id, type: record.type, title: record.title, description: record.description,
       interaction: record.interaction || 'none', question: record.question || '', options: record.options || [],

@@ -82,6 +82,8 @@ const applicationSchema = new mongoose.Schema({
   answers: { type: mongoose.Schema.Types.Mixed, default: () => [] }
 }, { timestamps: true });
 applicationSchema.index({ studentClubKey: 1 }, { unique: true, sparse: true });
+applicationSchema.index({ status: 1, clubId: 1, email: 1 });
+applicationSchema.index({ clubId: 1, createdAt: 1 });
 
 const siteSettingSchema = new mongoose.Schema({
   key: { type: String, required: true, unique: true },
@@ -105,6 +107,7 @@ const universityContentSchema = new mongoose.Schema({
   imagePublicId: { type: String, default: '' },
   publishedBy: { type: String, default: '' }
 }, { timestamps: true });
+universityContentSchema.index({ createdAt: -1, id: -1 });
 
 const siteVisitorSchema = new mongoose.Schema({
   visitorId: { type: String, required: true, unique: true, index: true },
