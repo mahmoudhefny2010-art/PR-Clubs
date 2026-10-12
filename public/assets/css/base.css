@@ -471,9 +471,10 @@ html.site-startup-pending::after {
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  gap: 7px;
+  width: 40px;
+  height: 40px;
   min-height: 40px;
-  padding: 0 12px;
+  padding: 0;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   background: var(--bg-panel);
@@ -488,6 +489,34 @@ html.site-startup-pending::after {
 .nav-refresh-btn:focus-visible { outline: 3px solid var(--border-focus); outline-offset: 2px; }
 .nav-refresh-btn:disabled { opacity: .65; cursor: progress; }
 .nav-refresh-btn svg { width: 17px; height: 17px; }
+.nav-refresh-btn span { display: none; }
+
+.pwa-refresh-indicator {
+  position: fixed;
+  z-index: 2147483000;
+  top: 0;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  max-width: calc(100vw - 32px);
+  padding: 10px 15px;
+  transform: translate(-50%, calc(-100% + var(--pull-distance, 0px)));
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: var(--bg-panel);
+  color: var(--text-main);
+  box-shadow: var(--shadow-lg);
+  font: 600 .88rem/1.2 Inter, system-ui, sans-serif;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity .16s ease, visibility .16s ease;
+}
+.pwa-refresh-indicator.is-active { opacity: 1; visibility: visible; }
+.pwa-refresh-indicator svg { width: 18px; height: 18px; flex: 0 0 18px; color: var(--primary-700); }
+.pwa-refresh-indicator.is-refreshing svg { animation: pwa-refresh-spin .8s linear infinite; }
+@keyframes pwa-refresh-spin { to { transform: rotate(360deg); } }
 
 .nav-signin-btn {
   display: inline-flex;

@@ -112,11 +112,6 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('submit', (event) => {
     if (!validateDataEntryForm(event.target)) event.preventDefault();
   }, true);
-  const markFormDirty = (event) => {
-    if (event.target instanceof HTMLElement && event.target.form) event.target.form.dataset.miuDirty = 'true';
-  };
-  document.addEventListener('input', markFormDirty, true);
-  document.addEventListener('change', markFormDirty, true);
 
   const inject = async (id, url) => {
     const el = document.getElementById(id);
@@ -144,20 +139,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const initHeader = () => {
     const refreshPageButton = document.getElementById('headerRefreshBtn');
     refreshPageButton?.addEventListener('click', async () => {
-      const hasUnsavedChanges = document.querySelector('form[data-miu-dirty="true"]');
-      if (hasUnsavedChanges && !window.confirm('Refresh this page? Any unsaved form changes will be lost.')) return;
       refreshPageButton.disabled = true;
       refreshPageButton.setAttribute('aria-busy', 'true');
       refreshPageButton.title = 'Refreshing page';
-      const label = refreshPageButton.querySelector('span');
-      if (label) label.textContent = 'Refreshing...';
       try {
-        const registration = await navigator.serviceWorker?.getRegistration('/');
-        await registration?.update();
+        const didRefresh = window.miuRefreshPage ? await window.miuRefreshPage() : (window.location.reload(), true);
+        if (didRefresh) return;
       } catch (_) {
-        // Reload still refreshes the page when service worker update checks fail.
+        // Fall through and allow another refresh attempt.
       }
-      window.location.reload();
+      refreshPageButton.disabled = false;
+      refreshPageButton.removeAttribute('aria-busy');
+      refreshPageButton.title = 'Refresh page';
     });
 
     // 1. Highlight active navigation link
