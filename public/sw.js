@@ -1,4 +1,4 @@
-const CACHE_NAME = 'miu-clubs-static-v1';
+﻿const CACHE_NAME = 'miu-clubs-static-v2';
 const OFFLINE_URL = '/offline.html';
 const PRECACHE_URLS = [
   OFFLINE_URL,
@@ -74,4 +74,5 @@ self.addEventListener('fetch', (event) => {
   if (url.pathname.startsWith('/api/') || !isCacheableStaticAsset(url)) return;
   event.respondWith(networkFirstStatic(request));
 });
+
 
