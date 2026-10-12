@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = 'miu-clubs-static-v2';
+const CACHE_NAME = 'miu-clubs-static-v3';
 const OFFLINE_URL = '/offline.html';
 const PRECACHE_URLS = [
   OFFLINE_URL,
