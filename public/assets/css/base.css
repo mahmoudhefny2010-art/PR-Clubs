@@ -215,17 +215,11 @@ html.auth-route-pending #authLoadingView { display: grid; }
 @keyframes auth-loading-spin { to { transform: rotate(360deg); } }
 
 .site-loading-indicator { position: fixed; z-index: 2000; }
-html.site-startup-pending::before,
 html.site-startup-pending::after {
   position: fixed;
   left: 50%;
   z-index: 1998;
   pointer-events: none;
-}
-html.site-startup-pending::before {
-  inset: 0;
-  content: "";
-  background: rgba(247, 249, 252, .96);
 }
 html.site-startup-pending::after {
   top: 50%;
@@ -253,7 +247,6 @@ html.site-startup-pending::after {
   text-align: center;
   white-space: pre;
 }
-:root[data-theme="dark"].site-startup-pending::before { background: rgba(8, 15, 28, .96); }
 .site-loading-indicator {
   top: 84px;
   left: 50%;
