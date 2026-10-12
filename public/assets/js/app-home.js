@@ -118,7 +118,7 @@ function forgetMyForm(id) {
 
 async function loadMyForms() {
   const stored = getStoredMyForms();
-  const results = await Promise.all(stored.map(async (entry) => {
+  const storedResults = await Promise.all(stored.map(async (entry) => {
     try {
       const response = await fetch(`/api/my-forms/${encodeURIComponent(entry.id)}`, {
         headers: { Authorization: `Bearer ${entry.token}` },
@@ -131,7 +131,25 @@ async function loadMyForms() {
       return null;
     }
   }));
-  state.myForms = results.filter(Boolean);
+  const formsById = new Map(storedResults.filter(Boolean).map((item) => [Number(item.id), item]));
+  try {
+    const response = await fetch('/api/student/my-forms', { cache: 'no-store' });
+    if (response.ok) {
+      const result = await response.json();
+      for (const item of Array.isArray(result.forms) ? result.forms : []) {
+        const existing = formsById.get(Number(item.id));
+        formsById.set(Number(item.id), {
+          ...(existing || {}),
+          ...item,
+          token: existing?.token || '',
+          studentOwned: true
+        });
+      }
+    }
+  } catch {
+    // Keep device-local code-based forms visible if the account lookup is unavailable.
+  }
+  state.myForms = [...formsById.values()];
   renderMyForms();
   await window.loadMemberAttendanceAssignments?.();
 }
@@ -239,7 +257,7 @@ async function removeMyForm(item) {
   if (!window.confirm(`Remove your application to ${state.clubs.find((club) => club.id === item.application.clubId)?.name || 'this club'}?`)) return;
   const response = await fetch(`/api/my-forms/${encodeURIComponent(item.id)}`, {
     method: 'DELETE',
-    headers: { Authorization: `Bearer ${item.token}` }
+    headers: item.token ? { Authorization: `Bearer ${item.token}` } : {}
   });
   if (!response.ok) {
     const result = await response.json().catch(() => ({}));

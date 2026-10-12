@@ -1009,7 +1009,7 @@ applicationForm.addEventListener('submit', async (event) => {
     const editing = state.editingMyForm;
     const response = await fetch(editing ? `/api/my-forms/${encodeURIComponent(editing.id)}` : '/api/applications', {
       method: editing ? 'PATCH' : 'POST',
-      headers: { 'Content-Type': 'application/json', ...(editing ? { Authorization: `Bearer ${editing.token}` } : {}) },
+      headers: { 'Content-Type': 'application/json', ...(editing?.token ? { Authorization: `Bearer ${editing.token}` } : {}) },
       body: JSON.stringify(payload),
     });
     const result = await response.json();

@@ -1,9 +1,7 @@
 (() => {
   const root = document.documentElement;
-  const navigationEntry = window.performance?.getEntriesByType?.('navigation')?.[0];
-  const isPageReload = navigationEntry?.type === 'reload' || (!navigationEntry && window.performance?.navigation?.type === 1);
-  // A newly loaded document always starts at the top, including links that
-  // carry a fragment. Hash changes made after load still navigate in-page.
+  // Let the browser restore scroll once. A second delayed restoration caused
+  // visible jumps while dynamic page content was still settling.
   if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'auto';
   let scrollResetFrame = 0;
   window.resetPageScroll = () => {
@@ -14,31 +12,12 @@
       window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     });
   };
-  const scrollPositionKey = `miu-scroll-position:${window.location.pathname}${window.location.search}${window.location.hash}`;
-  let scrollSaveTimer = 0;
-  const saveScrollPosition = () => {
-    try { sessionStorage.setItem(scrollPositionKey, JSON.stringify({ x: window.scrollX, y: window.scrollY })); } catch {}
-  };
-  window.addEventListener('scroll', () => {
-    window.clearTimeout(scrollSaveTimer);
-    scrollSaveTimer = window.setTimeout(saveScrollPosition, 80);
-  }, { passive: true });
-  window.addEventListener('pagehide', saveScrollPosition);
-  window.addEventListener('load', () => {
-    if (!isPageReload) return;
-    let saved;
-    try { saved = JSON.parse(sessionStorage.getItem(scrollPositionKey) || 'null'); } catch { saved = null; }
-    if (!saved || !Number.isFinite(saved.y)) return;
-    // App views may finish restoring after load; restore once they have rendered.
-    window.setTimeout(() => window.scrollTo({ left: saved.x || 0, top: saved.y, behavior: 'instant' }), 700);
-  }, { once: true });
   const nativeFetch = window.fetch.bind(window);
   let pendingRequests = 0;
   let pendingInitialRequests = 0;
   let domReady = document.readyState !== 'loading';
   let pageLoaded = document.readyState === 'complete';
   let revealTimer = 0;
-  let screen = null;
   let indicator = null;
 
   root.classList.add('site-startup-pending');
@@ -65,26 +44,21 @@
 
   function ensureIndicators() {
     if (!document.body) return false;
-    if (screen && indicator) return true;
-
-    screen = document.createElement('div');
-    screen.className = 'site-loading-screen';
-    screen.setAttribute('role', 'status');
-    screen.setAttribute('aria-live', 'polite');
-    screen.innerHTML = '<div class="site-loading-card"><span class="site-loading-logo"><img src="/assets/img/pics/logo.svg.png" alt="" /></span><span class="site-loading-title">MIU Clubs</span><span class="site-loading-caption">Getting things ready</span><span class="site-loading-track" aria-hidden="true"></span></div>';
+    if (indicator) return true;
 
     indicator = document.createElement('div');
     indicator.className = 'site-loading-indicator';
     indicator.setAttribute('role', 'status');
     indicator.setAttribute('aria-live', 'polite');
     indicator.innerHTML = '<span class="site-loading-mini-logo"><img src="/assets/img/pics/logo.svg.png" alt="" /></span><span>Loading MIU Clubs</span>';
-    document.body.append(screen, indicator);
+    document.body.append(indicator);
     return true;
   }
 
   function updateIndicators() {
     if (!ensureIndicators()) return;
-    screen.classList.toggle('is-visible', pendingInitialRequests > 0);
+    // The startup pseudo-element already covers initial requests. Keep one
+    // full-screen layer instead of stacking a second blurred loader over it.
     indicator.classList.toggle('is-visible', pendingRequests > 0 && pendingInitialRequests === 0);
     updateStartupScreen();
   }
@@ -104,8 +78,7 @@
       window.clearTimeout(revealTimer);
       updateStartupScreen();
       if (pendingRequests) updateIndicators();
-      else if (screen && indicator) {
-        screen.classList.remove('is-visible');
+      else if (indicator) {
         indicator.classList.remove('is-visible');
       }
     });
@@ -114,8 +87,7 @@
   window.addEventListener('load', () => {
     pageLoaded = true;
     domReady = true;
-    if (!pendingRequests && screen && indicator) {
-      screen.classList.remove('is-visible');
+    if (!pendingRequests && indicator) {
       indicator.classList.remove('is-visible');
     }
     updateStartupScreen();

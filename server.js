@@ -1153,9 +1153,20 @@ function generateMyFormCode() {
   return Array.from(crypto.randomBytes(12), (byte) => MY_FORM_CODE_ALPHABET[byte & 31]).join('');
 }
 
-function limitMyFormAccessAttempts(req, res, next) {
+async function limitMyFormAccessAttempts(req, res, next) {
   const token = getMyFormToken(req);
   if (applications.some((application) => canManageMyForm(application, token))) return next();
+  if (requestCookie(req, 'miu_student')) {
+    try {
+      const studentAccount = await getStudentAccountFromRequest(req, res);
+      if (studentAccount) {
+        req.studentAccount = studentAccount;
+        return next();
+      }
+    } catch {
+      // Fall through to the existing code-attempt rate limit if sign-in cannot be checked.
+    }
+  }
 
   const now = Date.now();
   const key = req.ip || req.socket.remoteAddress || 'unknown';
@@ -1188,6 +1199,13 @@ function canManageMyForm(application, token) {
   if (!/^[a-f0-9]{64}$/.test(storedHash)) return false;
   const candidateHash = hashMyFormToken(token);
   return crypto.timingSafeEqual(Buffer.from(storedHash, 'hex'), Buffer.from(candidateHash, 'hex'));
+}
+
+function studentApplicationOwnerFilter(account) {
+  return { $or: [
+    { studentAccountId: account._id },
+    { email: String(account.email || '').trim().toLowerCase() }
+  ] };
 }
 
 async function initializeMongoData() {
@@ -6048,6 +6066,28 @@ app.post('/api/applications', async (req, res) => {
   }
 });
 
+app.get('/api/student/my-forms', requireStudentAuth, async (req, res) => {
+  try {
+    if (!requireLiveDatabase(res)) return;
+    const records = await Application.find(studentApplicationOwnerFilter(req.studentAccount))
+      .read('primary').readConcern('majority').sort({ createdAt: -1 }).lean();
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ forms: records.map((record) => {
+      const application = toApiRecord(record);
+      delete application.studentAccountId;
+      return {
+        id: record.id,
+        application,
+        canEdit: !record.interviewed && record.status === 'pending',
+        studentOwned: true
+      };
+    }) });
+  } catch (error) {
+    console.error('Student forms lookup failed:', error.name);
+    res.status(503).json({ message: 'Your applications are temporarily unavailable.' });
+  }
+});
+
 app.post('/api/my-forms/access', limitMyFormAccessAttempts, (req, res) => {
   const token = getMyFormToken(req);
   const application = applications.find((item) => canManageMyForm(item, token));
@@ -6055,16 +6095,40 @@ app.post('/api/my-forms/access', limitMyFormAccessAttempts, (req, res) => {
   res.json({ application: toApiRecord(application), canEdit: !application.interviewed && application.status === 'pending' });
 });
 
-app.get('/api/my-forms/:id', limitMyFormAccessAttempts, (req, res) => {
+app.get('/api/my-forms/:id', limitMyFormAccessAttempts, async (req, res) => {
   const token = getMyFormToken(req);
-  const application = applications.find((item) => item.id === Number(req.params.id) && canManageMyForm(item, token));
+  const account = token ? null : req.studentAccount;
+  let application;
+  if (token) {
+    application = applications.find((item) => item.id === Number(req.params.id) && canManageMyForm(item, token));
+  } else if (account) {
+    try {
+      application = await Application.findOne({ id: Number(req.params.id), ...studentApplicationOwnerFilter(account) })
+        .read('primary').readConcern('majority').lean();
+    } catch (error) {
+      console.error('Student form lookup failed:', error.name);
+      return res.status(503).json({ message: 'This form is temporarily unavailable.' });
+    }
+  }
   if (!application) return res.status(404).json({ message: 'This form could not be found.' });
   res.json({ application: toApiRecord(application), canEdit: !application.interviewed && application.status === 'pending' });
 });
 
 app.patch('/api/my-forms/:id', limitMyFormAccessAttempts, async (req, res) => {
   const token = getMyFormToken(req);
-  const application = applications.find((item) => item.id === Number(req.params.id) && canManageMyForm(item, token));
+  const account = token ? null : req.studentAccount;
+  let application;
+  if (token) {
+    application = applications.find((item) => item.id === Number(req.params.id) && canManageMyForm(item, token));
+  } else if (account) {
+    try {
+      application = await Application.findOne({ id: Number(req.params.id), ...studentApplicationOwnerFilter(account) })
+        .read('primary').readConcern('majority').lean();
+    } catch (error) {
+      console.error('Student form lookup failed:', error.name);
+      return res.status(503).json({ message: 'This form is temporarily unavailable.' });
+    }
+  }
   if (!application) return res.status(404).json({ message: 'This form could not be found.' });
   if (application.interviewed || application.status !== 'pending') {
     return res.status(409).json({ message: 'This form can no longer be edited because its interview process has started.' });
@@ -6080,6 +6144,7 @@ app.patch('/api/my-forms/:id', limitMyFormAccessAttempts, async (req, res) => {
     return res.status(503).json({ message: 'The data store is temporarily unavailable.' });
   }
   const updates = {};
+  if (account && !application.studentAccountId) updates.studentAccountId = account._id;
   const textFields = [
     ['studentName', 160], ['email', 254], ['universityId', 80], ['major', 120],
     ['phone', 40], ['slot', 120], ['age', 10], ['motivation', 2000], ['notes', 2000]
@@ -6127,8 +6192,11 @@ app.patch('/api/my-forms/:id', limitMyFormAccessAttempts, async (req, res) => {
 
   try {
     if (!requireLiveDatabase(res)) return;
+    const ownerFilter = token
+      ? { managementTokenHash: hashMyFormToken(token) }
+      : studentApplicationOwnerFilter(account);
     const updated = await Application.findOneAndUpdate(
-      { id: application.id, managementTokenHash: hashMyFormToken(token), interviewed: { $ne: true }, status: 'pending' },
+      { id: application.id, ...ownerFilter, interviewed: { $ne: true }, status: 'pending' },
       { $set: updates },
       { new: true }
     ).lean();
@@ -6146,23 +6214,36 @@ app.patch('/api/my-forms/:id', limitMyFormAccessAttempts, async (req, res) => {
 
 app.delete('/api/my-forms/:id', limitMyFormAccessAttempts, async (req, res) => {
   const token = getMyFormToken(req);
+  const account = token ? null : req.studentAccount;
   const applicationIndex = applications.findIndex((item) => item.id === Number(req.params.id) && canManageMyForm(item, token));
-  if (applicationIndex < 0) return res.status(404).json({ message: 'This form could not be found.' });
-  const application = applications[applicationIndex];
+  let application = token ? applications[applicationIndex] : null;
+  if (!token && account) {
+    try {
+      application = await Application.findOne({ id: Number(req.params.id), ...studentApplicationOwnerFilter(account) })
+        .read('primary').readConcern('majority').lean();
+    } catch (error) {
+      console.error('Student form lookup failed:', error.name);
+      return res.status(503).json({ message: 'This form is temporarily unavailable.' });
+    }
+  }
+  if (!application) return res.status(404).json({ message: 'This form could not be found.' });
   if (application.interviewed || application.status !== 'pending') {
     return res.status(409).json({ message: 'This form can no longer be removed because its interview process has started.' });
   }
   try {
     if (!requireLiveDatabase(res)) return;
+    const ownerFilter = token
+      ? { managementTokenHash: hashMyFormToken(token) }
+      : studentApplicationOwnerFilter(account);
     const result = await Application.deleteOne({
       id: application.id,
-      managementTokenHash: hashMyFormToken(token),
+      ...ownerFilter,
       interviewed: { $ne: true },
       status: 'pending'
     });
     if (!result.deletedCount) return res.status(409).json({ message: 'This form can no longer be removed because its interview process has started.' });
     await removeApplicantPhoto(application.photoPublicId);
-    applications.splice(applicationIndex, 1);
+    if (applicationIndex >= 0) applications.splice(applicationIndex, 1);
     res.status(204).end();
   } catch (error) {
     console.error('Database operation failed:', error.name);
