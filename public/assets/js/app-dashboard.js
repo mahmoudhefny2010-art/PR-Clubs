@@ -651,7 +651,10 @@ document.querySelectorAll('[data-student-section]').forEach((button) => {
 });
 document.getElementById('applicationBackHomeBtn').addEventListener('click', () => {
   state.editingMyForm = null;
-  showView('home');
+  const returnView = views[state.applicationReturnView] && state.applicationReturnView !== 'application'
+    ? state.applicationReturnView
+    : 'home';
+  showView(returnView);
 });
 document.getElementById('acceptReviewBtn').addEventListener('click', async () => {
   await saveInterviewReview('accepted');

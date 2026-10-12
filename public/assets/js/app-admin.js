@@ -794,6 +794,9 @@ async function openApplicationForm(clubId, allowClosedClub = false) {
   const club = state.clubs.find((item) => item.id === clubId);
   if (!club || (!allowClosedClub && club.status !== 'open')) return;
 
+  const activeView = Object.keys(views).find((name) => views[name]?.classList.contains('active'));
+  if (activeView && activeView !== 'application') state.applicationReturnView = activeView;
+
   state.selectedClub = club;
   state.editingMyForm = null;
   applicationForm.reset();

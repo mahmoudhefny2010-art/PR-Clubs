@@ -91,6 +91,16 @@ app.use('/api', (req, res, next) => {
 });
 app.use(express.urlencoded({ extended: true }));
 
+// Public, non-sensitive deployment marker used by installed PWAs to detect a
+// newly deployed site while they remain open.
+app.get('/api/pwa/version', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.json({ version: process.env.VERCEL_DEPLOYMENT_ID
+    || process.env.VERCEL_GIT_COMMIT_SHA
+    || process.env.VERCEL_URL
+    || 'local' });
+});
+
 function signCloudinaryUpload(folder) {
   const timestamp = Math.floor(Date.now() / 1000);
   const publicId = `${folder}-${crypto.randomUUID()}`;

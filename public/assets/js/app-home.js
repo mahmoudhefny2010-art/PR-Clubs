@@ -11,6 +11,7 @@ const state = {
   clubAccount: null,
   myForms: [],
   editingMyForm: null,
+  applicationReturnView: 'home',
   studentProfile: null,
   searchQuery: '',
   activeCategory: 'All',
@@ -197,6 +198,9 @@ function renderMyForms() {
 async function startEditingMyForm(item) {
   const app = item.application;
   await openApplicationForm(app.clubId, true);
+  // The form can also be restored after a reload; in either case its X returns
+  // to the student's forms dashboard, where editing started.
+  state.applicationReturnView = 'myForms';
   state.editingMyForm = item;
   persistCurrentViewState();
   const currentCommitteeOption = [...applicationCommitteeInput.options]

@@ -53,6 +53,73 @@
   }
   window.miuRefreshPage = refreshPage;
 
+  // Detect a new Vercel deployment even when sw.js itself did not change.
+  // Reload immediately when safe; if a form has unsaved edits, offer a refresh
+  // action instead of discarding the user's work.
+  let deploymentVersion = '';
+  let updateNotice;
+  let checkingDeployment = false;
+  const hasDirtyForm = () => Boolean(document.querySelector('form[data-miu-dirty="true"]'));
+  const showUpdateNotice = () => {
+    if (!updateNotice) {
+      updateNotice = document.createElement('div');
+      updateNotice.setAttribute('role', 'status');
+      updateNotice.setAttribute('aria-live', 'polite');
+      Object.assign(updateNotice.style, {
+        position: 'fixed', inset: 'auto 12px 16px', zIndex: '2147483646', margin: '0 auto',
+        width: 'max-content', maxWidth: 'min(560px, calc(100vw - 24px))', padding: '10px 12px',
+        display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', justifyContent: 'center',
+        borderRadius: '12px', background: '#172033', color: '#fff', boxShadow: '0 8px 28px #0004',
+        font: '600 14px/1.45 system-ui, sans-serif'
+      });
+      const label = document.createElement('span');
+      label.textContent = 'A new version is ready.';
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = 'Refresh';
+      Object.assign(button.style, {
+        border: '0', borderRadius: '8px', padding: '7px 12px', background: '#fff', color: '#172033',
+        font: '700 14px system-ui, sans-serif', cursor: 'pointer'
+      });
+      button.addEventListener('click', async () => {
+        if (await refreshPage()) updateNotice?.remove();
+      });
+      updateNotice.append(label, button);
+      document.body.appendChild(updateNotice);
+    }
+    updateNotice.hidden = false;
+  };
+  const checkDeploymentVersion = async () => {
+    if (checkingDeployment || !navigator.onLine || document.visibilityState === 'hidden') return;
+    checkingDeployment = true;
+    try {
+      const response = await fetch(`/api/pwa/version?_=${Date.now()}`, {
+        cache: 'no-store', credentials: 'same-origin', headers: { Accept: 'application/json' }
+      });
+      if (!response.ok) return;
+      const payload = await response.json();
+      if (typeof payload.version !== 'string' || !payload.version) return;
+      if (!deploymentVersion) {
+        deploymentVersion = payload.version;
+        return;
+      }
+      if (deploymentVersion === payload.version) return;
+      deploymentVersion = payload.version;
+      if (hasDirtyForm()) showUpdateNotice();
+      else window.location.reload();
+    } catch {
+      // The site remains usable if the deployment check is temporarily unavailable.
+    } finally {
+      checkingDeployment = false;
+    }
+  };
+  window.addEventListener('load', checkDeploymentVersion, { once: true });
+  window.addEventListener('focus', checkDeploymentVersion);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') checkDeploymentVersion();
+  });
+  window.setInterval(checkDeploymentVersion, 120000);
+
   // Native browsers usually provide pull-to-refresh; this adds the same gesture
   // to installed PWAs and provides a consistent indicator on touch devices.
   if (window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window) {
