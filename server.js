@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const nodemailer = require('nodemailer');
 const cloudinary = require('cloudinary').v2;
+const { verifyGoogleStudentCredential, decideGoogleAccount, decideGoogleLink } = require('./services/google-auth');
 const { createAskAiRouter } = require('./services/ask-ai');
 const { describeVisitorDevice, createVisitorDeviceCode } = require('./services/visitor-device');
 const { getVisitorIpAddress } = require('./services/visitor-network');
@@ -980,7 +981,7 @@ async function getStudentAccountFromRequest(req, res) {
   if (!crypto.timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expected, 'hex'))) return null;
   let email;
   try { email = Buffer.from(encodedEmail, 'base64url').toString('utf8').toLowerCase(); } catch { return null; }
-  const account = await StudentAccount.findOne({ email }).select('email name universityId major phone age sessionVersion').read('primary').readConcern('majority').lean();
+  const account = await StudentAccount.findOne({ email }).select('email name universityId major phone age sessionVersion googleSub').read('primary').readConcern('majority').lean();
   if (!account || Number(account.sessionVersion || 0) !== Number(versionText)) return null;
   // Browsers cap persistent cookies near 400 days. Renew active student
   // sessions so students remain signed in while they continue using the site.
@@ -1001,50 +1002,27 @@ async function requireStudentAuth(req, res, next) {
   }
 }
 
-let googleSigningKeys = [];
-let googleSigningKeysExpiresAt = 0;
-
-async function getGoogleSigningKey(kid, forceRefresh = false) {
-  if (forceRefresh || Date.now() >= googleSigningKeysExpiresAt || !googleSigningKeys.length) {
-    const response = await fetch('https://www.googleapis.com/oauth2/v3/certs', { headers: { Accept: 'application/json' } });
-    if (!response.ok) throw new Error('GOOGLE_KEYS_UNAVAILABLE');
-    const payload = await response.json();
-    googleSigningKeys = Array.isArray(payload.keys) ? payload.keys : [];
-    googleSigningKeysExpiresAt = Date.now() + 60 * 60 * 1000;
-  }
-  return googleSigningKeys.find((key) => key.kid === kid && key.kty === 'RSA' && key.use === 'sig') || null;
+function clearGoogleNonceCookie(req, res) {
+  const secure = secureCookieSuffix(req);
+  res.append('Set-Cookie', `miu_google_nonce=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/;${secure}`);
 }
 
-async function verifyGoogleStudentCredential(credential, expectedNonce) {
-  const parts = String(credential || '').split('.');
-  if (parts.length !== 3 || !expectedNonce) throw new Error('GOOGLE_CREDENTIAL_INVALID');
-  let header;
-  let claims;
+function isSameOriginRequest(req) {
+  const origin = req.get('origin');
+  const host = req.get('host');
+  if (!origin || !host) return false;
   try {
-    header = JSON.parse(Buffer.from(parts[0], 'base64url').toString('utf8'));
-    claims = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
-  } catch { throw new Error('GOOGLE_CREDENTIAL_INVALID'); }
+    const parsed = new URL(origin);
+    return ['http:', 'https:'].includes(parsed.protocol) && parsed.host.toLowerCase() === host.toLowerCase();
+  } catch { return false; }
+}
+
+async function verifyGoogleRequest(req, res) {
+  const nonce = requestCookie(req, 'miu_google_nonce');
+  clearGoogleNonceCookie(req, res);
+  if (!nonce || !/^[A-Za-z0-9_-]{32}$/.test(nonce)) throw new Error('GOOGLE_CREDENTIAL_INVALID');
   const clientId = String(process.env.GOOGLE_CLIENT_ID || '').trim();
-  if (!clientId || header.alg !== 'RS256' || !header.kid) throw new Error('GOOGLE_CREDENTIAL_INVALID');
-  let key = await getGoogleSigningKey(header.kid);
-  if (!key) key = await getGoogleSigningKey(header.kid, true);
-  if (!key) throw new Error('GOOGLE_CREDENTIAL_INVALID');
-  const verifier = crypto.createVerify('RSA-SHA256');
-  verifier.update(`${parts[0]}.${parts[1]}`);
-  verifier.end();
-  if (!verifier.verify(crypto.createPublicKey({ key, format: 'jwk' }), Buffer.from(parts[2], 'base64url'))) {
-    throw new Error('GOOGLE_CREDENTIAL_INVALID');
-  }
-  const audienceValid = claims.aud === clientId || (Array.isArray(claims.aud) && claims.aud.includes(clientId));
-  const issuerValid = ['accounts.google.com', 'https://accounts.google.com'].includes(claims.iss);
-  if (!audienceValid || !issuerValid || Number(claims.exp) * 1000 <= Date.now()
-    || Number(claims.iat) * 1000 > Date.now() + 60_000 || claims.nonce !== expectedNonce
-    || claims.email_verified !== true || String(claims.hd || '').toLowerCase() !== 'miuegypt.edu.eg'
-    || !/^[a-z0-9._%+-]+@miuegypt\.edu\.eg$/i.test(String(claims.email || ''))
-    || typeof claims.sub !== 'string' || !claims.sub) {
-    throw new Error('GOOGLE_ACCOUNT_NOT_ALLOWED');
-  }
-  return { email: claims.email.toLowerCase(), name: cleanText(claims.name, 160), googleSub: claims.sub };
+  return verifyGoogleStudentCredential({ credential: req.body?.credential, expectedNonce: nonce, clientId });
 }
 
 function requestCookie(req, name) {
@@ -4339,52 +4317,96 @@ app.post('/api/student-auth/demo', async (req, res) => {
 
 app.post('/api/student-auth/google', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
+  if (!isSameOriginRequest(req)) return res.status(403).json({ message: 'Google sign-in request was blocked. Reload this page and try again.' });
   if (await checkLoginSourceLock(req, res)) return;
   if (!mongoReady) return res.status(503).json({ message: 'Google sign-in requires the database.' });
-  const nonce = requestCookie(req, 'miu_google_nonce');
   try {
-    const identity = await verifyGoogleStudentCredential(req.body.credential, nonce);
-    let account = await StudentAccount.findOne({ email: identity.email }).lean();
-    if (account?.googleSub && account.googleSub !== identity.googleSub) {
+    const identity = await verifyGoogleRequest(req, res);
+    const accountBySubject = await StudentAccount.findOne({ googleSub: identity.googleSub }).lean();
+    const accountByEmail = accountBySubject ? null : await StudentAccount.findOne({ email: identity.email }).lean();
+    const decision = decideGoogleAccount({ accountBySubject, accountByEmail });
+    if (decision.action === 'explicit_link_required') {
       if (await countLoginSourceFailure(req, res)) return;
-      return res.status(403).json({ message: 'This MIU email is already linked to another Google account.' });
+      return res.status(409).json({ message: 'An account already exists for this email. Sign in with your existing password, then choose Link Google account to connect it securely.' });
     }
-    if (!account) {
+    let account = decision.account;
+    if (decision.action === 'create') {
       try {
-        account = await StudentAccount.create({ email: identity.email, name: identity.name || identity.email.split('@')[0], googleSub: identity.googleSub });
+        account = await StudentAccount.create({ email: identity.email, name: cleanText(identity.name, 160) || identity.email.split('@')[0], googleSub: identity.googleSub });
         account = account.toObject();
       } catch (error) {
         if (error.code !== 11000) throw error;
-        account = await StudentAccount.findOne({ email: identity.email }).lean();
+        account = await StudentAccount.findOne({ googleSub: identity.googleSub }).lean();
+        if (!account) {
+          const emailAccount = await StudentAccount.findOne({ email: identity.email }).lean();
+          if (emailAccount) {
+            if (await countLoginSourceFailure(req, res)) return;
+            return res.status(409).json({ message: 'An account already exists for this email. Sign in with your existing password, then choose Link Google account to connect it securely.' });
+          }
+          throw error;
+        }
       }
-    }
-    if (account && !account.googleSub) {
-      await StudentAccount.updateOne({ email: identity.email, googleSub: { $exists: false } }, {
-        $set: { googleSub: identity.googleSub, ...(identity.name ? { name: identity.name } : {}) }
-      });
-      account = await StudentAccount.findOne({ email: identity.email }).lean();
     }
     if (!account || account.googleSub !== identity.googleSub) {
       if (await countLoginSourceFailure(req, res)) return;
-      return res.status(403).json({ message: 'This Google account cannot be linked to the supplied MIU identity.' });
+      return res.status(403).json({ message: 'This Google account could not be matched to a student account.' });
     }
     if (!await clearLoginSourceFailures(req, res)) return;
     await recordSuccessfulSignIn('student', account.email);
     setStudentSessionCookie(req, res, account);
-    const secure = secureCookieSuffix(req);
-    res.append('Set-Cookie', `miu_google_nonce=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/;${secure}`);
+    clearGoogleNonceCookie(req, res);
     return res.json({ authenticated: true, role: 'student' });
   } catch (error) {
-    if (error.message === 'GOOGLE_KEYS_UNAVAILABLE') {
-      console.error('Google sign-in keys could not be loaded.');
-      return res.status(503).json({ message: 'Google sign-in is temporarily unavailable.' });
-    }
     if (error.message !== 'GOOGLE_ACCOUNT_NOT_ALLOWED' && error.message !== 'GOOGLE_CREDENTIAL_INVALID') {
       console.error('Google sign-in failed:', error.name);
       return res.status(503).json({ message: 'Google sign-in is temporarily unavailable.' });
     }
     if (await countLoginSourceFailure(req, res)) return;
     res.status(401).json({ message: 'Use a verified Google account from the MIU university domain.' });
+  }
+});
+
+app.post('/api/student-auth/google/link', requireStudentAuth, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  if (!isSameOriginRequest(req)) return res.status(403).json({ message: 'Google account linking request was blocked. Reload this page and try again.' });
+  if (await checkLoginSourceLock(req, res)) return;
+  if (!mongoReady) return res.status(503).json({ message: 'Google account linking requires the database.' });
+  try {
+    const identity = await verifyGoogleRequest(req, res);
+    if (identity.email !== String(req.studentAccount.email || '').toLowerCase()) {
+      return res.status(403).json({ message: 'The Google account email must match the signed-in student account.' });
+    }
+    const subjectOwner = await StudentAccount.findOne({ googleSub: identity.googleSub }).select('email').lean();
+    const linkDecision = decideGoogleLink({
+      accountEmail: req.studentAccount.email,
+      googleEmail: identity.email,
+      currentGoogleSub: req.studentAccount.googleSub,
+      requestedGoogleSub: identity.googleSub,
+      subjectOwnerEmail: subjectOwner?.email
+    });
+    if (linkDecision === 'subject_in_use') {
+      return res.status(409).json({ message: 'This Google account is already linked to another student account.' });
+    }
+    if (linkDecision === 'different_google_account_linked') {
+      return res.status(409).json({ message: 'A different Google account is already linked to this student account.' });
+    }
+    if (linkDecision !== 'link') return res.status(403).json({ message: 'The Google account email must match the signed-in student account.' });
+    const result = await StudentAccount.updateOne({
+      email: req.studentAccount.email,
+      sessionVersion: req.studentAccount.sessionVersion,
+      $or: [{ googleSub: { $exists: false } }, { googleSub: null }, { googleSub: identity.googleSub }]
+    }, { $set: { googleSub: identity.googleSub } }, { writeConcern: { w: 'majority' } });
+    if (!result.matchedCount) return res.status(409).json({ message: 'A different Google account is already linked, or this session expired. Sign in again and retry.' });
+    if (!await clearLoginSourceFailures(req, res)) return;
+    return res.json({ linked: true });
+  } catch (error) {
+    if (error.code === 11000) return res.status(409).json({ message: 'This Google account is already linked to another student account.' });
+    if (error.message !== 'GOOGLE_ACCOUNT_NOT_ALLOWED' && error.message !== 'GOOGLE_CREDENTIAL_INVALID') {
+      console.error('Google account linking failed:', error.name);
+      return res.status(503).json({ message: 'Google account linking is temporarily unavailable.' });
+    }
+    if (await countLoginSourceFailure(req, res)) return;
+    return res.status(401).json({ message: 'Google could not verify this MIU account. Try again with your university Google account.' });
   }
 });
 
