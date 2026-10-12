@@ -85,7 +85,18 @@
                 } catch (error) { feedback.textContent = error.message; feedback.classList.add('is-error'); }
               }
             });
-            window.google.accounts.id.renderButton(document.getElementById('googleLoginButton'), { theme: 'outline', size: 'large', text: linkExistingAccount ? 'continue_with' : 'signin_with', shape: 'rectangular', width: 360 });
+            const buttonHost = document.getElementById('googleLoginButton');
+            let renderedWidth = 0;
+            const renderGoogleButton = () => {
+              const availableWidth = buttonHost.parentElement?.getBoundingClientRect().width || buttonHost.getBoundingClientRect().width || 360;
+              const width = Math.max(120, Math.min(400, Math.floor(availableWidth)));
+              if (width === renderedWidth) return;
+              renderedWidth = width;
+              buttonHost.replaceChildren();
+              window.google.accounts.id.renderButton(buttonHost, { theme: 'outline', size: 'large', text: linkExistingAccount ? 'continue_with' : 'signin_with', shape: 'rectangular', width });
+            };
+            renderGoogleButton();
+            if ('ResizeObserver' in window) new ResizeObserver(renderGoogleButton).observe(buttonHost.parentElement || buttonHost);
             area.classList.remove('hidden');
           };
           script.onerror = () => { fallbackButton.hidden = false; area.classList.remove('hidden'); };

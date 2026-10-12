@@ -186,7 +186,7 @@
 :root[data-theme="dark"] input[type="radio"] { accent-color: #e5434e; }
 
 /* Buttons, tags, states, and data views. */
-:root[data-theme="dark"] body :is(.secondary-btn, .logout-btn, .calendar-close-btn, .slide-arrow, .event-info-btn, .today-event-chip, .calendar-more, .tab-btn:not(.active), .record-actions button, .application-question-controls button) {
+:root[data-theme="dark"] body :is(.secondary-btn, .logout-btn, .slide-arrow, .event-info-btn, .today-event-chip, .calendar-more, .tab-btn:not(.active), .record-actions button, .application-question-controls button) {
   background-color: var(--bg-soft) !important;
   color: var(--text-main) !important;
   border-color: var(--border-color) !important;
@@ -230,7 +230,6 @@
   border-color: var(--border-color) !important;
 }
 :root[data-theme="dark"] body :is(dialog, .modal)::backdrop { background: rgba(2, 6, 15, .74) !important; backdrop-filter: blur(5px); }
-:root[data-theme="dark"] body :is(.request-dialog-close, .close-btn, .calendar-close-btn, .attachment-preview-close) { background-color: var(--bg-soft); color: var(--text-main); border-color: var(--border-color); }
 :root[data-theme="dark"] .event-page-content { background: var(--bg-panel) !important; color: var(--text-main) !important; }
 :root[data-theme="dark"] .brand-banner { background: var(--bg-panel) !important; }
 :root[data-theme="dark"] .brand-mark { max-width: 100%; object-fit: contain; }
@@ -244,8 +243,9 @@
   :root[data-theme="dark"] .brand-mark { width: 150px !important; height: 58px !important; }
 }
 @media (max-width: 760px) {
-  .page-shell { padding: 0 12px 24px; }
-  .topbar { width: calc(100% + 24px); max-width: none; margin: 0 -12px 12px; }
+  .page-shell { padding: 0 0 24px; }
+  #site-header { width: 100%; max-width: none; margin: 0; }
+  .topbar-nav { width: 100%; }
   .brand-banner { min-height: 76px; justify-content: center; padding: 8px 10px; }
   .brand-mark { width: 120px; height: 58px; }
   .app-container { width: 100%; }
@@ -261,8 +261,8 @@
   .site-theme-toggle.is-floating { top: 12px; right: 12px; width: 40px; height: 40px; }
 }
 @media (max-width: 420px) {
-  .page-shell { padding-right: 10px; padding-left: 10px; }
-  .topbar { width: calc(100% + 20px); margin-right: -10px; margin-left: -10px; }
+  .page-shell { padding-right: 0; padding-left: 0; }
+  #site-header { width: 100%; margin-right: 0; margin-left: 0; }
   .stats-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .summary-card { padding: 14px 12px; }
   .detail-actions { grid-template-columns: 1fr; }

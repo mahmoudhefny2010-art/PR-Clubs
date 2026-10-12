@@ -85,7 +85,7 @@
 :root[data-theme="dark"] .committee-timeline-event::before { border-color: var(--bg-panel); }
 .attachment-preview-dialog { width: min(1100px, 94vw); max-width: none; max-height: 92vh; padding: 0; overflow: visible; border: 0; border-radius: 18px; background: transparent; }
 .attachment-preview-dialog::backdrop { background: rgba(9, 15, 25, .82); backdrop-filter: blur(5px); }
-.attachment-preview-panel { position: relative; display: grid; place-items: center; min-height: 120px; padding: 16px; border: 1px solid rgba(255,255,255,.22); border-radius: 18px; background: #111827; box-shadow: 0 24px 80px rgba(0,0,0,.4); }
+.attachment-preview-panel { position: relative; display: grid; place-items: center; min-height: 120px; padding: 16px; border: 1px solid rgba(255,255,255,.22); border-radius: 18px; background: #111827; isolation: isolate; box-shadow: 0 24px 80px rgba(0,0,0,.4); }
 .attachment-preview-panel img { display: block; max-width: 88vw; max-height: 86vh; object-fit: contain; border-radius: 8px; }
 .attachment-preview-close { position: absolute; top: 10px; right: 10px; z-index: 1; display: grid; width: 40px; height: 40px; place-items: center; border: 1px solid rgba(255,255,255,.35); border-radius: 50%; background: rgba(15,23,42,.72); color: #fff; font-size: 1.5rem; line-height: 1; cursor: pointer; }
 .attachment-preview-close:hover { background: #b91c1c; }
@@ -521,6 +521,81 @@
 .status-overview-dialog .status-overview-inner, .review-history-dialog .review-history-inner { box-sizing: border-box; display: flex; max-height: inherit; flex-direction: column; overflow: hidden; }
 .status-overview-dialog .status-overview-list, .review-history-dialog .review-history-list { flex: 1 1 auto; min-height: 0; max-height: none; overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
 .attendance-qr-result { margin: 18px auto 26px; padding: 20px; max-width: 420px; text-align: center; border: 1px solid var(--border-color); border-radius: var(--radius-lg); background: var(--bg-soft); }
+
+/* Keep modal close controls reachable while their content scrolls. */
+:is(button[aria-label^="Close"], .club-detail-close, .calendar-close-btn, .close-btn, .request-dialog-close, .club-review-notice-close, .club-feedback-dialog-close, .attachment-preview-close) {
+  background-color: rgba(15, 23, 42, .2);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+.event-modal-panel > .event-modal-close {
+  position: sticky;
+  top: 8px;
+  grid-column: 1 / -1;
+  justify-self: end;
+  align-self: start;
+  margin: -10px -10px -42px 0;
+  background: rgba(255, 255, 255, .18);
+}
+
+.calendar-panel > .calendar-head,
+.member-dialog-inner > .member-dialog-header,
+.member-directory-inner > .member-directory-header,
+.approval-checkpoint-more-header,
+.request-dialog .request-dialog-head:has(.request-dialog-close),
+#reviewModal .modal-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: color-mix(in srgb, var(--bg-panel) 78%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+.calendar-panel > .calendar-head { margin-top: -16px; padding: 12px 0 10px; }
+.member-dialog-inner > .member-dialog-header { margin: -24px 0 0; padding: 12px 0; }
+.member-directory-inner > .member-directory-header { margin: -22px 0 0; padding: 12px 0; }
+.request-dialog .request-dialog-head:has(.request-dialog-close) { margin: -24px -24px 14px; padding: 14px 24px 10px; }
+#reviewModal .modal-header { background: color-mix(in srgb, var(--bg-panel) 78%, transparent); }
+
+.club-detail-card > .club-detail-close,
+#applicationView .app-form-card > .application-exit {
+  position: sticky;
+  top: 10px;
+  float: right;
+  margin: -6px 0 -44px 8px;
+  background: rgba(15, 23, 42, .2);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+.club-review-notice-content > .club-review-notice-close {
+  position: sticky;
+  top: 8px;
+  float: right;
+  margin: -10px -10px -44px 8px;
+  background: rgba(15, 23, 42, .2);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+.attachment-preview-dialog .attachment-preview-panel > .attachment-preview-close {
+  background: rgba(255, 255, 255, .16) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(1.15) !important;
+  backdrop-filter: blur(12px) saturate(1.15) !important;
+  border-color: rgba(255, 255, 255, .62);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, .9);
+}
+
+:root[data-theme="dark"] body .attachment-preview-dialog .attachment-preview-panel > .attachment-preview-close {
+  border-color: transparent !important;
+}
+
+:root[data-theme="dark"] body :is(.club-detail-close, .calendar-close-btn, .close-btn, .request-dialog-close, .club-review-notice-close, .club-feedback-dialog-close, .attachment-preview-close) {
+  border-color: transparent !important;
+}
+
 .attendance-qr-result h3 { margin: 0 0 14px; }
 .attendance-qr-result p { color: var(--text-muted); }
 .attendance-qr-canvas { display: grid; place-items: center; width: 250px; min-height: 250px; max-width: 100%; margin: 0 auto; padding: 10px; background: #fff; border-radius: var(--radius-md); }
