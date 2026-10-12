@@ -157,6 +157,20 @@
 :root[data-theme="dark"] body .today-event-title { color: var(--text-main) !important; }
 :root[data-theme="dark"] body :is(.footer, .site-footer, #site-footer) { color: var(--text-muted); }
 
+/* The home page's later light-mode gradient otherwise paints over this panel's dark fill. */
+:root[data-theme="dark"] #homeView > .events-slideshow {
+  background: linear-gradient(115deg, #111b2b 0%, #111b2b 72%, #172438 100%) !important;
+  border-color: rgba(240, 120, 128, .3) !important;
+}
+:root[data-theme="dark"] #homeView .events-slideshow-head h2,
+:root[data-theme="dark"] #homeView .event-slide-copy h3 { color: var(--text-main) !important; }
+:root[data-theme="dark"] #homeView .event-slide-club,
+:root[data-theme="dark"] #homeView .event-slide-copy .event-slide-cta { color: #ff9299 !important; }
+:root[data-theme="dark"] #homeView .event-slide-meta,
+:root[data-theme="dark"] #homeView .event-slide-copy > p:not(.event-slide-meta) { color: var(--text-muted) !important; }
+:root[data-theme="dark"] #homeView .events-slideshow-dots button { background: #57404d; }
+:root[data-theme="dark"] #homeView .events-slideshow-dots button.active { background: #ef5963; }
+
 /* Forms and native controls retain clear focus and readable placeholder text. */
 :root[data-theme="dark"] body :is(input, select, textarea, .panel input:not([type="file"]), .panel select, .panel textarea, .field-group input, .field-group select, .field-group textarea, .modal-field input, .modal-field select, .modal-field textarea, .attendance-checkin input, .attendance-checkin textarea, #regForm input) {
   color-scheme: dark;
