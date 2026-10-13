@@ -130,31 +130,59 @@
   }
 }
 
-/* The admin dashboard controls stay in one touch-scrollable row on phones. */
+/* Keep homepage-admin controls uniform and wrap them instead of clipping. */
+#adminView > .admin-panel > .admin-header {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+#adminView .admin-session-actions {
+  display: grid;
+  flex: 1 1 100%;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
+  align-items: stretch;
+  width: 100%;
+}
+
+#adminView .admin-session-actions > :is(a, button) {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 50px;
+  margin: 0;
+  padding: 10px 12px;
+  line-height: 1.2;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* Keep admin controls evenly sized and wrapped on narrow screens. */
 @media (max-width: 760px) {
   .admin-session-actions {
     box-sizing: border-box;
-    display: flex;
-    flex: 0 0 auto;
-    flex-flow: row nowrap;
+    display: grid;
+    flex: 1 1 100%;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 165px), 1fr));
+    align-items: stretch;
     width: 100%;
     max-width: 100%;
-    overflow-x: auto;
-    overflow-y: hidden;
-    overscroll-behavior-x: contain;
-    -webkit-overflow-scrolling: touch;
-    padding: 2px 2px 9px;
-    scrollbar-width: thin;
-    scrollbar-color: var(--primary-700) var(--bg-soft);
+    min-width: 0;
+    overflow: visible;
+    padding: 0;
+    gap: 8px;
   }
   .admin-session-actions > :is(a, button) {
-    flex: 0 0 auto;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
     min-height: 44px;
-    white-space: nowrap;
+    padding: 10px 9px;
+    white-space: normal;
   }
-  .admin-session-actions::-webkit-scrollbar { height: 5px; }
-  .admin-session-actions::-webkit-scrollbar-track { background: var(--bg-soft); border-radius: 999px; }
-  .admin-session-actions::-webkit-scrollbar-thumb { background: var(--primary-700); border-radius: 999px; }
 }
 
 @keyframes slideDown {
