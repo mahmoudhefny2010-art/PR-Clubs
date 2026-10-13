@@ -19,6 +19,7 @@
   let startupReleaseTimer = 0;
   let indicator = null;
   let startupRing = null;
+  let startupCover = null;
   let startupReleased = false;
   const afterStartupQueue = [];
   let activeAfterStartupTasks = 0;
@@ -31,6 +32,8 @@
     startupReleased = true;
     window.clearTimeout(startupReleaseTimer);
     root.classList.remove('site-startup-pending');
+    startupCover?.remove();
+    startupCover = null;
     runNextAfterStartupTask();
   }
 
@@ -94,6 +97,12 @@
 
   function ensureIndicators() {
     if (!document.body) return false;
+    if (!startupCover) {
+      startupCover = document.createElement('div');
+      startupCover.className = 'site-startup-cover';
+      startupCover.setAttribute('aria-hidden', 'true');
+      document.body.append(startupCover);
+    }
     if (!startupRing) {
       startupRing = document.createElement('span');
       startupRing.className = 'site-startup-ring';
