@@ -196,6 +196,7 @@
 :root[data-theme="dark"] body :is(.status-pill.status-accepted, .is-approved, .committee-approval-row > strong.is-approved) { background: rgba(22, 163, 74, .18) !important; color: #72e2a8 !important; border-color: rgba(74, 222, 153, .3) !important; }
 :root[data-theme="dark"] body :is(.status-pill.status-rejected, .danger, .delete-request) { background: rgba(220, 38, 38, .16) !important; color: #ff9299 !important; border-color: rgba(255, 126, 135, .35) !important; }
 :root[data-theme="dark"] body :is(.content-type-badge.event, .today-event-badge) { background: rgba(37, 99, 235, .2) !important; color: #9bbcff !important; }
+:root[data-theme="dark"] body .event-attendance-status { border-color: rgba(96, 165, 250, .3) !important; background: rgba(37, 99, 235, .2) !important; color: #9bbcff !important; }
 :root[data-theme="dark"] body .content-type-badge.feed { background: rgba(124, 58, 237, .2) !important; color: #c5a8ff !important; }
 :root[data-theme="dark"] body .content-type-badge.sponsor { background: rgba(217, 119, 6, .2) !important; color: #ffd279 !important; }
 :root[data-theme="dark"] body .content-type-badge.booth { background: rgba(22, 163, 74, .18) !important; color: #72e2a8 !important; }
@@ -222,6 +223,80 @@
 :root[data-theme="dark"] body :is(.dashboard-sync-grid span, .admin-data-status-database) { border-color: var(--success-border) !important; background: var(--success-bg) !important; color: #9aefbe !important; }
 :root[data-theme="dark"] body :is(.dashboard-sync-grid span[data-sync-state="error"], .admin-data-status-failure) { border-color: var(--danger-border) !important; background: var(--danger-bg) !important; color: #ffabb1 !important; }
 :root[data-theme="dark"] body .dashboard-sync-grid span[data-sync-state="loading"] { border-color: var(--warning-border) !important; background: var(--warning-bg) !important; color: #ffd279 !important; }
+
+/* Review and permit cards are shared by PR, Dean, English, and Security dashboards.
+   Page styles load after this file, so keep these selectors specific to preserve contrast. */
+:root[data-theme="dark"] body .req-card,
+:root[data-theme="dark"] body .status-overview-list .req-card {
+  background: var(--bg-panel) !important;
+  color: var(--text-main) !important;
+  border-color: var(--border-color) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+:root[data-theme="dark"] body .req-card :is(strong, b, h2, h3, h4) { color: var(--text-main) !important; }
+:root[data-theme="dark"] body .req-card :is(p, .req-meta, .status-overview-meta) { color: var(--text-muted) !important; }
+:root[data-theme="dark"] body .badge-status,
+:root[data-theme="dark"] body .status-overview-pill {
+  background: var(--warning-bg) !important;
+  color: #ffd279 !important;
+  border-color: var(--warning-border) !important;
+}
+:root[data-theme="dark"] body .status-overview-pill.published,
+:root[data-theme="dark"] body .req-card .badge-status.is-approved { background: var(--success-bg) !important; color: #9aefbe !important; border-color: var(--success-border) !important; }
+:root[data-theme="dark"] body .status-overview-pill.rejected,
+:root[data-theme="dark"] body .status-overview-pill.draft,
+:root[data-theme="dark"] body .status-overview-pill.pending { background: var(--bg-soft) !important; color: var(--text-muted) !important; border-color: var(--border-color) !important; }
+:root[data-theme="dark"] body .req-actions button,
+:root[data-theme="dark"] body .req-actions input,
+:root[data-theme="dark"] body .dialog-actions button {
+  background: var(--bg-soft) !important;
+  color: var(--text-main) !important;
+  border-color: var(--border-color) !important;
+}
+:root[data-theme="dark"] body .req-actions :is(.approve, .is-approved),
+:root[data-theme="dark"] body .dialog-actions .approve { background: var(--success-bg) !important; color: #9aefbe !important; border-color: var(--success-border) !important; }
+:root[data-theme="dark"] body .req-actions :is(.reject, .delete, .delete-request),
+:root[data-theme="dark"] body .dialog-actions :is(.reject, .delete-request) { background: var(--danger-bg) !important; color: #ffabb1 !important; border-color: var(--danger-border) !important; }
+:root[data-theme="dark"] body .req-actions :is(.changes, .return-review),
+:root[data-theme="dark"] body .dialog-actions :is(.changes, .return-review) { background: var(--warning-bg) !important; color: #ffd279 !important; border-color: var(--warning-border) !important; }
+:root[data-theme="dark"] body .req-actions :is(.reopen-review, .view-details),
+:root[data-theme="dark"] body .dialog-actions .reopen-review { background: var(--bg-soft) !important; color: #b8caff !important; border-color: #405477 !important; }
+:root[data-theme="dark"] body .request-dialog-close { background: var(--bg-soft) !important; color: var(--text-main) !important; }
+:root[data-theme="dark"] body :is(.detail-item, .review-history-entry, .history-return-panel) { background: var(--bg-soft) !important; color: var(--text-main) !important; border-color: var(--border-color) !important; }
+:root[data-theme="dark"] body :is(.detail-item h3, .status-overview-meta) { color: var(--text-muted) !important; }
+:root[data-theme="dark"] body .review-history-entry.focused-review { background: #18263b !important; }
+:root[data-theme="dark"] body .review-history-entry :is(p, h3) { color: var(--text-main) !important; }
+
+/* Common content management forms and cards. */
+:root[data-theme="dark"] body :is(.panel, .module-card, .content-card, .speaker-panel, .feed-post-card, .application-row, .speaker-request-card, .speaker-invite-result) {
+  background-color: var(--bg-panel) !important;
+  color: var(--text-main) !important;
+  border-color: var(--border-color) !important;
+}
+:root[data-theme="dark"] body :is(.mini-btn, .date-time-picker button, .feed-filter:not(.is-active), .content-form-assignment select, .content-task-assignment select, .module-nav a:not(.is-active)) {
+  background-color: var(--bg-soft) !important;
+  color: var(--text-main) !important;
+  border-color: var(--border-color) !important;
+}
+:root[data-theme="dark"] body :is(.content-form-assignment, .content-card, .module-card) { color: var(--text-main) !important; }
+:root[data-theme="dark"] body .content-card-type { background: var(--bg-strong) !important; color: var(--text-muted) !important; }
+:root[data-theme="dark"] body :is(.review-history-badge.request_edit, .speaker-status.changes_requested, .speaker-status.pending_club) { background: var(--warning-bg) !important; color: #ffd279 !important; border-color: var(--warning-border) !important; }
+:root[data-theme="dark"] body .review-history-badge.reject,
+:root[data-theme="dark"] body .speaker-status.rejected { background: var(--danger-bg) !important; color: #ffabb1 !important; border-color: var(--danger-border) !important; }
+:root[data-theme="dark"] body .history-return-panel textarea { background: #0d1727 !important; color: var(--text-main) !important; border-color: var(--border-color) !important; }
+
+/* Standalone error pages define their own light palette, so explicitly theme the full surface. */
+:root[data-theme="dark"] body:has(.error-card) {
+  background: var(--bg-main) !important;
+  color: var(--text-main) !important;
+}
+:root[data-theme="dark"] body:has(.error-card) .error-card {
+  background: var(--bg-main) !important;
+  color: var(--text-main) !important;
+  border-color: var(--border-color) !important;
+}
+:root[data-theme="dark"] body:has(.error-card) :is(h1, p, .error-message) { color: var(--text-main) !important; }
+:root[data-theme="dark"] body:has(.error-card) :is(.back-action, .retry-action) { background: var(--bg-soft) !important; color: var(--text-main) !important; border-color: var(--border-color) !important; }
 
 /* Dialogs and overlays. */
 :root[data-theme="dark"] body :is(dialog, .modal, .modal-card, .request-dialog-inner, .approval-checkpoint-more-inner, .admin-data-status-dialog, .committee-availability-dialog, .attendance-review-dialog) {
@@ -278,4 +353,17 @@
   .my-form-card { align-items: stretch; flex-direction: column; }
   .my-form-actions > button { flex: 1 1 130px; }
   .home-form-actions { justify-content: flex-start; }
+}
+@media (max-width: 640px) {
+  :root[data-theme="dark"] body .committee-sidebar,
+  :root[data-theme="dark"] body .president-sidebar {
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    scrollbar-color: var(--primary-700) transparent;
+  }
+  :root[data-theme="dark"] body .committee-sidebar::-webkit-scrollbar-track,
+  :root[data-theme="dark"] body .president-sidebar::-webkit-scrollbar-track { background: transparent !important; }
+  :root[data-theme="dark"] body .committee-sidebar::-webkit-scrollbar-thumb,
+  :root[data-theme="dark"] body .president-sidebar::-webkit-scrollbar-thumb { background: #64748b; }
 }

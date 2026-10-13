@@ -10,10 +10,14 @@
   let activeExternalId = '';
   let activeEmail = '';
   let emailEnabled = false;
+  let emailSupported = true;
   let sdkUnavailable = false;
+  let notificationConfigMissing = false;
+  let sdkUnavailableMessage = '';
   let settingsLoading = false;
   let settingsError = '';
   let sessionRevision = 0;
+  let currentSession = null;
   let welcomeDialog = null;
 
   function welcomeStorageKey() {
@@ -34,6 +38,10 @@
   }
 
   function maybeShowNotificationWelcome() {
+    if (document.querySelector('dialog[open]')) {
+      document.querySelector('dialog[open]').addEventListener('close', maybeShowNotificationWelcome, { once: true });
+      return;
+    }
     if (!oneSignalInstance || !oneSignalInstance.Notifications.isPushSupported()) return;
     if (oneSignalInstance.User.PushSubscription.optedIn) return;
     if (typeof Notification !== 'undefined' && Notification.permission === 'denied') return;
@@ -89,20 +97,20 @@
     ]).finally(() => clearTimeout(timer));
   }
 
-  function announce(message) {
+  function announce(message, visible = false) {
     status.textContent = message;
-    status.hidden = !message;
+    status.hidden = !message || !visible;
   }
 
   function render() {
     if (sdkUnavailable) {
-      toggle.disabled = true;
-      toggle.textContent = 'Notifications unavailable';
-      announce('Push notifications are not configured for this site yet.');
+      toggle.disabled = notificationConfigMissing;
+      toggle.textContent = notificationConfigMissing ? 'Notifications unavailable' : 'Retry notifications';
+      announce(sdkUnavailableMessage || 'Notification service could not be loaded. Try again in a moment.', true);
       emailToggle.disabled = true;
       emailToggle.textContent = 'Email updates unavailable';
       emailStatus.textContent = 'Email updates are not configured for this site yet.';
-      emailStatus.hidden = false;
+      emailStatus.hidden = !emailSupported;
       return;
     }
     if (settingsLoading) {
@@ -114,13 +122,13 @@
       return;
     }
     if (settingsError) {
-      toggle.disabled = true;
-      toggle.textContent = 'Notifications unavailable';
-      announce(settingsError);
+      toggle.disabled = false;
+      toggle.textContent = 'Retry notifications';
+      announce(settingsError, true);
       emailToggle.disabled = true;
       emailToggle.textContent = 'Email updates unavailable';
       emailStatus.textContent = settingsError;
-      emailStatus.hidden = false;
+      emailStatus.hidden = !emailSupported;
       return;
     }
     if (!oneSignalInstance) return;
@@ -132,18 +140,19 @@
       emailToggle.textContent = 'Preparing email updates...';
       return;
     }
-    emailToggle.disabled = false;
+    emailToggle.hidden = !emailSupported;
+    emailToggle.disabled = !emailSupported;
     emailToggle.textContent = emailEnabled ? 'Turn off email updates' : 'Turn on email updates';
     emailStatus.textContent = emailEnabled
       ? 'You will receive relevant club updates at your student account email.'
       : 'Email updates are off. Turn them on when you are ready.';
-    emailStatus.hidden = false;
+    emailStatus.hidden = !emailSupported;
     const supported = oneSignalInstance.Notifications.isPushSupported();
     const permissionDenied = typeof Notification !== 'undefined' && Notification.permission === 'denied';
     if (!supported) {
       toggle.disabled = true;
       toggle.textContent = 'Notifications unavailable';
-      announce('This browser or device does not support web push notifications.');
+      announce('This browser or device does not support web push notifications.', true);
       return;
     }
     const optedIn = Boolean(oneSignalInstance.User.PushSubscription.optedIn);
@@ -151,29 +160,49 @@
     toggle.textContent = optedIn ? 'Turn off notifications' : permissionDenied ? 'Notifications blocked' : 'Turn on notifications';
     announce(permissionDenied
       ? 'Notifications are blocked in browser settings. Change this site’s permission there to enable them.'
-      : optedIn ? 'You are subscribed to relevant club updates.' : 'Push notifications are off. You can turn them on when you are ready.');
+      : optedIn ? 'You are subscribed to relevant club updates.' : 'Push notifications are off. You can turn them on when you are ready.',
+    permissionDenied);
   }
 
   async function loadOneSignal() {
     if (initialization) return initialization;
     initialization = (async () => {
-      const configResponse = await withTimeout(fetch('/api/notifications/config', { cache: 'no-store' }), 10000, 'ONESIGNAL_CONFIG_TIMEOUT');
-      const config = configResponse.ok ? await configResponse.json() : { enabled: false };
+      const configResponse = await withTimeout(fetch('/api/notifications/config', {
+        cache: 'no-store', siteStartupNonBlocking: true
+      }), 10000, 'ONESIGNAL_CONFIG_TIMEOUT');
+      if (!configResponse.ok) throw new Error(`NOTIFICATION_CONFIG_HTTP_${configResponse.status}`);
+      const config = await configResponse.json();
       if (!config.enabled || !config.appId) {
         sdkUnavailable = true;
+        notificationConfigMissing = true;
+        sdkUnavailableMessage = 'Push notifications are not configured for this site yet.';
         render();
         return null;
       }
+      notificationConfigMissing = false;
 
       window.OneSignalDeferred = window.OneSignalDeferred || [];
       let resolveSdk;
       let rejectSdk;
+      let attemptActive = true;
+      let script;
+      let deferredHandler;
       const sdkReady = new Promise((resolve, reject) => { resolveSdk = resolve; rejectSdk = reject; });
-      window.OneSignalDeferred.push(async (OneSignal) => {
+      const removePendingInitialization = () => {
+        attemptActive = false;
+        if (Array.isArray(window.OneSignalDeferred) && deferredHandler) {
+          const pendingIndex = window.OneSignalDeferred.indexOf(deferredHandler);
+          if (pendingIndex !== -1) window.OneSignalDeferred.splice(pendingIndex, 1);
+        }
+        script?.remove();
+      };
+      deferredHandler = async (OneSignal) => {
+        if (!attemptActive) return;
         try {
           await OneSignal.init({
             appId: config.appId,
-            serviceWorkerPath: 'push/onesignal/OneSignalSDKWorker.js',
+            // Use an origin-root path so the same worker is found from nested dashboard URLs too.
+            serviceWorkerPath: '/push/onesignal/OneSignalSDKWorker.js',
             serviceWorkerParam: { scope: '/push/onesignal/' },
             allowLocalhostAsSecureOrigin: ['localhost', '127.0.0.1'].includes(location.hostname)
           });
@@ -181,20 +210,30 @@
         } catch (error) {
           rejectSdk(error);
         }
-      });
+      };
+      window.OneSignalDeferred.push(deferredHandler);
 
-      const script = document.createElement('script');
+      script = document.createElement('script');
       script.src = 'https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js';
       script.async = true;
-      script.onerror = () => rejectSdk(new Error('OneSignal SDK failed to load.'));
+      script.onerror = () => rejectSdk(new Error('The OneSignal SDK could not be downloaded. Check the network or content blocker and retry.'));
       document.head.appendChild(script);
-      oneSignalInstance = await withTimeout(sdkReady, 12000, 'ONESIGNAL_SDK_TIMEOUT');
+      try {
+        oneSignalInstance = await withTimeout(sdkReady, 12000, 'ONESIGNAL_SDK_TIMEOUT');
+      } catch (error) {
+        removePendingInitialization();
+        throw error;
+      }
+      attemptActive = false;
       oneSignalInstance.User.PushSubscription.addEventListener('change', render);
       oneSignalInstance.Notifications.addEventListener('permissionChange', render);
       render();
       return oneSignalInstance;
     })().catch((error) => {
-      console.warn('Push notifications are currently unavailable:', error.name || 'Error');
+      sdkUnavailableMessage = error.message === 'ONESIGNAL_SDK_TIMEOUT'
+        ? 'OneSignal took too long to start. Check the connection and retry.'
+        : (error.message || 'OneSignal could not start. Check the connection and retry.').slice(0, 220);
+      console.warn('Push notifications are currently unavailable:', error.name || 'Error', error.message || '');
       sdkUnavailable = true;
       render();
       return null;
@@ -203,8 +242,12 @@
   }
 
   async function setSession(session) {
+    currentSession = session;
+    emailSupported = session?.type === 'student';
+    emailToggle.hidden = !emailSupported;
+    emailStatus.hidden = !emailSupported;
     const revision = ++sessionRevision;
-    if (!session?.authenticated || session.type !== 'student') {
+    if (!session?.authenticated || !['student', 'club', 'admin'].includes(session.type)) {
       if (oneSignalInstance && activeExternalId) {
         await oneSignalInstance.User.PushSubscription.optOut().catch(() => {});
         await oneSignalInstance.logout().catch(() => {});
@@ -225,7 +268,7 @@
       const OneSignal = await loadOneSignal();
       if (!OneSignal || revision !== sessionRevision) return;
       const identityResponse = await withTimeout(fetch('/api/notifications/identity', {
-        cache: 'no-store', credentials: 'same-origin'
+        cache: 'no-store', credentials: 'same-origin', siteStartupNonBlocking: true
       }), 10000, 'NOTIFICATION_IDENTITY_TIMEOUT');
       if (!identityResponse.ok) throw new Error(`NOTIFICATION_IDENTITY_HTTP_${identityResponse.status}`);
       const identity = await identityResponse.json();
@@ -240,6 +283,7 @@
         await OneSignal.logout().catch(() => {});
         return;
       }
+      emailSupported = identity.emailSupported !== false;
       activeExternalId = identity.externalId;
       activeEmail = identity.email || '';
       emailEnabled = Boolean(identity.emailNotificationsEnabled);
@@ -270,6 +314,18 @@
   }
 
   toggle.addEventListener('click', async () => {
+    if (sdkUnavailable) {
+      if (notificationConfigMissing) return;
+      sdkUnavailable = false;
+      sdkUnavailableMessage = '';
+      initialization = null;
+      await setSession(currentSession);
+      return;
+    }
+    if (settingsError) {
+      await setSession(currentSession);
+      return;
+    }
     toggle.disabled = true;
     announce('Updating your notification preference…');
     let outcomeMessage = '';
@@ -292,14 +348,15 @@
       console.warn('Push preference update failed:', error.name || 'Error');
     } finally {
       render();
-      if (outcomeMessage) announce(outcomeMessage);
+      if (outcomeMessage) announce(outcomeMessage, true);
     }
   });
 
   emailToggle.addEventListener('click', async () => {
+    if (!emailSupported) return;
     emailToggle.disabled = true;
     emailStatus.textContent = 'Updating your email preference...';
-    emailStatus.hidden = false;
+    emailStatus.hidden = !emailSupported;
     try {
       const OneSignal = await loadOneSignal();
       if (!OneSignal || !activeExternalId || !activeEmail) throw new Error('EMAIL_IDENTITY_UNAVAILABLE');
@@ -346,7 +403,9 @@
     try {
       let session = window.__miuAccountSession;
       if (!session) {
-        const response = await fetch('/api/site/account-session', { cache: 'no-store', credentials: 'same-origin' });
+        const response = await fetch('/api/site/account-session', {
+          cache: 'no-store', credentials: 'same-origin', siteStartupNonBlocking: true
+        });
         if (response.ok) session = await response.json();
       }
       if (session) await setSession(session);

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Manage Club Supervisors · MIU Clubs</title>
+  <script src="/assets/js/site-loading.js?v=20261013stagedload4"></script>
+  <link rel="stylesheet" href="/assets/css/base.css?v=20261013caret1">
+  <link rel="stylesheet" href="/assets/css/responsive.css?v=20261013mobilebuttons1">
+  <link rel="stylesheet" href="/assets/css/dark.css?v=20261013darkglobal2">
+  <link rel="stylesheet" href="/assets/css/features.css?v=20261013backbutton1">
+  <link rel="stylesheet" href="/assets/css/pages/supervisor-dashboard.css?v=20261013navscroll1">
+  <link rel="stylesheet" href="/assets/css/pages/supervisor-management.css?v=20261013responsive1">
+  <script src="/assets/js/theme.js?v=20261009c" defer></script>
+  <script src="/assets/js/layout.js?v=20261013stagedload3" defer></script>
+  <script src="/assets/js/supervisor-management.js?v=20261013verifiedpassword1" defer></script>
+  <link rel="stylesheet" href="/assets/css/modal-controls.css?v=20261013modalclose2">
+</head><body><div id="site-header"></div>
+  <main class="app-container supervisor-main supervisor-management"><section class="committee-card supervisor-management-shell">
+    <header class="supervisor-management-heading"><div><span class="committee-label">ADMINISTRATION</span><h1>Manage club supervisors</h1><p>Create supervisor accounts and assign the clubs they review.</p><a href="/dashboards/staff-management.html">Manage all staff roles</a></div><a class="secondary-btn" href="/admin">Back to dashboard</a></header>
+    <p id="supervisorAdminFeedback" role="status" aria-live="polite">Loading assignments…</p>
+    <form id="supervisorAdminForm" class="supervisor-admin-form" hidden>
+      <div class="supervisor-form-heading"><h2>Supervisor account</h2><p>Use an existing supervisor email to update its assignments.</p></div>
+      <div class="supervisor-account-fields">
+      <label for="supervisorEmail">Supervisor email<input id="supervisorEmail" type="email" required maxlength="254" autocomplete="off" placeholder="doctor@university.edu"></label>
+      <label for="supervisorPassword">New password <span class="supervisor-field-hint">Leave empty to keep existing</span><input id="supervisorPassword" type="password" minlength="12" maxlength="200" autocomplete="new-password" placeholder="At least 12 characters"></label>
+      <label for="supervisorConfirmPassword">Confirm new password<input id="supervisorConfirmPassword" type="password" minlength="12" maxlength="200" autocomplete="new-password" placeholder="Re-enter the new password"></label>
+      </div>
+      <fieldset id="supervisorAssignments"><legend>Assigned clubs</legend></fieldset>
+      <div class="supervisor-form-footer"><p>MIU staff can use Google sign-in after you assign their email and clubs. Changing assignments signs the supervisor out.</p>
+      <button class="primary-btn" type="submit">Save supervisor</button>
+      </div>
+    </form>
+    <section class="supervisor-management-section" aria-labelledby="clubSupervisorsHeading"><div class="supervisor-section-heading"><h2 id="clubSupervisorsHeading">Club supervisors</h2><p>Check coverage and manage each club's supervisor.</p></div><div id="supervisorClubAssignments"></div></section>
+    <section class="supervisor-management-section" aria-labelledby="supervisorAccountsHeading"><div class="supervisor-section-heading"><h2 id="supervisorAccountsHeading">Supervisor accounts</h2><p>All supervisors share the same dashboard and permissions.</p></div><div id="supervisorAccounts"></div></section>
+  </section></main><div id="site-footer"></div>
+</body></html>

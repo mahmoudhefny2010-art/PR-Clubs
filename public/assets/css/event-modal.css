@@ -50,6 +50,7 @@ body.modal-open { overflow: hidden; }
 .event-modal-club { color: #b71c1c; font-size: .85rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .event-modal-copy h2 { margin: 8px 0; font-size: clamp(1.6rem, 3vw, 2.4rem); line-height: 1.15; }
 .event-modal-meta, .event-modal-description { color: #536176; font-size: 1.05rem; line-height: 1.55; }
+.event-modal-copy .event-attendance-status { color: #1d4ed8; }
 .event-modal-description { white-space: pre-wrap; }
 .event-modal-copy form { max-width: 440px; }
 .event-modal-copy form[hidden] { display: none !important; }

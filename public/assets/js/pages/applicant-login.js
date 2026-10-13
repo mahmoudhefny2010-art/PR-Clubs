@@ -14,14 +14,14 @@
           });
           const result = await response.json();
           if (!response.ok) throw new Error(result.message || 'Login failed.');
-          window.location.assign(result.role === 'student' ? studentReturnTarget() : (result.redirect || '/'));
+          window.location.replace(result.role === 'student' ? studentReturnTarget() : (result.redirect || '/'));
         } catch (error) {
           feedback.textContent = error.message;
           feedback.classList.add('is-error');
         }
       });
       const studentReturnTarget = () => {
-        const target = new URLSearchParams(window.location.search).get('redirect') || '/';
+        const target = new URLSearchParams(window.location.search).get('redirect') || '/?myForms=1';
         try {
           const parsed = new URL(target, window.location.origin);
           return target.startsWith('/') && parsed.origin === window.location.origin
@@ -81,7 +81,7 @@
                     feedback.textContent = 'Your Google account is now linked. You can use either sign-in method.';
                     return;
                   }
-                  window.location.assign(studentReturnTarget());
+                  window.location.replace(result.role === 'student' ? studentReturnTarget() : (result.redirect || '/'));
                 } catch (error) { feedback.textContent = error.message; feedback.classList.add('is-error'); }
               }
             });

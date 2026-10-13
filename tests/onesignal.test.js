@@ -97,14 +97,19 @@ test('does not make a provider request when configuration is missing', async () 
   assert.equal(called, false);
 });
 
-test('keeps identity lookup behind student auth and exposes no client-callable push dispatch route', () => {
+test('keeps identity lookup behind account authentication and exposes no client-callable push dispatch route', () => {
   const serverSource = fs.readFileSync(require.resolve('../server'), 'utf8');
-  assert.match(serverSource, /app\.get\('\/api\/notifications\/identity',\s*requireStudentAuth/);
+  assert.match(serverSource, /const club = await getClubAccountFromRequest\(req\)/);
+  assert.match(serverSource, /if \(!student\) return res.status\(401\)/);
   assert.match(serverSource, /app\.put\('\/api\/notifications\/email-preference',\s*requireStudentAuth/);
   assert.match(serverSource, /dispatchPublishedContentNotifications\(\{/);
   assert.match(serverSource, /emailNotificationsEnabled === true/);
   assert.match(serverSource, /source: 'university'/);
   assert.match(serverSource, /app\.patch\('\/api\/applications\/:id\/status',\s*requireClubAuth/);
+  assert.match(serverSource, /async function dispatchSpeakerRequestStatusPush\(request\)/);
+  assert.match(serverSource, /request\?\.requesterType !== 'student'/);
+  assert.match(serverSource, /Changes were requested to your speaker request/);
+  assert.equal([...serverSource.matchAll(/await dispatchSpeakerRequestStatusPush\(record\)/g)].length, 1);
   assert.match(serverSource, /app\.use\('\/api\/admin',\s*requireAdmin\)/);
   assert.doesNotMatch(serverSource, /app\.(?:post|put|patch|delete)\('\/api\/notifications\/(?:dispatch|send)/);
 });

@@ -6,7 +6,7 @@ const vm = require('node:vm');
 const clientSource = fs.readFileSync(require.resolve('../public/assets/js/onesignal-notifications.js'), 'utf8');
 
 function createClientHarness({ session, externalId = 'student-1', permissionResult = 'granted' }) {
-  const calls = { logins: [], logouts: 0, optIns: 0, optOuts: 0, addEmails: [], removeEmails: [] };
+  const calls = { logins: [], logouts: 0, optIns: 0, optOuts: 0, addEmails: [], removeEmails: [], initOptions: null };
   const windowListeners = new Map();
   const deferred = [];
   const pushListeners = new Map();
@@ -19,9 +19,10 @@ function createClientHarness({ session, externalId = 'student-1', permissionResu
   let optedIn = false;
   let currentSession = session;
   let currentExternalId = externalId;
+  let identityStatus = 200;
   let nextPermissionResult = permissionResult;
   const oneSignal = {
-    init: async () => {},
+    init: async (options) => { calls.initOptions = options; },
     login: async (id) => { calls.logins.push(id); },
     logout: async () => { calls.logouts += 1; },
     User: {
@@ -59,10 +60,13 @@ function createClientHarness({ session, externalId = 'student-1', permissionResu
     }
   };
   const sandbox = {
+    setTimeout, clearTimeout,
+    localStorage: { getItem: () => "seen" },
     console: { warn: () => {} },
     Notification: { permission: 'default' },
     location: { hostname: 'localhost' },
     document: {
+      querySelector: () => null,
       getElementById: (id) => ({ headerNotificationToggle: toggle, headerNotificationStatus: status, headerEmailNotificationToggle: emailToggle, headerEmailNotificationStatus: emailStatus })[id] || null,
       createElement: () => ({ dataset: {}, async: false, onerror: null }),
       head: { appendChild: () => {
@@ -71,7 +75,9 @@ function createClientHarness({ session, externalId = 'student-1', permissionResu
     },
     fetch: async (url) => {
       if (url === '/api/notifications/config') return { ok: true, json: async () => ({ enabled: true, appId: '123e4567-e89b-42d3-a456-426614174000' }) };
-      if (url === '/api/notifications/identity') return { ok: true, json: async () => ({ externalId: currentExternalId, email: 'student@miuegypt.edu.eg', emailNotificationsEnabled: false }) };
+      if (url === '/api/notifications/identity') return { ok: identityStatus === 200, status: identityStatus,
+        json: async () => ({ externalId: currentExternalId, email: currentSession?.type === 'student' ? 'student@miuegypt.edu.eg' : '',
+          emailSupported: currentSession?.type === 'student', emailNotificationsEnabled: false }) };
       if (url === '/api/notifications/email-preference') return { ok: true, json: async () => ({ emailNotificationsEnabled: true }) };
       throw new Error(`Unexpected request ${url}`);
     },
@@ -90,6 +96,7 @@ function createClientHarness({ session, externalId = 'student-1', permissionResu
   return {
     calls, toggle, status, emailToggle, emailStatus, sandbox, currentSession: (value) => { currentSession = value; },
     externalId: (value) => { currentExternalId = value; },
+    identityStatus: (value) => { identityStatus = value; },
     permissionResult: (value) => { nextPermissionResult = value; },
     async sessionChanged(value) {
       const callback = windowListeners.get('miu:push-account-session-changed')[0];
@@ -113,6 +120,8 @@ test('restores a signed-in student, opts in only after a click, and reflects sub
   const harness = createClientHarness({ session: { authenticated: true, type: 'student' } });
   await harness.flush();
   assert.deepEqual(harness.calls.logins, ['student-1']);
+  assert.equal(harness.calls.initOptions.serviceWorkerPath, '/push/onesignal/OneSignalSDKWorker.js');
+  assert.equal(harness.calls.initOptions.serviceWorkerParam.scope, '/push/onesignal/');
   assert.equal(harness.toggle.textContent, 'Turn on notifications');
 
   await harness.click();
@@ -161,4 +170,38 @@ test('a dismissed permission prompt leaves push off with a retryable explanation
   await harness.click();
   assert.equal(harness.toggle.textContent, 'Turn on notifications');
   assert.match(harness.status.textContent, /No permission was granted/);
+});
+
+test('club representatives, supervisors and committee accounts can enable push with their own identity', async () => {
+  for (const role of ['president', 'head', 'supervisor', 'pr', 'english', 'security', 'sso', 'dean']) {
+    const id = `club-account:${role}`;
+    const harness = createClientHarness({ session: { authenticated: true, type: 'club', role }, externalId: id });
+    await harness.flush();
+    assert.deepEqual(harness.calls.logins, [id]);
+    assert.equal(harness.toggle.disabled, false);
+    assert.equal(harness.emailToggle.hidden, true);
+    await harness.click();
+    assert.equal(harness.toggle.textContent, 'Turn off notifications');
+  }
+});
+test('admin accounts can bind push independently without student email preferences', async () => {
+  const harness = createClientHarness({ session: { authenticated: true, type: 'admin' }, externalId: 'admin-account:opaque-id' });
+  await harness.flush();
+  assert.deepEqual(harness.calls.logins, ['admin-account:opaque-id']);
+  await harness.click();
+  assert.equal(harness.calls.optIns, 1);
+  assert.equal(harness.emailToggle.hidden, true);
+});
+test('a temporary identity lookup failure can be retried by a club account', async () => {
+  const session = { authenticated: true, type: 'club', role: 'supervisor' };
+  const harness = createClientHarness({ session, externalId: 'club-account:supervisor' });
+  await harness.flush();
+  harness.identityStatus(503);
+  await harness.sessionChanged(session);
+  assert.equal(harness.toggle.textContent, 'Retry notifications');
+  assert.equal(harness.toggle.disabled, false);
+  assert.equal(harness.emailStatus.hidden, true);
+  harness.identityStatus(200);
+  await harness.click();
+  assert.equal(harness.toggle.textContent, 'Turn on notifications');
 });

@@ -1,4 +1,6 @@
 const express = require('express');
+const compression = require('compression');
+const { publicClubProjection, registerPublicClubMedia, publicFields } = require('./services/public-club-media');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const crypto = require('crypto');
@@ -14,6 +16,7 @@ const { parseInteraction, registerFeedbackRoutes } = require('./services/student
 const { OneSignalApiError, claimOneSignalDispatch, sendOneSignalPush, sendOneSignalEmail } = require('./services/onesignal');
 const {
   Club,
+  SupervisorReview,
   Application,
   SiteSetting,
   UniversityContent,
@@ -22,6 +25,9 @@ const {
   SiteVisitorPresence,
   ClubAccount,
   ContentRequest,
+  SpeakerRequest,
+  SpeakerCvUpload,
+  SpeakerInvite,
   EventRegistration,
   AttendanceSession,
   AttendanceActivityClosure,
@@ -37,6 +43,7 @@ const {
   StudentEmailCode,
   AuditLog
 } = require('./models');
+const { MAX_CV_BYTES, CV_UPLOAD_TTL_MS, requesterKey, speakerInviteTokenHash, publicSpeakerDuplicateKey, validateSpeakerPayload, validatePublicSpeakerInvitePayload, canReviewSpeakerRequest, canClubReviewSpeakerRequest, validClubSpeakerDecision, validSpeakerDecision, speakerResubmissionStatus, validateSpeakerCvAsset, decodeSpeakerCvData } = require('./services/speaker-requests');
 require('dotenv').config();
 
 const app = express();
@@ -70,6 +77,7 @@ const cloudinaryFolders = Object.freeze({
   university: 'miu-university-content'
 });
 const uploadSignatureAttempts = new Map();
+const speakerUploadAttempts = new Map();
 
 if (cloudinaryConfigured) {
   cloudinary.config({
@@ -78,6 +86,9 @@ if (cloudinaryConfigured) {
   });
 }
 
+// Compress HTML, CSS, JavaScript and JSON for every route. The middleware
+// negotiates Accept-Encoding and leaves images/small responses alone.
+app.use(compression({ threshold: 1024, level: 4 }));
 app.use(cors());
 // Base64 expands binary images by roughly one third, so allow enough JSON
 // request space for an image whose decoded size is capped at 10 MiB.
@@ -464,7 +475,7 @@ let clubs = readJsonFile(clubsFile, defaultClubs).map((club, index) => ({
 }));
 let clubAccounts = readJsonFile(clubAccountsFile, []).map((account) => ({
   ...account,
-  role: ['head', 'pr', 'english', 'security', 'sso', 'dean'].includes(account.role) ? account.role : 'president',
+  role: ['head', 'pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'software_development'].includes(account.role) ? account.role : 'president',
   committee: typeof account.committee === 'string' ? account.committee : ''
 }));
 
@@ -568,6 +579,7 @@ async function makeClub(payload, existing, id) {
     club.imagePublicId = uploadedImage.publicId;
   }
 
+  if (!club.image) return null;
   return club;
 }
 
@@ -661,7 +673,25 @@ function createAdminSession() {
   return `${payload}.${signature}`;
 }
 
+async function isSoftwareDevelopmentSession(req) {
+  const staffCookie = String(req.headers.cookie || '').split(';').map(value => value.trim()).find(value => value.startsWith('miu_club='));
+  if (!mongoReady || !staffCookie) return false;
+  const parts = staffCookie.slice('miu_club='.length).split('.');
+  if (![5, 6].includes(parts.length)) return false;
+  if (parts.length === 6 && parts[2] !== 'software_development') return false;
+  if (parts.length === 5) {
+    let email = '';
+    try { email = Buffer.from(parts[1], 'base64url').toString('utf8').toLowerCase(); } catch { return false; }
+    const cached = clubAccounts.find(item => item.email === email && item.clubId === Number(parts[0]));
+    if (cached && cached.role !== 'software_development') return false;
+  }
+  const staff = await getClubAccountFromRequest(req);
+  return staff?.role === 'software_development';
+}
+
 async function isAdminSessionValid(req) {
+  // Delegated administrators use a live, signed and revocable staff identity.
+  if (await isSoftwareDevelopmentSession(req)) return true;
   const cookies = String(req.headers.cookie || '').split(';');
   const adminCookie = cookies.map((cookie) => cookie.trim()).find((cookie) => cookie.startsWith('miu_admin='));
   if (!adminCookie) return false;
@@ -687,10 +717,11 @@ function setAdminSessionCookie(req, res) {
 }
 
 async function requireAdmin(req, res, next) {
-  if (!hasAdminPassword()) {
-    return res.status(503).json({ message: 'Admin password setup is required.' });
-  }
   try {
+    if (await isSoftwareDevelopmentSession(req)) return next();
+    if (!hasAdminPassword()) {
+      return res.status(503).json({ message: 'Admin password setup is required.' });
+    }
     if (!await isAdminSessionValid(req)) {
       return res.status(401).json({ message: 'Admin login required.' });
     }
@@ -705,14 +736,20 @@ function clubPasswordMatches(password, account) {
   if (typeof password !== 'string') return false;
   if (!account?.salt || !account?.passwordHash) return false;
   const expectedHash = Buffer.from(account.passwordHash, 'hex');
+  if (expectedHash.length !== 64) return false;
   const providedHash = crypto.scryptSync(password, account.salt, expectedHash.length);
   return expectedHash.length === providedHash.length && crypto.timingSafeEqual(expectedHash, providedHash);
 }
 
-function createClubSession(account) {
+function createClubSession(account, assignment = null) {
   const expiresAt = Date.now() + 8 * 60 * 60 * 1000;
   const encodedEmail = Buffer.from(account.email).toString('base64url');
   const version = Number(account.sessionVersion) || 0;
+  if (assignment) {
+    const payload = `${Number(assignment.clubId) || 0}.${encodedEmail}.${assignment.role}.${expiresAt}.${version}`;
+    const signature = crypto.createHmac('sha256', sessionSecret).update(payload).digest('hex');
+    return `${payload}.${signature}`;
+  }
   const payload = `${account.clubId}.${encodedEmail}.${expiresAt}.${version}`;
   const signature = crypto.createHmac('sha256', sessionSecret).update(payload).digest('hex');
   return `${payload}.${signature}`;
@@ -776,8 +813,20 @@ async function getClubAccountFromRequest(req) {
   let signature;
   let payload;
   let account;
+  let selectedRole = '';
 
-  if (cookieParts.length === 5) {
+  if (cookieParts.length === 6) {
+    const [, encodedEmail, roleText, newExpiresText, versionText, newSignature] = cookieParts;
+    if (!/^[a-z_]{2,40}$/.test(roleText || '') || !/^\d+$/.test(versionText || '')) return null;
+    selectedRole = roleText;
+    try { Buffer.from(encodedEmail, 'base64url').toString('utf8').toLowerCase(); } catch { return null; }
+    expiresText = newExpiresText;
+    version = Number(versionText);
+    signature = newSignature;
+    payload = `${clubIdText}.${encodedEmail}.${roleText}.${expiresText}.${versionText}`;
+    const email = Buffer.from(encodedEmail, 'base64url').toString('utf8').toLowerCase();
+    account = clubAccounts.find((item) => item.email === email);
+  } else if (cookieParts.length === 5) {
     const [, encodedEmail, newExpiresText, versionText, newSignature] = cookieParts;
     if (!/^\d+$/.test(versionText || '')) return null;
     let email;
@@ -815,30 +864,66 @@ async function getClubAccountFromRequest(req) {
   }
 
   if (!/^\d+$/.test(clubIdText || '') || !/^\d+$/.test(expiresText || '')
-    || Number(expiresText) < Date.now() || !/^[a-f0-9]{64}$/.test(signature || '') || !account) return null;
+    || Number(expiresText) < Date.now() || !/^[a-f0-9]{64}$/.test(signature || '')) return null;
 
   const expectedSignature = crypto.createHmac('sha256', sessionSecret).update(payload).digest('hex');
   if (!crypto.timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expectedSignature, 'hex'))) return null;
+  if (!account && mongoReady && [5, 6].includes(cookieParts.length)) {
+    const email = Buffer.from(cookieParts[1], 'base64url').toString('utf8').toLowerCase();
+    account = await ClubAccount.findOne(cookieParts.length === 6 ? { email } : { clubId: Number(clubIdText), email }).lean();
+  }
+  if (!account || ['supervisor', 'software_development'].includes(account.role) && ![5, 6].includes(cookieParts.length)) return null;
   if (mongoReady) {
-    const storedAccount = await ClubAccount.findOne({ clubId: Number(clubIdText), email: account.email }).lean();
+    const storedAccount = await ClubAccount.findOne(cookieParts.length === 6
+      ? { email: account.email } : { clubId: Number(clubIdText), email: account.email }).lean();
     if (!storedAccount || Number(storedAccount.sessionVersion) !== version) return null;
     const accountIndex = clubAccounts.findIndex((item) => item.clubId === storedAccount.clubId && item.email === storedAccount.email);
     if (accountIndex >= 0) clubAccounts[accountIndex] = storedAccount;
+    else clubAccounts.push(storedAccount);
+    if (selectedRole) {
+      const assignment = require('./services/staff-google-auth').staffRoleAssignments(storedAccount)
+        .find(item => item.role === selectedRole && item.clubId === Number(clubIdText));
+      if (!assignment) return null;
+      return { ...storedAccount, role: assignment.role, clubId: assignment.clubId,
+        committee: assignment.committee, assignedClubIds: assignment.assignedClubIds };
+    }
     return storedAccount;
   }
   if (Number(account.sessionVersion || 0) !== version) return null;
+  if (selectedRole) {
+    const assignment = require('./services/staff-google-auth').staffRoleAssignments(account)
+      .find(item => item.role === selectedRole && item.clubId === Number(clubIdText));
+    if (!assignment) return null;
+    return { ...account, role: assignment.role, clubId: assignment.clubId,
+      committee: assignment.committee, assignedClubIds: assignment.assignedClubIds };
+  }
   return account;
 }
 
-function setClubSessionCookie(req, res, account) {
+function setClubSessionCookie(req, res, account, assignment = null) {
   const secure = req.secure ? ' Secure;' : '';
-  res.setHeader('Set-Cookie', `miu_club=${createClubSession(account)}; Max-Age=28800; HttpOnly; SameSite=Strict; Path=/;${secure}`);
+  res.setHeader('Set-Cookie', `miu_club=${createClubSession(account, assignment)}; Max-Age=28800; HttpOnly; SameSite=Strict; Path=/;${secure}`);
+}
+
+function getStaffDashboardOptions(account) {
+  const { STAFF_ROUTES, STAFF_ROLE_LABELS, staffRoleAssignments } = require('./services/staff-google-auth');
+  return staffRoleAssignments(account).map(assignment => ({
+    role: assignment.role,
+    clubId: assignment.clubId,
+    committee: assignment.committee,
+    label: STAFF_ROLE_LABELS[assignment.role] || assignment.role,
+    href: STAFF_ROUTES[assignment.role],
+    clubName: (assignment.role === 'supervisor' ? assignment.assignedClubIds
+      : ['president', 'head'].includes(assignment.role) ? [assignment.clubId] : [])
+      .map(id => clubs.find(club => Number(club.id) === Number(id))?.name).filter(Boolean).join(', ')
+  }));
 }
 
 async function requireClubAuth(req, res, next) {
   try {
     const account = await getClubAccountFromRequest(req);
     if (!account) return res.status(401).json({ message: 'Club login required.' });
+    if (['supervisor', 'software_development'].includes(account.role)) return res.status(403).json({ message: 'Use your assigned dashboard for access.' });
     req.clubAccount = account;
     next();
   } catch (error) {
@@ -1013,6 +1098,604 @@ async function requireStudentAuth(req, res, next) {
     res.status(503).json({ message: 'Student sign-in is temporarily unavailable.' });
   }
 }
+
+async function getSpeakerRequester(req, res) {
+  const preferredType = req.query?.as || req.body?.requesterType;
+  if (preferredType !== 'club') {
+    const student = await getStudentAccountFromRequest(req, res);
+    if (student) return {
+      type: 'student', id: String(student._id), email: student.email,
+      name: student.name, role: 'student'
+    };
+  }
+  if (preferredType !== 'student') {
+    const club = await getClubAccountFromRequest(req);
+    if (club && ['president', 'head'].includes(club.role)) return {
+      type: 'club', id: `club:${Number(club.clubId)}:${String(club.email).toLowerCase()}`,
+      email: club.email, name: club.name || `${club.role === 'head' ? club.committee + ' head' : 'Club representative'}`,
+      role: club.role, clubId: Number(club.clubId)
+    };
+  }
+  return null;
+}
+
+function publicSpeakerRequest(record) {
+  const storedAttachments = Array.isArray(record.speakerAttachments) ? record.speakerAttachments : [];
+  const attachments = storedAttachments.length ? storedAttachments : (record.cvPublicId ? [{
+    publicId: record.cvPublicId, name: record.cvName || 'speaker-material.pdf', format: record.cvFormat || 'pdf'
+  }] : []);
+  return {
+    id: String(record._id), clubId: record.clubId, clubName: record.clubName,
+    speakerName: record.speakerName, speakerEmail: record.speakerEmail || '', professionalDetails: record.professionalDetails,
+    jobTitleCompany: record.jobTitleCompany || '', linkedinProfile: record.linkedinProfile || '',
+    speakerSelectionReason: record.speakerSelectionReason || '', expectedStudentBenefit: record.expectedStudentBenefit || '',
+    shortBio: record.shortBio || '', sessionFormat: record.sessionFormat || '',
+    availability: record.availability || '', specialRequirements: record.specialRequirements || '',
+    contactDetails: record.contactDetails, proposedTopic: record.proposedTopic,
+    eventPurpose: record.eventPurpose, proposedDate: record.proposedDate,
+    status: record.status, reviewerComment: record.reviewerComment || '',
+    clubReviewerComment: record.clubReviewerComment || '', clubReviewedAt: record.clubReviewedAt || null,
+    requesterType: record.requesterType, requesterId: record.requesterId,
+    requesterEmail: record.requesterEmail || '', assignedHeadEmail: record.assignedHeadEmail || '',
+    submittedAt: record.submittedAt, updatedAt: record.updatedAt,
+    decidedAt: record.decidedAt,
+    attachments: attachments.map((item, index) => ({ index, name: item.name || `speaker-material.${item.format || 'pdf'}`, format: item.format || 'pdf' })),
+    cvAvailable: attachments.length > 0, cvName: attachments[0]?.name || record.cvName || '',
+    ...(record.requesterType ? { requesterName: record.requesterName || '' } : {})
+  };
+}
+
+async function findSpeakerInvite(token) {
+  if (typeof token !== 'string' || !/^[a-f0-9]{64}$/i.test(token)) return null;
+  return SpeakerInvite.findOne({
+    tokenHash: speakerInviteTokenHash(token), revokedAt: null,
+    $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }]
+  }).lean();
+}
+
+async function verifySpeakerCvUpload(uploadId, identity) {
+  if (!uploadId) return { publicId: '' };
+  if (typeof uploadId !== 'string' || !/^[a-f0-9-]{36}$/i.test(uploadId)) {
+    return { error: 'The CV upload could not be verified. Upload the PDF again.' };
+  }
+  const grant = await SpeakerCvUpload.findOne({ _id: uploadId, requesterKey: requesterKey(identity, identity.type === 'club' ? identity.clubId : 0), consumedAt: null, expiresAt: { $gt: new Date() } }).lean();
+  if (!grant) return { error: 'This CV upload expired or belongs to another account. Upload it again.' };
+  try {
+    const asset = await cloudinary.api.resource(grant.publicId, { resource_type: 'raw', type: 'authenticated' });
+    if (!validateSpeakerCvAsset(asset)) {
+      return { error: 'The uploaded file must be a PDF no larger than 5 MB.' };
+    }
+    const claimed = await SpeakerCvUpload.findOneAndUpdate(
+      { _id: grant._id, consumedAt: null, expiresAt: { $gt: new Date() } },
+      { $set: { consumedAt: new Date() } }, { new: true }
+    ).lean();
+    if (!claimed) return { error: 'This CV upload has already been used. Upload it again.' };
+    return { publicId: grant.publicId };
+  } catch (error) {
+    console.error('Speaker CV verification failed:', error.name);
+    return { error: 'Could not verify the uploaded CV. Please upload it again.' };
+  }
+}
+
+function sanitizeSpeakerAttachmentName(value, format) {
+  let name = String(value || '').split(/[\\/]/).pop()
+    .replace(/[^\p{L}\p{N} ._()\-]/gu, '').trim().slice(0, 180);
+  if (!name || !name.toLowerCase().endsWith(`.${format}`)) name = `speaker-material.${format}`;
+  return name;
+}
+
+async function verifySpeakerCvUploads(items, identity) {
+  if (!Array.isArray(items)) return { error: 'The attachment list is invalid.' };
+  if (items.length > 5) return { error: 'Choose up to five supporting documents.' };
+  if (!items.length) return { attachments: [] };
+  const ids = items.map((item) => String(item?.uploadId || ''));
+  if (ids.some((id) => !/^[a-f0-9-]{36}$/i.test(id)) || new Set(ids).size !== ids.length) {
+    return { error: 'One of the uploads could not be verified. Upload the files again.' };
+  }
+  const ownerKey = requesterKey(identity, identity.type === 'club' ? identity.clubId : 0);
+  try {
+    const grants = await Promise.all(ids.map((id) => SpeakerCvUpload.findOne({
+      _id: id, requesterKey: ownerKey, consumedAt: null, expiresAt: { $gt: new Date() }
+    }).lean()));
+    if (grants.some((grant) => !grant)) return { error: 'An upload expired or belongs to another account. Upload the files again.' };
+    const assets = await Promise.all(grants.map((grant) => cloudinary.api.resource(grant.publicId, { resource_type: 'raw', type: 'authenticated' })));
+    if (assets.some((asset) => !validateSpeakerCvAsset(asset))) {
+      return { error: 'Each attachment must be a valid PDF, DOC, DOCX, PPT, or PPTX no larger than 5 MB.' };
+    }
+    const consumedAt = new Date();
+    const claimed = [];
+    for (const grant of grants) {
+      const result = await SpeakerCvUpload.findOneAndUpdate(
+        { _id: grant._id, requesterKey: ownerKey, consumedAt: null, expiresAt: { $gt: consumedAt } },
+        { $set: { consumedAt } }, { new: true }
+      ).lean();
+      if (!result) return { error: 'An upload was already used. Select and upload the files again.' };
+      claimed.push(result);
+    }
+    return {
+      attachments: claimed.map((grant, index) => {
+        const format = String(assets[index].format).toLowerCase();
+        return {
+          publicId: grant.publicId,
+          name: sanitizeSpeakerAttachmentName(items[index].name, format),
+          format
+        };
+      })
+    };
+  } catch (error) {
+    console.error('Speaker attachments verification failed:', error.name);
+    return { error: 'Could not verify the uploaded documents. Please upload them again.' };
+  }
+}
+
+async function verifySpeakerRequestAttachments(body, identity) {
+  if (Array.isArray(body?.attachmentUploads)) return verifySpeakerCvUploads(body.attachmentUploads, identity);
+  const legacy = await verifySpeakerCvUpload(body?.cvUploadId, identity);
+  if (legacy.error) return legacy;
+  if (!legacy.publicId) return { attachments: [] };
+  const format = legacy.publicId.split('.').pop().toLowerCase();
+  return { attachments: [{ publicId: legacy.publicId, name: sanitizeSpeakerAttachmentName(body?.cvName, format), format }] };
+}
+
+function uploadSpeakerCv(buffer, publicId) {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream({
+      resource_type: 'raw', type: 'authenticated', public_id: publicId,
+      overwrite: false, allowed_formats: ['pdf', 'doc', 'docx', 'ppt', 'pptx']
+    }, (error, result) => error ? reject(error) : resolve(result));
+    stream.end(buffer);
+  });
+}
+
+function deriveStableSpeakerInviteToken(inviteId) {
+  const secret = process.env.SPEAKER_INVITE_SECRET
+    || process.env.ADMIN_SESSION_SECRET
+    || adminCredentials?.sessionSecret
+    || process.env.MONGO_URI;
+  if (!secret) throw new Error('Configure SPEAKER_INVITE_SECRET to create stable speaker links.');
+  return crypto.createHmac('sha256', secret).update(`miu-speaker-invite:v1:${inviteId}`).digest('hex');
+}
+
+async function getOrCreateStableSpeakerInvite(club, actor, rotate = false) {
+  const createdByEmail = String(actor.email || '').toLowerCase();
+  const ownerFilter = { clubId: club.id, createdByEmail, revokedAt: null };
+  if (!rotate) {
+    const existing = await SpeakerInvite.findOne({ ...ownerFilter, stableToken: true, expiresAt: null }).lean();
+    if (existing) {
+      const token = deriveStableSpeakerInviteToken(existing._id);
+      return { invite: existing, token, reused: true };
+    }
+  } else {
+    await SpeakerInvite.updateMany(ownerFilter, { $set: { revokedAt: new Date() } });
+  }
+
+  const inviteId = new mongoose.Types.ObjectId();
+  const token = deriveStableSpeakerInviteToken(inviteId);
+  try {
+    const invite = await SpeakerInvite.create({
+      _id: inviteId,
+      clubId: club.id,
+      clubName: club.name,
+      createdByEmail,
+      createdByName: actor.name || actor.committee || 'University organizer',
+      createdByRole: actor.role,
+      tokenHash: speakerInviteTokenHash(token),
+      stableToken: true,
+      expiresAt: null
+    });
+    return { invite, token, reused: false };
+  } catch (error) {
+    // A unique partial index makes concurrent requests from multiple devices
+    // converge on the same permanent link.
+    if (error?.code !== 11000) throw error;
+    const existing = await SpeakerInvite.findOne({ ...ownerFilter, stableToken: true, expiresAt: null }).lean();
+    if (!existing) throw error;
+    return { invite: existing, token: deriveStableSpeakerInviteToken(existing._id), reused: true };
+  }
+}
+
+function speakerInviteResponse(invite, token, reused) {
+  return {
+    url: `/speaker-intake.html?t=${token}`,
+    expiresAt: invite.expiresAt || null,
+    permanent: Boolean(invite.stableToken),
+    reused,
+    clubName: invite.clubName
+  };
+}
+
+app.post('/api/club/speaker-invites', requireClubAuth, async (req, res) => {
+  if (!isSameOriginRequest(req)) return res.status(403).json({ message: 'Reload the page and try again.' });
+  if (!['president', 'head'].includes(req.clubAccount?.role)) return res.status(403).json({ message: 'Only the club president or a committee head can create speaker invitation links.' });
+  if (!requireLiveDatabase(res)) return;
+  try {
+    const club = await Club.findOne({ id: Number(req.clubAccount.clubId), archivedAt: null }).select('id name').lean();
+    if (!club) return res.status(404).json({ message: 'This club is not available.' });
+    const result = await getOrCreateStableSpeakerInvite(club, req.clubAccount, req.body?.rotate === true);
+    res.status(result.reused ? 200 : 201).json(speakerInviteResponse(result.invite, result.token, result.reused));
+  } catch (error) {
+    console.error('Speaker invitation creation failed:', error.name);
+    res.status(503).json({ message: error.message.includes('SPEAKER_INVITE_SECRET') ? error.message : 'Could not create a speaker invitation link.' });
+  }
+});
+
+app.get('/api/dean/speaker-invites/clubs', requireClubAuth, async (req, res) => {
+  if (req.clubAccount?.role !== 'dean') return res.status(403).json({ message: 'Only the Dean can create university speaker links.' });
+  if (!requireLiveDatabase(res)) return;
+  try {
+    const clubs = await Club.find({ archivedAt: null }).select('id name').sort({ name: 1 }).lean();
+    res.json(clubs.map(({ id, name }) => ({ id, name })));
+  } catch (error) {
+    console.error('Dean speaker invite clubs failed:', error.name);
+    res.status(503).json({ message: 'Could not load clubs for a speaker link.' });
+  }
+});
+
+app.post('/api/dean/speaker-invites', requireClubAuth, async (req, res) => {
+  if (req.clubAccount?.role !== 'dean') return res.status(403).json({ message: 'Only the Dean can create university speaker links.' });
+  if (!isSameOriginRequest(req)) return res.status(403).json({ message: 'Reload the page and try again.' });
+  if (!requireLiveDatabase(res)) return;
+  const clubId = Number(req.body?.clubId);
+  if (!Number.isSafeInteger(clubId) || clubId <= 0) return res.status(400).json({ message: 'Choose a hosting club.' });
+  try {
+    const club = await Club.findOne({ id: clubId, archivedAt: null }).select('id name').lean();
+    if (!club) return res.status(404).json({ message: 'The hosting club is not available.' });
+    const result = await getOrCreateStableSpeakerInvite(club, req.clubAccount, req.body?.rotate === true);
+    res.status(result.reused ? 200 : 201).json(speakerInviteResponse(result.invite, result.token, result.reused));
+  } catch (error) {
+    console.error('Dean speaker invitation creation failed:', error.name);
+    res.status(503).json({ message: error.message.includes('SPEAKER_INVITE_SECRET') ? error.message : 'Could not create a speaker invitation link.' });
+  }
+});
+
+app.get('/api/public/speaker-invites/:token', async (req, res) => {
+  if (!requireLiveDatabase(res)) return;
+  try {
+    const invite = await findSpeakerInvite(req.params.token);
+    if (!invite) return res.status(404).json({ message: 'This speaker invitation link is invalid, expired, or revoked. Ask the club for a new link.' });
+    res.json({ clubName: invite.clubName, expiresAt: invite.expiresAt });
+  } catch (error) {
+    console.error('Public speaker invitation lookup failed:', error.name);
+    res.status(503).json({ message: 'Could not load this speaker form. Please try again.' });
+  }
+});
+
+app.post('/api/public/speaker-invites/:token/submit', async (req, res) => {
+  if (!isSameOriginRequest(req)) return res.status(403).json({ message: 'Reload the form and try again.' });
+  if (!requireLiveDatabase(res)) return;
+  let uploadedPublicId = '';
+  try {
+    const invite = await findSpeakerInvite(req.params.token);
+    if (!invite) return res.status(404).json({ message: 'This speaker invitation link is invalid, expired, or revoked. Ask the club for a new link.' });
+    const ip = String(req.ip || req.socket?.remoteAddress || 'unknown').slice(0, 160);
+    const attempts = (speakerUploadAttempts.get(`public:${ip}`) || []).filter((time) => Date.now() - time < 10 * 60 * 1000);
+    if (attempts.length >= 5) return res.status(429).json({ message: 'Too many submissions from this connection. Try again later.' });
+    attempts.push(Date.now()); speakerUploadAttempts.set(`public:${ip}`, attempts);
+    const validated = validatePublicSpeakerInvitePayload(req.body);
+    if (validated.error) return res.status(400).json({ message: validated.error });
+    if (!validated.value.speakerEmail) return res.status(400).json({ message: 'Provide an email address so the club can contact you and prevent duplicate requests.' });
+    const club = await Club.findOne({ id: invite.clubId, archivedAt: null }).select('id name').lean();
+    if (!club) return res.status(404).json({ message: 'The hosting club is no longer available.' });
+    const activeRequesterKey = publicSpeakerDuplicateKey(club.id, validated.value.speakerEmail);
+    if (await SpeakerRequest.exists({ activeRequesterKey })) return res.status(409).json({ message: 'You already have an active speaker request with this club.' });
+    const materialData = req.body?.materialFileData || req.body?.cvFileData;
+    let materialFormat = 'pdf';
+    let materialName = '';
+    if (materialData) {
+      if (!cloudinaryConfigured) return res.status(503).json({ message: 'Private attachment storage is unavailable right now. Submit without a file or try again later.' });
+      const decoded = decodeSpeakerCvData(materialData);
+      if (decoded.error) return res.status(400).json({ message: decoded.error });
+      materialFormat = decoded.format;
+      materialName = String(req.body?.materialName || '').replace(/[^\p{L}\p{N} ._()\-]/gu, '').trim().slice(0, 180);
+      if (!materialName || !materialName.toLowerCase().endsWith(`.${materialFormat}`)) materialName = `speaker-material.${materialFormat}`;
+      uploadedPublicId = `miu-speaker-cvs/${crypto.randomUUID()}.${materialFormat}`;
+      const asset = await uploadSpeakerCv(decoded.buffer, uploadedPublicId);
+      if (!validateSpeakerCvAsset(asset)) {
+        await cloudinary.uploader.destroy(uploadedPublicId, { resource_type: 'raw', type: 'authenticated' }).catch(() => {});
+        uploadedPublicId = '';
+        return res.status(400).json({ message: 'The attachment must be a valid PDF, DOC, DOCX, PPT, or PPTX file no larger than 5 MB.' });
+      }
+    }
+    const speakerAttachments = uploadedPublicId ? [{ publicId: uploadedPublicId, name: materialName, format: materialFormat }] : [];
+    const record = await SpeakerRequest.create({
+      ...validated.value, clubId: club.id, clubName: club.name,
+      requesterType: 'speaker', requesterId: `speaker:${validated.value.speakerEmail}`,
+      requesterEmail: validated.value.speakerEmail, requesterRole: 'speaker',
+      requesterName: validated.value.speakerName,
+      assignedHeadEmail: invite.createdByRole === 'dean' ? '' : invite.createdByEmail,
+      inviteId: invite._id,
+      cvPublicId: uploadedPublicId, cvFormat: materialFormat, cvName: materialName, speakerAttachments, status: 'pending_club', activeRequesterKey,
+      decisionHistory: [{ action: 'submitted', role: 'speaker', email: validated.value.speakerEmail }]
+    });
+    res.status(201).json({ message: 'Thank you for your interest! Your response has been submitted successfully. Our team will contact you soon.' });
+  } catch (error) {
+    if (uploadedPublicId) await cloudinary.uploader.destroy(uploadedPublicId, { resource_type: 'raw', type: 'authenticated' }).catch(() => {});
+    if (error?.code === 11000) return res.status(409).json({ message: 'You already have an active speaker request with this club.' });
+    console.error('Public speaker request submission failed:', error.name);
+    res.status(503).json({ message: 'Your proposal could not be saved. Please try again.' });
+  }
+});
+
+app.get('/api/speaker-requests/context', async (req, res) => {
+  if (!requireLiveDatabase(res)) return;
+  try {
+    const identity = await getSpeakerRequester(req, res);
+    if (!identity) return res.status(401).json({ message: 'Sign in as a student or club representative to request a speaker.' });
+    const clubs = identity.type === 'student'
+      ? await Club.find({ archivedAt: null }).select('id name').sort({ name: 1 }).lean()
+      : [];
+    const club = identity.type === 'club'
+      ? await Club.findOne({ id: identity.clubId, archivedAt: null }).select('id name').lean()
+      : null;
+    const clubRequestFilter = identity.role === 'head'
+      ? { clubId: identity.clubId, $or: [{ assignedHeadEmail: { $in: ['', null] } }, { assignedHeadEmail: identity.email.toLowerCase() }] }
+      : { clubId: identity.clubId };
+    const requests = await SpeakerRequest.find(identity.type === 'student'
+      ? { requesterType: 'student', requesterId: identity.id }
+      : clubRequestFilter).sort({ submittedAt: -1 }).lean();
+    res.json({ identity: { type: identity.type, name: identity.name, email: identity.email, role: identity.role, clubId: identity.clubId || null }, club, clubs, requests: requests.map(publicSpeakerRequest) });
+  } catch (error) {
+    console.error('Speaker request context failed:', error.name);
+    res.status(503).json({ message: 'Could not load speaker request information. Please try again.' });
+  }
+});
+
+app.post('/api/speaker-requests/cv-upload', async (req, res) => {
+  if (!isSameOriginRequest(req)) return res.status(403).json({ message: 'This upload request could not be verified. Reload and try again.' });
+  if (!requireLiveDatabase(res)) return;
+  if (!cloudinaryConfigured) return res.status(503).json({ message: 'Private CV uploads are unavailable because file storage is not configured.' });
+  try {
+    const identity = await getSpeakerRequester(req, res);
+    if (!identity) return res.status(401).json({ message: 'Sign in as a student or club representative before uploading a CV.' });
+    const clubId = identity.type === 'club' ? identity.clubId : 0;
+    const ownerKey = requesterKey(identity, clubId);
+    const attempts = (speakerUploadAttempts.get(ownerKey) || []).filter((time) => Date.now() - time < 10 * 60 * 1000);
+    if (attempts.length >= 5) return res.status(429).json({ message: 'Too many CV uploads. Wait a few minutes and try again.' });
+    attempts.push(Date.now());
+    speakerUploadAttempts.set(ownerKey, attempts);
+    if (speakerUploadAttempts.size > 2000) {
+      for (const [key, times] of speakerUploadAttempts) {
+        const recentTimes = times.filter((time) => Date.now() - time < 10 * 60 * 1000);
+        if (recentTimes.length) speakerUploadAttempts.set(key, recentTimes);
+        else speakerUploadAttempts.delete(key);
+      }
+    }
+    const decoded = decodeSpeakerCvData(req.body?.fileData);
+    if (decoded.error) return res.status(400).json({ message: decoded.error });
+    const publicId = `miu-speaker-cvs/${crypto.randomUUID()}.${decoded.format}`;
+    const asset = await uploadSpeakerCv(decoded.buffer, publicId);
+    if (!validateSpeakerCvAsset(asset)) {
+      await cloudinary.uploader.destroy(publicId, { resource_type: 'raw', type: 'authenticated' }).catch(() => {});
+      return res.status(400).json({ message: 'The uploaded file must be a valid PDF, DOC, DOCX, PPT, or PPTX no larger than 5 MB.' });
+    }
+    const uploadId = crypto.randomUUID();
+    try {
+      await SpeakerCvUpload.create({ _id: uploadId, publicId, requesterKey: ownerKey, expiresAt: new Date(Date.now() + CV_UPLOAD_TTL_MS) });
+    } catch (error) {
+      await cloudinary.uploader.destroy(publicId, { resource_type: 'raw', type: 'authenticated' }).catch(() => {});
+      throw error;
+    }
+    res.json({ uploadId });
+  } catch (error) {
+    console.error('Speaker CV upload setup failed:', error.name);
+    res.status(503).json({ message: 'Could not prepare the private CV upload. Please try again.' });
+  }
+});
+
+app.get('/api/speaker-requests', async (req, res) => {
+  if (!requireLiveDatabase(res)) return;
+  try {
+    const identity = await getSpeakerRequester(req, res);
+    if (!identity) return res.status(401).json({ message: 'Sign in to view your speaker requests.' });
+    const filter = identity.type === 'student'
+      ? { requesterType: 'student', requesterId: identity.id }
+      : identity.role === 'head'
+        ? { clubId: identity.clubId, $or: [{ assignedHeadEmail: { $in: ['', null] } }, { assignedHeadEmail: identity.email.toLowerCase() }] }
+        : { clubId: identity.clubId };
+    const records = await SpeakerRequest.find(filter).sort({ submittedAt: -1 }).lean();
+    res.json(records.map(publicSpeakerRequest));
+  } catch (error) {
+    console.error('Speaker request list failed:', error.name);
+    res.status(503).json({ message: 'Could not load your speaker requests.' });
+  }
+});
+
+app.post('/api/speaker-requests', async (req, res) => {
+  if (!isSameOriginRequest(req)) return res.status(403).json({ message: 'This form submission could not be verified. Reload and try again.' });
+  if (!requireLiveDatabase(res)) return;
+  try {
+    const identity = await getSpeakerRequester(req, res);
+    if (!identity) return res.status(401).json({ message: 'Sign in as a student or club representative to submit this request.' });
+    const validated = validateSpeakerPayload(req.body);
+    if (validated.error) return res.status(400).json({ message: validated.error });
+    const clubId = identity.type === 'club' ? identity.clubId : Number(req.body?.clubId);
+    if (!Number.isSafeInteger(clubId) || clubId < 1 || (identity.type === 'club' && Number(req.body?.clubId) !== identity.clubId)) {
+      return res.status(400).json({ message: 'Choose a valid hosting club.' });
+    }
+    const club = await Club.findOne({ id: clubId, archivedAt: null }).select('id name').lean();
+    if (!club) return res.status(404).json({ message: 'The selected club was not found.' });
+    const activeRequesterKey = requesterKey(identity, clubId);
+    if (await SpeakerRequest.exists({ activeRequesterKey })) {
+      return res.status(409).json({ message: 'You already have an active speaker request for this club. Update that request instead.' });
+    }
+    const upload = await verifySpeakerRequestAttachments(req.body, identity);
+    if (upload.error) return res.status(400).json({ message: upload.error });
+    const attachments = upload.attachments || [];
+    const primaryAttachment = attachments[0];
+    const record = await SpeakerRequest.create({
+      ...validated.value, clubId, clubName: club.name, requesterType: identity.type,
+      requesterId: identity.id, requesterEmail: identity.email, requesterRole: identity.role,
+      requesterName: identity.name, speakerAttachments: attachments,
+      cvPublicId: primaryAttachment?.publicId || '', cvFormat: primaryAttachment?.format || 'pdf', cvName: primaryAttachment?.name || '',
+      status: identity.type === 'club' ? 'pending_supervisor' : 'pending_club', activeRequesterKey,
+      decisionHistory: [{ action: 'submitted', role: identity.role, email: identity.email }]
+    });
+    await notifySpeakerWorkflow(record.toObject());
+    res.status(201).json(publicSpeakerRequest(record.toObject()));
+  } catch (error) {
+    if (error?.code === 11000) return res.status(409).json({ message: 'You already have an active speaker request for this club. Update that request instead.' });
+    console.error('Speaker request submission failed:', error.name);
+    res.status(503).json({ message: 'The speaker request was not saved. Please try again.' });
+  }
+});
+
+app.post('/api/club/speaker-requests/:id/decision', requireClubAuth, async (req, res) => {
+  if (!['president', 'head'].includes(req.clubAccount?.role)) return res.status(403).json({ message: 'Only the club president or a committee head can review speaker requests.' });
+  if (!isSameOriginRequest(req)) return res.status(403).json({ message: 'This decision could not be verified. Reload and try again.' });
+  if (!requireLiveDatabase(res)) return;
+  const action = req.body?.action;
+  const comment = cleanText(req.body?.comment, 2000);
+  if (!validClubSpeakerDecision('pending_club', action)) return res.status(400).json({ message: 'Choose accept or reject.' });
+  if (action === 'reject' && !comment) return res.status(400).json({ message: 'Add a short reason before rejecting this request.' });
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ message: 'Speaker request not found.' });
+    const existing = await SpeakerRequest.findById(req.params.id).select('clubId status requesterEmail assignedHeadEmail').lean();
+    if (!existing || Number(existing.clubId) !== Number(req.clubAccount.clubId)) return res.status(404).json({ message: 'Speaker request not found.' });
+    if (!canClubReviewSpeakerRequest(req.clubAccount, existing)) return res.status(403).json({ message: 'You cannot review this request. It may be assigned to another head, or you submitted it yourself.' });
+    if (!validClubSpeakerDecision(existing.status, action)) return res.status(409).json({ message: 'This request is no longer waiting for club review.' });
+    const nextStatus = action === 'accept' ? 'pending_supervisor' : 'rejected';
+    const now = new Date();
+    const update = {
+      $set: { status: nextStatus, clubReviewerEmail: req.clubAccount.email, clubReviewerRole: req.clubAccount.role, clubReviewerComment: comment, clubReviewedAt: now },
+      $push: { decisionHistory: { action: action === 'accept' ? 'club_accepted' : 'club_rejected', role: req.clubAccount.role, email: req.clubAccount.email, comment, createdAt: now } }
+    };
+    if (action === 'reject') update.$unset = { activeRequesterKey: 1 };
+    const record = await SpeakerRequest.findOneAndUpdate({ _id: req.params.id, status: existing.status }, update, { new: true, runValidators: true }).lean();
+    if (!record) return res.status(409).json({ message: 'Another reviewer updated this request. Refresh before trying again.' });
+    await notifySpeakerWorkflow(record);
+    res.json(publicSpeakerRequest(record));
+  } catch (error) {
+    console.error('Club speaker request decision failed:', error.name);
+    res.status(503).json({ message: 'The club decision was not saved. Please try again.' });
+  }
+});
+
+app.patch('/api/speaker-requests/:id/resubmit', async (req, res) => {
+  if (!isSameOriginRequest(req)) return res.status(403).json({ message: 'This form submission could not be verified. Reload and try again.' });
+  if (!requireLiveDatabase(res)) return;
+  try {
+    const identity = await getSpeakerRequester(req, res);
+    if (!identity) return res.status(401).json({ message: 'Sign in to update your speaker request.' });
+    const validated = validateSpeakerPayload(req.body);
+    if (validated.error) return res.status(400).json({ message: validated.error });
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ message: 'This request is not available for changes.' });
+    const existing = await SpeakerRequest.findOne({ _id: req.params.id, status: 'changes_requested' }).select('status speakerEmail clubId requesterType requesterId requesterEmail assignedHeadEmail clubReviewedAt speakerAttachments cvPublicId cvFormat cvName').lean();
+    if (!existing) return res.status(404).json({ message: 'This request is not available for changes.' });
+    const isStudentOwner = identity.type === 'student' && existing.requesterType === 'student' && existing.requesterId === identity.id;
+    const isClubOwner = identity.type === 'club' && Number(existing.clubId) === identity.clubId
+      && (identity.role === 'president' || existing.requesterId === identity.id
+        || existing.assignedHeadEmail && existing.assignedHeadEmail.toLowerCase() === identity.email.toLowerCase());
+    if (!isStudentOwner && !isClubOwner) return res.status(404).json({ message: 'This request is not available for changes.' });
+    const oldAttachments = Array.isArray(existing.speakerAttachments) && existing.speakerAttachments.length
+      ? existing.speakerAttachments
+      : existing.cvPublicId ? [{ publicId: existing.cvPublicId, name: existing.cvName || `speaker-material.${existing.cvFormat || 'pdf'}`, format: existing.cvFormat || 'pdf' }] : [];
+    if (Array.isArray(req.body?.attachmentUploads) && oldAttachments.length + req.body.attachmentUploads.length > 5) {
+      return res.status(400).json({ message: 'A request can have up to five supporting documents total. Remove an existing attachment before adding more.' });
+    }
+    const upload = await verifySpeakerRequestAttachments(req.body, identity);
+    if (upload.error) return res.status(400).json({ message: upload.error });
+    const resubmissionStatus = speakerResubmissionStatus(existing);
+    const fields = { ...validated.value, speakerEmail: validated.value.speakerEmail || existing.speakerEmail || '', status: resubmissionStatus, reviewerComment: '', reviewerEmail: '', reviewerRole: '', decidedAt: null };
+    if (resubmissionStatus === 'pending_club') fields.clubReviewerComment = '';
+    const newAttachments = upload.attachments || [];
+    if (newAttachments.length) {
+      fields.speakerAttachments = [...oldAttachments, ...newAttachments];
+      fields.cvPublicId = fields.speakerAttachments[0]?.publicId || '';
+      fields.cvFormat = fields.speakerAttachments[0]?.format || 'pdf';
+      fields.cvName = fields.speakerAttachments[0]?.name || '';
+    }
+    const record = await SpeakerRequest.findOneAndUpdate(
+      { _id: req.params.id, status: 'changes_requested' },
+      { $set: fields, $push: { decisionHistory: { action: 'resubmitted', role: identity.role, email: identity.email } } },
+      { new: true, runValidators: true }
+    ).lean();
+    if (!record) return res.status(409).json({ message: 'This request was already updated. Refresh your list before trying again.' });
+    await notifySpeakerWorkflow(record);
+    res.json(publicSpeakerRequest(record));
+  } catch (error) {
+    console.error('Speaker request update failed:', error.name);
+    res.status(503).json({ message: 'The updated request was not saved. Please try again.' });
+  }
+});
+
+app.get('/api/speaker-requests/:id/cv', async (req, res) => {
+  if (!requireLiveDatabase(res)) return;
+  if (!cloudinaryConfigured) return res.status(503).json({ message: 'Private CV storage is temporarily unavailable.' });
+  try {
+    const identity = await getSpeakerRequester(req, res);
+    const committee = await getClubAccountFromRequest(req);
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ message: 'Speaker request not found.' });
+    const record = await SpeakerRequest.findById(req.params.id).lean();
+    if (!record) return res.status(404).json({ message: 'Speaker request not found.' });
+    const owner = identity && (record.requesterType === 'student' && identity.type === 'student' && record.requesterId === identity.id
+      || identity.type === 'club' && ['president', 'head'].includes(identity.role) && Number(record.clubId) === identity.clubId
+        && (identity.role === 'president' || !record.assignedHeadEmail || record.assignedHeadEmail.toLowerCase() === identity.email.toLowerCase()));
+    const dean = committee?.role === 'dean' && Boolean(record.clubReviewedAt)
+      && canReviewSpeakerRequest(committee.role, record.requesterEmail, committee.email);
+    const supervisor = committee?.role === 'supervisor' && require('./services/supervisor-dashboard').assignedIds(committee).includes(Number(record.clubId));
+    if (!owner && !dean && !supervisor) return res.status(403).json({ message: 'You do not have access to this attachment.' });
+    const storedAttachments = Array.isArray(record.speakerAttachments) ? record.speakerAttachments : [];
+    const attachments = storedAttachments.length ? storedAttachments : (record.cvPublicId ? [{ publicId: record.cvPublicId, format: record.cvFormat || 'pdf' }] : []);
+    const attachmentIndex = req.query.attachmentIndex === undefined ? 0 : Number(req.query.attachmentIndex);
+    if (!Number.isInteger(attachmentIndex) || attachmentIndex < 0 || attachmentIndex >= attachments.length) return res.status(404).json({ message: 'This request has no attachment at that position.' });
+    const attachment = attachments[attachmentIndex];
+    const url = cloudinary.utils.private_download_url(attachment.publicId, attachment.format || 'pdf', {
+      resource_type: 'raw', type: 'authenticated', expires_at: Math.floor(Date.now() / 1000) + 300, attachment: true
+    });
+    res.json({ url });
+  } catch (error) {
+    console.error('Speaker CV access failed:', error.name);
+    res.status(503).json({ message: 'Could not prepare a secure CV download.' });
+  }
+});
+
+app.get('/api/dean/speaker-requests', requireClubAuth, async (req, res) => {
+  if (req.clubAccount?.role !== 'dean') return res.status(403).json({ message: 'Only the Dean can review external speaker requests.' });
+  if (!requireLiveDatabase(res)) return;
+  try {
+    const records = await SpeakerRequest.find({ $or: [
+      { status: 'pending_dean' },
+      { status: { $in: ['approved', 'rejected', 'changes_requested'] }, reviewerRole: 'dean', clubReviewedAt: { $ne: null } }
+    ] }).sort({ submittedAt: -1 }).lean();
+    records.sort((left, right) => Number(right.status === 'pending_dean') - Number(left.status === 'pending_dean'));
+    res.json(records.map((record) => ({ ...publicSpeakerRequest(record), requesterType: record.requesterType, requesterEmail: record.requesterEmail })));
+  } catch (error) {
+    console.error('Dean speaker request list failed:', error.name);
+    res.status(503).json({ message: 'Could not load speaker requests right now.' });
+  }
+});
+
+app.post('/api/dean/speaker-requests/:id/decision', requireClubAuth, async (req, res) => {
+  if (req.clubAccount?.role !== 'dean') return res.status(403).json({ message: 'Only the Dean can review external speaker requests.' });
+  if (!isSameOriginRequest(req)) return res.status(403).json({ message: 'This decision could not be verified. Reload and try again.' });
+  if (!requireLiveDatabase(res)) return;
+  const action = req.body?.action;
+  const comment = cleanText(req.body?.comment, 2000);
+  if (!validSpeakerDecision('pending_dean', action)) return res.status(400).json({ message: 'Choose approve, reject, or request changes.' });
+  if (action === 'request_changes' && !comment) return res.status(400).json({ message: 'Add a comment explaining what changes are needed.' });
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ message: 'Speaker request not found.' });
+    const existing = await SpeakerRequest.findById(req.params.id).select('status requesterEmail').lean();
+    if (!existing) return res.status(404).json({ message: 'Speaker request not found.' });
+    if (!canReviewSpeakerRequest(req.clubAccount.role, existing.requesterEmail, req.clubAccount.email)) {
+      return res.status(403).json({ message: 'A requester cannot review their own speaker request.' });
+    }
+    const status = action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : 'changes_requested';
+    const now = new Date();
+    const update = {
+      $set: { status, reviewerRole: 'dean', reviewerEmail: req.clubAccount.email, reviewerComment: comment, decidedAt: now },
+      $push: { decisionHistory: { action: status, role: 'dean', email: req.clubAccount.email, comment, createdAt: now } }
+    };
+    if (status === 'approved' || status === 'rejected') update.$unset = { activeRequesterKey: 1 };
+    const record = await SpeakerRequest.findOneAndUpdate({ _id: req.params.id, status: 'pending_dean' }, update, { new: true, runValidators: true }).lean();
+    if (!record) return res.status(409).json({ message: 'This request has already changed. Refresh the list before reviewing it.' });
+    await notifySpeakerWorkflow(record);
+    res.json(publicSpeakerRequest(record));
+  } catch (error) {
+    console.error('Dean speaker request decision failed:', error.name);
+    res.status(503).json({ message: 'The decision was not saved. Please try again.' });
+  }
+});
 
 function clearGoogleNonceCookie(req, res) {
   const secure = secureCookieSuffix(req);
@@ -1222,18 +1905,19 @@ async function initializeMongoData() {
     if (uniqueClubIdIndex) await ClubAccount.collection.dropIndex(uniqueClubIdIndex.name);
   }
   await ClubAccount.createIndexes();
+  await SupervisorReview.createIndexes();
 
-  if (await Club.countDocuments() === 0) {
+  if (!await Club.exists({})) {
     await Club.insertMany(clubs);
   }
-  if (await Application.countDocuments() === 0) {
+  if (!await Application.exists({})) {
     await Application.insertMany(applications);
   }
   if (clubAccounts.length) {
-    await ClubAccount.bulkWrite(clubAccounts.map(({ clubId, email, salt, passwordHash, role, committee }) => ({
+    await ClubAccount.bulkWrite(clubAccounts.map(({ clubId, email, salt, passwordHash, role, committee, assignedClubIds }) => ({
       updateOne: {
-        filter: { clubId, email },
-        update: { $setOnInsert: { clubId, email, salt, passwordHash, role: ['head', 'pr', 'english', 'security', 'sso', 'dean'].includes(role) ? role : 'president', committee: committee || '' } },
+        filter: { email },
+        update: { $setOnInsert: { clubId, email, salt, passwordHash, role: ['head', 'pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'software_development'].includes(role) ? role : 'president', committee: committee || '', assignedClubIds: assignedClubIds || [] } },
         upsert: true
       }
     })));
@@ -1267,15 +1951,21 @@ async function initializeMongoData() {
     await record.save();
   }
 
-  clubs = (await Club.find().sort({ sortOrder: 1, id: 1 }).lean()).map((record, index) => ({
+  // These reads are independent; keep initialization gated until all succeed.
+  const [clubRecords, applicationRecords, accountRecords] = await Promise.all([
+    Club.find().sort({ sortOrder: 1, id: 1 }).lean(),
+    Application.find().sort({ id: 1 }).lean(),
+    ClubAccount.find().sort({ clubId: 1, role: 1, committee: 1 }).lean()
+  ]);
+  clubs = clubRecords.map((record, index) => ({
     ...toApiRecord(record),
     sortOrder: Number.isFinite(Number(record.sortOrder)) ? Number(record.sortOrder) : index + 1,
     pinned: record.pinned === true && record.status === 'open'
   }));
-  applications = await Application.find().sort({ id: 1 }).lean();
-  clubAccounts = (await ClubAccount.find().sort({ clubId: 1, role: 1, committee: 1 }).lean()).map((account) => ({
+  applications = applicationRecords;
+  clubAccounts = accountRecords.map((account) => ({
     ...toApiRecord(account),
-    role: ['head', 'pr', 'english', 'security', 'sso', 'dean'].includes(account.role) ? account.role : 'president',
+    role: ['head', 'pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'software_development'].includes(account.role) ? account.role : 'president',
     committee: account.committee || ''
   }));
 }
@@ -1292,13 +1982,17 @@ function accountCanReviewApplication(account, application) {
     && (account.role !== 'head' || application.committee === account.committee);
 }
 
+registerPublicClubMedia(app, { Club, requireLiveDatabase });
+
 app.get('/api/clubs', async (req, res) => {
   try {
     if (!requireLiveDatabase(res)) return;
     const [clubsFromDatabase, acceptedMemberGroups] = await Promise.all([
-      Club.find({ archivedAt: null })
-        .select('id sortOrder name committee category tagline image imagePublicId imageFit status applicationCycleStartedAt pinned seats members committeeAvailability description requirements applicationIntro applicationFields interviewForms events posts sponsors booths memberRoster.email')
-        .read('primary').readConcern('majority').sort({ sortOrder: 1, id: 1 }).lean(),
+      req.query.media === 'links'
+        ? Club.aggregate([{ $match: { archivedAt: null } }, { $sort: { sortOrder: 1, id: 1 } },
+          { $project: publicClubProjection() }]).read('primary').readConcern('majority')
+        : Club.find({ archivedAt: null }).select(publicFields)
+          .read('primary').readConcern('majority').sort({ sortOrder: 1, id: 1 }).lean(),
       Application.aggregate([
         { $match: { status: 'accepted' } },
         { $project: { clubId: 1, email: { $toLower: { $trim: { input: { $ifNull: ['$email', ''] } } } } } },
@@ -1362,13 +2056,15 @@ app.get('/api/university-content', async (req, res) => {
     if (!mongoReady) return res.status(503).json({ message: 'University updates are temporarily unavailable.' });
     res.setHeader('Cache-Control', 'no-store');
     const records = await UniversityContent.find()
-      .select('id type title description interaction question options date time location image registrationEnabled createdAt')
+      .select('id type title description interaction question options date time location image registrationEnabled attendanceEnabled createdAt')
       .read('primary').readConcern('majority').sort({ createdAt: -1, id: -1 }).lean();
     res.json(records.map((record) => ({
       id: record.id, type: record.type, title: record.title, description: record.description,
       interaction: record.interaction || 'none', question: record.question || '', options: record.options || [],
       date: record.date, time: record.time, location: record.location, image: record.image,
       registrationEnabled: record.type === 'event' && record.registrationEnabled === true,
+      attendanceEnabled: record.type === 'event' && record.registrationEnabled === true
+        ? (typeof record.attendanceEnabled === 'boolean' ? record.attendanceEnabled : null) : false,
       createdAt: record.createdAt
     })));
   } catch (error) {
@@ -1393,10 +2089,11 @@ app.post('/api/clubs/:id/view', (req, res) => {
 
 app.get('/api/admin/session', async (req, res) => {
   try {
+    const delegatedAdmin = await isSoftwareDevelopmentSession(req);
     res.json({
-      configured: hasAdminPassword(),
+      configured: hasAdminPassword() || delegatedAdmin,
       localSetupAllowed: isLoopbackRequest(req) && !(process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD),
-      authenticated: hasAdminPassword() && await isAdminSessionValid(req)
+      authenticated: delegatedAdmin || (hasAdminPassword() && await isAdminSessionValid(req))
     });
   } catch (error) {
     console.error('Admin session validation failed:', error.name);
@@ -1407,7 +2104,12 @@ app.get('/api/admin/session', async (req, res) => {
 app.get('/api/site/account-session', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   try {
-    if (await isAdminSessionValid(req)) return res.json({ authenticated: true, type: 'admin', email: getConfiguredAdminEmail() || '' });
+    if (await isAdminSessionValid(req)) {
+      const staff = await getClubAccountFromRequest(req);
+      return res.json({ authenticated: true, type: 'admin', role: staff?.role === 'software_development' ? staff.role : 'admin',
+        name: staff?.role === 'software_development' ? 'Software Development team' : 'Administrator', email: staff?.role === 'software_development' ? staff.email : getConfiguredAdminEmail() || '',
+        dashboards: staff ? getStaffDashboardOptions(staff) : [] });
+    }
     const clubAccount = await getClubAccountFromRequest(req);
     if (clubAccount) {
       const club = clubs.find((item) => Number(item.id) === Number(clubAccount.clubId));
@@ -1418,7 +2120,8 @@ app.get('/api/site/account-session', async (req, res) => {
         email: clubAccount.email || '',
         name: ['pr', 'english', 'security', 'sso', 'dean'].includes(clubAccount.role)
           ? `${committeeRoleLabels[clubAccount.role] || clubAccount.role} Dashboard`
-          : club?.name || ''
+          : club?.name || '',
+        dashboards: getStaffDashboardOptions(clubAccount)
       });
     }
     const studentAccount = await getStudentAccountFromRequest(req, res);
@@ -1437,10 +2140,30 @@ app.get('/api/notifications/config', (req, res) => {
   res.json(validAppId ? { enabled: true, appId } : { enabled: false });
 });
 
-app.get('/api/notifications/identity', requireStudentAuth, (req, res) => {
+const { clubExternalId, createContentRequestNotifier } = require('./services/content-request-notifications');
+const notifyContentRequest = createContentRequestNotifier({ ClubAccount, NotificationDispatch });
+const notifyClubOpening = require('./services/club-opening-notifications').createClubOpeningNotifier({
+  StudentAccount, ClubAccount, NotificationDispatch, getAdminEmail: getConfiguredAdminEmail
+});
+app.get('/api/notifications/identity', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
-  // This opaque ID is disclosed only to the authenticated owner of the session.
-  res.json({ externalId: String(req.studentAccount._id), email: req.studentAccount.email, emailNotificationsEnabled: Boolean(req.studentAccount.emailNotificationsEnabled) });
+  try {
+    if (await isAdminSessionValid(req)) {
+      const staff = await getClubAccountFromRequest(req);
+      if (staff?.role === 'software_development') return res.json({ externalId: clubExternalId(staff), emailNotificationsEnabled: false, emailSupported: false });
+      const email = getConfiguredAdminEmail();
+      if (!email) return res.status(503).json({ message: 'Admin notification identity is temporarily unavailable.' });
+      return res.json({ externalId: `admin-account:${crypto.createHash('sha256').update(email.toLowerCase()).digest('hex')}`,
+        emailNotificationsEnabled: false, emailSupported: false });
+    }
+    const club = await getClubAccountFromRequest(req);
+    if (club?._id) return res.json({ externalId: clubExternalId(club), emailNotificationsEnabled: false, emailSupported: false });
+    const student = await getStudentAccountFromRequest(req, res);
+    if (!student) return res.status(401).json({ message: 'Sign in to enable notifications.' });
+    return res.json({ externalId: String(student._id), email: student.email, emailNotificationsEnabled: Boolean(student.emailNotificationsEnabled) });
+  } catch (error) {
+    return res.status(503).json({ message: 'Notification settings are temporarily unavailable.' });
+  }
 });
 
 app.put('/api/notifications/email-preference', requireStudentAuth, async (req, res) => {
@@ -1514,6 +2237,71 @@ async function dispatchAcceptedApplicationPush(application) {
       message: 'Your club application status has been updated.',
       url: notificationUrl
     }));
+  }
+}
+
+async function notifySpeakerWorkflow(record) {
+  await dispatchSpeakerRequestStatusPush(record);
+  await notifyContentRequest({ ...record, type: 'speaker', id: String(record._id),
+    workflowHistory: (record.decisionHistory || []).map(event => ({ ...event, actorEmail: event.email })) });
+}
+async function notifyAttendanceWorkflow(key, status, action, revision = new Date()) {
+  await notifyContentRequest({ ...key, _id: 'attendance:' + key.clubId + ':' + key.itemType + ':' + key.eventRequestId,
+    id: key.eventRequestId, type: 'attendance', status,
+    workflowHistory: [{ _id: new Date(revision).getTime(), action, role: 'club' }] });
+}
+
+async function dispatchSpeakerRequestStatusPush(request) {
+  const statusMessages = {
+    pending_supervisor: 'Your speaker request is waiting for the hosting club supervisor.',
+    pending_dean: 'The club supervisor approved your speaker request and sent it to the Dean for review.',
+    approved: 'Your speaker request was approved. Sign in to view the review details.',
+    rejected: 'Your speaker request was declined. Sign in to view the review details.',
+    changes_requested: 'Changes were requested to your speaker request. Sign in to review the feedback.'
+  };
+  if (request?.requesterType !== 'student' || !statusMessages[request.status]
+    || !mongoose.isValidObjectId(request.requesterId)) return;
+
+  const appId = String(process.env.ONESIGNAL_APP_ID || '').trim();
+  const apiKey = String(process.env.ONESIGNAL_REST_API_KEY || '').trim();
+  const configuredBaseUrl = String(process.env.ONESIGNAL_SITE_URL || '').trim();
+  if (!appId || !apiKey || !configuredBaseUrl) return;
+
+  let notificationUrl;
+  try {
+    const parsedBase = new URL(configuredBaseUrl);
+    const isLoopback = ['localhost', '127.0.0.1'].includes(parsedBase.hostname);
+    if (parsedBase.protocol !== 'https:' && !(isLoopback && parsedBase.protocol === 'http:')) throw new Error('INVALID_ORIGIN');
+    notificationUrl = new URL('/speaker-request.html?as=student', parsedBase).toString();
+  } catch {
+    return;
+  }
+
+  let eventKey = '';
+  try {
+    const student = await StudentAccount.findById(request.requesterId).select('_id').lean();
+    if (!student) return;
+    eventKey = `speaker-request:${request._id}:status:${request.status}:${new Date(request.updatedAt || Date.now()).getTime()}`;
+    const claimed = await claimOneSignalDispatch(eventKey, (key) => NotificationDispatch.create({ eventKey: key, status: 'sending' }));
+    if (!claimed) return;
+    const result = await sendOneSignalPush({
+      appId,
+      apiKey,
+      externalId: String(student._id),
+      title: 'MIU Clubs · Speaker request',
+      message: statusMessages[request.status],
+      url: notificationUrl
+    });
+    await NotificationDispatch.updateOne({ eventKey }, {
+      $set: { status: result.messageId ? 'sent' : 'no_recipient', providerMessageId: result.messageId }
+    }).catch((error) => console.error('Speaker request push status update failed:', error.name));
+  } catch (error) {
+    const errorCode = error instanceof OneSignalApiError
+      ? `HTTP_${error.status}`
+      : error.message === 'ONESIGNAL_INVALID_RECIPIENTS' ? 'RECIPIENT_LIMIT'
+        : error.name === 'TimeoutError' || error.name === 'AbortError' ? 'TIMEOUT' : 'NETWORK_ERROR';
+    if (eventKey) await NotificationDispatch.updateOne({ eventKey }, { $set: { status: 'failed', errorCode } }).catch(() => {});
+    console.error('Speaker request push dispatch failed:', errorCode);
   }
 }
 
@@ -1641,7 +2429,7 @@ app.get('/api/club-auth/session', async (req, res) => {
     console.error('Club session validation failed:', error.name);
     return res.status(503).json({ message: 'Club access is temporarily unavailable.' });
   }
-  if (account && ['pr', 'english', 'security', 'sso', 'dean'].includes(account.role)) {
+  if (account && ['pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'software_development'].includes(account.role)) {
     return res.json({
       configured: clubAccounts.length > 0,
       authenticated: true,
@@ -1672,18 +2460,31 @@ app.get('/api/club-auth/session', async (req, res) => {
   });
 });
 
+app.post('/api/club-auth/switch-dashboard', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  if (!isSameOriginRequest(req)) return res.status(403).json({ message: 'Reload and try again.' });
+  if (!mongoReady) return res.status(503).json({ message: 'Dashboard access is temporarily unavailable.' });
+  try {
+    const account = await getClubAccountFromRequest(req);
+    if (!account) return res.status(401).json({ message: 'Sign in to switch dashboards.' });
+    const assignment = getStaffDashboardOptions(account).find(item => item.role === req.body?.role);
+    if (!assignment) return res.status(403).json({ message: 'This dashboard is not assigned to your account.' });
+    setClubSessionCookie(req, res, account, assignment);
+    return res.json({ redirect: assignment.href, role: assignment.role });
+  } catch (error) {
+    console.error('Dashboard switch failed:', error.name);
+    return res.status(503).json({ message: 'Dashboard access is temporarily unavailable.' });
+  }
+});
+
 app.post('/api/club-auth/login', async (req, res) => {
   if (await checkLoginSourceLock(req, res)) return;
-  if (!clubAccounts.length) {
-    return res.status(503).json({ message: 'Club accounts are not seeded yet. Run npm run seed.' });
-  }
+  if (!mongoReady) return res.status(503).json({ message: 'Sign-in storage is temporarily unavailable. Please try again.' });
 
   const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
   let account;
   try {
-    account = mongoReady
-      ? await ClubAccount.findOne({ email }).lean()
-      : clubAccounts.find((item) => item.email === email);
+    account = await ClubAccount.findOne({ email }).read('primary').readConcern('majority').lean();
   } catch (error) {
     console.error('Club login failed:', error.name);
     return res.status(503).json({ message: 'Club login is temporarily unavailable.' });
@@ -1696,7 +2497,9 @@ app.post('/api/club-auth/login', async (req, res) => {
   if (!await clearLoginSourceFailures(req, res)) return;
   await recordSuccessfulSignIn('club', account.email);
   setClubSessionCookie(req, res, account);
-  const committeeRoles = ['pr', 'english', 'security', 'sso', 'dean'];
+  res.append('Set-Cookie', `miu_admin=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/;${secureCookieSuffix(req)}`);
+  res.append('Set-Cookie', `miu_student=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/;${secureCookieSuffix(req)}`);
+  const committeeRoles = ['pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'software_development'];
   const club = committeeRoles.includes(account.role)
     ? { id: 0, name: account.role.toUpperCase(), image: '/assets/img/pics/logo.svg.png', role: account.role, committee: '' }
     : clubs.find((item) => item.id === account.clubId);
@@ -1744,7 +2547,7 @@ app.patch('/api/club/status', requireClubAuth, async (req, res) => {
   try {
     if (!requireLiveDatabase(res)) return;
     const currentClub = await Club.findOne({ id: clubId, archivedAt: null })
-      .select('id status applicationCycleStartedAt')
+      .select('id name status applicationCycleStartedAt')
       .read('primary').readConcern('majority').lean();
     if (!currentClub) return res.status(404).json({ message: 'Your club could not be found.' });
     const statusUpdate = { status };
@@ -1755,7 +2558,7 @@ app.patch('/api/club/status', requireClubAuth, async (req, res) => {
       { id: clubId, archivedAt: null, status: currentClub.status },
       { $set: statusUpdate },
       { new: true, runValidators: true, writeConcern: { w: 'majority' } }
-    ).select('id status applicationCycleStartedAt').read('primary').lean();
+    ).select('id name status applicationCycleStartedAt').read('primary').lean();
     if (!saved) return res.status(409).json({ message: 'The club status changed. Refresh and try again.' });
     const applicationQuery = { clubId };
     if (saved.applicationCycleStartedAt) applicationQuery.createdAt = { $gte: saved.applicationCycleStartedAt };
@@ -1767,6 +2570,7 @@ app.patch('/api/club/status', requireClubAuth, async (req, res) => {
       applicationCycleStartedAt: saved.applicationCycleStartedAt
     };
     res.setHeader('Cache-Control', 'no-store');
+    await notifyClubOpening(currentClub.status, saved);
     res.json({ savedToDatabase: true, clubId, status: saved.status, applicants: applicantCount });
   } catch (error) {
     console.error('Club president status update failed:', error.name);
@@ -1957,6 +2761,7 @@ app.post('/api/club/attendance-events/:clubId/:itemType/:eventRequestId/end', re
     const eventTitle = cleanText(selected?.title || selected?.boothName, 140);
     const eventDate = cleanText(selected?.date || selected?.boothOpenDate, 80);
     if (!club || !selected || !eventTitle) return res.status(404).json({ message: 'This event or booth could not be found in your club.' });
+    if (itemType === 'event' && selected.attendanceEnabled === false) return res.status(409).json({ message: 'This event was published without attendance tracking.' });
     if (!isActivityScheduledToday(eventDate)) return res.status(409).json({ message: 'Attendance can only be ended on the event or booth day.' });
     const key = { clubId, itemType, eventRequestId };
     const endedAt = new Date();
@@ -1973,6 +2778,7 @@ app.post('/api/club/attendance-events/:clubId/:itemType/:eventRequestId/end', re
     await AttendanceSession.updateMany({ ...key, active: true }, { $set: { active: false } }, { writeConcern: { w: 'majority' } });
     const closure = await AttendanceActivityClosure.findOne(key).read('primary').readConcern('majority').lean();
     if (!closure) throw new Error('Attendance closure could not be confirmed in the database.');
+    await notifyAttendanceWorkflow(key, 'pending_supervisor', 'submitted', closure.endedAt);
     res.setHeader('Cache-Control', 'no-store');
     res.json({ ended: true, alreadyEnded, endedAt: closure.endedAt });
   } catch (error) {
@@ -2010,6 +2816,7 @@ app.post('/api/attendance/admin-self-checkin', requireClubAuth, async (req, res)
     const eventDate = cleanText(selected?.date || selected?.boothOpenDate, 80);
     const eventTime = cleanText(selected?.time || selected?.boothOpenTime, 80);
     if (!club || !selected || !eventTitle) return res.status(404).json({ message: 'This event or booth could not be found in your club.' });
+    if (itemType === 'event' && selected.attendanceEnabled === false) return res.status(409).json({ message: 'This event was published without attendance tracking.' });
     if (!isActivityScheduledToday(eventDate)) return res.status(409).json({ message: 'You can check in only on the event or booth date.' });
     if (await isAttendanceActivityManuallyEnded(clubId, itemType, eventRequestId)) return res.status(409).json({ message: 'Attendance has ended for this event or booth.' });
 
@@ -2093,6 +2900,7 @@ app.post('/api/club/attendance-sessions', requireClubAuth, async (req, res) => {
     if (!club || !selectedEvent || !title) {
       return res.status(404).json({ message: 'This published event or booth could not be found.' });
     }
+    if (itemType === 'event' && selectedEvent.attendanceEnabled === false) return res.status(409).json({ message: 'This event was published without attendance tracking.' });
     const eventDate = cleanText(selectedEvent.date || selectedEvent.boothOpenDate, 80);
     if (!isActivityScheduledToday(eventDate)) {
       return res.status(409).json({ message: 'Attendance QR codes can only be created on the event or booth date.' });
@@ -2385,6 +3193,7 @@ app.post('/api/member/attendance-assignments/:id/check-in', requireStudentAuth, 
     if (!selected || eventTitle !== assignment.eventTitle || !isActivityScheduledToday(eventDate)) {
       return res.status(404).json({ message: 'The assigned event or booth is no longer available.' });
     }
+    if (assignment.itemType === 'event' && selected.attendanceEnabled === false) return res.status(409).json({ message: 'This event was published without attendance tracking.' });
     const existing = await AttendanceRecord.findOne({
       clubId: assignment.clubId, itemType: assignment.itemType, eventRequestId: assignment.eventRequestId,
       $or: [{ email }, { deviceHash: assignedDeviceHash }]
@@ -2899,6 +3708,7 @@ app.post('/api/club/attendance-assignments', requireClubAuth, async (req, res) =
     if (!activityClub || !selected || !eventTitle || !isActivityScheduledToday(eventDate)) {
       return res.status(404).json({ message: 'Choose an event or booth scheduled for today.' });
     }
+    if (itemType === 'event' && selected.attendanceEnabled === false) return res.status(409).json({ message: 'This event was published without attendance tracking.' });
     if (await isAttendanceActivityManuallyEnded(clubId, itemType, eventRequestId)) {
       return res.status(409).json({ message: 'Attendance has ended for this event or booth.' });
     }
@@ -3059,10 +3869,16 @@ app.put('/api/club/committee-availability', requireClubAuth, requireClubPresiden
   await updateCommitteeAvailability(req.clubAccount.clubId, req.body.committees, res);
 });
 
-app.get('/api/club/heads', requireClubAuth, requireClubPresident, (req, res) => {
-  res.json(clubAccounts
-    .filter((account) => account.clubId === req.clubAccount.clubId && account.role === 'head')
-    .map(({ email, committee }) => ({ email, committee })));
+app.get('/api/club/heads', requireClubAuth, requireClubPresident, async (req, res) => {
+  if (!mongoReady) return res.status(503).json({ message: 'Committee head records need the database.' });
+  try {
+    const heads = await ClubAccount.find({ clubId: req.clubAccount.clubId, role: 'head' })
+      .select('email committee').read('primary').lean();
+    res.json(heads.map(({ email, committee }) => ({ email, committee })));
+  } catch (error) {
+    console.error('Committee head lookup failed:', error.name);
+    res.status(503).json({ message: 'Could not load this club’s committee heads.' });
+  }
 });
 
 function acceptedApplicationsAsMembers(applicationsForClub) {
@@ -3543,6 +4359,7 @@ app.post('/api/committee/attendance-reviews/:clubId/:itemType/:eventRequestId/ap
     if (action === 'reject') update.$set = { approvalStatus: 'rejected' };
     const result = await AttendanceRecord.updateMany({ ...reviewFilter, ...stageFilter }, update);
     if (!result.modifiedCount) return res.status(409).json({ message: `This activity is no longer waiting for ${attendanceApprovalNames[role]} approval.` });
+    await notifyAttendanceWorkflow(reviewFilter, action === 'approve' ? (role === 'dean' ? 'approved' : role === 'pr' ? 'pending_sso' : 'pending_dean') : action === 'reject' ? 'rejected' : stage, action);
     res.setHeader('Cache-Control', 'no-store');
     res.json({
       action, nextStage: action === 'approve' ? (role === 'dean' ? 'complete' : role === 'pr' ? 'sso' : 'dean') : '',
@@ -3567,7 +4384,7 @@ app.get('/api/committee/club-members', requireClubAuth, async (req, res) => {
   }
 });
 
-const committeeStage = { pr: 'pending_pr', english: 'pending_english', security: 'pending_security', dean: 'pending_dean' };
+const committeeStage = { supervisor: 'pending_supervisor', pr: 'pending_pr', english: 'pending_english', security: 'pending_security', dean: 'pending_dean' };
 const committeeRoleLabels = { pr: 'PR Department', english: 'English Department', security: 'Security Office', dean: 'Dean' };
 
 function committeeCanAccessRequest(role, type) {
@@ -3711,7 +4528,10 @@ function buildPublishedItem(record, club) {
     image: record.image || club.image,
     createdAt: record.createdAt
   };
-  if (record.type === 'event') item.registrationEnabled = record.registrationEnabled !== false;
+  if (record.type === 'event') {
+    item.registrationEnabled = record.registrationEnabled !== false;
+    item.attendanceEnabled = record.registrationEnabled !== false && record.attendanceEnabled === true;
+  }
   if (record.type === 'sponsor') {
     Object.assign(item, {
       sponsorName: record.sponsorName,
@@ -3869,7 +4689,9 @@ app.patch('/api/club/content/:id/assignment', requireClubAuth, async (req, res) 
       }
     }
     record.assignedHeadEmail = email;
+    appendWorkflowEvent(record, 'club', 'assigned', record.status, record.status, '', req.clubAccount);
     await record.save();
+    await notifyContentRequest(record);
     res.json({ id: record.id, assignedHeadEmail: record.assignedHeadEmail });
   } catch (error) {
     console.error('Content task assignment failed:', error.name);
@@ -3903,6 +4725,18 @@ for (const moduleType of CONTENT_TYPES) {
   });
 }
 
+async function resolveContentHeadAssignment(req, type, rawEmail) {
+  const email = cleanText(rawEmail, 254).toLowerCase();
+  if (!email) return '';
+  if (type === 'entry_permit' || req.clubAccount.role !== 'president') return null;
+  const head = await ClubAccount.findOne({
+    clubId: req.clubAccount.clubId,
+    role: 'head',
+    email
+  }).select('_id').lean();
+  return head ? email : null;
+}
+
 async function createContentRequest(req, res, type) {
   try {
     if (!mongoReady) return res.status(503).json({ message: 'Content storage needs MongoDB.' });
@@ -3925,26 +4759,37 @@ async function createContentRequest(req, res, type) {
       return res.status(400).json({ message: type === 'sponsor' ? 'Add the company logo before submitting this sponsor request.' : 'Add an image before submitting this content.' });
     }
     const club = clubs.find((item) => item.id === req.clubAccount.clubId);
+    const assignedHeadEmail = req.body.assignedHeadEmail
+      ? await resolveContentHeadAssignment(req, type, req.body.assignedHeadEmail)
+      : '';
+    if (assignedHeadEmail === null) return res.status(400).json({ message: 'Choose a committee head assigned to this club.' });
     const last = await ContentRequest.findOne().sort({ id: -1 }).lean();
     const record = await ContentRequest.create({
       id: (last?.id || 0) + 1,
       clubId: req.clubAccount.clubId,
       clubName: club?.name || '',
       type,
+      assignedHeadEmail,
       title,
       description,
       date: type === 'booth' ? (cleanText(req.body.boothOpenDate, 40) || cleanText(req.body.date, 40)) : cleanText(req.body.date, 40),
       time: cleanText(req.body.time, 40),
-      ...(type === 'event' ? { registrationEnabled: req.body.registrationEnabled === undefined ? true : req.body.registrationEnabled === true } : {}),
+      ...(type === 'event' ? {
+        registrationEnabled: req.body.registrationEnabled === undefined ? true : req.body.registrationEnabled === true,
+        attendanceEnabled: req.body.registrationEnabled !== false && req.body.attendanceEnabled === true
+      } : {}),
       location: type === 'booth' ? (cleanText(req.body.boothLocation, 140) || cleanText(req.body.location, 120)) : cleanText(req.body.location, 120),
       budget: cleanText(req.body.budget, 80),
       image: typeof req.body.image === 'string' ? req.body.image.slice(0, 4 * 1024 * 1024) : '',
       ...extractContentFields(type, req.body),
-      status: req.body.submit === true ? 'pending_pr' : 'draft',
-      clubNotice: req.body.submit === true ? `Club submitted a new ${contentSingularLabel(type)} for PR review.` : ''
+      status: req.body.submit === true ? 'pending_supervisor' : 'draft',
+      clubNotice: req.body.submit === true ? `Club submitted a new ${contentSingularLabel(type)} for supervisor review.` : ''
     });
-    if (req.body.submit === true) appendWorkflowEvent(record, 'club', 'submitted', 'draft', 'pending_pr', '', req.clubAccount);
-    if (req.body.submit === true) await record.save();
+    if (req.body.submit === true) appendWorkflowEvent(record, 'club', 'submitted', 'draft', 'pending_supervisor', '', req.clubAccount);
+    if (req.body.submit === true) {
+      await record.save();
+      await notifyContentRequest(record);
+    }
     const { _id, __v, ...rest } = record.toObject();
     res.status(201).json(rest);
   } catch (error) {
@@ -3982,10 +4827,19 @@ app.put('/api/club/content/:id', requireClubAuth, async (req, res) => {
     if (req.body.time !== undefined) record.time = cleanText(req.body.time, 40);
     if (type === 'event' && req.body.registrationEnabled !== undefined) {
       record.registrationEnabled = req.body.registrationEnabled === true;
+      if (!record.registrationEnabled) record.attendanceEnabled = false;
+    }
+    if (type === 'event' && req.body.attendanceEnabled !== undefined) {
+      record.attendanceEnabled = record.registrationEnabled && req.body.attendanceEnabled === true;
     }
     if (req.body.location !== undefined) record.location = cleanText(req.body.location, 120);
     if (req.body.budget !== undefined) record.budget = cleanText(req.body.budget, 80);
     if (typeof req.body.image === 'string') record.image = req.body.image.slice(0, 4 * 1024 * 1024);
+    if (req.clubAccount.role === 'president' && req.body.assignedHeadEmail !== undefined && type !== 'entry_permit') {
+      const assignedHeadEmail = await resolveContentHeadAssignment(req, type, req.body.assignedHeadEmail);
+      if (assignedHeadEmail === null) return res.status(400).json({ message: 'Choose a committee head assigned to this club.' });
+      record.assignedHeadEmail = assignedHeadEmail;
+    }
     if (type === 'sponsor') Object.assign(record, extractSponsorFields(req.body));
     if (type === 'entry_permit' && req.body.submit === true
       && !validEntryPermitItems(req.body.permitItems === undefined ? record.permitItems : req.body.permitItems)) {
@@ -4015,22 +4869,25 @@ app.put('/api/club/content/:id', requireClubAuth, async (req, res) => {
     }
     if (req.body.submit === true) {
       const fromStatus = record.editRequestedBy ? 'changes_requested' : record.status;
-      const targetStage = type === 'entry_permit' && record.editRequestedBy === 'pr'
+      const targetStage = record.editRequestedBy === 'supervisor' ? (record.supervisorNextStage || 'pending_pr')
+        : type === 'entry_permit' && record.editRequestedBy === 'pr'
         ? 'pending_pr'
         : type !== 'event' && record.editRequestedBy === 'english' ? 'pending_pr'
         : record.editRequestedBy ? committeeStage[record.editRequestedBy] : (record.resubmitTo || 'pending_pr');
       const isFirstSubmission = !(record.workflowHistory || []).some((event) => ['submitted', 'resubmitted'].includes(event.action));
-      record.status = targetStage;
+      record.supervisorNextStage = targetStage;
+      record.status = 'pending_supervisor';
       record.resubmitTo = 'pending_pr';
       const nextReviewer = { pending_pr: 'PR Department', pending_english: 'English Department', pending_security: 'Security Office' }[targetStage] || 'Dean';
-      record.clubNotice = `${isFirstSubmission ? 'Club submitted a new' : 'Club resubmitted the updated'} ${contentSingularLabel(type)}. Waiting for ${nextReviewer} review.`;
-      appendWorkflowEvent(record, 'club', isFirstSubmission ? 'submitted' : 'resubmitted', fromStatus, targetStage, '', req.clubAccount);
+      record.clubNotice = `${isFirstSubmission ? 'Club submitted a new' : 'Club resubmitted the updated'} ${contentSingularLabel(type)}. Waiting for club supervisor approval, then ${nextReviewer} review.`;
+      appendWorkflowEvent(record, 'club', isFirstSubmission ? 'submitted' : 'resubmitted', fromStatus, 'pending_supervisor', '', req.clubAccount);
       record.editRequestedBy = '';
-      record.assignedHeadEmail = '';
     } else {
+      appendWorkflowEvent(record, 'club', 'edited', record.status, 'draft', '', req.clubAccount);
       record.status = 'draft';
     }
     await record.save();
+    await notifyContentRequest(record);
     const { _id, __v, ...rest } = record.toObject();
     res.json(rest);
   } catch (error) {
@@ -4124,7 +4981,7 @@ app.post('/api/committee/requests/:id/reopen', requireClubAuth, requireCommittee
     const record = await ContentRequest.findOne({ id: Number(req.params.id) });
     if (!record) return res.status(404).json({ message: 'Request not found.' });
   if (!committeeCanAccessRequest(role, record.type) || record.type === 'entry_permit' && !['pr', 'security'].includes(role)) return res.status(404).json({ message: 'Request not found.' });
-    if (record.status === 'draft' || record.status === 'changes_requested' || record.status === committeeStage[role]) {
+    if (record.status === 'pending_supervisor' || record.status === 'draft' || record.status === 'changes_requested' || record.status === committeeStage[role]) {
       return res.status(409).json({ message: `This request is already in the ${committeeRoleLabels[role]} review process.` });
     }
     const comment = cleanText(req.body.comment, 2000);
@@ -4149,6 +5006,7 @@ app.post('/api/committee/requests/:id/reopen', requireClubAuth, requireCommittee
       }
     }
     await record.save();
+    await notifyContentRequest(record);
     const { _id, __v, ...rest } = record.toObject();
     res.json(rest);
   } catch (error) {
@@ -4194,6 +5052,7 @@ app.post('/api/committee/requests/:id/return-to-committee', requireClubAuth, req
       }
     }
     await record.save();
+    await notifyContentRequest(record);
     const { _id, __v, ...rest } = record.toObject();
     res.json(rest);
   } catch (error) {
@@ -4224,6 +5083,7 @@ app.delete('/api/committee/requests/:id', requireClubAuth, requireCommitteeRole,
     record.clubNotice = contentNotice('Dean', 'delete', record.type);
     appendWorkflowEvent(record, 'dean', 'deleted', previousStatus, 'deleted', '', req.clubAccount);
     await record.save();
+    await notifyContentRequest(record);
     res.json({ deleted: true, status: record.status });
   } catch (error) {
     console.error('Database operation failed:', error.name);
@@ -4260,6 +5120,7 @@ app.delete('/api/committee/requests/:id/comment', requireClubAuth, requireCommit
       return res.status(404).json({ message: 'Your comment was not found.' });
     }
     await record.save();
+    await notifyContentRequest(record);
     res.json({ deleted: true });
   } catch (error) {
     console.error('Database operation failed:', error.name);
@@ -4344,6 +5205,7 @@ app.post('/api/committee/requests/:id/action', requireClubAuth, requireCommittee
       }
     }
     await record.save();
+    await notifyContentRequest(record);
     if (nextStatus === 'published' && record.type !== 'entry_permit') {
       await dispatchPublishedContentNotifications({
         source: 'club',
@@ -4507,6 +5369,38 @@ app.post('/api/student-auth/google', async (req, res) => {
   if (!mongoReady) return res.status(503).json({ message: 'Google sign-in requires the database.' });
   try {
     const identity = await verifyGoogleRequest(req, res);
+    if (identity.email === getConfiguredAdminEmail()) {
+      adminAuthState = await require('./services/staff-google-auth').resolveAdminGoogleAccount({
+        AdminAuthState, identity, configuredEmail: getConfiguredAdminEmail(),
+        async fallbackCredentials() {
+          if (process.env.ADMIN_EMAIL?.trim().toLowerCase() === identity.email && process.env.ADMIN_PASSWORD) {
+            const salt = crypto.randomBytes(16).toString('hex');
+            const passwordHash = await new Promise((resolve, reject) => crypto.scrypt(process.env.ADMIN_PASSWORD, salt, 64,
+              (error, hash) => error ? reject(error) : resolve(hash.toString('hex'))));
+            return { salt, passwordHash };
+          }
+          return adminCredentials?.email === identity.email ? { salt: adminCredentials.salt, passwordHash: adminCredentials.passwordHash } : null;
+        }
+      });
+      if (!adminAuthState) throw new Error('STAFF_GOOGLE_ACCOUNT_CONFLICT');
+      if (!await clearLoginSourceFailures(req, res)) return;
+      await recordSuccessfulSignIn('admin', identity.email);
+      setAdminSessionCookie(req, res);
+      res.append('Set-Cookie', `miu_club=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/;${secureCookieSuffix(req)}`);
+      res.append('Set-Cookie', `miu_student=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/;${secureCookieSuffix(req)}`);
+      clearGoogleNonceCookie(req, res);
+      return res.json({ authenticated: true, role: 'admin', redirect: '/admin' });
+    }
+    const staff = await require('./services/staff-google-auth').resolveStaffGoogleAccount(ClubAccount, identity);
+    if (staff) {
+      if (!await clearLoginSourceFailures(req, res)) return;
+      await recordSuccessfulSignIn('club', staff.account.email);
+      setClubSessionCookie(req, res, staff.account);
+      res.append('Set-Cookie', `miu_admin=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/;${secureCookieSuffix(req)}`);
+      res.append('Set-Cookie', `miu_student=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/;${secureCookieSuffix(req)}`);
+      clearGoogleNonceCookie(req, res);
+      return res.json({ authenticated: true, role: staff.account.role, redirect: staff.redirect });
+    }
     const accountBySubject = await StudentAccount.findOne({ googleSub: identity.googleSub }).lean();
     const accountByEmail = accountBySubject ? null : await StudentAccount.findOne({ email: identity.email }).lean();
     const decision = decideGoogleAccount({ accountBySubject, accountByEmail });
@@ -4539,9 +5433,14 @@ app.post('/api/student-auth/google', async (req, res) => {
     if (!await clearLoginSourceFailures(req, res)) return;
     await recordSuccessfulSignIn('student', account.email);
     setStudentSessionCookie(req, res, account);
+    res.append('Set-Cookie', `miu_club=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/;${secureCookieSuffix(req)}`);
+    res.append('Set-Cookie', `miu_admin=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/;${secureCookieSuffix(req)}`);
     clearGoogleNonceCookie(req, res);
     return res.json({ authenticated: true, role: 'student' });
   } catch (error) {
+    if (error.message === 'STAFF_GOOGLE_ACCOUNT_CONFLICT' || error.code === 11000) {
+      return res.status(409).json({ message: 'This staff Google account could not be linked. Contact the platform administrator.' });
+    }
     if (error.message !== 'GOOGLE_ACCOUNT_NOT_ALLOWED' && error.message !== 'GOOGLE_CREDENTIAL_INVALID') {
       console.error('Google sign-in failed:', error.name);
       return res.status(503).json({ message: 'Google sign-in is temporarily unavailable.' });
@@ -4688,14 +5587,13 @@ app.post('/api/auth/login', async (req, res) => {
     if (!await clearLoginSourceFailures(req, res)) return;
     await recordSuccessfulSignIn('admin', email);
     setAdminSessionCookie(req, res);
-    return res.json({ authenticated: true, role: 'admin', redirect: '/admin/global' });
+    return res.json({ authenticated: true, role: 'admin', redirect: '/admin' });
   }
 
   let account;
   try {
-    account = mongoReady
-      ? await ClubAccount.findOne({ email }).lean()
-      : clubAccounts.find((item) => item.email === email);
+    if (!mongoReady) return res.status(503).json({ message: 'Sign-in storage is temporarily unavailable. Please try again.' });
+    account = await ClubAccount.findOne({ email }).read('primary').readConcern('majority').lean();
   } catch (error) {
     console.error('Club login failed:', error.name);
     return res.status(503).json({ message: 'Login is temporarily unavailable. Please try again shortly.' });
@@ -4704,9 +5602,13 @@ app.post('/api/auth/login', async (req, res) => {
     if (!await clearLoginSourceFailures(req, res)) return;
     await recordSuccessfulSignIn('club', account.email);
     setClubSessionCookie(req, res, account);
+    res.append('Set-Cookie', `miu_admin=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/;${secureCookieSuffix(req)}`);
+    res.append('Set-Cookie', `miu_student=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/;${secureCookieSuffix(req)}`);
     const roleRedirects = {
-      president: '/club-login',
-      head: '/club-login',
+      software_development: '/admin',
+      supervisor: '/dashboards/supervisor-dashboard.html',
+      president: '/club-dashboard',
+      head: '/club-dashboard',
       pr: '/dashboards/pr-dashboard.html',
       english: '/dashboards/english-dashboard.html',
       security: '/dashboards/security-dashboard.html',
@@ -4716,6 +5618,10 @@ app.post('/api/auth/login', async (req, res) => {
     return res.json({ authenticated: true, role: account.role, redirect: roleRedirects[account.role] || '/club-login' });
   }
 
+  if (account) {
+    if (await countLoginSourceFailure(req, res)) return;
+    return res.status(401).json({ message: 'Incorrect email or password.' });
+  }
   const studentAccount = mongoReady ? await StudentAccount.findOne({ email }).lean().catch((error) => {
     console.error('Student login failed:', error.name);
     return null;
@@ -4724,6 +5630,8 @@ app.post('/api/auth/login', async (req, res) => {
     if (!await clearLoginSourceFailures(req, res)) return;
     await recordSuccessfulSignIn('student', studentAccount.email);
     setStudentSessionCookie(req, res, studentAccount);
+    res.append('Set-Cookie', `miu_club=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/;${secureCookieSuffix(req)}`);
+    res.append('Set-Cookie', `miu_admin=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/;${secureCookieSuffix(req)}`);
     return res.json({ authenticated: true, role: 'student', redirect: '/' });
   }
 
@@ -4826,7 +5734,7 @@ app.post('/api/admin/login', async (req, res) => {
 });
 
 app.post('/api/admin/logout', (req, res) => {
-  res.setHeader('Set-Cookie', 'miu_admin=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/');
+  res.setHeader('Set-Cookie', ['miu_admin=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/', 'miu_club=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/']);
   res.status(204).end();
 });
 
@@ -4914,7 +5822,7 @@ async function findRecoverableAccount(email) {
     StudentAccount.findOne({ email }).select('_id').read('primary').lean(),
     ClubAccount.findOne({ email }).select('_id').read('primary').lean()
   ]);
-  if (studentAccount || !clubAccount) return null;
+  if (!clubAccount) return null;
   return 'club';
 }
 
@@ -4924,7 +5832,7 @@ async function requestClubPasswordReset(email) {
     StudentAccount.findOne({ email }).select('_id').read('primary').lean(),
     ClubAccount.findOne({ email }).select('email role').read('primary').readConcern('majority').lean()
   ]);
-  if (studentAccount) return { status: 'student' };
+  if (studentAccount && !clubAccount) return { status: 'student' };
   if (!clubAccount) return { status: 'not_found' };
 
   const transporter = getPasswordRecoveryTransport();
@@ -5118,6 +6026,39 @@ app.post('/api/password-reset/confirm', limitPasswordResetRequests, async (req, 
 
 registerFeedbackRoutes(app, { Club, UniversityContent, requireStudentAuth, isAdminSessionValid, getClubAccountFromRequest, requireLiveDatabase });
 app.use('/api/admin', requireAdmin);
+require('./services/staff-account-admin').registerStaffAccountAdmin(app, {
+  ClubAccount, Club, databaseReady: () => mongoReady, sameOrigin: isSameOriginRequest, isAdminEmail: emailMatches,
+  refreshAccount(account) {
+    const index = clubAccounts.findIndex(item => item.email === account.email);
+    if (index < 0) clubAccounts.push(account); else clubAccounts[index] = account;
+    writePrivateClubAccountsFile();
+  },
+  removeAccount(account) {
+    clubAccounts = clubAccounts.filter(item => item.email !== account.email);
+    writePrivateClubAccountsFile();
+  }
+});
+require('./services/supervisor-admin').registerSupervisorAdmin(app, {
+  ClubAccount, StudentAccount, Club, databaseReady: () => mongoReady, sameOrigin: isSameOriginRequest,
+  isAdminEmail: emailMatches,
+  removeAccount(email) {
+    clubAccounts = clubAccounts.filter(account => account.email !== email);
+    writePrivateClubAccountsFile();
+  },
+  refreshAccount(account) {
+    const index = clubAccounts.findIndex(item => item.email === account.email);
+    if (index < 0) clubAccounts.push(account); else clubAccounts[index] = account;
+    writePrivateClubAccountsFile();
+  }
+});
+require('./services/supervisor-dashboard').registerSupervisorDashboard(app, {
+  getAccount: getClubAccountFromRequest, databaseReady: () => mongoReady,
+  Club, ContentRequest, SpeakerRequest, AttendanceRecord, Review: SupervisorReview,
+  sameOrigin: isSameOriginRequest, publicSpeakerRequest,
+  notifyContent: notifyContentRequest, notifySpeaker: notifySpeakerWorkflow, notifyAttendance: notifyAttendanceWorkflow,
+  attendanceClosureMapFor, attendanceActivityKey, isAttendanceActivityEnded
+});
+
 
 app.post('/api/admin/accounts/password-reset', limitPasswordResetRequests, async (req, res) => {
   const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
@@ -5154,7 +6095,7 @@ app.post('/api/admin/accounts/password', limitPasswordResetRequests, async (req,
 
   try {
     const studentAccount = await StudentAccount.findOne({ email }).select('_id').read('primary').lean();
-    if (studentAccount) {
+    if (studentAccount && !await ClubAccount.exists({ email })) {
       return res.status(422).json({ message: 'Student accounts use Google sign-in. They cannot have a portal password set here; contact the MIU IT Office for access help.' });
     }
 
@@ -5229,6 +6170,7 @@ app.post('/api/admin/university-content', async (req, res) => {
       ...interactionFields,
       id: (last?.id || 0) + 1, type, title, description, date, time,
       registrationEnabled: type === 'event' && req.body.registrationEnabled === true,
+      attendanceEnabled: type === 'event' && req.body.registrationEnabled === true && req.body.attendanceEnabled === true,
       location,
       image, imagePublicId, publishedBy: getConfiguredAdminEmail() || 'MIU Admin'
     });
@@ -5768,7 +6710,7 @@ app.put('/api/admin/homepage', async (req, res) => {
 });
 
 app.post('/api/admin/clubs', async (req, res) => {
-  const nextId = clubs.reduce((largestId, club) => Math.max(largestId, club.id), 0) + 1;
+  let nextId;
   const email = typeof req.body.clubLoginEmail === 'string' ? req.body.clubLoginEmail.trim().toLowerCase() : '';
   const password = req.body.clubInitialPassword;
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -5784,7 +6726,7 @@ app.post('/api/admin/clubs', async (req, res) => {
     const existingAccount = mongoReady
       ? await ClubAccount.findOne({ email }).select('_id').lean()
       : clubAccounts.find((account) => account.email === email);
-    if (existingAccount) return res.status(409).json({ message: 'This email is already associated with an account.' });
+    if (existingAccount || mongoReady && await StudentAccount.exists({ email })) return res.status(409).json({ message: 'This email is already associated with an account.' });
   } catch (error) {
     console.error('Club account validation failed:', error.name);
     return res.status(503).json({ message: 'The data store is temporarily unavailable.' });
@@ -5793,10 +6735,13 @@ app.post('/api/admin/clubs', async (req, res) => {
   if (!requireLiveDatabase(res)) return;
   let club;
   try {
+    const lastClub = await Club.findOne().sort({ id: -1 }).select('id').lean();
+    nextId = (Number(lastClub?.id) || 0) + 1;
     club = await makeClub(req.body, null, nextId);
     if (!club) {
       return res.status(400).json({ message: 'Complete the required fields and upload a valid image.' });
     }
+    if (club.status === 'open') club.applicationCycleStartedAt = new Date();
     const salt = crypto.randomBytes(16).toString('hex');
     const account = {
       clubId: nextId,
@@ -5826,6 +6771,7 @@ app.post('/api/admin/clubs', async (req, res) => {
     } catch (error) {
       console.error('Club credential cache update failed:', error.name);
     }
+    await notifyClubOpening(null, club);
     res.status(201).json(club);
   } catch (error) {
     if (club) await removeClubImage(club);
@@ -5878,18 +6824,24 @@ app.patch('/api/admin/clubs/:id', async (req, res) => {
     return res.status(404).json({ message: 'Club not found.' });
   }
 
-  const previousClub = clubs[clubIndex];
+  let previousClub = clubs[clubIndex];
   let updatedClub;
   try {
     if (!requireLiveDatabase(res)) return;
+    previousClub = await Club.findOne({ id: clubId }).read('primary').lean();
+    if (!previousClub) return res.status(404).json({ message: 'Club not found.' });
     updatedClub = await makeClub(req.body, previousClub, clubId);
     if (!updatedClub) {
       return res.status(400).json({ message: 'Complete the required fields and upload a valid image.' });
     }
-    const savedClub = await Club.findOneAndUpdate({ id: clubId }, { $set: updatedClub }, { new: true });
-    if (!savedClub) return res.status(404).json({ message: 'Club not found.' });
+    updatedClub.applicationCycleStartedAt = updatedClub.status === 'open' && previousClub.status !== 'open'
+      ? new Date() : previousClub.applicationCycleStartedAt || null;
+    const savedClub = await Club.findOneAndUpdate({ id: clubId, status: previousClub.status }, { $set: updatedClub },
+      { new: true, writeConcern: { w: 'majority' } });
+    if (!savedClub) return res.status(409).json({ message: 'Club status changed. Refresh and try again.' });
     clubs[clubIndex] = updatedClub;
     if (previousClub.image !== updatedClub.image) await removeClubImage(previousClub);
+    await notifyClubOpening(previousClub.status, updatedClub);
     res.json(updatedClub);
   } catch (error) {
     if (updatedClub && updatedClub.image !== previousClub.image) await removeClubImage(updatedClub);
@@ -6490,6 +7442,9 @@ const connectMongo = async () => {
 
     await mongoose.connect(process.env.MONGO_URI, {
       serverSelectionTimeoutMS: 8000,
+      // Negotiate wire compression for legacy embedded media during hydration.
+      compressors: ['zlib'],
+      zlibCompressionLevel: 4,
       // Keep each serverless instance's connection footprint small. Vercel can
       // scale many function instances at once, each with its own Mongo pool.
       maxPoolSize: 5,

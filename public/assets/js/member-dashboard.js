@@ -10,6 +10,8 @@
   let activeQrDate = String(savedQr.eventDate || '');
   let activeQrTimer = 0;
   let activeQrCountdown = 0;
+  let assignmentLoadPromise = null;
+  let assignmentsLoadedAt = 0;
 
   const todayInCairo = () => {
     const parts = new Intl.DateTimeFormat('en', {
@@ -97,7 +99,10 @@
     });
   }
 
-  async function loadAssignments() {
+  function loadAssignments(force = false) {
+    if (assignmentLoadPromise) return assignmentLoadPromise;
+    if (!force && assignmentsLoadedAt && Date.now() - assignmentsLoadedAt < 25_000) return Promise.resolve();
+    const operation = (async () => {
     list.replaceChildren();
     const loading = document.createElement('p');
     loading.className = 'member-assignment-empty';
@@ -109,6 +114,7 @@
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.message || 'Could not load member attendance requests.');
       assignments = Array.isArray(payload) ? payload : [];
+      assignmentsLoadedAt = Date.now();
       if (activeQrDate && activeQrDate !== todayInCairo()) {
         activeToken = '';
         activeAssignmentId = '';
@@ -117,19 +123,25 @@
       }
       render();
     } catch (error) {
+      assignmentsLoadedAt = 0;
       list.replaceChildren();
       const message = document.createElement('p');
       message.className = 'member-assignment-empty is-error';
       message.textContent = error.message;
       list.append(message);
     }
+    })();
+    assignmentLoadPromise = operation;
+    return operation.finally(() => {
+      if (assignmentLoadPromise === operation) assignmentLoadPromise = null;
+    });
   }
 
   async function acceptAssignment(id) {
     try {
       const result = await apiJson(`/api/member/attendance-assignments/${encodeURIComponent(id)}/accept`, { method: 'POST' });
       if (result.savedToDatabase !== true) throw new Error('Your response was not confirmed in the database.');
-      await loadAssignments();
+      await loadAssignments(true);
     } catch (error) {
       window.alert(error.message);
     }
@@ -145,24 +157,12 @@
     try {
       const result = await apiJson(`/api/member/attendance-assignments/${encodeURIComponent(assignment.id)}/check-in`, { method: 'POST' });
       if (result.savedToDatabase !== true) throw new Error('Your attendance was not confirmed in the database.');
-      await loadAssignments();
+      await loadAssignments(true);
     } catch (error) {
       message.textContent = error.message;
       message.classList.add('is-error');
       actionButtons.forEach((button) => { button.disabled = false; });
     }
-  }
-
-  function loadQrLibrary() {
-    if (typeof window.QRCode === 'function') return Promise.resolve();
-    return new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
-      script.async = true;
-      script.onload = () => typeof window.QRCode === 'function' ? resolve() : reject(new Error('QR generator did not load.'));
-      script.onerror = () => reject(new Error('QR generator could not be reached. Check your connection and retry.'));
-      document.head.append(script);
-    });
   }
 
   async function refreshQr(qr, token, eventDate) {
@@ -175,7 +175,7 @@
       window.sessionStorage.removeItem('memberAttendanceQr');
       window.clearTimeout(activeQrTimer);
       qr.classList.add('hidden');
-      await loadAssignments();
+      await loadAssignments(true);
       return;
     }
     try {
@@ -208,7 +208,7 @@
         window.sessionStorage.removeItem('memberAttendanceQr');
         window.clearTimeout(activeQrTimer);
         qr.classList.add('hidden');
-        await loadAssignments();
+        await loadAssignments(true);
         return;
       }
       if (/attendance has ended|event day is over|no longer available/i.test(error.message)) {
@@ -217,7 +217,7 @@
         activeQrDate = '';
         window.clearTimeout(activeQrTimer);
         window.sessionStorage.removeItem('memberAttendanceQr');
-        await loadAssignments();
+        await loadAssignments(true);
         return;
       }
       qr.textContent = `${error.message} Retrying shortly…`;
@@ -235,7 +235,7 @@
     activeToken = '';
     activeAssignmentId = assignment.id;
     try {
-      await loadQrLibrary();
+      await window.ensureQRCode();
       const result = await apiJson(`/api/member/attendance-assignments/${encodeURIComponent(assignment.id)}/session`, { method: 'POST' });
       if (!result.token) throw new Error('The database did not return a saved QR session.');
       activeToken = result.token;
@@ -248,9 +248,9 @@
     }
   }
 
-  document.getElementById('refreshMemberAssignmentsBtn')?.addEventListener('click', loadAssignments);
+  document.getElementById('refreshMemberAssignmentsBtn')?.addEventListener('click', () => loadAssignments(true));
   window.setInterval(() => {
-    if (!activeToken && document.visibilityState === 'visible' && document.getElementById('myFormsView')?.classList.contains('active')) loadAssignments();
+    if (!activeToken && document.visibilityState === 'visible' && document.getElementById('myFormsView')?.classList.contains('active')) loadAssignments(true);
   }, 30000);
   window.loadMemberAttendanceAssignments = loadAssignments;
 })();

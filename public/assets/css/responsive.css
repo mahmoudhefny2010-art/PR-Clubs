@@ -130,6 +130,33 @@
   }
 }
 
+/* The admin dashboard controls stay in one touch-scrollable row on phones. */
+@media (max-width: 760px) {
+  .admin-session-actions {
+    box-sizing: border-box;
+    display: flex;
+    flex: 0 0 auto;
+    flex-flow: row nowrap;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    padding: 2px 2px 9px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--primary-700) var(--bg-soft);
+  }
+  .admin-session-actions > :is(a, button) {
+    flex: 0 0 auto;
+    min-height: 44px;
+    white-space: nowrap;
+  }
+  .admin-session-actions::-webkit-scrollbar { height: 5px; }
+  .admin-session-actions::-webkit-scrollbar-track { background: var(--bg-soft); border-radius: 999px; }
+  .admin-session-actions::-webkit-scrollbar-thumb { background: var(--primary-700); border-radius: 999px; }
+}
+
 @keyframes slideDown {
   from { opacity: 0; transform: translateY(-8px); }
   to { opacity: 1; transform: translateY(0); }
@@ -502,7 +529,130 @@
   .nav-right { margin-left: auto; }
   .mobile-menu-toggle { margin-right: 8px; }
 }
+
+@media (max-width: 640px) {
+  .admin-club-row {
+    box-sizing: border-box;
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 10px 12px;
+    min-width: 0;
+    padding: 12px;
+  }
+  .admin-club-info { min-width: 0; overflow-wrap: anywhere; }
+  .admin-row-actions {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 36px 36px minmax(60px, 1fr) minmax(72px, 1.1fr);
+    gap: 6px;
+    width: 100%;
+    min-width: 0;
+  }
+  .admin-row-actions > :is(button, a) {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    padding-inline: 5px;
+    white-space: nowrap;
+  }
+  .admin-row-actions > .order-btn { height: 38px; }
+  .admin-row-actions > .secondary-btn,
+  .admin-row-actions > .delete-btn { min-height: 42px; font-size: .78rem; }
+}
+
 .nav-profile-dropdown { box-sizing: border-box; width: min(280px, calc(100vw - 24px)); }
+.nav-profile-dashboard-choices { display: grid; gap: 3px; padding: 7px 0; border-bottom: 1px solid var(--border-color); }
+.nav-profile-dashboard-choices[hidden] { display: none !important; }
+.nav-profile-dashboard-label { padding: 6px 12px 2px; color: var(--text-muted); font-size: .75rem; font-weight: 750; }
+.nav-profile-dashboard-option:disabled { cursor: wait; opacity: .65; }
+
+/* Size club management cards from their actual panel width, including narrow desktop columns. */
+#adminClubList { min-width: 0; container-type: inline-size; }
+@container (max-width: 460px) {
+  #adminClubList .admin-club-row {
+    box-sizing: border-box;
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 10px 12px;
+    min-width: 0;
+    padding: 12px;
+  }
+  #adminClubList .admin-club-row > img { width: 44px; height: 44px; }
+  #adminClubList .admin-club-info { min-width: 0; overflow-wrap: anywhere; }
+  #adminClubList .admin-row-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    width: 100%;
+    min-width: 0;
+  }
+  #adminClubList .admin-row-actions > .order-btn {
+    box-sizing: border-box;
+    flex: 0 0 36px;
+    width: 36px;
+    height: 38px;
+    padding: 0;
+  }
+  #adminClubList .admin-row-actions > :is(.secondary-btn, .delete-btn) {
+    box-sizing: border-box;
+    flex: 1 1 78px;
+    min-width: 0;
+    min-height: 42px;
+    padding-inline: 7px;
+    font-size: .8rem;
+    white-space: nowrap;
+  }
+}
+
+/* Shared touch-friendly button sizing and wrapping across mobile pages. */
+@media (max-width: 760px) {
+  :is(.primary-btn, .secondary-btn, .submit-btn, .logout-btn, .delete-btn, .action-btn,
+      .preview-btn, .approve, .reject, .changes, .reopen-review, .return-review,
+      .text-button, .event-info-btn, .club-detail-apply, .club-rate-button) {
+    box-sizing: border-box;
+    min-width: 0;
+    max-width: 100%;
+    min-height: 44px;
+    padding: 10px 13px;
+    border-radius: 12px;
+    font-size: clamp(.78rem, 3.4vw, .9rem);
+    line-height: 1.25;
+    text-align: center;
+    text-wrap: balance;
+    overflow-wrap: anywhere;
+    white-space: normal;
+    touch-action: manipulation;
+  }
+
+  :is(.committee-top .top-actions, .sso-hero .top-actions, .president-form-actions,
+      .committee-head-actions, .committee-head-edit-actions, .form-actions,
+      .button-row, .button-group, .dialog-actions, .modal-actions, .card-actions,
+      .review-actions, .dashboard-actions) {
+    box-sizing: border-box;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+  }
+
+  :is(.committee-top .top-actions, .sso-hero .top-actions, .president-form-actions,
+      .committee-head-actions, .committee-head-edit-actions, .form-actions,
+      .button-row, .button-group, .dialog-actions, .modal-actions, .card-actions,
+      .review-actions, .dashboard-actions) > :is(a, button, input[type="button"], input[type="submit"]) {
+    box-sizing: border-box;
+    flex: 1 1 140px;
+    min-width: min(100%, 120px);
+    max-width: 100%;
+    margin-inline: 0;
+  }
+
+  :is(.primary-btn, .secondary-btn, .submit-btn, .logout-btn, .delete-btn, .action-btn,
+      .preview-btn, .approve, .reject, .changes, .reopen-review, .return-review,
+      .event-info-btn, .club-detail-apply, .club-rate-button):disabled {
+    white-space: normal;
+  }
+}
 
 @media (max-width: 520px) {
   .nav-right .nav-refresh-btn { display: none !important; }

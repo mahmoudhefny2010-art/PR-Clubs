@@ -102,6 +102,7 @@ const universityContentSchema = new mongoose.Schema({
   date: { type: String, default: '' },
   time: { type: String, default: '' },
   registrationEnabled: { type: Boolean, default: false },
+  attendanceEnabled: { type: Boolean, default: false },
   location: { type: String, default: '', trim: true, maxlength: 160 },
   image: { type: String, default: '' },
   imagePublicId: { type: String, default: '' },
@@ -134,7 +135,15 @@ const siteVisitorPresenceSchema = new mongoose.Schema({
   expiresAt: { type: Date, required: true, index: { expires: 0 } }
 }, { versionKey: false });
 
+const clubRoleAssignmentSchema = new mongoose.Schema({
+  role: { type: String, enum: ['president', 'head', 'pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'software_development'], required: true },
+  clubId: { type: Number, required: true, default: 0 },
+  assignedClubIds: { type: [Number], default: [] },
+  committee: { type: String, default: '' }
+}, { _id: false });
+
 const clubAccountSchema = new mongoose.Schema({
+  googleSub: { type: String, unique: true, sparse: true },
   clubId: { type: Number, required: true, index: true },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   salt: { type: String, required: true },
@@ -142,7 +151,9 @@ const clubAccountSchema = new mongoose.Schema({
   sessionVersion: { type: Number, default: 0 },
   passwordChangedAt: { type: Date, default: null },
   lastLoginAt: { type: Date, default: null },
-  role: { type: String, enum: ['president', 'head', 'pr', 'english', 'security', 'sso', 'dean'], default: 'president' },
+  role: { type: String, enum: ['president', 'head', 'pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'software_development'], default: 'president' },
+  roleAssignments: { type: [clubRoleAssignmentSchema], default: [] },
+  assignedClubIds: { type: [Number], default: [] },
   committee: { type: String, default: '' }
 }, { timestamps: true, autoIndex: false });
 
@@ -157,6 +168,7 @@ const contentRequestSchema = new mongoose.Schema({
   date: { type: String, default: '' },
   time: { type: String, default: '' },
   registrationEnabled: { type: Boolean, default: true },
+  attendanceEnabled: { type: Boolean, default: true },
   location: { type: String, default: '' },
   budget: { type: String, default: '' },
   image: { type: String, default: '' },
@@ -188,13 +200,16 @@ const contentRequestSchema = new mongoose.Schema({
   boothCloseDate: { type: String, default: '' },
   boothContact: { type: String, default: '' },
   boothNotes: { type: String, default: '' },
-  status: { type: String, enum: ['draft', 'pending_pr', 'pending_english', 'pending_security', 'pending_dean', 'changes_requested', 'rejected', 'published', 'approved', 'deleted'], default: 'draft', index: true },
-  resubmitTo: { type: String, enum: ['pending_pr', 'pending_english', 'pending_security'], default: 'pending_pr' },
-  editRequestedBy: { type: String, enum: ['', 'pr', 'english', 'security'], default: '' },
+  status: { type: String, enum: ['draft', 'pending_supervisor', 'pending_pr', 'pending_english', 'pending_security', 'pending_dean', 'changes_requested', 'rejected', 'published', 'approved', 'deleted'], default: 'draft', index: true },
+  resubmitTo: { type: String, enum: ['pending_supervisor', 'pending_pr', 'pending_english', 'pending_security'], default: 'pending_pr' },
+  editRequestedBy: { type: String, enum: ['', 'supervisor', 'pr', 'english', 'security'], default: '' },
+  supervisorNextStage: { type: String, enum: ['pending_pr', 'pending_english', 'pending_security', 'pending_dean'], default: 'pending_pr' },
+  supervisorReviewerEmail: { type: String, default: '' },
+  supervisorReviewedAt: { type: Date, default: null },
   skipEnglishOnNextPrApproval: { type: Boolean, default: false },
   clubNotice: { type: String, default: '' },
   workflowHistory: [{
-    role: { type: String, enum: ['club', 'pr', 'english', 'security', 'dean'], required: true },
+    role: { type: String, enum: ['club', 'supervisor', 'pr', 'english', 'security', 'dean'], required: true },
     actorRole: { type: String, default: '' },
     actorEmail: { type: String, default: '' },
     action: { type: String, required: true },
@@ -204,13 +219,14 @@ const contentRequestSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
   }],
   comments: {
+    supervisor: { type: String, default: '' },
     pr: { type: String, default: '' },
     english: { type: String, default: '' },
     security: { type: String, default: '' },
     dean: { type: String, default: '' }
   },
   commentHistory: [{
-    role: { type: String, enum: ['pr', 'english', 'security', 'dean'], required: true },
+    role: { type: String, enum: ['supervisor', 'pr', 'english', 'security', 'dean'], required: true },
     text: { type: String, required: true },
     createdAt: { type: Date, default: Date.now },
     deletedAt: { type: Date, default: null }
@@ -220,6 +236,89 @@ const contentRequestSchema = new mongoose.Schema({
   publishedAt: { type: Date },
   deletedAt: { type: Date }
 }, { timestamps: true });
+
+const speakerRequestSchema = new mongoose.Schema({
+  clubId: { type: Number, required: true, index: true },
+  clubName: { type: String, required: true, trim: true, maxlength: 120 },
+  requesterType: { type: String, enum: ['student', 'club', 'speaker'], required: true },
+  requesterId: { type: String, required: true, index: true },
+  requesterEmail: { type: String, required: true, lowercase: true, trim: true, maxlength: 254 },
+  requesterName: { type: String, default: '', trim: true, maxlength: 160 },
+  requesterRole: { type: String, default: '' },
+  inviteId: { type: mongoose.Schema.Types.ObjectId, default: null, index: true },
+  assignedHeadEmail: { type: String, default: '', lowercase: true, trim: true, maxlength: 254 },
+  speakerEmail: { type: String, default: '', lowercase: true, trim: true, maxlength: 254 },
+  speakerName: { type: String, required: true, trim: true, maxlength: 160 },
+  jobTitleCompany: { type: String, default: '', trim: true, maxlength: 300 },
+  linkedinProfile: { type: String, default: '', trim: true, maxlength: 500 },
+  speakerSelectionReason: { type: String, default: '', trim: true, maxlength: 2000 },
+  expectedStudentBenefit: { type: String, default: '', trim: true, maxlength: 2000 },
+  shortBio: { type: String, default: '', trim: true, maxlength: 2000 },
+  sessionFormat: { type: String, enum: ['', 'On-campus', 'Online', 'Either'], default: '' },
+  availability: { type: String, default: '', trim: true, maxlength: 500 },
+  specialRequirements: { type: String, default: '', trim: true, maxlength: 1500 },
+  professionalDetails: { type: String, default: '', trim: true, maxlength: 2000 },
+  contactDetails: { type: String, default: '', trim: true, maxlength: 500 },
+  proposedTopic: { type: String, required: true, trim: true, maxlength: 300 },
+  eventPurpose: { type: String, default: '', trim: true, maxlength: 2000 },
+  proposedDate: { type: Date, default: null },
+  cvPublicId: { type: String, default: '' },
+  cvFormat: { type: String, default: 'pdf', enum: ['pdf', 'doc', 'docx', 'ppt', 'pptx'] },
+  cvName: { type: String, default: '', trim: true, maxlength: 180 },
+  speakerAttachments: [{
+    publicId: { type: String, required: true },
+    name: { type: String, required: true, trim: true, maxlength: 180 },
+    format: { type: String, enum: ['pdf', 'doc', 'docx', 'ppt', 'pptx'], required: true }
+  }],
+  status: { type: String, enum: ['pending', 'pending_club', 'pending_supervisor', 'pending_dean', 'approved', 'rejected', 'changes_requested'], default: 'pending_club', index: true },
+  activeRequesterKey: { type: String, default: undefined },
+  supervisorReviewerEmail: { type: String, default: '' },
+  supervisorReviewedAt: { type: Date, default: null },
+  clubReviewerEmail: { type: String, default: '', lowercase: true, trim: true },
+  clubReviewerRole: { type: String, default: '' },
+  clubReviewerComment: { type: String, default: '', trim: true, maxlength: 2000 },
+  clubReviewedAt: { type: Date, default: null },
+  reviewerEmail: { type: String, default: '', lowercase: true, trim: true },
+  reviewerRole: { type: String, default: '' },
+  reviewerComment: { type: String, default: '', trim: true, maxlength: 2000 },
+  submittedAt: { type: Date, default: Date.now },
+  decidedAt: { type: Date, default: null },
+  decisionHistory: [{
+    action: { type: String, enum: ['submitted', 'club_accepted', 'club_rejected', 'supervisor_approved', 'approved', 'rejected', 'changes_requested', 'resubmitted'], required: true },
+    role: { type: String, required: true },
+    email: { type: String, required: true, lowercase: true, trim: true },
+    comment: { type: String, default: '', maxlength: 2000 },
+    createdAt: { type: Date, default: Date.now }
+  }]
+}, { timestamps: true });
+speakerRequestSchema.index({ activeRequesterKey: 1 }, { unique: true, sparse: true });
+speakerRequestSchema.index({ status: 1, submittedAt: -1 });
+
+const speakerCvUploadSchema = new mongoose.Schema({
+  _id: { type: String, required: true },
+  publicId: { type: String, required: true, unique: true },
+  requesterKey: { type: String, required: true, index: true },
+  expiresAt: { type: Date, required: true },
+  consumedAt: { type: Date, default: null }
+}, { timestamps: true });
+speakerCvUploadSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
+const speakerInviteSchema = new mongoose.Schema({
+  clubId: { type: Number, required: true, index: true },
+  clubName: { type: String, required: true, trim: true, maxlength: 120 },
+  createdByEmail: { type: String, required: true, lowercase: true, trim: true, maxlength: 254 },
+  createdByName: { type: String, default: '', trim: true, maxlength: 160 },
+  createdByRole: { type: String, enum: ['president', 'head', 'dean'], required: true },
+  tokenHash: { type: String, required: true, unique: true },
+  stableToken: { type: Boolean, default: false },
+  expiresAt: { type: Date, default: null },
+  revokedAt: { type: Date, default: null }
+}, { timestamps: true });
+speakerInviteSchema.index({ clubId: 1, createdByEmail: 1, revokedAt: 1 });
+speakerInviteSchema.index(
+  { clubId: 1, createdByEmail: 1 },
+  { unique: true, partialFilterExpression: { stableToken: true, revokedAt: null } }
+);
 
 const auditLogSchema = new mongoose.Schema({
   id: { type: Number, required: true, unique: true, index: true },
@@ -307,9 +406,9 @@ const attendanceRecordSchema = new mongoose.Schema({
   email: { type: String, required: true, trim: true, lowercase: true, maxlength: 254 },
   deviceHash: { type: String, select: false },
   note: { type: String, default: '', trim: true, maxlength: 500 },
-  approvalStatus: { type: String, enum: ['pending_pr', 'pending_sso', 'pending_dean', 'approved', 'rejected'], default: 'pending_pr', index: true },
+  approvalStatus: { type: String, enum: ['pending_supervisor', 'pending_pr', 'pending_sso', 'pending_dean', 'approved', 'rejected'], default: 'pending_supervisor', index: true },
   approvalHistory: [{
-    role: { type: String, enum: ['pr', 'sso', 'dean'], required: true },
+    role: { type: String, enum: ['supervisor', 'pr', 'sso', 'dean'], required: true },
     email: { type: String, default: '', lowercase: true, trim: true },
     action: { type: String, enum: ['approved', 'rejected', 'noted'], required: true },
     note: { type: String, default: '', trim: true, maxlength: 500 },
@@ -396,6 +495,7 @@ const notificationDispatchSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 const adminAuthStateSchema = new mongoose.Schema({
+  googleSub: { type: String, unique: true, sparse: true },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   salt: { type: String, required: true },
   passwordHash: { type: String, required: true },
@@ -403,6 +503,17 @@ const adminAuthStateSchema = new mongoose.Schema({
   passwordChangedAt: { type: Date, default: Date.now },
   lastLoginAt: { type: Date, default: null }
 }, { timestamps: true });
+
+const supervisorReviewSchema = new mongoose.Schema({
+  supervisorId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'ClubAccount' },
+  supervisorEmail: { type: String, required: true, lowercase: true, trim: true },
+  clubId: { type: Number, required: true, index: true },
+  targetType: { type: String, enum: ['content', 'speaker'], required: true },
+  targetId: { type: String, required: true },
+  note: { type: String, required: true, trim: true, maxlength: 2000 }
+}, { timestamps: true });
+supervisorReviewSchema.index({ supervisorId: 1, clubId: 1, targetType: 1, targetId: 1 }, { unique: true });
+const SupervisorReview = mongoose.models.SupervisorReview || mongoose.model('SupervisorReview', supervisorReviewSchema);
 
 const EventRegistration = mongoose.models.EventRegistration || mongoose.model('EventRegistration', eventRegistrationSchema);
 const AttendanceSession = mongoose.models.AttendanceSession || mongoose.model('AttendanceSession', attendanceSessionSchema);
@@ -427,9 +538,13 @@ const SiteNetwork = mongoose.models.SiteNetwork || mongoose.model('SiteNetwork',
 const SiteVisitorPresence = mongoose.models.SiteVisitorPresence || mongoose.model('SiteVisitorPresence', siteVisitorPresenceSchema);
 const ClubAccount = mongoose.models.ClubAccount || mongoose.model('ClubAccount', clubAccountSchema);
 const ContentRequest = mongoose.models.ContentRequest || mongoose.model('ContentRequest', contentRequestSchema);
+const SpeakerRequest = mongoose.models.SpeakerRequest || mongoose.model('SpeakerRequest', speakerRequestSchema);
+const SpeakerCvUpload = mongoose.models.SpeakerCvUpload || mongoose.model('SpeakerCvUpload', speakerCvUploadSchema);
+const SpeakerInvite = mongoose.models.SpeakerInvite || mongoose.model('SpeakerInvite', speakerInviteSchema);
 const AuditLog = mongoose.models.AuditLog || mongoose.model('AuditLog', auditLogSchema);
 
 module.exports = {
+  SupervisorReview,
   Club,
   Application,
   SiteSetting,
@@ -439,6 +554,9 @@ module.exports = {
   SiteVisitorPresence,
   ClubAccount,
   ContentRequest,
+  SpeakerRequest,
+  SpeakerCvUpload,
+  SpeakerInvite,
   AuditLog,
   EventRegistration,
   AttendanceSession,

@@ -2,24 +2,27 @@
 <html lang="en">
   <head>
       <link rel="manifest" href="/manifest.webmanifest">
+    <script src="/assets/js/install-welcome.js?v=20261013install1" defer></script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <script src="/assets/js/site-loading.js?v=20261012loadingdatawait1"></script>
+    <script src="/assets/js/site-loading.js?v=20261013stagedload4"></script>
     <script>if(['/admin','/club-login','/club-dashboard'].includes(location.pathname))document.documentElement.classList.add('auth-route-pending');</script>
     <title>Club Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" /></noscript>
-    <link rel="stylesheet" href="/assets/css/base.css?v=20261012loadingringmatch1" />
-    <link rel="stylesheet" href="/assets/css/responsive.css?v=20261012fluidmobile1" />
-    <link rel="stylesheet" href="/assets/css/dark.css?v=20261012closeglass4" />
-    <link rel="stylesheet" href="/assets/css/features.css?v=20261012stickyclose18" />
-    <link rel="stylesheet" href="/assets/css/event-modal.css?v=4" />
+    <link rel="stylesheet" href="/assets/css/base.css?v=20261013caret1" />
+    <link rel="stylesheet" href="/assets/css/responsive.css?v=20261013mobilebuttons1" />
+    <link rel="stylesheet" href="/assets/css/dark.css?v=20261013darkglobal2" />
+    <link rel="stylesheet" href="/assets/css/features.css?v=20261013dashboardtabs1" />
+    <link rel="stylesheet" href="/assets/css/event-modal.css?v=20261013attendancebadge1" />
     <link rel="icon" href="/assets/img/pics/logo.svg.png" type="image/png">
-    <link rel="stylesheet" href="/assets/css/pages/home.css?v=20261012stickyclose1" />
+    <link rel="stylesheet" href="/assets/css/pages/home.css?v=20261013upcomingdynamicheight1" />
+    <link rel="stylesheet" href="/assets/css/pages/speaker-requests.css?v=20261013responsivedark1" />
       <script defer src="/assets/js/pwa-register.js"></script>
-  </head>
+    <link rel="stylesheet" href="/assets/css/modal-controls.css?v=20261013modalclose2">
+</head>
   <body>
     <div class="page-shell">
       <div id="site-header"></div>
@@ -156,6 +159,11 @@
               </div>
               <button id="adminLoginSubmit" class="primary-btn" type="submit">Unlock dashboard</button>
             </form>
+            <div class="admin-google-signin">
+              <div class="admin-google-divider" aria-hidden="true"><span>OR</span></div>
+              <div id="adminGoogleButton" class="admin-google-button"></div>
+              <p id="adminGoogleFeedback" class="admin-feedback" aria-live="polite"></p>
+            </div>
             <p id="adminLoginFeedback" class="admin-feedback" aria-live="polite"></p>
             <p id="adminLoginForgotWrap"><a class="text-button" href="/pages/forgot-password.html">Forgot Password?</a></p>
             <button id="adminResetAccessBtn" class="text-button" type="button" hidden>Set a new admin email and password</button>
@@ -199,8 +207,10 @@
                 <a class="secondary-btn" href="/admin/global">All-club access</a>
                 <button class="secondary-btn" type="button" data-open-member-directory="admin">View club members</button>
                 <button class="secondary-btn" id="openArchivedClubsBtn" type="button">Archived clubs</button>
-                <button class="secondary-btn" id="adminBackBtn" type="button">Back to homepage</button>
-                <button class="delete-btn" id="adminLogoutBtn" type="button">Log out</button>
+                <a class="secondary-btn" href="/dashboards/supervisor-management.html">Manage club supervisors</a>
+                <a class="secondary-btn" href="/dashboards/staff-management.html">Staff accounts &amp; roles</a>
+                <a class="secondary-btn" href="/?explore=clubs">Home</a>
+                <button class="secondary-btn" id="adminBackBtn" type="button">Back</button>
               </div>
             </header>
 
@@ -349,7 +359,7 @@
           <div class="admin-panel my-forms-panel">
             <div class="admin-header">
               <div><span class="admin-eyebrow">STUDENT DASHBOARD</span><h2>My Dashboard</h2><p>Manage your club applications and attendance requests in one place.</p></div>
-              <button id="myFormsBackHomeBtn" class="secondary-btn" type="button">Back to home</button>
+              <button id="myFormsBackHomeBtn" class="secondary-btn" type="button">Back</button>
             </div>
             <div class="student-dashboard-layout">
               <aside class="student-dashboard-sidebar" aria-label="Student dashboard navigation">
@@ -358,6 +368,7 @@
                   <button class="student-dashboard-nav-item is-active" type="button" data-student-section="overview" aria-current="page"><svg class="student-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-6v-7h-4v7H4a1 1 0 0 1-1-1z"/></svg><span>Overview</span></button>
                   <button class="student-dashboard-nav-item" type="button" data-student-section="applications"><svg class="student-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg><span>Applications</span><span class="student-nav-count" id="studentSidebarApplicationCount">—</span></button>
                   <button class="student-dashboard-nav-item" type="button" data-student-section="attendance"><svg class="student-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Attendance</span><span class="student-nav-count" id="studentSidebarAttendanceCount">—</span></button>
+                  <a class="student-dashboard-nav-item" href="/speaker-request.html?as=student"><svg class="student-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v4m0 10v4M3 12h4m10 0h4M5.6 5.6l2.8 2.8m7.2 7.2 2.8 2.8m0-12.8-2.8 2.8m-7.2 7.2-2.8 2.8"/><circle cx="12" cy="12" r="5"/></svg><span>Speaker request</span></a>
                 </nav>
                 <a class="student-dashboard-explore" href="/?explore=clubs#clubGrid">Explore clubs <span aria-hidden="true">→</span></a>
               </aside>
@@ -512,8 +523,7 @@
               </div>
               <div class="top-actions">
                 <a id="openContentStudioBtn" class="secondary-btn" href="/pages/club-content.html">Open Content Studio</a>
-                <button id="backHomeBtn" class="secondary-btn" type="button">Back to Clubs</button>
-                <button id="logoutBtn" class="logout-btn" type="button">Log out</button>
+                <button id="backHomeBtn" class="secondary-btn" type="button">Back</button>
               </div>
             </div>
 
@@ -555,6 +565,8 @@
                 <a href="#interviewFormManager" data-dashboard-section="interviewFormManager">Interview questions</a>
                 <a href="#presidentApplicantsPanel" data-dashboard-section="presidentApplicantsPanel" data-unread-section="applicants">Applicants <span class="sidebar-unread-badge" data-unread-badge="applicants" hidden></span></a>
                 <span class="president-sidebar-group-title">Club operations</span>
+                <a href="#speakerRequestDashboardPanel" data-dashboard-section="speakerRequestDashboardPanel">External speaker request</a>
+                <a href="#speakerInviteDashboardPanel" data-dashboard-section="speakerInviteDashboardPanel">Create speaker link</a>
                 <button id="openMemberManagerBtn" class="president-sidebar-action hidden" data-unread-section="clubMembers" type="button">Club members <span class="sidebar-unread-badge" data-unread-badge="clubMembers" hidden></span></button>
                 <button id="openAttendanceManagerBtn" class="president-sidebar-action hidden" data-unread-section="eventAttendance" type="button">Event attendance <span class="sidebar-unread-badge" data-unread-badge="eventAttendance" hidden></span></button>
                 <button id="openEntryPermitDialogBtn" class="president-sidebar-action hidden" type="button">Entry permits</button>
@@ -650,6 +662,50 @@
               <div class="president-form-actions">
                 <button id="saveInterviewFormBtn" class="primary-btn" type="button">Save interview form</button>
                 <p id="interviewFormFeedback" class="admin-feedback" aria-live="polite"></p>
+              </div>
+            </section>
+
+            <section id="speakerRequestDashboardPanel" class="committee-head-manager speaker-dashboard-panel hidden" aria-labelledby="clubSpeakerRequestTitle">
+              <div class="admin-section-heading"><div><span class="admin-eyebrow">CLUB OPERATIONS · CONTENT STUDIO</span><h3 id="clubSpeakerRequestTitle">External speaker request</h3></div></div>
+              <p>Submit a speaker proposal for your club. The club reviews it first, then accepted requests go to the Dean.</p>
+              <p id="speakerPageMessage" class="speaker-message" role="status" aria-live="polite">Loading your account…</p>
+              <div id="speakerContent" class="speaker-dashboard-content" hidden>
+                <section class="speaker-panel">
+                  <h2 id="speakerFormTitle">Propose a speaker</h2>
+                  <p class="speaker-signed-in">Submitting as <strong id="speakerIdentity"></strong></p>
+                  <form id="speakerRequestForm" data-account-mode="club">
+                    <label id="speakerClubField">Hosting club<select name="clubId" id="speakerClub" required><option value="">Choose a club</option></select></label>
+                    <label>Speaker name<input name="speakerName" minlength="2" maxlength="160" autocomplete="name" required></label>
+                    <label>Current position &amp; company<input name="jobTitleCompany" minlength="2" maxlength="300" autocomplete="organization-title" required></label>
+                    <label>LinkedIn profile <span class="speaker-optional">(optional)</span><input name="linkedinProfile" type="url" maxlength="500" autocomplete="url" placeholder="https://www.linkedin.com/in/..."></label>
+                    <label>Proposed talk topic<input name="proposedTopic" minlength="3" maxlength="300" required></label>
+                    <label>Why did we choose this speaker?<textarea name="speakerSelectionReason" minlength="3" maxlength="2000" rows="3" required placeholder="Explain how the speaker's experience fits this event"></textarea></label>
+                    <label>Expected benefit to students<textarea name="expectedStudentBenefit" minlength="3" maxlength="2000" rows="3" required placeholder="Describe what students will learn or gain"></textarea></label>
+                    <label class="speaker-field-wide">CV or supporting documents <span class="speaker-optional">(optional; PDF, DOC, DOCX, PPT, or PPTX; up to 5 files, 5 MB each)</span><input id="speakerFiles" name="speakerFiles" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation" multiple></label>
+                    <p id="speakerFormMessage" class="speaker-message" role="status" aria-live="polite"></p>
+                    <div class="speaker-form-actions"><button id="speakerSubmit" class="primary-btn" type="submit">Submit request</button><button id="speakerCancelEdit" class="secondary-btn" type="button" hidden>Cancel changes</button></div>
+                  </form>
+                </section>
+                <section class="speaker-panel"><h2 id="speakerRequestsHeading">Your requests</h2><p id="speakerRequestsHelp" class="speaker-help">Track each speaker request and its review status.</p><div id="speakerRequestsList" class="speaker-request-list" aria-live="polite"></div></section>
+              </div>
+            </section>
+
+            <section id="speakerInviteDashboardPanel" class="committee-head-manager speaker-dashboard-panel hidden" aria-labelledby="clubSpeakerInviteTitle">
+              <div class="admin-section-heading"><div><span class="admin-eyebrow">CLUB OPERATIONS · CONTENT STUDIO</span><h3 id="clubSpeakerInviteTitle">Create speaker link</h3></div></div>
+              <p>Generate a permanent invitation link or QR code for a speaker. Their response will be sent through the club review workflow to the Dean.</p>
+              <div class="speaker-panel">
+                <div id="speakerInvitePanel" hidden>
+                  <h2>Invite an external speaker</h2>
+                  <p class="speaker-help">Share the link or QR code with the speaker. They can submit their details and supporting material securely.</p>
+                  <button id="generateSpeakerInvite" class="primary-btn" type="button">Generate speaker form link</button>
+                  <div id="speakerInviteResult" class="speaker-invite-result" hidden>
+                    <label>Speaker form link<input id="speakerInviteUrl" type="url" readonly></label>
+                    <div class="speaker-form-actions"><button id="copySpeakerInvite" class="secondary-btn" type="button">Copy link</button><button id="downloadSpeakerInviteQr" class="secondary-btn" type="button">Download QR</button><button id="revokeSpeakerInvite" class="secondary-btn" type="button">Revoke and generate another</button></div>
+                    <div id="speakerInviteQr" class="speaker-invite-qr" aria-label="QR code for speaker form link"></div>
+                    <p id="speakerInviteExpiry" class="speaker-help"></p>
+                  </div>
+                  <p id="speakerInviteMessage" class="speaker-message" role="status" aria-live="polite"></p>
+                </div>
               </div>
             </section>
 
@@ -760,11 +816,7 @@
             <button class="calendar-close-btn" type="button" data-close-member-directory aria-label="Close member directory">&times;</button>
           </header>
           <label class="member-directory-filter">Choose a club
-            <select id="memberDirectoryClubSelect" class="member-directory-native-select" tabindex="-1" aria-hidden="true"><option value="all">All clubs</option></select>
-            <span class="member-directory-picker">
-              <button id="memberDirectoryClubTrigger" class="member-directory-picker-trigger" type="button" aria-haspopup="listbox" aria-expanded="false">All clubs <span aria-hidden="true">⌄</span></button>
-              <span id="memberDirectoryClubOptions" class="member-directory-picker-options" role="listbox" aria-label="Club options" hidden></span>
-            </span>
+            <select id="memberDirectoryClubSelect" class="member-directory-native-select"><option value="all">All clubs</option></select>
           </label>
           <div id="memberDirectoryList" class="member-directory-list" aria-live="polite"></div>
         </div>
@@ -906,6 +958,7 @@
             <span id="eventModalClub" class="event-modal-club"></span>
             <h2 id="eventModalTitle"></h2>
             <p id="eventModalMeta" class="event-modal-meta"></p>
+            <p id="eventModalAttendance" class="event-attendance-status" hidden></p>
             <p id="eventModalDescription" class="event-modal-description"></p>
             <form id="eventModalForm">
               <div class="field-group">
@@ -999,19 +1052,19 @@
 
     <div id="site-footer"></div>
 
-    <script src="/assets/js/event-modal.js?v=5" defer></script>
-    <script src="/assets/js/committee-sidebar.js?v=20261011overviewdefault1" defer></script>
-    <script src="/assets/js/member-dashboard.js?v=20261011assignedqrdisplay2" defer></script>
-    <script src="/assets/js/app-home.js?v=20261012mobileeventswipe3" defer></script>
+    <script src="/assets/js/event-modal.js?v=20261013attendancebadge1" defer></script>
+    <script src="/assets/js/committee-sidebar.js?v=20261013lighter1" defer></script>
+    <script src="/assets/js/member-dashboard.js?v=20261013stagedload3" defer></script>
+    <script src="/assets/js/app-home.js?v=20261013stagedload4" defer></script>
     <script src="/assets/js/cloudinary-upload.js?v=2" defer></script>
-    <script src="/assets/js/student-feedback.js?v=20261011clubview1" defer></script>
-    <script src="/assets/js/app-admin.js?v=20261011clubviewclick1" defer></script>
-    <script src="/assets/js/app-dashboard.js?v=20261011applicantcycle1" defer></script>
+    <script src="/assets/js/student-feedback.js?v=20261013stagedload3" defer></script>
+    <script src="/assets/js/app-admin.js?v=20261013stagedload3" defer></script>
+    <script src="/assets/js/app-dashboard.js?v=20261013stagedload4" defer></script>
     <script src="/assets/js/admin-data-status.js?v=2" defer></script>
-    <script src="/assets/js/attendance-dashboard.js?v=20261010selfattendance4" defer></script>
+    <script src="/assets/js/attendance-dashboard.js?v=20261013lighter1" defer></script>
     <script src="/assets/js/entry-permit-dashboard.js?v=20261010permitpicker1" defer></script>
-    <script src="/assets/js/member-directory.js?v=20261010headmembers1" defer></script>
-    <script src="/assets/js/layout.js?v=20261012firstvisit1" defer></script>
+    <script src="/assets/js/member-directory.js?v=20261013stagedload3" defer></script>
+    <script src="/assets/js/layout.js?v=20261013stagedload3" defer></script>
     <script src="/assets/js/theme.js?v=20261009c" defer></script>
   </body>
 </html>

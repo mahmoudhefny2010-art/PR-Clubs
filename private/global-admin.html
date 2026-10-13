@@ -118,6 +118,13 @@
     .tab-btn { padding: 10px 18px; border: 1px solid var(--border-color); border-radius: 999px; background: var(--bg-panel); color: var(--text-muted); font-weight: 700; cursor: pointer; transition: all .15s ease; }
     .tab-btn:hover { border-color: var(--primary-700); color: var(--primary-700); }
     .tab-btn.active { background: var(--primary-800); color: #fff; border-color: var(--primary-800); }
+    @media (max-width: 760px) {
+      .tab-bar { flex-wrap: nowrap; max-width: 100%; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; scrollbar-width: thin; scrollbar-color: var(--primary-700) var(--bg-soft); padding: 2px 2px 9px; }
+      .tab-btn { flex: 0 0 auto; white-space: nowrap; min-height: 44px; }
+      .tab-bar::-webkit-scrollbar { height: 5px; }
+      .tab-bar::-webkit-scrollbar-track { background: var(--bg-soft); border-radius: 999px; }
+      .tab-bar::-webkit-scrollbar-thumb { background: var(--primary-700); border-radius: 999px; }
+    }
     .club-feedback-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin: 14px 0 18px; }
     .club-feedback-filters label { display: grid; min-width: min(240px, 100%); gap: 6px; color: var(--text-muted); font-size: .84rem; font-weight: 700; }
     .club-feedback-filters input, .club-feedback-filters select { box-sizing: border-box; min-height: 42px; padding: 9px 12px; border: 1px solid var(--border-color); border-radius: 11px; background: var(--bg-panel); color: var(--text-main); font: inherit; }
@@ -239,7 +246,7 @@
           <p id="adminSubtitle">Manage clubs, heads, and applications globally.</p>
         </div>
         <div class="top-actions">
-          <button id="logoutBtn" class="secondary-btn" type="button">Sign out</button>
+          <a id="adminBackBtn" class="secondary-btn" href="/admin">Back</a>
         </div>
       </section>
 
@@ -337,6 +344,9 @@
               <label for="universityPostLocation">Location<input id="universityPostLocation" name="location" maxlength="160" placeholder="Building or venue" /></label>
               <label for="universityPostRegistration">Event registration
                 <select id="universityPostRegistration" name="registrationEnabled"><option value="false" selected>No registration</option><option value="true">Allow students to register</option></select>
+              </label>
+              <label id="universityAttendanceField" for="universityPostAttendance" hidden>Attendance tracking
+                <select id="universityPostAttendance" name="attendanceEnabled"><option value="false" selected>Attendance will not be recorded</option><option value="true">Attendance will be recorded</option></select>
               </label>
             </div>
             <fieldset style="border:0;padding:0;margin:0;">
@@ -660,6 +670,7 @@
               <div>
                 <h3 class="record-title">${escapeHtml(post.title)}</h3>
                 <p class="record-meta">${post.type === 'event' ? 'Event' : 'Announcement'}${post.date ? ` · ${escapeHtml(post.date)}` : post.type === 'event' ? ' · Date to be announced' : ''}${post.time ? ` · ${escapeHtml(window.formatSiteTime ? window.formatSiteTime(post.time) : post.time)}` : ''}${post.location ? ` · ${escapeHtml(post.location)}` : ''}${post.type === 'event' ? (post.registrationEnabled ? ' · Registration open' : ' · No registration') : ''}</p>
+                ${post.type === 'event' && post.registrationEnabled ? `<p class="record-meta">${post.attendanceEnabled === true ? 'Attendance will be recorded' : 'Attendance will not be recorded'}</p>` : ''}
               </div>
               <div class="record-actions"><button class="danger" type="button" data-delete-university-post="${Number(post.id)}">Delete</button></div>
             </div>
@@ -690,14 +701,24 @@
     }, 30_000);
     const universityEventFields = byId('universityEventFields');
     const universityEventDate = byId('universityPostDate');
+    const universityEventType = byId('universityPostType');
+    const universityRegistration = byId('universityPostRegistration');
+    const universityAttendance = byId('universityPostAttendance');
+    const universityAttendanceField = byId('universityAttendanceField');
     const universityImageInput = byId('universityPostImage');
     const universityPreview = byId('universityPostPreview');
     let universityPreviewUrl = '';
-    byId('universityPostType').addEventListener('change', (event) => {
-      const isEvent = event.currentTarget.value === 'event';
+    function updateUniversityEventFields() {
+      const isEvent = universityEventType.value === 'event';
       universityEventFields.hidden = !isEvent;
+      universityAttendanceField.hidden = !isEvent || universityRegistration.value !== 'true';
+      if (universityAttendanceField.hidden) universityAttendance.value = 'false';
       universityEventDate.required = false;
-    });
+    }
+    universityEventType.addEventListener('change', updateUniversityEventFields);
+    universityRegistration.addEventListener('change', updateUniversityEventFields);
+    byId('universityPostForm').addEventListener('reset', () => setTimeout(updateUniversityEventFields, 0));
+    updateUniversityEventFields();
     document.querySelectorAll('input[name="imageChoice"]').forEach((radio) => radio.addEventListener('change', (event) => {
       const isCustom = event.currentTarget.value === 'custom';
       byId('universityImageField').hidden = !isCustom;
@@ -733,9 +754,11 @@
       try {
         const imageChoice = form.elements.imageChoice.value;
         const imageFile = universityImageInput.files[0];
+        const isEvent = universityEventType.value === 'event';
+        const registrationEnabled = isEvent && universityRegistration.value === 'true';
         if (imageChoice === 'custom' && !imageFile) throw new Error('Choose an image to upload, or select the MIU logo.');
         const payload = {
-          type: byId('universityPostType').value,
+          type: universityEventType.value,
           interaction: byId('universityInteraction').value,
           question: byId('universityQuestion').value.trim(),
           options: byId('universityOptions').value.split('\n').map(value => value.trim()).filter(Boolean),
@@ -744,7 +767,8 @@
           date: universityEventDate.value,
           time: byId('universityPostTime').value,
           location: byId('universityPostLocation').value.trim(),
-          registrationEnabled: byId('universityPostRegistration').value === 'true',
+          registrationEnabled,
+          attendanceEnabled: registrationEnabled && universityAttendance.value === 'true',
           imageChoice
         };
         if (imageChoice === 'custom') {
@@ -756,7 +780,7 @@
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
         });
         form.reset();
-        universityEventFields.hidden = true;
+        updateUniversityEventFields();
         universityEventDate.required = false;
         byId('universityImageField').hidden = true;
         universityPreview.src = '/assets/img/pics/logo.svg.png';
@@ -1210,7 +1234,19 @@
         setMessage('headMessage', error.message, true);
       }
     });
-    byId('logoutBtn').addEventListener('click', async () => {
+    byId('adminBackBtn').addEventListener('click', (event) => {
+      let previousPageIsSameSite = false;
+      try {
+        previousPageIsSameSite = Boolean(document.referrer)
+          && new URL(document.referrer).origin === window.location.origin
+          && new URL(document.referrer).href !== window.location.href;
+      } catch {}
+      if (previousPageIsSameSite && window.history.length > 1) {
+        event.preventDefault();
+        window.history.back();
+      }
+    });
+    byId('logoutBtn')?.addEventListener('click', async () => {
       await fetch('/api/admin/logout', { method: 'POST' });
       window.location.assign('/');
     });

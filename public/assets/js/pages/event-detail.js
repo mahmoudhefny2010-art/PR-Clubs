@@ -6,6 +6,7 @@
   const clubEl = document.getElementById('eventPageClub');
   const titleEl = document.getElementById('eventPageTitle');
   const metaEl = document.getElementById('eventPageMeta');
+  const attendanceEl = document.getElementById('eventPageAttendance');
   const descriptionEl = document.getElementById('eventPageDescription');
   const registrationForm = document.getElementById('regForm');
   const feedbackEl = document.getElementById('regFeedback');
@@ -40,6 +41,11 @@
     return Number.isNaN(date.getTime())
       ? String(value || '')
       : date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  }
+
+  function showAttendanceStatus(event) {
+    attendanceEl.hidden = event.attendanceEnabled !== true;
+    attendanceEl.textContent = 'Attendance taken';
   }
 
   registrationForm.addEventListener('submit', async (event) => {
@@ -85,6 +91,7 @@
         titleEl.textContent = event.title || 'University event';
         metaEl.textContent = [event.date ? formatDate(event.date) : 'Date to be announced', window.formatSiteTime ? window.formatSiteTime(event.time) : event.time, event.location].filter(Boolean).join(' · ');
         descriptionEl.textContent = event.description || '';
+        showAttendanceStatus(event);
         contentEl.insertAdjacentHTML('beforeend', window.studentFeedbackForm('university', event.id, event.interaction, event.question, event.options));
         registrationForm.hidden = event.registrationEnabled !== true;
         statusEl.hidden = true;
@@ -116,7 +123,7 @@
     return;
   }
 
-  fetch('/api/clubs')
+  fetch('/api/clubs?media=links')
     .then((response) => response.json())
     .then((clubs) => {
       const club = Array.isArray(clubs) ? clubs.find((item) => Number(item.id) === clubId) : null;
@@ -132,6 +139,7 @@
       titleEl.textContent = event.title || 'Event';
       metaEl.textContent = [formatDate(event.date), window.formatSiteTime ? window.formatSiteTime(event.time) : event.time, event.location].filter(Boolean).join(' · ');
       descriptionEl.textContent = event.description || '';
+      showAttendanceStatus(event);
       registrationForm.hidden = event.registrationEnabled === false;
       statusEl.hidden = true;
       contentEl.hidden = false;

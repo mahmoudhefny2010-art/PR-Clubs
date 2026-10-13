@@ -16,6 +16,8 @@ let historyReturnTarget = '';
 let activeDetailContext = 'pending';
 let currentRequests = [];
 let statusOverviewMode = 'all';
+let cachedStatusOverview = null;
+let statusOverviewLoadedAt = 0;
 
 const CONTENT_TYPE_LABELS = { event: 'Event', feed: 'Feed', sponsor: 'Sponsor', booth: 'Booth', entry_permit: 'Entry Permit' };
 const CONTENT_ITEM_LABELS = { event: 'event', feed: 'feed post', sponsor: 'sponsor request', booth: 'booth request', entry_permit: 'Entry Permit' };
@@ -447,11 +449,13 @@ async function deleteOwnComment(item) {
   }
 }
 
-async function loadRequests() {
+async function loadRequests(sharedResponse = null) {
+  cachedStatusOverview = null;
+  statusOverviewLoadedAt = 0;
   window.dashboardSync?.report('requests', 'loading');
   try {
-    const response = await fetch('/api/committee/requests');
-    const items = await response.json();
+    const response = await (sharedResponse || fetch('/api/committee/requests', { cache: 'no-store' }));
+    const items = await response.clone().json();
     if (!response.ok) throw new Error(items.message || 'Could not load requests.');
     if (!Array.isArray(items)) throw new Error('Unexpected pending requests response.');
     currentRequests = items;
@@ -473,6 +477,8 @@ async function loadRequests() {
         const image = document.createElement('img');
         image.src = requestImage;
         image.alt = `${item.clubName || 'Club'} ${item.image || item.sponsorLogo ? 'request image' : 'logo'}`;
+        image.loading = 'lazy';
+        image.decoding = 'async';
         card.append(image);
       }
       const summary = document.createElement('div');
@@ -543,16 +549,15 @@ async function loadRequests() {
   }
 }
 
-async function refreshUnreadRequestBadges() {
+async function refreshUnreadRequestBadges(sharedPendingResponse = null) {
   window.dashboardSync?.report('requests', 'loading');
   window.dashboardSync?.report('allRequests', 'loading');
   try {
     const [pendingResponse, statusResponse] = await Promise.all([
-      fetch('/api/committee/requests', { cache: 'no-store' }),
+      sharedPendingResponse || fetch('/api/committee/requests', { cache: 'no-store' }),
       fetch('/api/committee/status', { cache: 'no-store' })
     ]);
-    const pending = await pendingResponse.json();
-    const statuses = await statusResponse.json();
+    const [pending, statuses] = await Promise.all([pendingResponse.clone().json(), statusResponse.json()]);
     if (!pendingResponse.ok) throw new Error(pending.message || 'Could not sync pending requests.');
     if (!statusResponse.ok) throw new Error(statuses.message || 'Could not sync request status.');
     if (!Array.isArray(pending)) throw new Error('Unexpected pending requests response.');
@@ -612,12 +617,23 @@ async function showRestartOverview() {
   await loadStatusOverview();
 }
 
+async function fetchStatusOverviewItems() {
+  if (Array.isArray(cachedStatusOverview) && Date.now() - statusOverviewLoadedAt < 25_000) {
+    return cachedStatusOverview;
+  }
+  const response = await fetch('/api/committee/status', { cache: 'no-store' });
+  const items = await response.json();
+  if (!response.ok) throw new Error(items.message || 'Could not load request statuses.');
+  if (!Array.isArray(items)) throw new Error('Unexpected request status response.');
+  cachedStatusOverview = items;
+  statusOverviewLoadedAt = Date.now();
+  return cachedStatusOverview;
+}
+
 async function loadStatusOverview() {
   if (!statusOverviewList) return;
   try {
-    const response = await fetch('/api/committee/status', { cache: 'no-store' });
-    let items = await response.json();
-    if (!response.ok) throw new Error(items.message || 'Could not load request statuses.');
+    let items = [...await fetchStatusOverviewItems()];
     if (statusOverviewMode === 'restartable') {
       items = items.filter((item) => !['draft', 'changes_requested', 'pending_english', 'pending_security'].includes(item.status)
         && (currentRole !== 'security' || item.type === 'entry_permit'));
@@ -645,6 +661,7 @@ async function loadStatusOverview() {
     }
     const labels = {
       draft: 'Draft',
+      pending_supervisor: 'Waiting for club supervisor',
       pending_pr: 'Waiting for PR',
       pending_english: 'Waiting for English',
       pending_security: 'Waiting for Security Office',
@@ -667,6 +684,8 @@ async function loadStatusOverview() {
         const image = document.createElement('img');
         image.src = rowImage;
         image.alt = '';
+        image.loading = 'lazy';
+        image.decoding = 'async';
         row.append(image);
       }
       const details = document.createElement('div');
@@ -811,6 +830,7 @@ async function deleteDeanContent() {
 function displayTimelineStatus(status) {
   return ({
     draft: 'Draft',
+    pending_supervisor: 'Under supervisor review',
     pending_pr: 'Under PR Review',
     pending_english: 'Under English Review',
     pending_security: 'Under Security Office Review',
@@ -861,7 +881,7 @@ function renderReviewHistory(item) {
   if (!events.length) {
     const empty = document.createElement('p'); empty.textContent = 'No review history is recorded for this request yet.'; reviewHistoryList.append(empty); return;
   }
-  const roles = { club: 'Club', pr: 'PR Committee', english: 'English Committee', security: 'Security Office', dean: 'Religion Committee (Dean)', system: 'Workflow' };
+  const roles = { supervisor: 'Club supervisor', club: 'Club', pr: 'PR Committee', english: 'English Committee', security: 'Security Office', dean: 'Religion Committee (Dean)', system: 'Workflow' };
   for (const event of events) {
     const actionKey = ['request_edit', 'returned_to_pr', 'returned_to_english', 'returned_to_security'].includes(event.action) ? 'request_edit'
       : event.action === 'reject' ? 'reject'
@@ -1098,20 +1118,24 @@ document.getElementById('historyReturnComment')?.addEventListener('input', (even
   const canReturn = ['pending_dean', 'published', 'approved'].includes(activeReviewHistoryItem?.status);
   document.getElementById('submitHistoryReturnBtn').disabled = !canReturn || !event.currentTarget.value.trim();
 });
-document.getElementById('logoutBtn').addEventListener('click', async () => {
+document.getElementById('logoutBtn')?.addEventListener('click', async () => {
   await fetch('/api/club-auth/logout', { method: 'POST' });
   window.location.href = '/';
 });
 
 (async () => {
 if (await ensureSession()) {
-  await loadRequests();
-  refreshUnreadRequestBadges();
+  const pendingResponse = fetch('/api/committee/requests', { cache: 'no-store' });
+  await Promise.all([loadRequests(pendingResponse), refreshUnreadRequestBadges(pendingResponse)]);
+  window.siteStartup?.afterStartup?.(() => fetchStatusOverviewItems());
   window.setInterval(() => {
     if (document.visibilityState === 'visible') refreshUnreadRequestBadges();
-  }, 10000);
+  }, 30000);
 }
 })();
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && currentRole) refreshUnreadRequestBadges();
+});
 window.addEventListener('dashboard:refresh', () => {
   if (currentRole) refreshUnreadRequestBadges();
 });

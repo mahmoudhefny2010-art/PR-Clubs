@@ -9,6 +9,8 @@
 
   let loading = false;
   let authorized = false;
+  let cachedReviewData = null;
+  let reviewDataLoadedAt = 0;
   const htmlDate = (value) => {
     if (!value) return '—';
     const date = new Date(value);
@@ -55,6 +57,8 @@
         const image = document.createElement('img');
         image.src = review.clubImage;
         image.alt = `${review.clubName || 'Club'} logo`;
+        image.loading = 'lazy';
+        image.decoding = 'async';
         image.addEventListener('error', () => { avatar.textContent = (review.clubName || 'C').trim().charAt(0).toUpperCase(); }, { once: true });
         avatar.append(image);
       } else {
@@ -136,7 +140,11 @@
     loading = true;
     window.dashboardSync?.report('attendanceApprovals', 'loading');
     try {
-      const data = await request('/api/committee/attendance-reviews');
+      const data = cachedReviewData && Date.now() - reviewDataLoadedAt < 25_000
+        ? cachedReviewData
+        : await request('/api/committee/attendance-reviews');
+      cachedReviewData = data;
+      reviewDataLoadedAt = Date.now();
       if (!Array.isArray(data.reviews)) throw new Error('Unexpected attendance reviews response.');
       renderReviews(data.reviews, data.stage);
       window.dashboardUnread?.update('attendanceApprovals', reviewKeys(data));
@@ -170,6 +178,8 @@
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, ...(note ? { note } : {}) })
       });
+      cachedReviewData = null;
+      reviewDataLoadedAt = 0;
       const confirmation = action === 'note'
         ? `Note saved for all ${data.recordsUpdated} attendance record(s).`
         : action === 'reject'
@@ -196,6 +206,8 @@
     try {
       const data = await request('/api/committee/attendance-reviews');
       if (!Array.isArray(data.reviews)) throw new Error('Unexpected attendance reviews response.');
+      cachedReviewData = data;
+      reviewDataLoadedAt = Date.now();
       window.dashboardUnread?.update('attendanceApprovals', reviewKeys(data));
       window.dashboardSync?.report('attendanceApprovals', 'success');
     } catch (error) {
@@ -222,16 +234,21 @@
     window.location.assign('/');
   });
 
-  request('/api/club-auth/session').then((session) => {
+  request('/api/club-auth/session', { siteStartupNonBlocking: true }).then((session) => {
     authorized = Boolean(session.authenticated && ['pr', 'sso', 'dean'].includes(session.club?.role));
-    refreshUnreadBadge();
+    const preloadReviews = () => refreshUnreadBadge();
+    if (authorized && window.siteStartup?.afterStartup) window.siteStartup.afterStartup(preloadReviews);
+    else preloadReviews();
     window.setInterval(() => {
       if (document.visibilityState === 'visible' && !dialog.open) refreshUnreadBadge();
-    }, 10000);
+    }, 30000);
   }).catch((error) => {
     window.dashboardSync?.report('attendanceApprovals', 'error', error.message);
     message.textContent = error.message;
     message.classList.add('is-error');
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && authorized && !dialog.open) refreshUnreadBadge();
   });
   window.addEventListener('dashboard:refresh', refreshUnreadBadge);
 })();

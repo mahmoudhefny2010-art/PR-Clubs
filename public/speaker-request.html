@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="/assets/js/site-loading.js?v=20261013stagedload4"></script>
+  <title>External Speaker Request · MIU Clubs</title>
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" onload="this.onload=null;this.rel='stylesheet'"><noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"></noscript>
+  <link rel="stylesheet" href="/assets/css/base.css?v=20261013caret1">
+  <link rel="stylesheet" href="/assets/css/responsive.css?v=20261013mobilebuttons1">
+  <link rel="stylesheet" href="/assets/css/dark.css?v=20261013darkglobal2">
+  <link rel="stylesheet" href="/assets/css/features.css?v=20261013backbutton1">
+  <link rel="stylesheet" href="/assets/css/pages/speaker-requests.css?v=20261013responsivedark1">
+  <script defer src="/assets/js/pwa-register.js"></script>
+  <link rel="stylesheet" href="/assets/css/modal-controls.css?v=20261013modalclose2">
+</head>
+<body>
+  <div id="site-header"></div>
+  <main class="app-container speaker-page">
+    <section class="committee-card speaker-shell">
+      <header class="committee-top"><div><span class="committee-label">CLUB EVENT PLANNING</span><h1>External speaker request</h1><p>Requests are reviewed by the hosting club first, then forwarded to the Dean if accepted.</p></div><div class="top-actions"><a class="secondary-btn" href="/" data-history-back>Back</a></div></header>
+      <p id="speakerPageMessage" class="speaker-message" role="status" aria-live="polite">Loading your account…</p>
+      <div class="speaker-columns" id="speakerContent" hidden>
+        <section class="speaker-panel">
+          <h2 id="speakerFormTitle">Propose a speaker</h2>
+          <p class="speaker-signed-in">Submitting as <strong id="speakerIdentity"></strong></p>
+          <form id="speakerRequestForm">
+            <label id="speakerClubField">Hosting club<select name="clubId" id="speakerClub" required><option value="">Choose a club</option></select></label>
+            <label>Speaker name<input name="speakerName" minlength="2" maxlength="160" autocomplete="name" required></label>
+            <label>Current position &amp; company<input name="jobTitleCompany" minlength="2" maxlength="300" autocomplete="organization-title" required></label>
+            <label>LinkedIn profile <span class="speaker-optional">(optional)</span><input name="linkedinProfile" type="url" maxlength="500" autocomplete="url" placeholder="https://www.linkedin.com/in/..."></label>
+            <label>Proposed talk topic<input name="proposedTopic" minlength="3" maxlength="300" required></label>
+            <label>Why did we choose this speaker?<textarea name="speakerSelectionReason" minlength="3" maxlength="2000" rows="3" required placeholder="Explain how the speaker's experience fits this event"></textarea></label>
+            <label>Expected benefit to students<textarea name="expectedStudentBenefit" minlength="3" maxlength="2000" rows="3" required placeholder="Describe what students will learn or gain"></textarea></label>
+            <label class="speaker-field-wide">CV or supporting documents <span class="speaker-optional">(optional; PDF, DOC, DOCX, PPT, or PPTX; up to 5 files, 5 MB each)</span><input id="speakerFiles" name="speakerFiles" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation" multiple></label>
+            <p id="speakerFormMessage" class="speaker-message" role="status" aria-live="polite"></p>
+            <div class="speaker-form-actions"><button id="speakerSubmit" class="primary-btn" type="submit">Submit request</button><button id="speakerCancelEdit" class="secondary-btn" type="button" hidden>Cancel changes</button></div>
+          </form>
+        </section>
+        <section class="speaker-panel">
+          <div id="speakerInvitePanel" hidden>
+            <h2>Invite an external speaker</h2>
+            <p class="speaker-help">Generate a private link to share with a speaker. Their submission will be linked to you and this club, visible to your club president and the Dean, and reviewed by the Dean.</p>
+            <button id="generateSpeakerInvite" class="primary-btn" type="button">Generate speaker form link</button>
+            <div id="speakerInviteResult" class="speaker-invite-result" hidden>
+              <label>Speaker form link<input id="speakerInviteUrl" type="url" readonly></label>
+              <div class="speaker-form-actions"><button id="copySpeakerInvite" class="secondary-btn" type="button">Copy link</button><button id="downloadSpeakerInviteQr" class="secondary-btn" type="button">Download QR</button><button id="revokeSpeakerInvite" class="secondary-btn" type="button">Revoke and generate another</button></div>
+              <div id="speakerInviteQr" class="speaker-invite-qr" aria-label="QR code for speaker form link"></div>
+              <p id="speakerInviteExpiry" class="speaker-help"></p>
+            </div>
+            <p id="speakerInviteMessage" class="speaker-message" role="status" aria-live="polite"></p>
+            <hr>
+          </div>
+          <h2 id="speakerRequestsHeading">Your requests</h2><p id="speakerRequestsHelp" class="speaker-help">Each student or club representative can have one active request per club.</p>
+          <div id="speakerRequestsList" class="speaker-request-list" aria-live="polite"></div>
+        </section>
+      </div>
+    </section>
+  </main>
+  <div id="site-footer"></div>
+  <script src="/assets/js/speaker-request.js?v=20261013lighter1"></script>
+  <script src="/assets/js/layout.js?v=20261013stagedload3" defer></script>
+  <script src="/assets/js/theme.js?v=20261009c" defer></script>
+</body>
+</html>

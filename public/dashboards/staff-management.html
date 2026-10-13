@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Staff roles · MIU Clubs</title>
+  <script src="/assets/js/site-loading.js?v=20261013stagedload4"></script>
+  <link rel="stylesheet" href="/assets/css/base.css?v=20261013caret1">
+  <link rel="stylesheet" href="/assets/css/responsive.css?v=20261013mobilebuttons1">
+  <link rel="stylesheet" href="/assets/css/dark.css?v=20261013darkglobal2">
+  <link rel="stylesheet" href="/assets/css/features.css?v=20261013backbutton1">
+  <link rel="stylesheet" href="/assets/css/pages/supervisor-dashboard.css?v=20261013navscroll1">
+  <link rel="stylesheet" href="/assets/css/pages/supervisor-management.css?v=20261013responsive1">
+  <script src="/assets/js/theme.js?v=20261009c" defer></script>
+  <script src="/assets/js/layout.js?v=20261013stagedload3" defer></script>
+  <script src="/assets/js/staff-management.js?v=20261013staffrolelookup8" defer></script>
+  <link rel="stylesheet" href="/assets/css/modal-controls.css?v=20261013modalclose2">
+</head><body><div id="site-header"></div>
+<main class="app-container supervisor-main supervisor-management"><section class="committee-card supervisor-management-shell">
+  <header class="supervisor-management-heading"><div><span class="committee-label">ADMINISTRATION</span><h1>Staff accounts &amp; roles</h1><p>Assign an MIU Google email to its dashboard and club responsibilities.</p></div><a class="secondary-btn" href="/admin">Back to dashboard</a></header>
+  <p id="staffFeedback" role="status" aria-live="polite">Loading staff accounts…</p>
+  <form id="staffForm" class="supervisor-admin-form" hidden>
+    <div class="supervisor-form-heading"><h2>Assign dashboard roles</h2><p>One MIU Google account can have several dashboards. Saving changes signs out its current sessions.</p></div>
+    <div class="supervisor-account-fields">
+      <label for="staffEmail">MIU Google email<input id="staffEmail" type="email" required maxlength="254" placeholder="staff@miuegypt.edu.eg" autocomplete="off"><small id="staffEmailRoleStatus" class="staff-email-role-status" role="status" aria-live="polite" hidden></small></label>
+      <label for="staffPassword">New password (optional)<input id="staffPassword" type="password" minlength="12" maxlength="200" autocomplete="new-password" placeholder="Leave empty for Google or to keep the current password"></label>
+      <label for="staffConfirmPassword">Confirm new password<input id="staffConfirmPassword" type="password" minlength="12" maxlength="200" autocomplete="new-password" placeholder="Re-enter the new password"></label>
+    </div>
+    <div id="staffRoleAssignments" class="staff-role-assignments"></div>
+    <button id="staffAddRoleBtn" class="secondary-btn" type="button">Add another dashboard</button>
+    <div class="supervisor-form-footer"><p>Each dashboard checks its role and club scope on the server.</p><button class="primary-btn" type="submit">Save dashboard roles</button></div>
+  </form>
+  <section class="supervisor-management-section"><div class="supervisor-section-heading"><h2>Assigned staff</h2><p>Find an account and edit its role or club assignments.</p></div>
+    <div class="staff-directory-filters">
+      <label for="staffSearch">Search staff<input id="staffSearch" type="search" placeholder="Email, role, or club"><small>Searching a full MIU email shows the account across all roles.</small></label>
+      <label for="staffRoleFilter">Dashboard role<select id="staffRoleFilter"><option value="">All dashboard roles</option></select></label>
+    </div>
+    <p id="staffSearchStatus" class="staff-search-status" role="status" aria-live="polite"></p>
+    <div id="staffAccounts" class="staff-account-grid"></div>
+  </section>
+</section></main><div id="site-footer"></div></body></html>

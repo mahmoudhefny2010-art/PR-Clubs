@@ -12,6 +12,9 @@
   let attendanceRecords = [];
   let currentRole = '';
   let recordsRequestPending = false;
+  let recordsRequest = null;
+  let recordsLoadedAt = 0;
+  let roleRequest = null;
 
   const approvalStatusLabels = {
     pending_pr: 'Waiting for PR', pending_sso: 'Waiting for SSO',
@@ -130,6 +133,8 @@
         const image = document.createElement('img');
         image.src = group.clubImage;
         image.alt = `${group.clubName} logo`;
+        image.loading = 'lazy';
+        image.decoding = 'async';
         image.addEventListener('error', () => { avatar.textContent = group.clubName.trim().charAt(0).toUpperCase(); }, { once: true });
         avatar.append(image);
       } else avatar.textContent = group.clubName.trim().charAt(0).toUpperCase();
@@ -249,7 +254,7 @@
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, ...(note ? { note } : {}) })
       });
-      await loadRecords();
+      await loadRecords(false, true);
       feedback.textContent = action === 'approve'
         ? `Approved ${result.recordsUpdated} check-in${result.recordsUpdated === 1 ? '' : 's'}; forwarded to ${result.nextStage.toUpperCase()}.`
         : action === 'reject' ? `Rejected ${result.recordsUpdated} check-in${result.recordsUpdated === 1 ? '' : 's'}.`
@@ -261,51 +266,64 @@
     }
   }
 
-  async function loadRecords(showLoading = false) {
-    if (recordsRequestPending) return;
+  async function loadRecords(showLoading = false, force = false) {
+    if (recordsRequest) return recordsRequest;
+    if (!force && recordsLoadedAt && Date.now() - recordsLoadedAt < 25_000) return;
     recordsRequestPending = true;
     if (showLoading) feedback.textContent = 'Loading event attendance…';
-    try {
-      attendanceRecords = await apiJson('/api/committee/attendance-records?clubId=all');
-      if (downloadButton) downloadButton.disabled = !attendanceRecords.length;
-      window.dashboardUnread?.update('eventAttendance', attendanceRecords.map((record) => `${record.clubId}:${record.itemType}:${record.eventRequestId}:${record.email}:${record.attendedAt}`));
-      renderRecords();
-      feedback.textContent = '';
-      feedback.classList.remove('is-error');
-    } catch (error) {
-      if (showLoading || !recordsList.childElementCount) {
-        feedback.textContent = error.message;
-        feedback.classList.add('is-error');
+    const operation = (async () => {
+      try {
+        attendanceRecords = await apiJson('/api/committee/attendance-records?clubId=all');
+        recordsLoadedAt = Date.now();
+        if (downloadButton) downloadButton.disabled = !attendanceRecords.length;
+        window.dashboardUnread?.update('eventAttendance', attendanceRecords.map((record) => `${record.clubId}:${record.itemType}:${record.eventRequestId}:${record.email}:${record.attendedAt}`));
+        renderRecords();
+        feedback.textContent = '';
+        feedback.classList.remove('is-error');
+      } catch (error) {
+        recordsLoadedAt = 0;
+        if (showLoading || !recordsList.childElementCount) {
+          feedback.textContent = error.message;
+          feedback.classList.add('is-error');
+        }
+        throw error;
       }
-    } finally {
-      recordsRequestPending = false;
-    }
+    })();
+    recordsRequest = operation;
+    try { await operation; }
+    finally { recordsRequestPending = false; recordsRequest = null; }
   }
 
   async function loadRole() {
-    const session = await apiJson('/api/club-auth/session');
-    if (!session.authenticated || !session.club) throw new Error('Sign in with an authorized committee account to view attendance.');
-    currentRole = session.club.role;
+    if (currentRole) return currentRole;
+    if (!roleRequest) roleRequest = apiJson('/api/club-auth/session').then((session) => {
+      if (!session.authenticated || !session.club) throw new Error('Sign in with an authorized committee account to view attendance.');
+      currentRole = session.club.role;
+      return currentRole;
+    }).finally(() => { roleRequest = null; });
+    return roleRequest;
+  }
+
+  async function preloadAttendance(force = false) {
+    await Promise.all([loadRole(), loadRecords(false, force)]);
   }
 
   async function openAttendance() {
     window.dashboardPanels?.show('committeeAttendanceDialog');
-    feedback.textContent = 'Loading event attendance…';
+    if (!recordsLoadedAt) feedback.textContent = 'Loading event attendance…';
     feedback.classList.remove('is-error');
     try {
-      await loadRole();
-      await loadRecords(true);
+      await preloadAttendance();
     } catch (error) {
       feedback.textContent = error.message;
       feedback.classList.add('is-error');
     }
   }
 
-  async function refreshAttendanceBadge() {
+  async function refreshAttendanceBadge(force = false) {
     window.dashboardSync?.report('eventAttendance', 'loading');
     try {
-      const records = await apiJson('/api/committee/attendance-records?clubId=all');
-      window.dashboardUnread?.update('eventAttendance', records.map((record) => `${record.clubId}:${record.itemType}:${record.eventRequestId}:${record.email}:${record.attendedAt}`));
+      await preloadAttendance(force);
       window.dashboardSync?.report('eventAttendance', 'success');
     } catch (error) {
       window.dashboardSync?.report('eventAttendance', 'error', error.message);
@@ -317,12 +335,16 @@
   refreshButton?.addEventListener('click', async () => {
     if (!refreshButton || recordsRequestPending) return;
     refreshButton.disabled = true;
-    try { await loadRecords(true); }
+    try { await loadRecords(true, true); }
     finally { refreshButton.disabled = false; }
   });
   document.getElementById('overviewAttendanceBtn')?.addEventListener('click', openAttendance);
   closeButton?.addEventListener('click', () => window.dashboardPanels?.showOverview());
   searchInput?.addEventListener('input', renderRecords);
-  refreshAttendanceBadge();
-  window.addEventListener('dashboard:refresh', refreshAttendanceBadge);
+  window.siteStartup?.afterStartup?.(() => refreshAttendanceBadge());
+  if (!window.siteStartup?.afterStartup) refreshAttendanceBadge();
+  window.addEventListener('dashboard:refresh', () => refreshAttendanceBadge(true));
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') refreshAttendanceBadge(true);
+  });
 })();

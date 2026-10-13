@@ -6,6 +6,7 @@
   const club = document.getElementById('eventModalClub');
   const title = document.getElementById('eventModalTitle');
   const meta = document.getElementById('eventModalMeta');
+  const attendance = document.getElementById('eventModalAttendance');
   const description = document.getElementById('eventModalDescription');
   const form = document.getElementById('eventModalForm');
   const feedback = document.getElementById('eventModalFeedback');
@@ -37,6 +38,8 @@
     club.textContent = event.clubName || '';
     title.textContent = event.title || 'Event';
     meta.textContent = [formatDate(event.date), window.formatSiteTime ? window.formatSiteTime(event.time) : event.time, event.location].filter(Boolean).join(' · ');
+    attendance.hidden = event.attendanceEnabled !== true;
+    attendance.textContent = 'Attendance taken';
     description.textContent = event.description || '';
     feedback.textContent = '';
     form.reset();

@@ -22,7 +22,6 @@
   let delegationOptionsLoaded = false;
   let delegationOptionsDate = '';
   let attendanceDataDate = '';
-  let qrCodeLoadPromise = null;
   let activeQrToken = '';
   let activeQrActivityKey = '';
   let qrRefreshTimeout = 0;
@@ -30,27 +29,6 @@
   let recordsPollTimeout = 0;
   let recordsPollingInFlight = false;
   if (!openButton || !dialog) return;
-
-  function loadQrCodeLibrary() {
-    if (typeof window.QRCode === 'function') return Promise.resolve();
-    if (qrCodeLoadPromise) return qrCodeLoadPromise;
-
-    qrCodeLoadPromise = new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
-      script.async = true;
-      script.onload = () => typeof window.QRCode === 'function'
-        ? resolve()
-        : reject(new Error('QR generator did not load. Please try again.'));
-      script.onerror = () => reject(new Error('QR generator could not be reached. Check your connection and try again.'));
-      document.head.append(script);
-    }).catch((error) => {
-      qrCodeLoadPromise = null;
-      throw error;
-    });
-
-    return qrCodeLoadPromise;
-  }
 
   const formatDate = (value) => {
     const date = new Date(value);
@@ -61,6 +39,7 @@
     return Number.isNaN(date.getTime()) ? '—' : window.formatSiteTime(date);
   };
   const attendanceApprovalLabel = (status) => ({
+    pending_supervisor: 'Waiting for club supervisor',
     pending_pr: 'Waiting for PR',
     pending_sso: 'Waiting for SSO',
     pending_dean: 'SSO approved · Waiting for Dean',
@@ -219,7 +198,7 @@
       meta.textContent = [activity.clubName, activity.itemType === 'booth' ? 'Booth' : 'Event', activity.date, window.formatSiteTime(activity.time)].filter(Boolean).join(' · ');
       const status = document.createElement('span');
       status.className = `attendance-activity-status${activity.attendanceEnded ? ' is-processing' : ' is-pending'}`;
-      status.textContent = activity.attendanceEnded ? 'Processing · PR review' : 'Attendance open';
+      status.textContent = activity.attendanceEnded ? 'Attendance closed · Review in progress' : 'Attendance open';
       content.append(title, meta, status);
       card.append(content);
       if (!activity.attendanceEnded) {
@@ -235,9 +214,9 @@
   }
 
   async function endActivityAttendance(activity, button) {
-    if (!window.confirm(`End attendance for “${activity.title}”? New check-ins will stop and the full list will go to PR.`)) return;
+    if (!window.confirm(`End attendance for “${activity.title}”? New check-ins will stop and the full list will go to the club supervisor.`)) return;
     button.disabled = true;
-    feedback.textContent = 'Ending attendance and sending the list to PR…';
+    feedback.textContent = 'Ending attendance and sending the list to the club supervisor…';
     feedback.classList.remove('is-error');
     try {
       await apiJson(`/api/club/attendance-events/${encodeURIComponent(activity.clubId)}/${encodeURIComponent(activity.itemType)}/${encodeURIComponent(activity.eventRequestId)}/end`, { method: 'POST' });
@@ -247,7 +226,7 @@
         qrCanvas.replaceChildren();
         qrResult.classList.add('hidden');
       }
-      feedback.textContent = `${activity.title}: attendance ended. The list is processing with PR.`;
+      feedback.textContent = `${activity.title}: attendance ended. The list is waiting for the club supervisor.`;
       await Promise.all([loadEvents(), loadRecords()]);
     } catch (error) {
       button.disabled = false;
@@ -383,7 +362,7 @@
     if (recordsDetails) recordsDetails.open = historyOnly;
     dialog.showModal();
     if (delegationPanel?.open && (!delegationOptionsLoaded || delegationOptionsDate !== cairoTodayKey())) loadDelegationOptions();
-    if (!historyOnly) loadQrCodeLibrary().catch((error) => {
+    if (!historyOnly) window.ensureQRCode().catch((error) => {
       if (dialog.open) {
         feedback.textContent = error.message;
         feedback.classList.add('is-error');
@@ -493,7 +472,7 @@
     feedback.classList.remove('is-error');
     qrCanvas.replaceChildren();
     try {
-      await loadQrCodeLibrary();
+      await window.ensureQRCode();
       const result = await apiJson('/api/club/attendance-sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

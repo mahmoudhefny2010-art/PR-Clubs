@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Club Supervisor Dashboard · MIU Clubs</title>
+  <script src="/assets/js/site-loading.js?v=20261013stagedload4"></script>
+  <link rel="stylesheet" href="/assets/css/base.css?v=20261013caret1">
+  <link rel="stylesheet" href="/assets/css/responsive.css?v=20261013mobilebuttons1">
+  <link rel="stylesheet" href="/assets/css/dark.css?v=20261013darkglobal2">
+  <link rel="stylesheet" href="/assets/css/features.css?v=20261013dashboardtabs1">
+  <link rel="stylesheet" href="/assets/css/pages/supervisor-dashboard.css?v=20261013navscroll1">
+  <link rel="icon" href="/assets/img/pics/logo.svg.png">
+  <script src="/assets/js/theme.js?v=20261009c" defer></script>
+  <script src="/assets/js/layout.js?v=20261013stagedload3" defer></script>
+  <script src="/assets/js/supervisor-dashboard.js?v=20261013supervisorgate1" defer></script>
+  <link rel="stylesheet" href="/assets/css/modal-controls.css?v=20261013modalclose2">
+</head>
+<body>
+  <div id="site-header"></div>
+  <main class="app-container committee-dashboard-layout">
+    <aside class="committee-sidebar" aria-label="Supervisor dashboard navigation">
+      <h2>DASHBOARD</h2>
+      <button class="committee-sidebar-link is-active" data-panel="overview" aria-current="page">Overview</button>
+      <h3>ASSIGNED CLUBS</h3>
+      <label class="supervisor-club-label" for="supervisorClub">Hosting club</label>
+      <select id="supervisorClub" disabled><option>Loading clubs…</option></select>
+      <button class="committee-sidebar-link" data-panel="events">Events</button>
+      <button class="committee-sidebar-link" data-panel="requests">Club requests</button>
+      <button class="committee-sidebar-link" data-panel="speakers">External speaker requests</button>
+      <button class="committee-sidebar-link" data-panel="reports">Activity reports</button>
+    </aside>
+    <section class="committee-card supervisor-main" aria-labelledby="supervisorTitle">
+      <div class="committee-top"><div><span class="committee-label">CLUB SUPERVISION</span><h1 id="supervisorTitle">Supervisor dashboard</h1></div>
+        <button class="secondary-btn" id="supervisorRefresh" type="button">Refresh</button></div>
+      <p id="supervisorFeedback" role="status" aria-live="polite">Loading assigned clubs…</p>
+      <div id="supervisorContent" aria-busy="true"></div>
+    </section>
+  </main>
+  <div id="site-footer"></div>
+</body>
+</html>

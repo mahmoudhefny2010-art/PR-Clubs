@@ -3,6 +3,8 @@ const memberDirectoryClubSelect = document.getElementById('memberDirectoryClubSe
 const memberDirectoryList = document.getElementById('memberDirectoryList');
 let memberDirectoryClubs = [];
 let memberDirectoryMode = 'admin';
+const memberDirectoryCache = new Map();
+const memberDirectoryRequests = new Map();
 
 function renderMemberDirectory() {
   if (!memberDirectoryList || !memberDirectoryClubSelect) return;
@@ -15,7 +17,7 @@ function renderMemberDirectory() {
     return;
   }
   const selectedId = memberDirectoryClubSelect.value;
-  if (memberDirectoryMode === 'pr' && !selectedId) {
+  if (!selectedId) {
     const prompt = document.createElement('p');
     prompt.className = 'member-directory-empty';
     prompt.textContent = 'Choose a club to see its members.';
@@ -98,51 +100,25 @@ async function openMemberDirectory(mode) {
     filter.hidden = isHeadView;
     filter.classList.toggle('hidden', isHeadView);
   }
-  if (isHeadView) memberDirectoryDialog.showModal();
-  else if (window.dashboardPanels) window.dashboardPanels.show('memberDirectoryDialog');
-  else memberDirectoryDialog.showModal();
-  memberDirectoryList.replaceChildren();
-  const loading = document.createElement('p');
-  loading.className = 'member-directory-empty';
-  loading.textContent = 'Loading club members…';
-  memberDirectoryList.append(loading);
+  const inlineDirectory = isPrView && memberDirectoryDialog.classList.contains('committee-inline-panel')
+    && window.dashboardPanels;
+  if (inlineDirectory) window.dashboardPanels.show('memberDirectoryDialog');
+  else {
+    memberDirectoryDialog.hidden = false;
+    if (!memberDirectoryDialog.open) memberDirectoryDialog.showModal();
+  }
+  const cachedDirectory = memberDirectoryCache.get(mode);
+  const directoryIsWarm = cachedDirectory && Date.now() - cachedDirectory.loadedAt < 25_000;
+  if (!directoryIsWarm) {
+    memberDirectoryList.replaceChildren();
+    const loading = document.createElement('p');
+    loading.className = 'member-directory-empty';
+    loading.textContent = 'Loading club members…';
+    memberDirectoryList.append(loading);
+  }
 
   try {
-    if (isPrView) {
-      const [publicResponse, rosterResponse] = await Promise.all([
-        fetch('/api/clubs', { cache: 'no-store' }),
-        fetch('/api/committee/club-members', { cache: 'no-store', credentials: 'same-origin' })
-      ]);
-      const publicClubs = await publicResponse.json();
-      const rosterResult = await rosterResponse.json();
-      if (!publicResponse.ok) throw new Error(publicClubs.message || 'Could not load the clubs list.');
-      if (!rosterResponse.ok) throw new Error(rosterResult.message || 'Could not load club members.');
-      const rosterClubs = Array.isArray(rosterResult) ? rosterResult : Array.isArray(rosterResult.clubs) ? rosterResult.clubs : [];
-      const rosterById = new Map(rosterClubs.map((club) => [Number(club.id), club]));
-      memberDirectoryClubs = (Array.isArray(publicClubs) ? publicClubs : []).map((club) => {
-        const roster = rosterById.get(Number(club.id));
-        return {
-          ...club,
-          totalCount: Number.isFinite(Number(roster?.totalCount)) ? Number(roster.totalCount) : Number(club.members) || 0,
-          members: Array.isArray(roster?.members) ? roster.members : []
-        };
-      });
-    } else if (isHeadView) {
-      const response = await fetch('/api/club/members', { cache: 'no-store', credentials: 'same-origin' });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message || 'Could not load your committee members.');
-      memberDirectoryClubs = [{
-        id: result.clubId,
-        name: `${result.clubName} · ${result.committee}`,
-        members: Array.isArray(result.members) ? result.members : [],
-        totalCount: Number(result.totalCount) || 0
-      }];
-    } else {
-      const response = await fetch('/api/admin/club-members', { cache: 'no-store' });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message || 'Could not load the member directory.');
-      memberDirectoryClubs = Array.isArray(result) ? result : Array.isArray(result.clubs) ? result.clubs : [];
-    }
+    memberDirectoryClubs = await loadMemberDirectoryData(mode);
     if (isPrView || isHeadView) updateClubMemberUnreadCount(memberDirectoryClubs);
     memberDirectoryClubSelect.replaceChildren();
     if (isPrView) {
@@ -153,9 +129,9 @@ async function openMemberDirectory(mode) {
       memberDirectoryClubSelect.add(new Option(memberDirectoryClubs[0]?.name || 'My committee', String(memberDirectoryClubs[0]?.id || '')));
       memberDirectoryClubSelect.value = String(memberDirectoryClubs[0]?.id || '');
     } else {
-      memberDirectoryClubSelect.add(new Option('All clubs', 'all'));
+      memberDirectoryClubSelect.add(new Option('Choose a club', ''));
       memberDirectoryClubs.forEach((club) => memberDirectoryClubSelect.add(new Option(club.name, String(club.id))));
-      memberDirectoryClubSelect.value = 'all';
+      memberDirectoryClubSelect.value = '';
     }
     renderMemberDirectory();
   } catch (error) {
@@ -166,6 +142,54 @@ async function openMemberDirectory(mode) {
     memberDirectoryList.append(message);
   }
 }
+
+async function loadMemberDirectoryData(mode, force = false) {
+  const cached = memberDirectoryCache.get(mode);
+  if (!force && cached && Date.now() - cached.loadedAt < 25_000) return cached.clubs;
+  if (!force && memberDirectoryRequests.has(mode)) return memberDirectoryRequests.get(mode);
+  const request = (async () => {
+    let clubs;
+    if (mode === 'pr') {
+      const [publicResponse, rosterResponse] = await Promise.all([
+        fetch('/api/clubs?media=links', { cache: 'no-store' }),
+        fetch('/api/committee/club-members', { cache: 'no-store', credentials: 'same-origin' })
+      ]);
+      const publicClubs = await publicResponse.json();
+      const rosterResult = await rosterResponse.json();
+      if (!publicResponse.ok) throw new Error(publicClubs.message || 'Could not load the clubs list.');
+      if (!rosterResponse.ok) throw new Error(rosterResult.message || 'Could not load club members.');
+      const rosterClubs = Array.isArray(rosterResult) ? rosterResult : Array.isArray(rosterResult.clubs) ? rosterResult.clubs : [];
+      const rosterById = new Map(rosterClubs.map((club) => [Number(club.id), club]));
+      clubs = (Array.isArray(publicClubs) ? publicClubs : []).map((club) => {
+        const roster = rosterById.get(Number(club.id));
+        return {
+          ...club,
+          totalCount: Number.isFinite(Number(roster?.totalCount)) ? Number(roster.totalCount) : Number(club.members) || 0,
+          members: Array.isArray(roster?.members) ? roster.members : []
+        };
+      });
+    } else if (mode === 'head') {
+      const response = await fetch('/api/club/members', { cache: 'no-store', credentials: 'same-origin' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Could not load your committee members.');
+      clubs = [{ id: result.clubId, name: `${result.clubName} · ${result.committee}`, members: Array.isArray(result.members) ? result.members : [], totalCount: Number(result.totalCount) || 0 }];
+    } else {
+      const response = await fetch('/api/admin/club-members', { cache: 'no-store' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Could not load the member directory.');
+      clubs = Array.isArray(result) ? result : Array.isArray(result.clubs) ? result.clubs : [];
+    }
+    memberDirectoryCache.set(mode, { clubs, loadedAt: Date.now() });
+    if (mode === 'pr' || mode === 'head') updateClubMemberUnreadCount(clubs);
+    if (mode === 'pr') window.dashboardSync?.report('clubMembers', 'success');
+    return clubs;
+  })();
+  memberDirectoryRequests.set(mode, request);
+  try { return await request; }
+  finally { if (memberDirectoryRequests.get(mode) === request) memberDirectoryRequests.delete(mode); }
+}
+
+window.preloadMemberDirectory = (mode, force = false) => loadMemberDirectoryData(mode, force);
 
 function updateClubMemberUnreadCount(clubs) {
   const keys = [];
@@ -196,14 +220,25 @@ document.querySelectorAll('[data-open-member-directory]').forEach((button) => {
   button.addEventListener('click', () => openMemberDirectory(button.dataset.openMemberDirectory));
 });
 document.querySelectorAll('[data-close-member-directory]').forEach((button) => {
-  button.addEventListener('click', () => memberDirectoryMode === 'head'
-    ? memberDirectoryDialog?.close()
-    : window.dashboardPanels ? window.dashboardPanels.showOverview() : memberDirectoryDialog?.close());
+  button.addEventListener('click', () => {
+    if (memberDirectoryMode === 'pr' && memberDirectoryDialog?.classList.contains('committee-inline-panel')
+      && window.dashboardPanels) window.dashboardPanels.showOverview();
+    else memberDirectoryDialog?.close();
+  });
 });
 memberDirectoryClubSelect?.addEventListener('change', renderMemberDirectory);
 window.openClubMemberDirectory = openMemberDirectory;
-refreshClubMemberUnreadCount();
+if (document.getElementById('prMemberDirectoryBtn')) {
+  const preloadPrMemberDirectory = () => loadMemberDirectoryData('pr').catch((error) => {
+    window.dashboardSync?.report('clubMembers', 'error', error.message);
+  });
+  if (window.siteStartup?.afterStartup) window.siteStartup.afterStartup(preloadPrMemberDirectory);
+  else preloadPrMemberDirectory();
+} else refreshClubMemberUnreadCount();
 window.addEventListener('dashboard:refresh', refreshClubMemberUnreadCount);
 window.setInterval(() => {
   if (document.visibilityState === 'visible') refreshClubMemberUnreadCount();
-}, 15000);
+}, 30000);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') refreshClubMemberUnreadCount();
+});

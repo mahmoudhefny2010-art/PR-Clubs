@@ -1,3 +1,87 @@
+let adminGoogleSdkPromise;
+let adminGoogleSigningIn = false;
+let archivedClubsLoadedAt = 0;
+let archivedClubsRequest = null;
+
+async function configureAdminGoogleSignIn() {
+  const host = document.getElementById('adminGoogleButton');
+  const feedback = document.getElementById('adminGoogleFeedback');
+  if (!host || !feedback) return;
+  host.replaceChildren();
+  feedback.textContent = 'Loading Google sign-in...';
+  feedback.classList.remove('is-error');
+
+  try {
+    const configResponse = await fetch('/api/student-auth/google-config', { cache: 'no-store' });
+    const config = await configResponse.json();
+    if (!configResponse.ok || !config.enabled || !config.clientId || !config.nonce) {
+      feedback.textContent = 'Google sign-in is not configured on this server. Use your admin email and password.';
+      return;
+    }
+
+    if (!window.google?.accounts?.id) {
+      if (!adminGoogleSdkPromise) {
+        adminGoogleSdkPromise = new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://accounts.google.com/gsi/client';
+          script.async = true;
+          script.onload = resolve;
+          script.onerror = () => reject(new Error('Google sign-in could not load. Check your connection and try again.'));
+          document.head.append(script);
+        });
+      }
+      await adminGoogleSdkPromise;
+    }
+    if (!window.google?.accounts?.id) throw new Error('Google sign-in could not start. Refresh the page and try again.');
+
+    window.google.accounts.id.initialize({
+      client_id: config.clientId,
+      nonce: config.nonce,
+      hd: 'miuegypt.edu.eg',
+      error_callback: () => {
+        feedback.textContent = 'Google sign-in was closed or could not be opened. Try again or use your email and password.';
+        feedback.classList.add('is-error');
+      },
+      callback: async (credentialResponse) => {
+        if (adminGoogleSigningIn) return;
+        if (!credentialResponse?.credential) {
+          feedback.textContent = 'Google did not return a sign-in credential. Try again or use your email and password.';
+          feedback.classList.add('is-error');
+          return;
+        }
+        adminGoogleSigningIn = true;
+        feedback.textContent = 'Checking your authorized MIU account...';
+        feedback.classList.remove('is-error');
+        try {
+          const response = await fetch('/api/student-auth/google', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ credential: credentialResponse.credential }),
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok || result.authenticated !== true) throw new Error(result.message || 'Google sign-in failed.');
+          const redirect = new URL(result.redirect || '/admin', window.location.origin);
+          if (redirect.origin !== window.location.origin) throw new Error('The sign-in destination is invalid.');
+          window.location.assign(`${redirect.pathname}${redirect.search}${redirect.hash}`);
+        } catch (error) {
+          feedback.textContent = error.message || 'Google sign-in failed. Try again.';
+          feedback.classList.add('is-error');
+          adminGoogleSigningIn = false;
+        }
+      },
+    });
+
+    host.replaceChildren();
+    window.google.accounts.id.renderButton(host, {
+      theme: 'outline', size: 'large', text: 'signin_with', shape: 'rectangular', width: Math.min(400, Math.max(220, Math.floor(host.getBoundingClientRect().width || 396))),
+    });
+    feedback.textContent = '';
+  } catch (error) {
+    feedback.textContent = error.message || 'Google sign-in is temporarily unavailable.';
+    feedback.classList.add('is-error');
+  }
+}
+
 async function openAdminAccess() {
   try {
     const response = await fetch('/api/admin/session');
@@ -6,7 +90,20 @@ async function openAdminAccess() {
       resetClubEditor();
       setAdminFeedback('');
       showView('admin');
-      await Promise.all([loadClubs(), loadHomepageSettings(), loadArchivedClubs()]);
+      await Promise.all([loadClubs(), loadHomepageSettings()]);
+      if (window.siteStartup?.afterStartup) window.siteStartup.afterStartup(async () => {
+        const [archiveResult, memberDirectoryResult] = await Promise.allSettled([
+          loadArchivedClubs(),
+          window.preloadMemberDirectory?.('admin')
+        ]);
+        if (archiveResult.status === 'rejected') {
+          const error = archiveResult.reason;
+          const list = document.getElementById('archivedClubList');
+          if (list) list.textContent = error.message || 'Archived clubs could not be loaded. Use refresh to try again.';
+        }
+        if (memberDirectoryResult.status === 'rejected') console.warn('Club member directory could not be preloaded.', memberDirectoryResult.reason);
+      });
+      else await Promise.allSettled([loadArchivedClubs(), window.preloadMemberDirectory?.('admin')]);
       return;
     }
 
@@ -31,6 +128,7 @@ async function openAdminAccess() {
     document.getElementById('adminLoginForm').reset();
     setAdminLoginFeedback('');
     showView('adminLogin');
+    configureAdminGoogleSignIn();
     passwordInput.focus();
   } catch (error) {
     setAdminLoginFeedback('Could not check admin access. Is the server running?', true);
@@ -68,7 +166,7 @@ function renderAdminClubList() {
   const orderedClubs = getOrderedClubs(state.clubs);
   adminClubList.innerHTML = orderedClubs.map((club, index) => `
     <article class="admin-club-row">
-      <img src="${escapeHtml(club.image)}" alt="" />
+      <img src="${escapeHtml(club.image)}" alt="" loading="lazy" decoding="async" />
       <div class="admin-club-info">
         <strong>${escapeHtml(club.name)}</strong>
         <span>${escapeHtml(club.category)} · ${escapeHtml(getClubStatusLabel(club.status))}${club.pinned ? ' · Pinned' : ''}</span>
@@ -93,18 +191,30 @@ function renderAdminClubList() {
   });
 }
 
-async function loadArchivedClubs() {
+async function loadArchivedClubs(force = false) {
   const list = document.getElementById('archivedClubList');
   const count = document.getElementById('archivedClubCount');
   if (!list || !count) return;
-
-  const response = await fetch('/api/admin/clubs/archived', { cache: 'no-store' });
-  if (!response.ok) throw new Error('Could not load archived clubs.');
-  const archivedClubs = await response.json();
+  if (!force && archivedClubsLoadedAt && Date.now() - archivedClubsLoadedAt < 30_000) return;
+  if (!archivedClubsRequest) {
+    archivedClubsRequest = (async () => {
+      const response = await fetch('/api/admin/clubs/archived', { cache: 'no-store' });
+      if (!response.ok) throw new Error('Could not load archived clubs.');
+      return response.json();
+    })();
+  }
+  const request = archivedClubsRequest;
+  let archivedClubs;
+  try {
+    archivedClubs = await request;
+    archivedClubsLoadedAt = Date.now();
+  } finally {
+    if (archivedClubsRequest === request) archivedClubsRequest = null;
+  }
   count.textContent = `${archivedClubs.length} clubs`;
   list.innerHTML = archivedClubs.length ? archivedClubs.map((club) => `
     <article class="admin-club-row">
-      <img src="${escapeHtml(club.image)}" alt="" />
+      <img src="${escapeHtml(club.image)}" alt="" loading="lazy" decoding="async" />
       <div class="admin-club-info">
         <strong>${escapeHtml(club.name)}</strong>
         <span>${escapeHtml(club.category)} · Archived${club.archivedAt ? ` · ${escapeHtml(new Date(club.archivedAt).toLocaleDateString())}` : ''}</span>
@@ -141,7 +251,7 @@ async function moveClubOrder(clubId, direction) {
     return;
   }
 
-  await loadClubs();
+  await loadClubs(true);
   setAdminFeedback(`Moved ${movedClubName} ${direction < 0 ? 'up' : 'down'}.`);
 }
 
@@ -599,7 +709,7 @@ async function archiveClub(clubId) {
   }
 
   if (Number(document.getElementById('clubEditorId').value) === clubId) resetClubEditor();
-  await Promise.all([loadClubs(), loadArchivedClubs()]);
+  await Promise.all([loadClubs(true), loadArchivedClubs(true)]);
   setAdminFeedback(`${club.name} archived. Its applications and other records were kept.`);
 }
 
@@ -613,7 +723,7 @@ async function restoreClub(clubId) {
     return;
   }
 
-  await Promise.all([loadClubs(), loadArchivedClubs()]);
+  await Promise.all([loadClubs(true), loadArchivedClubs(true)]);
   setAdminFeedback(`${club.name} restored to active clubs.`);
 }
 
@@ -679,7 +789,7 @@ function renderClubContentSections(club) {
       const meta = clubContentMeta(item, section.type);
       const description = item.text || item.description || '';
       const imageBlock = image
-        ? `<img class="club-image" src="${escapeHtml(image)}" alt="${escapeHtml(item.title || section.label)}" />`
+        ? `<img class="club-image" src="${escapeHtml(image)}" alt="${escapeHtml(item.title || section.label)}" loading="lazy" decoding="async" />`
         : `<div class="club-image club-image-placeholder" aria-hidden="true">${escapeHtml(section.label)}</div>`;
       return `
         <article class="club-card feed-card">

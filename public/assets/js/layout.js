@@ -1,3 +1,57 @@
+// Shared page navigation: keep Back separate from the explicit Home links.
+(() => {
+  let qrCodeLibraryPromise = null;
+  window.ensureQRCode = () => {
+    if (typeof window.QRCode === 'function') return Promise.resolve();
+    if (qrCodeLibraryPromise) return qrCodeLibraryPromise;
+    qrCodeLibraryPromise = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
+      script.async = true;
+      script.onload = () => typeof window.QRCode === 'function'
+        ? resolve()
+        : reject(new Error('QR generator did not load.'));
+      script.onerror = () => reject(new Error('QR generator could not be reached. Check your connection and try again.'));
+      document.head.append(script);
+    }).catch((error) => {
+      qrCodeLibraryPromise = null;
+      throw error;
+    });
+    return qrCodeLibraryPromise;
+  };
+
+  const safePrevious = value => {
+    if (typeof value !== 'string' || !value.trim()) return '';
+    try {
+      const url = new URL(value, location.origin);
+      if (url.origin !== location.origin || url.href === location.href || /(?:login|sign-in|reset-password|forgot-password)/i.test(url.pathname)) return '';
+      return url.pathname + url.search + url.hash;
+    } catch { return ''; }
+  };
+  let previous = document.referrer ? safePrevious(document.referrer) : '';
+  try {
+    const current = location.pathname + location.search + location.hash;
+    const saved = JSON.parse(sessionStorage.getItem('miu:page-navigation') || 'null');
+    if (saved?.current === current) previous = safePrevious(saved.previous) || previous;
+    else previous = previous || (saved?.current ? safePrevious(saved.current) : '');
+    sessionStorage.setItem('miu:page-navigation', JSON.stringify({ current, previous }));
+  } catch { /* Private browsing can disable storage. */ }
+  window.miuGoBack = (fallback = '/') => {
+    if (previous) {
+      if (document.referrer && safePrevious(document.referrer) === previous && history.length > 1) history.back();
+      else location.assign(previous);
+    } else location.assign(fallback);
+  };
+  document.addEventListener('click', event => {
+    if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    const control = event.target.closest('[data-history-back], a');
+    if (!control || (!control.hasAttribute('data-history-back') && !/^(Back(?:\s|$)|Exit$)/i.test(control.textContent.trim()))) return;
+    if (control.closest('.recovery-card') || /(?:forgot-password|reset-password)/.test(location.pathname)) return;
+    event.preventDefault(); event.stopImmediatePropagation();
+    window.miuGoBack(control.getAttribute('href') || '/');
+  }, true);
+})();
+
 window.formatSiteTime = (value) => {
   if (value instanceof Date) {
     return Number.isNaN(value.getTime()) ? '' : value.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
@@ -117,14 +171,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const el = document.getElementById(id);
     if (!el) return;
     try {
-      const res = await fetch(url, { cache: 'no-store' });
+      const res = await fetch(url, { siteStartupNonBlocking: true });
       if (res.ok) {
         el.innerHTML = await res.text();
         if (id === 'site-header') {
           initHeader();
           if (!document.querySelector('script[data-miu-push-client]')) {
             const pushClient = document.createElement('script');
-            pushClient.src = '/assets/js/onesignal-notifications.js?v=20261012firstvisit1';
+            pushClient.src = '/assets/js/onesignal-notifications.js?v=20261013notificationretry2';
             pushClient.async = true;
             pushClient.dataset.miuPushClient = 'true';
             document.head.appendChild(pushClient);
@@ -201,6 +255,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const studentProfileEmail = document.getElementById('headerStudentEmail');
     const studentProfileAvatar = document.getElementById('headerStudentAvatar');
     const accountDashboardLink = document.getElementById('headerAccountDashboardLink');
+    const dashboardChoices = document.getElementById('headerDashboardChoices');
+    const dashboardChoiceList = document.getElementById('headerDashboardChoiceList');
+    const dashboardSwitchStatus = document.getElementById('headerDashboardSwitchStatus');
     const studentFormsLink = document.getElementById('headerStudentFormsLink');
     let currentHeaderSession = null;
     const closeStudentProfileMenu = () => {
@@ -222,7 +279,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (authBtn) {
       const refreshHeaderAccountState = async () => {
         try {
-          const response = await fetch('/api/site/account-session', { cache: 'no-store' });
+          const response = await fetch('/api/site/account-session', { cache: 'no-store', siteStartupNonBlocking: true });
           if (!response.ok) return;
           const session = await response.json();
           currentHeaderSession = session;
@@ -236,7 +293,9 @@ document.addEventListener('DOMContentLoaded', () => {
             english: { label: 'Dashboard', href: '/dashboards/english-dashboard.html' },
             security: { label: 'Dashboard', href: '/dashboards/security-dashboard.html' },
             sso: { label: 'Dashboard', href: '/dashboards/sso-dashboard.html' },
+            supervisor: { label: 'Dashboard', href: '/dashboards/supervisor-dashboard.html' },
             dean: { label: 'Dashboard', href: '/dashboards/dean-dashboard.html' },
+            software_development: { label: 'Dashboard', href: '/admin' },
             student: { label: 'My Dashboard', href: '/?myForms=1' }
           };
           const account = session?.authenticated
@@ -265,12 +324,44 @@ document.addEventListener('DOMContentLoaded', () => {
             accountDashboardLink.href = account.href;
             accountDashboardLink.textContent = account.label;
           }
+          if (dashboardChoiceList) {
+            dashboardChoiceList.replaceChildren();
+            const choices = Array.isArray(session.dashboards)
+              ? session.dashboards.filter(item => item.role && item.role !== session.role) : [];
+            if (dashboardChoices) dashboardChoices.hidden = choices.length === 0;
+            choices.forEach(choice => {
+              const button = document.createElement('button');
+              button.type = 'button';
+              button.className = 'nav-profile-item nav-profile-dashboard-option';
+              button.setAttribute('role', 'menuitem');
+              button.textContent = [choice.label, choice.committee, choice.clubName].filter(Boolean).join(' · ');
+              button.addEventListener('click', async () => {
+                button.disabled = true;
+                if (dashboardSwitchStatus) dashboardSwitchStatus.textContent = `Opening ${choice.label}...`;
+                try {
+                  const response = await fetch('/api/club-auth/switch-dashboard', {
+                    method: 'POST', credentials: 'same-origin', cache: 'no-store',
+                    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role: choice.role })
+                  });
+                  const result = await response.json().catch(() => ({}));
+                  if (!response.ok) throw new Error(result.message || 'Could not switch dashboards.');
+                  const target = new URL(result.redirect, window.location.origin);
+                  if (target.origin !== window.location.origin || !target.pathname.startsWith('/')) throw new Error('This dashboard link is not valid.');
+                  window.location.assign(`${target.pathname}${target.search}${target.hash}`);
+                } catch (error) {
+                  if (dashboardSwitchStatus) dashboardSwitchStatus.textContent = error.message;
+                  button.disabled = false;
+                }
+              });
+              dashboardChoiceList.append(button);
+            });
+          }
           if (studentFormsLink) studentFormsLink.hidden = !isStudent;
           const notificationToggle = document.getElementById('headerNotificationToggle');
           const notificationStatus = document.getElementById('headerNotificationStatus');
           const emailNotificationToggle = document.getElementById('headerEmailNotificationToggle');
           const emailNotificationStatus = document.getElementById('headerEmailNotificationStatus');
-          if (notificationToggle) notificationToggle.hidden = !isStudent;
+          if (notificationToggle) notificationToggle.hidden = !(isAuthenticated && ['student', 'club', 'admin'].includes(session.type));
           if (emailNotificationToggle) emailNotificationToggle.hidden = !isStudent;
           if (!isStudent && notificationStatus) notificationStatus.hidden = true;
           if (!isStudent && emailNotificationStatus) emailNotificationStatus.hidden = true;
@@ -298,7 +389,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const logoutPath = currentHeaderSession?.type === 'student'
           ? '/api/student-auth/logout'
           : currentHeaderSession?.type === 'admin' ? '/api/admin/logout' : '/api/club-auth/logout';
-        if (currentHeaderSession?.type === 'student') await window.miuPushNotifications?.logout();
+        if (['student', 'club', 'admin'].includes(currentHeaderSession?.type)) await window.miuPushNotifications?.logout();
         const response = await fetch(logoutPath, { method: 'POST', cache: 'no-store' });
         if (!response.ok) {
           const result = await response.json().catch(() => ({}));
@@ -329,6 +420,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  inject('site-header', '/components/site-header.html');
+  inject('site-header', '/components/site-header.html?v=20261013multipleroles2');
   inject('site-footer', '/components/site-footer.html');
 });

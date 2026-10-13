@@ -1,0 +1,56 @@
+.supervisor-main { min-width: 0; }
+.supervisor-main h1 { margin: 6px 0 18px; font-size: clamp(1.4rem, 3vw, 2rem); }
+.supervisor-main h2 { margin: 18px 0 14px; }
+.supervisor-club-label { margin: 8px 10px; font-size: .85rem; }
+#supervisorClub, .supervisor-main input, .supervisor-main select, .supervisor-main textarea {
+  box-sizing: border-box; width: 100%; padding: 11px 12px; border: 1px solid var(--border-color);
+  border-radius: 10px; background: var(--bg-panel); color: var(--text-main); font: inherit;
+}
+.supervisor-record { margin: 14px 0; padding: 18px; border: 1px solid var(--border-color); border-radius: 14px; background: var(--bg-panel); overflow-wrap: anywhere; }
+.supervisor-record h3 { margin: 0 0 10px; }
+.supervisor-record p { white-space: pre-wrap; }
+.supervisor-record small, .supervisor-muted { color: var(--text-muted); }
+.supervisor-status { display: inline-block; padding: 4px 10px; border-radius: 999px; background: var(--bg-soft); color: var(--text-main); font-size: .85rem; }
+.supervisor-record form { display: grid; gap: 10px; margin-top: 18px; }
+.supervisor-record textarea { min-height: 90px; resize: vertical; }
+.supervisor-record button { justify-self: start; }
+.supervisor-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+.supervisor-summary > div { padding: 16px; border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-soft); }
+.supervisor-summary strong { display: block; font-size: 1.7rem; margin-top: 8px; }
+.supervisor-main [role="alert"] { color: var(--primary-700); }
+.supervisor-admin-form { display: grid; gap: 12px; max-width: 680px; }
+.supervisor-admin-form fieldset { border: 1px solid var(--border-color); border-radius: 12px; padding: 14px; }
+.supervisor-admin-form .supervisor-assignment { display: flex; gap: 10px; align-items: center; padding: 8px 0; }
+.supervisor-assignment input { width: auto; }
+.supervisor-main :is(button, select, input, textarea):focus-visible { outline: 3px solid var(--primary-700); outline-offset: 3px; }
+@media (max-width: 700px) { .supervisor-main { padding: 18px; } .supervisor-record { padding: 14px; } }
+
+.supervisor-decision-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* Keep dashboard content usable when the shared two-column layout collapses. */
+.supervisor-main { overflow-wrap: anywhere; }
+.supervisor-main .committee-top { align-items: center; }
+.supervisor-main .committee-top > div { min-width: 0; }
+.supervisor-main .committee-top > button { flex: 0 0 auto; }
+.supervisor-record form > * { min-width: 0; }
+.supervisor-record button { max-width: 100%; }
+@media (max-width: 820px) {
+  .committee-dashboard-layout:has(.supervisor-main) { grid-template-columns: minmax(0, 1fr); gap: 12px; padding-inline: 12px; }
+  .committee-dashboard-layout .supervisor-main { width: 100%; padding: clamp(14px, 3vw, 22px); }
+  .committee-dashboard-layout .committee-sidebar { position: static !important; display: flex; flex-flow: row nowrap; align-items: center; max-width: 100%; max-height: none; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; scrollbar-width: thin; scrollbar-color: var(--primary-700) var(--bg-soft); }
+  .committee-dashboard-layout .committee-sidebar > :is(h2, h3, .supervisor-club-label) { display: none; }
+  .committee-dashboard-layout .committee-sidebar #supervisorClub { flex: 0 0 220px; width: 220px; }
+  .committee-dashboard-layout .committee-sidebar .committee-sidebar-link { flex: 0 0 auto; width: max-content; min-height: 44px; white-space: nowrap; }
+  .committee-dashboard-layout .committee-sidebar::-webkit-scrollbar { display: block; height: 5px; }
+  .committee-dashboard-layout .committee-sidebar::-webkit-scrollbar-thumb { background: var(--primary-700); border-radius: 999px; }
+}
+@media (max-width: 520px) {
+  .committee-dashboard-layout:has(.supervisor-main) { padding-inline: 8px; }
+  .committee-dashboard-layout .committee-sidebar { padding: 8px 2px; }
+  .committee-dashboard-layout .supervisor-main { padding: 14px 12px; }
+  .supervisor-main .committee-top { align-items: stretch; }
+  .supervisor-main .committee-top > button { width: 100%; }
+  .supervisor-decision-actions { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .supervisor-decision-actions > * { width: 100%; min-width: 0; }
+  .supervisor-record { padding: 13px; }
+}

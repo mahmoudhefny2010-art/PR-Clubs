@@ -1,6 +1,6 @@
 # OneSignal setup
 
-This project uses the OneSignal Web SDK v16. Push and email updates are optional and require a signed-in student to enable each channel from the account menu. Push permission is requested only after an explicit click; email is linked to the verified email on the signed-in student account. No real messages are sent unless valid OneSignal credentials are configured and an accepted application or newly published student-facing post exists.
+This project uses the OneSignal Web SDK v16. Push updates are available to signed-in students, club accounts, and staff accounts from the account menu. Email updates are student-only and linked to the verified email on the signed-in student account. Push permission is requested only after an explicit click. No real messages are sent unless valid OneSignal credentials are configured and an accepted application or newly published student-facing post exists.
 
 ## Dashboard configuration
 

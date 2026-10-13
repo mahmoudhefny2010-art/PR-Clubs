@@ -1,0 +1,132 @@
+/* Shared modal close controls: stay reachable while long content scrolls. */
+:root {
+  --modal-close-safe-top: max(8px, env(safe-area-inset-top));
+}
+
+body :is(
+  button[aria-label*="close" i],
+  button[aria-label*="exit" i],
+  button[title*="close" i],
+  button[class*="close" i],
+  button[id*="close" i],
+  .club-detail-close,
+  .calendar-close-btn,
+  .close-btn,
+  .request-dialog-close,
+  .club-review-notice-close,
+  .club-feedback-dialog-close,
+  .attachment-preview-close
+) {
+  position: sticky !important;
+  top: var(--modal-close-safe-top) !important;
+  z-index: 30 !important;
+  align-self: flex-start;
+  flex: 0 0 auto;
+  margin-inline-start: auto;
+  -webkit-backdrop-filter: blur(16px) saturate(1.25) !important;
+  backdrop-filter: blur(16px) saturate(1.25) !important;
+  box-shadow: 0 8px 24px rgba(2, 6, 23, .24);
+  transition: background-color .18s ease, border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+
+.event-modal-panel > .event-modal-close {
+  position: sticky !important;
+  top: var(--modal-close-safe-top) !important;
+  grid-column: 1 / -1;
+  justify-self: end;
+  align-self: start;
+  margin: -12px -12px -44px 0;
+  -webkit-backdrop-filter: blur(16px) saturate(1.25) !important;
+  backdrop-filter: blur(16px) saturate(1.25) !important;
+}
+
+.club-detail-card > .club-detail-close,
+#applicationView .app-form-card > .application-exit,
+.club-review-notice-content > .club-review-notice-close {
+  position: sticky !important;
+  top: var(--modal-close-safe-top) !important;
+  z-index: 30 !important;
+  float: right;
+  -webkit-backdrop-filter: blur(16px) saturate(1.25) !important;
+  backdrop-filter: blur(16px) saturate(1.25) !important;
+}
+
+/* Blur and dim the page behind native dialogs and custom modal layers. */
+dialog::backdrop {
+  background: rgba(5, 11, 22, .58) !important;
+  -webkit-backdrop-filter: blur(6px) saturate(.9);
+  backdrop-filter: blur(6px) saturate(.9);
+}
+
+.event-modal:not(.hidden),
+.calendar-modal:not(.hidden),
+.modal:not(.hidden) {
+  -webkit-backdrop-filter: blur(6px) saturate(.9);
+  backdrop-filter: blur(6px) saturate(.9);
+}
+
+@media (max-width: 700px) {
+  body :is(
+    button[aria-label*="close" i],
+    button[aria-label*="exit" i],
+    button[title*="close" i],
+    button[class*="close" i],
+    button[id*="close" i],
+    .club-detail-close,
+    .calendar-close-btn,
+    .close-btn,
+    .request-dialog-close,
+    .club-review-notice-close,
+    .club-feedback-dialog-close,
+    .attachment-preview-close
+  ) {
+    min-width: 42px;
+    min-height: 42px;
+    border-radius: 999px;
+    background-color: color-mix(in srgb, var(--bg-panel, #111b2b) 72%, transparent) !important;
+    border-color: color-mix(in srgb, var(--text-main, #edf2f8) 28%, transparent) !important;
+    touch-action: manipulation;
+  }
+
+  .event-modal { -webkit-backdrop-filter: blur(6px) saturate(.9); backdrop-filter: blur(6px) saturate(.9); }
+}
+
+/* Keep action buttons aligned and easy to tap in cards on narrow screens. */
+@media (max-width: 600px) {
+  :is(.req-card, .application-card, .record, .content-card, .speaker-request-card)
+  :is(.req-actions, .card-actions, .record-actions, .application-actions, .content-card-actions) {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+    margin-top: 10px;
+  }
+
+  :is(.req-card, .application-card, .record, .content-card, .speaker-request-card)
+  :is(.req-actions, .card-actions, .record-actions, .application-actions, .content-card-actions)
+  > :is(button, a, input) {
+    box-sizing: border-box;
+    display: inline-flex;
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    padding: 9px 10px;
+    font-size: .88rem;
+    line-height: 1.25;
+    text-align: center;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  :is(.req-card, .application-card, .record, .content-card, .speaker-request-card)
+  :is(.req-actions, .card-actions, .record-actions, .application-actions, .content-card-actions)
+  > :is(.delete, .delete-request, [data-action="delete"]) { grid-column: 1 / -1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body :is(button[aria-label*="close" i], button[aria-label*="exit" i], .club-detail-close, .calendar-close-btn, .close-btn, .request-dialog-close, .club-review-notice-close, .club-feedback-dialog-close, .attachment-preview-close) { transition: none; }
+}

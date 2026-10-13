@@ -42,7 +42,7 @@
         <span class="event-timeline-marker" aria-hidden="true"></span>
         <span class="event-timeline-content">
           <span class="event-timeline-header">
-            <img src="${escapeHtml(sponsor.sponsorLogo || sponsor.clubImage)}" alt="" class="feed-timeline-avatar" />
+            <img src="${escapeHtml(sponsor.sponsorLogo || sponsor.clubImage)}" alt="" class="feed-timeline-avatar" loading="lazy" decoding="async" />
             <span class="event-timeline-meta">
               <span class="event-tile-club">${escapeHtml(sponsor.clubName || '')}</span>
               <span class="feed-timeline-date">Upcoming Sponsor</span>
@@ -84,7 +84,7 @@
     });
   }
 
-  fetch('/api/clubs')
+  fetch('/api/clubs?media=links')
     .then((response) => response.json())
     .then((data) => {
       clubs = Array.isArray(data) ? data : [];

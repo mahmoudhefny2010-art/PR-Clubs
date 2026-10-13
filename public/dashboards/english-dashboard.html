@@ -4,18 +4,19 @@
       <link rel="manifest" href="/manifest.webmanifest">
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <script src="/assets/js/site-loading.js?v=20261012loadingdatawait1"></script>
+    <script src="/assets/js/site-loading.js?v=20261013stagedload4"></script>
     <title>Committee Review</title>
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" /></noscript>
-    <link rel="stylesheet" href="/assets/css/base.css?v=20261012loadingringmatch1" />
-    <link rel="stylesheet" href="/assets/css/responsive.css?v=20261012fluidmobile1" />
-    <link rel="stylesheet" href="/assets/css/dark.css?v=20261012closeglass4" />
-    <link rel="stylesheet" href="/assets/css/features.css?v=20261012stickyclose18" />
+    <link rel="stylesheet" href="/assets/css/base.css?v=20261013caret1" />
+    <link rel="stylesheet" href="/assets/css/responsive.css?v=20261013mobilebuttons1" />
+    <link rel="stylesheet" href="/assets/css/dark.css?v=20261013darkglobal2" />
+    <link rel="stylesheet" href="/assets/css/features.css?v=20261013attendancemobile1" />
     <link rel="icon" href="/assets/img/pics/logo.svg.png" type="image/png">
     <link rel="stylesheet" href="/assets/css/pages/english-dashboard.css?v=1" />
       <script defer src="/assets/js/pwa-register.js"></script>
-  </head>
+    <link rel="stylesheet" href="/assets/css/modal-controls.css?v=20261013modalclose2">
+</head>
   <body>
     <div id="site-header"></div>
     <main class="app-container committee-dashboard-layout">
@@ -29,13 +30,12 @@
             <div class="committee-label">APPROVALS COMMITTEE</div>
             <h2 id="committeeTitle">Committee dashboard</h2>
           </div>
-          <div class="top-actions">
+          <div class="top-actions"><a class="secondary-btn" href="/?explore=clubs">Home</a>
             <a class="secondary-btn" href="/">Back</a>
-            <button id="logoutBtn" class="logout-btn" type="button">Logout</button>
           </div>
         </div>
         <p id="sessionMessage"></p>
-        <section id="committeeOverviewPanel" class="committee-overview-panel"><span class="committee-label">ENGLISH DEPARTMENT</span><h2>Overview</h2><p>Requests ready for English Department review.</p><div class="committee-overview-stats overview-grid-2"><button class="overview-stat-card" type="button" data-dashboard-panel="pendingRequestsSection"><span>Requests to review</span><strong data-overview-count="requests">—</strong><small>Open English review queue</small></button><button class="overview-stat-card" type="button" id="overviewRestartsBtn"><span>Restart review</span><strong data-overview-count="allRequests">—</strong><small>Requests returned for review</small></button></div></section>
+        <section id="committeeOverviewPanel" class="committee-overview-panel"><span class="committee-label">ENGLISH DEPARTMENT</span><h2>Overview</h2><p>Requests ready for English Department review.</p><div class="committee-overview-stats overview-grid-2"><button class="overview-stat-card" type="button" data-dashboard-panel="pendingRequestsSection"><span>Requests to review</span><strong data-overview-count="requests">â€”</strong><small>Open English review queue</small></button><button class="overview-stat-card" type="button" id="overviewRestartsBtn"><span>Restart review</span><strong data-overview-count="allRequests">â€”</strong><small>Requests returned for review</small></button></div></section>
         <section id="pendingRequestsSection" class="committee-requests-section" hidden><h2>Pending requests</h2><p id="hintText"></p><div id="requestsList"></div></section>
       </section>
     </main>
@@ -59,9 +59,9 @@
       </div>
     </dialog>
     <div id="site-footer"></div>
-    <script src="/assets/js/committee-sidebar.js?v=20261011overviewdefault1"></script>
-    <script src="/assets/js/committee-dashboard.js?v=20261010allrequestsdb1"></script>
-      <script src="/assets/js/layout.js?v=20261012firstvisit1" defer></script>
+    <script src="/assets/js/committee-sidebar.js?v=20261013lighter1"></script>
+    <script src="/assets/js/committee-dashboard.js?v=20261013stagedload1"></script>
+      <script src="/assets/js/layout.js?v=20261013stagedload3" defer></script>
       <script src="/assets/js/theme.js?v=20261009c" defer></script>
   </body>
 </html>

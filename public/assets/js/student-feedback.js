@@ -30,20 +30,47 @@
     finally { button.disabled = false; }
   });
   async function setupReview() {
+    const hasAdminFeedback = document.querySelector('#adminTabs [data-tab="feedback"]')
+      && document.getElementById('studentFeedbackResults');
+    const hasCommitteeFeedback = document.querySelector('.committee-sidebar')
+      && document.getElementById('studentFeedbackPanel')
+      && document.getElementById('studentFeedbackResults');
+    if (!hasAdminFeedback && !hasCommitteeFeedback) return;
+
     try {
-      const response = await fetch('/api/feedback/access', { cache: 'no-store' });
+      const response = await fetch('/api/feedback/access', { cache: 'no-store', siteStartupNonBlocking: true });
       if (!response.ok) return;
       const access = await response.json();
       if (!access.club && !access.university) return;
-      const renderResults = async (results, kinds) => {
-        results.textContent = 'Loading…';
+      const feedbackRowsCache = new Map();
+      const feedbackRowsLoadedAt = new Map();
+      const feedbackRowsPending = new Map();
+      const getFeedbackRows = (kind, refresh = false) => {
+        if (!refresh && feedbackRowsCache.has(kind) && Date.now() - feedbackRowsLoadedAt.get(kind) < 30_000) {
+          return Promise.resolve(feedbackRowsCache.get(kind));
+        }
+        if (!refresh && feedbackRowsPending.has(kind)) return feedbackRowsPending.get(kind);
+        const request = (async () => {
+          const res = await fetch(`/api/feedback/results/${kind}`, { cache: 'no-store' });
+          const rows = await res.json();
+          if (!res.ok) throw new Error(rows.message);
+          feedbackRowsCache.set(kind, rows);
+          feedbackRowsLoadedAt.set(kind, Date.now());
+          return rows;
+        })();
+        feedbackRowsPending.set(kind, request);
+        return request.finally(() => { if (feedbackRowsPending.get(kind) === request) feedbackRowsPending.delete(kind); });
+      };
+      const renderResults = async (results, kinds, refresh = false) => {
+        if (refresh) kinds.forEach((kind) => { feedbackRowsCache.delete(kind); feedbackRowsLoadedAt.delete(kind); });
+        const hasWarmResults = kinds.every((kind) => feedbackRowsCache.has(kind)
+          && Date.now() - feedbackRowsLoadedAt.get(kind) < 30_000);
+        if (!hasWarmResults) results.textContent = 'Loading…';
         try {
           let clubRows = [];
           const feedbackKeys = [];
           const sections = await Promise.all(kinds.map(async kind => {
-            const res = await fetch(`/api/feedback/results/${kind}`, { cache: 'no-store' });
-            const rows = await res.json();
-            if (!res.ok) throw new Error(rows.message);
+            const rows = await getFeedbackRows(kind, refresh);
             feedbackKeys.push(...rows.flatMap(row => (row.responses || []).map(item => `${kind}:${row.id}:${item.email}:${item.updatedAt || ''}`)));
             if (kind === 'club') {
               clubRows = rows;
@@ -93,16 +120,20 @@
       const adminResults = document.getElementById('studentFeedbackResults');
       if (access.university && adminTabButton && adminResults) {
         adminTabButton.addEventListener('click', () => renderResults(adminResults, ['club']));
-        document.getElementById('refreshStudentFeedbackBtn')?.addEventListener('click', () => renderResults(adminResults, ['club']));
+        document.getElementById('refreshStudentFeedbackBtn')?.addEventListener('click', () => renderResults(adminResults, ['club'], true));
         const miuTabButton = document.querySelector('#adminTabs [data-tab="miu-feedback"]');
         const miuResults = document.getElementById('miuFeedbackResults');
         if (miuTabButton && miuResults) {
           miuTabButton.addEventListener('click', () => renderResults(miuResults, ['university']));
-          document.getElementById('refreshMiuFeedbackBtn')?.addEventListener('click', () => renderResults(miuResults, ['university']));
+          document.getElementById('refreshMiuFeedbackBtn')?.addEventListener('click', () => renderResults(miuResults, ['university'], true));
         }
-        const activeTab = document.querySelector('#adminTabs .tab-btn.active');
-        if (activeTab === adminTabButton) renderResults(adminResults, ['club']);
-        else if (activeTab === miuTabButton && miuResults) renderResults(miuResults, ['university']);
+        const preloadAdminFeedback = async () => {
+          const tasks = [renderResults(adminResults, ['club'])];
+          if (access.university && miuResults) tasks.push(renderResults(miuResults, ['university']));
+          await Promise.allSettled(tasks);
+        };
+        if (window.siteStartup?.afterStartup) window.siteStartup.afterStartup(preloadAdminFeedback);
+        else preloadAdminFeedback();
         return;
       }
 
@@ -112,8 +143,10 @@
       const feedbackResults = document.getElementById('studentFeedbackResults');
       if (!feedbackPanel || !feedbackResults) return;
       const kinds = [...(access.club ? ['club'] : []), ...(access.university ? ['university'] : [])];
-      renderResults(feedbackResults, kinds);
-      document.getElementById('refreshStudentFeedbackBtn')?.addEventListener('click', () => renderResults(feedbackResults, kinds));
+      const preloadCommitteeFeedback = () => renderResults(feedbackResults, kinds);
+      if (window.siteStartup?.afterStartup) window.siteStartup.afterStartup(preloadCommitteeFeedback);
+      else preloadCommitteeFeedback();
+      document.getElementById('refreshStudentFeedbackBtn')?.addEventListener('click', () => renderResults(feedbackResults, kinds, true));
     } catch { /* Public pages remain available when session checks fail. */ }
   }  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setupReview);
   else setupReview();

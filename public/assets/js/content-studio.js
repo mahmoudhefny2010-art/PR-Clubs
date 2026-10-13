@@ -65,9 +65,9 @@ const ContentStudio = (() => {
     return `
     <article class="content-card">
       ${image
-        ? `<img src="${escapeHtml(image)}" alt="" />`
+        ? `<img src="${escapeHtml(image)}" alt="" loading="lazy" decoding="async" />`
         : `<div class="content-card-type" aria-hidden="true">${escapeHtml(label)}</div>`}
-      <div style="flex:1">
+      <div class="content-card-body">
         <strong>${escapeHtml(item.title)}</strong>
         <div class="meta"><span class="type-badge type-${escapeHtml(item.type)}">${escapeHtml(label)}</span>${escapeHtml(contentMeta(item)) || 'no details'}</div>
         ${renderPermitItems(item)}
@@ -114,6 +114,28 @@ const ContentStudio = (() => {
     const contentForm = document.getElementById('contentForm');
     const contentFormPanel = contentForm?.closest('.panel');
     let editingId = null;
+    let assignedHeadSelect = null;
+
+    function renderHeadAssignment(item = null) {
+      if (!contentForm || accountRole !== 'president' || type === 'entry_permit') return;
+      if (assignedHeadSelect) {
+        if (item) assignedHeadSelect.value = item.assignedHeadEmail || '';
+        return;
+      }
+      const actions = contentForm.querySelector('#submitReviewBtn')?.parentElement;
+      if (!actions) return;
+      const field = document.createElement('label');
+      field.className = 'content-form-assignment';
+      field.htmlFor = 'assignedHeadInput';
+      field.textContent = 'Assigned committee head (optional)';
+      assignedHeadSelect = document.createElement('select');
+      assignedHeadSelect.id = 'assignedHeadInput';
+      assignedHeadSelect.innerHTML = `<option value="">No committee head selected</option>${committeeHeads.map((head) => `<option value="${escapeHtml(head.email)}">${escapeHtml(head.committee)} · ${escapeHtml(head.email)}</option>`).join('')}`;
+      field.append(assignedHeadSelect);
+      field.title = committeeHeads.length ? '' : 'Add a committee head to your club before assigning a request.';
+      actions.before(field);
+      if (item) assignedHeadSelect.value = item.assignedHeadEmail || '';
+    }
 
     if (new URLSearchParams(window.location.search).get('embed') === '1') document.body.classList.add('embed');
 
@@ -151,6 +173,7 @@ const ContentStudio = (() => {
         } else {
           const headsResponse = await fetch('/api/club/heads');
           if (headsResponse.ok) committeeHeads = await headsResponse.json();
+          renderHeadAssignment();
         }
         contentLayout.hidden = false;
         return true;
@@ -184,6 +207,7 @@ const ContentStudio = (() => {
         const item = items.find((entry) => entry.id === id);
         if (!item || (type && item.type !== type)) throw new Error('This content could not be found.');
         editingId = id;
+        renderHeadAssignment(item);
         if (accountRole === 'head' && contentFormPanel) contentFormPanel.classList.remove('hidden');
         document.getElementById('formTitle').textContent = `Edit ${typeLabels[item.type] || 'content'}`;
         if (fill) fill(item);
@@ -253,6 +277,7 @@ const ContentStudio = (() => {
       editingId = null;
       document.getElementById('formTitle').textContent = formTitle;
       if (contentForm) contentForm.reset();
+      if (assignedHeadSelect) assignedHeadSelect.value = '';
       if (resetExtras) resetExtras();
       if (accountRole === 'head' && contentFormPanel) contentFormPanel.classList.add('hidden');
       formFeedback.textContent = '';
@@ -262,6 +287,7 @@ const ContentStudio = (() => {
       formFeedback.textContent = '';
       if (window.validateDataEntryForm && !window.validateDataEntryForm(contentForm)) return;
       const payload = { ...(collect ? collect() : {}), submit };
+      if (assignedHeadSelect) payload.assignedHeadEmail = assignedHeadSelect.value;
       if (submit && (type === 'event' || type === 'feed') && !String(payload.image || '').trim()) {
         formFeedback.textContent = 'Add an image before submitting this content for review.';
         document.getElementById('imageInput')?.focus();
@@ -280,6 +306,8 @@ const ContentStudio = (() => {
         if (!res.ok) throw new Error(result.message || 'Save failed');
         formFeedback.textContent = !submit
           ? 'Saved as draft.'
+          : result.status === 'pending_supervisor'
+            ? 'Submitted to your club supervisor for approval.'
           : result.status === 'pending_english'
             ? 'Resubmitted to English Department.'
             : result.status === 'pending_security'

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Speaker proposal · MIU Clubs</title>
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" onload="this.onload=null;this.rel='stylesheet'"><noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"></noscript>
+  <link rel="stylesheet" href="/assets/css/base.css?v=20261013caret1">
+  <link rel="stylesheet" href="/assets/css/responsive.css?v=20261013mobilebuttons1">
+  <link rel="stylesheet" href="/assets/css/dark.css?v=20261013darkglobal2">
+  <link rel="stylesheet" href="/assets/css/pages/speaker-requests.css?v=20261013responsivedark1">
+  <script defer src="/assets/js/pwa-register.js"></script>
+  <link rel="stylesheet" href="/assets/css/modal-controls.css?v=20261013modalclose2">
+</head>
+<body>
+  <header class="topbar-nav speaker-public-header">
+    <div class="topbar-container speaker-public-header-inner">
+      <div class="speaker-public-brand" aria-label="Misr International University Clubs">
+        <img class="brand-logo" src="/assets/img/pics/logo.svg.png" alt="Misr International University logo">
+        <span class="speaker-public-brand-copy">University Speaker Request</span>
+      </div>
+      <div class="nav-right" aria-label="Display settings"></div>
+    </div>
+  </header>
+  <main class="app-container speaker-page speaker-intake-page">
+    <section class="committee-card speaker-shell">
+      <header class="committee-top"><div><span class="committee-label">MIU CLUBS · SPEAKER INVITATION</span><h1>University Speaker Request Form</h1><p id="speakerInviteClubName" class="speaker-request-meta"></p><p>We would love to invite you to speak at our university event! Please fill out this short form to help us coordinate with you.</p></div></header>
+      <p id="speakerInvitePageMessage" class="speaker-message" role="status" aria-live="polite">Loading this speaker form…</p>
+      <section id="speakerInviteFormPanel" class="speaker-panel" hidden>
+        <form id="publicSpeakerForm">
+          <p class="speaker-form-guidance">Please complete all fields unless they are marked optional.</p>
+          <label>Full Name<input name="fullName" minlength="2" maxlength="160" autocomplete="name" required></label>
+          <label>Job Title &amp; Company<input name="jobTitleCompany" minlength="2" maxlength="300" autocomplete="organization-title" required></label>
+          <label>Email Address<input name="email" type="email" maxlength="254" autocomplete="email" required></label>
+          <label><span class="speaker-label-text">LinkedIn Profile <span class="speaker-optional">(optional)</span></span><input name="linkedinProfile" type="url" maxlength="500" autocomplete="url" placeholder="https://www.linkedin.com/in/..."></label>
+          <label>Proposed Talk Topic<input name="proposedTopic" minlength="3" maxlength="300" required></label>
+          <label><span class="speaker-label-text">Short Bio <span class="speaker-optional">(optional)</span></span><textarea name="shortBio" maxlength="2000" rows="3"></textarea></label>
+          <label>Preferred Session Format<select name="sessionFormat" required><option value="">Choose a format</option><option>On-campus</option><option>Online</option><option>Either</option></select></label>
+          <label>Availability<input name="availability" minlength="3" maxlength="500" required placeholder="Dates, days, or time ranges that work for you"></label>
+          <label class="speaker-field-wide"><span class="speaker-label-text">Special Requirements <span class="speaker-optional">(optional)</span></span><textarea name="specialRequirements" maxlength="1500" rows="3" placeholder="Accessibility, equipment, or other requirements"></textarea></label>
+          <label class="speaker-field-wide speaker-attachment-field"><span class="speaker-label-text">CV or other material to share <span class="speaker-optional">(optional; PDF, DOC, DOCX, PPT, or PPTX up to 5 MB)</span></span><input id="publicSpeakerCv" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"></label>
+          <p id="publicSpeakerFormMessage" class="speaker-message" role="status" aria-live="polite"></p>
+          <button id="publicSpeakerSubmit" class="primary-btn" type="submit">Send proposal</button>
+        </form>
+      </section>
+    </section>
+  </main>
+  <footer class="speaker-public-footer">
+    <div class="speaker-public-footer-inner">
+      <div class="speaker-public-footer-brand">
+        <span class="speaker-public-footer-logo"><img src="/assets/img/pics/logo.svg.png" alt=""></span>
+        <span class="speaker-public-footer-brand-copy"><strong>Misr International University</strong></span>
+      </div>
+      <div class="speaker-public-footer-bottom">
+        <p class="speaker-public-copyright">&copy; 2026 Misr International University. All rights reserved.</p>
+        <p class="speaker-public-credit">Designed &amp; developed by <a href="https://www.linkedin.com/in/mahmoud-hefny-1264763b0" target="_blank" rel="noopener noreferrer">Mahmoud Hefny</a> <span aria-hidden="true">&amp;</span> <a href="https://www.linkedin.com/in/rozan-tarek/" target="_blank" rel="noopener noreferrer">Rozan Tarek</a></p>
+      </div>
+    </div>
+  </footer>
+  <script src="/assets/js/speaker-intake.js?v=2"></script>
+  <script defer src="/assets/js/theme.js?v=20261009c"></script>
+</body>
+</html>

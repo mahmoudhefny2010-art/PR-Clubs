@@ -2,6 +2,12 @@
    MIU CLUBS - CORE DESIGN SYSTEM & BASE STYLES
    ========================================================================== */
 
+/* Static page text should not show a typing caret. Keep form editing visible. */
+html { caret-color: transparent; }
+input, textarea, [contenteditable="true"], [contenteditable=""], [contenteditable="plaintext-only"] {
+  caret-color: auto;
+}
+
 :root {
   /* Color Palette - University Maroon & Modern Slate */
   --primary-50: #fef2f2;

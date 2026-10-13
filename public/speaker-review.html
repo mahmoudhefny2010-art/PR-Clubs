@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="manifest" href="/manifest.webmanifest"><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="/assets/js/site-loading.js?v=20261013stagedload4"></script>
+  <title>External Speaker Reviews · MIU Clubs</title>
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" onload="this.onload=null;this.rel='stylesheet'"><noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"></noscript>
+  <link rel="stylesheet" href="/assets/css/base.css?v=20261013caret1"><link rel="stylesheet" href="/assets/css/responsive.css?v=20261013mobilebuttons1"><link rel="stylesheet" href="/assets/css/dark.css?v=20261013darkglobal2"><link rel="stylesheet" href="/assets/css/features.css?v=20261013backbutton1"><link rel="stylesheet" href="/assets/css/pages/speaker-requests.css?v=20261013responsivedark1">
+  <script defer src="/assets/js/pwa-register.js"></script>
+  <link rel="stylesheet" href="/assets/css/modal-controls.css?v=20261013modalclose2">
+</head>
+<body>
+  <div id="site-header"></div>
+  <main class="app-container speaker-page"><section class="committee-card speaker-shell">
+    <header class="committee-top"><div><span class="committee-label">DEAN DASHBOARD</span><h1>External speaker requests</h1><p>Only proposals accepted by their hosting club appear in this final review queue.</p></div><div class="top-actions"><a class="secondary-btn" href="/dashboards/dean-dashboard.html">Back to Dean dashboard</a></div></header>
+    <p id="speakerReviewMessage" class="speaker-message" role="status" aria-live="polite">Checking reviewer access…</p>
+    <div id="speakerReviewTools" class="speaker-review-tools" hidden>
+      <label>Search requests<input id="speakerReviewSearch" type="search" autocomplete="off" placeholder="Name, email, topic, or company"></label>
+      <label>Filter by status<select id="speakerReviewFilter"><option value="all">All statuses</option><option value="pending_club">Pending club</option><option value="pending_dean">Pending Dean</option><option value="approved">Approved</option><option value="rejected">Rejected</option><option value="changes_requested">Changes requested</option></select></label>
+      <button id="speakerReviewExport" class="secondary-btn" type="button" disabled>Export CSV</button>
+    </div>
+    <div id="speakerReviewList" class="speaker-request-list" aria-live="polite"></div>
+  </section></main>
+  <div id="site-footer"></div>
+  <script src="/assets/js/speaker-review.js?v=20261013stagedload3"></script><script src="/assets/js/layout.js?v=20261013stagedload3" defer></script><script src="/assets/js/theme.js?v=20261009c" defer></script>
+</body>
+</html>

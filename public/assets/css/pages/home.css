@@ -4,6 +4,11 @@
       #adminLoginMessage { text-align: center; color: var(--text-muted); margin: 0 0 24px; font-size: .95rem; }
       #adminLoginForm { text-align: left; }
       #adminLoginForm .primary-btn { width: 100%; padding: 13px; font-size: 1rem; border-radius: var(--radius-md); }
+      .admin-google-signin { margin-top: 18px; }
+      .admin-google-divider { display: flex; align-items: center; gap: 12px; margin: 18px 0; color: var(--text-muted); font-size: .82rem; font-weight: 700; }
+      .admin-google-divider::before, .admin-google-divider::after { content: ""; flex: 1; height: 1px; background: var(--border-color, #dbe3ef); }
+      .admin-google-button { display: flex; justify-content: center; min-height: 44px; }
+      .admin-google-signin .admin-feedback { margin: 8px 0 0; font-size: .86rem; }
       #adminLoginForgotWrap { text-align: center; margin-top: 14px; }
       .login-foot { text-align: center; margin-top: 22px; font-size: .9rem; color: var(--text-muted); }
       .login-foot-link { background: none; border: none; padding: 0; color: var(--primary-700); font-weight: 700; cursor: pointer; font-size: .9rem; }
@@ -126,10 +131,14 @@
 
 #homeView .event-slide-copy {
   grid-template-columns: fit-content(240px) max-content minmax(0, 1fr);
-  grid-template-areas: "club badge ." "title title title" "meta meta meta" "description description cta";
+  grid-template-areas: "club badge ." "title title title" "meta meta meta" "attendance attendance attendance" "description description cta";
   align-items: center;
   column-gap: 10px;
   row-gap: 2px;
+}
+
+#homeView .event-slide-copy:not(.has-attendance) {
+  grid-template-areas: "club badge ." "title title title" "meta meta meta" "description description cta";
 }
 
 #homeView .event-slide-club {
@@ -156,10 +165,20 @@
 }
 
 #homeView .event-slide-meta,
-#homeView .event-slide-copy > p:not(.event-slide-meta) {
+#homeView .event-slide-copy > p:not(.event-slide-meta):not(.event-attendance-status) {
   min-width: 0;
   font-size: .8rem;
   line-height: 1.4;
+}
+
+#homeView .event-slide-copy .event-attendance-status {
+  grid-area: attendance !important;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: .74rem;
+  line-height: 1.3;
+  text-overflow: ellipsis;
 }
 
 #homeView .event-slide-copy .event-slide-cta {
@@ -177,22 +196,23 @@
   #homeView .events-slideshow .slide-arrow { display: none !important; }
   #homeView > .events-slideshow {
     box-sizing: border-box;
-    height: 184px;
-    min-height: 184px;
-    max-height: 184px;
+    height: auto;
+    min-height: 0;
+    max-height: none;
     overflow: hidden;
     padding: 11px 14px 8px;
   }
-  #homeView .events-slideshow-track { height: 119px; }
+  #homeView .events-slideshow-track { height: auto; }
   #homeView .events-slideshow-head h2 { font-size: 1rem; }
   #homeView .event-slide {
     box-sizing: border-box;
     width: 100%;
-    height: 119px;
-    min-height: 119px;
-    max-height: 119px;
+    height: auto;
+    min-height: 0;
+    max-height: none;
     min-width: 0;
-    overflow: hidden;
+    overflow: visible;
+    align-items: flex-start;
     gap: 9px;
     padding-inline: 8px;
   }
@@ -200,12 +220,16 @@
   #homeView .event-slide-copy {
     flex: 1 1 0;
     min-width: 0;
-    height: 100%;
+    height: auto;
     justify-items: start;
+    align-content: start;
+    align-items: start;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "club" "badge" "title" "meta" "description" "cta";
-    grid-template-rows: 12px 20px 19px 16px minmax(0, 1fr) 14px;
+    grid-template-areas: "club" "badge" "title" "meta" "attendance" "description" "cta";
     row-gap: 3px;
+  }
+  #homeView .event-slide-copy:not(.has-attendance) {
+    grid-template-areas: "club" "badge" "title" "meta" "description" "cta";
   }
   #homeView .event-slide-copy > :not(.event-slide-cta) {
     justify-self: start;
@@ -228,19 +252,27 @@
   }
   #homeView .event-slide-copy .content-type-badge { justify-self: start; max-width: 100%; }
   #homeView .event-slide-meta,
-  #homeView .event-slide-copy > p:not(.event-slide-meta) { font-size: .76rem; }
+  #homeView .event-slide-copy > p:not(.event-slide-meta):not(.event-attendance-status) { font-size: .76rem; }
   #homeView .event-slide-meta,
-  #homeView .event-slide-copy > p:not(.event-slide-meta) {
+  #homeView .event-slide-copy > p:not(.event-slide-meta):not(.event-attendance-status) {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  #homeView .event-slide-copy > p:not(.event-slide-meta) {
+  #homeView .event-slide-copy > p:not(.event-slide-meta):not(.event-attendance-status) {
     display: -webkit-box;
     white-space: normal;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
   }
+  #homeView .event-slide-copy .event-attendance-status {
+    align-self: center;
+    font-size: .72rem;
+    white-space: nowrap;
+  }
   #homeView .event-slide-copy .event-slide-cta { justify-self: end; align-self: end; }
 }
+.university-published-items { display: grid; gap: 10px; margin-top: 20px; }
+.university-published-item { display: grid; gap: 4px; padding: 12px 14px; border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-soft); }
+.university-published-item > span, .university-published-item > small { color: var(--text-muted); font-size: .88rem; }

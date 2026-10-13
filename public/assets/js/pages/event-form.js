@@ -1,6 +1,15 @@
 
       let currentImage = '';
       const imageInput = document.getElementById('imageInput');
+      const registrationInput = document.getElementById('registrationEnabledInput');
+      const attendanceField = document.getElementById('attendanceEnabledField');
+      const attendanceInput = document.getElementById('attendanceEnabledInput');
+      const updateAttendanceField = () => {
+        attendanceField.hidden = registrationInput.value !== 'true';
+        if (attendanceField.hidden) attendanceInput.value = 'false';
+      };
+      registrationInput.addEventListener('change', updateAttendanceField);
+      document.getElementById('contentForm').addEventListener('reset', () => setTimeout(updateAttendanceField, 0));
       imageInput.addEventListener('change', async (event) => {
         const file = event.target.files[0];
         if (file) currentImage = await ContentStudio.fileToDataUrl(file);
@@ -16,6 +25,7 @@
           time: document.getElementById('timeInput').value,
           location: document.getElementById('locationInput').value,
           registrationEnabled: document.getElementById('registrationEnabledInput').value === 'true',
+          attendanceEnabled: registrationInput.value === 'true' && attendanceInput.value === 'true',
           budget: document.getElementById('budgetInput').value,
           description: document.getElementById('descInput').value,
           image: currentImage
@@ -26,6 +36,8 @@
           document.getElementById('timeInput').value = item.time || '';
           document.getElementById('locationInput').value = item.location || '';
           document.getElementById('registrationEnabledInput').value = item.registrationEnabled === false ? 'false' : 'true';
+          attendanceInput.value = item.attendanceEnabled === true ? 'true' : 'false';
+          updateAttendanceField();
           document.getElementById('budgetInput').value = item.budget || '';
           document.getElementById('descInput').value = item.description || '';
           currentImage = item.image || '';
@@ -35,3 +47,4 @@
           imageInput.value = '';
         }
       });
+      updateAttendanceField();

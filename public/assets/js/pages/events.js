@@ -99,7 +99,7 @@
         <span class="event-timeline-marker" aria-hidden="true"></span>
         <span class="event-timeline-content">
           <span class="event-timeline-header">
-            <img src="${escapeHtml(event.clubImage)}" alt="" class="feed-timeline-avatar${event.university ? ' university-brand-avatar' : ''}" />
+            <img src="${escapeHtml(event.clubImage)}" alt="" class="feed-timeline-avatar${event.university ? ' university-brand-avatar' : ''}" loading="lazy" decoding="async" />
             <span class="event-timeline-meta">
               <span class="event-tile-club">${escapeHtml(event.clubName || '')}</span>
               <span class="feed-timeline-date">${event.date ? `${formatDateForTimeline(event.date)}${label ? ` · ${label}` : ''}` : 'Date to be announced'}</span>
@@ -107,9 +107,10 @@
           </span>
           <span class="event-timeline-body">
             <strong class="feed-timeline-title">${escapeHtml(event.title || 'Event')}</strong>
+            ${event.attendanceEnabled === true ? '<span class="event-attendance-status">Attendance taken</span>' : ''}
             ${event.location ? `<span class="event-timeline-location">${escapeHtml(event.location)}</span>` : ''}
             ${event.description ? `<span class="feed-timeline-text">${escapeHtml(event.description)}</span>` : ''}
-            ${event.image && event.image !== event.clubImage ? `<img src="${escapeHtml(event.image)}" alt="${escapeHtml(event.title || 'Event image')}" class="feed-timeline-image" loading="lazy" />` : ''}
+            ${event.image && event.image !== event.clubImage ? `<img src="${escapeHtml(event.image)}" alt="${escapeHtml(event.title || 'Event image')}" class="feed-timeline-image" loading="lazy" decoding="async" />` : ''}
             <span class="event-timeline-link">View event details →</span>
           </span>
         </span>
@@ -134,7 +135,7 @@
         <div class="feed-timeline-marker"></div>
         <div class="feed-timeline-content">
           <div class="feed-timeline-header">
-            <img src="${escapeHtml(feed.clubImage)}" alt="${escapeHtml(feed.clubName)}" class="feed-timeline-avatar${feed.university ? ' university-brand-avatar' : ''}" />
+            <img src="${escapeHtml(feed.clubImage)}" alt="${escapeHtml(feed.clubName)}" class="feed-timeline-avatar${feed.university ? ' university-brand-avatar' : ''}" loading="lazy" decoding="async" />
             <div class="feed-timeline-meta">
               <span class="feed-timeline-club">${escapeHtml(feed.clubName || '')}</span>
               <span class="feed-timeline-date">${formatDateForTimeline(feed.date)}</span>
@@ -145,7 +146,7 @@
             <span class="content-type-badge feed">Latest Feed</span>
             <p class="feed-timeline-text">${escapeHtml(feed.text || feed.description || '')}</p>
             ${feed.university ? window.studentFeedbackForm('university', feed.id, feed.interaction, feed.question, feed.options) : ''}
-            ${feed.image && feed.image !== feed.clubImage ? '<img src="' + escapeHtml(feed.image) + '" alt="' + escapeHtml(feed.title || 'Feed image') + '" class="feed-timeline-image" />' : ''}
+            ${feed.image && feed.image !== feed.clubImage ? '<img src="' + escapeHtml(feed.image) + '" alt="' + escapeHtml(feed.title || 'Feed image') + '" class="feed-timeline-image" loading="lazy" decoding="async" />' : ''}
           </div>
         </div>
       </article>
@@ -169,15 +170,17 @@
     renderFeedTimeline();
   }
 
-  Promise.all([
-    fetch('/api/clubs', { cache: 'no-store' }).then((response) => response.json()),
-    fetch('/api/university-content', { cache: 'no-store' }).then((response) => response.ok ? response.json() : []).catch(() => [])
-  ])
-    .then(([data, universityData]) => {
+  fetch('/api/clubs?media=links', { cache: 'no-store' })
+    .then((response) => {
+      if (!response.ok) throw new Error('Could not load events.');
+      return response.json();
+    })
+    .then((data) => {
       clubs = Array.isArray(data) ? data : [];
-      universityContent = Array.isArray(universityData) ? universityData : [];
       renderList();
       renderFeedTimeline();
+      if (window.siteStartup?.afterStartup) window.siteStartup.afterStartup(refreshUniversityContent);
+      else void refreshUniversityContent();
     })
     .catch(() => {
       if (listEl) listEl.innerHTML = '<p class="events-empty">Could not load events right now.</p>';

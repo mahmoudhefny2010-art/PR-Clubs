@@ -80,6 +80,7 @@
       else panel.setAttribute('aria-hidden', 'true');
     });
     target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    window.dispatchEvent(new CustomEvent('dashboard:panel-change', { detail: { panelId } }));
   }
 
   const content = sidebar.closest('.committee-dashboard-layout')?.querySelector('#committee-overview, .sso-content');

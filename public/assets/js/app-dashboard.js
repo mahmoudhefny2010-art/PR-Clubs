@@ -199,11 +199,13 @@ function collectInterviewReviewAnswers() {
 }
 
 async function loadCommitteeHeads() {
-  const response = await fetch('/api/club/heads');
+  const [response] = await Promise.all([
+    fetch('/api/club/heads'),
+    loadCommitteeAvailability()
+  ]);
   if (!response.ok) throw new Error('Could not load committee heads.');
   const heads = await response.json();
   window.dashboardUnread?.update('committeeHeads', heads.map((head) => `${head.committee}:${head.email}`));
-  await loadCommitteeAvailability();
   document.getElementById('committeeHeadCount').textContent = `${heads.length} ${heads.length === 1 ? 'head' : 'heads'}`;
   committeeHeadList.replaceChildren();
   if (!heads.length) {
@@ -303,11 +305,16 @@ document.getElementById('saveCommitteeAvailabilityBtn')?.addEventListener('click
   }
 });
 
-async function loadClubMembers() {
+let clubMembersLoadedAt = 0;
+let clubMembersRequestPending = false;
+async function loadClubMembers(force = false) {
+  if (clubMembersRequestPending) return;
+  if (!force && clubMembersLoadedAt && Date.now() - clubMembersLoadedAt < 25_000) return;
+  clubMembersRequestPending = true;
   const list = document.getElementById('clubMemberList');
   const count = document.getElementById('memberRosterCount');
   const committeeSelect = document.getElementById('clubMemberCommittee');
-  if (!list || !count || !committeeSelect) return;
+  if (!list || !count || !committeeSelect) { clubMembersRequestPending = false; return; }
   list.replaceChildren();
   count.textContent = 'Loading members…';
   try {
@@ -364,17 +371,20 @@ async function loadClubMembers() {
       card.append(details, actions);
       list.append(card);
     });
+    clubMembersLoadedAt = Date.now();
     const note = document.getElementById('clubMemberCountNote');
       if (note) note.textContent = state.clubAccount?.role === 'head'
         ? `${members.length} members in ${data.committee || state.clubAccount.committee}`
         : `${Number(data.totalCount) || 0} club members · ${members.length} named profiles`;
   } catch (error) {
+    clubMembersLoadedAt = 0;
     count.textContent = 'Members could not be loaded';
     const message = document.createElement('p');
     message.className = 'member-roster-empty';
     message.textContent = error.message;
     list.append(message);
   }
+  clubMembersRequestPending = false;
 }
 
 function showMemberRoleEditor(card, member) {
@@ -406,7 +416,7 @@ function showMemberRoleEditor(card, member) {
   cancel.type = 'button';
   cancel.className = 'secondary-btn';
   cancel.textContent = 'Cancel';
-  cancel.addEventListener('click', () => loadClubMembers());
+  cancel.addEventListener('click', () => loadClubMembers(true));
   actions.append(save, cancel);
   form.append(positionLabel, levelLabel, actions);
   form.addEventListener('submit', async (event) => {
@@ -420,7 +430,7 @@ function showMemberRoleEditor(card, member) {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message || 'Could not update this member.');
-      await loadClubMembers();
+      await loadClubMembers(true);
     } catch (error) {
       let feedback = card.querySelector('.member-role-edit-error');
       if (!feedback) {
@@ -494,7 +504,7 @@ document.getElementById('clubMemberForm')?.addEventListener('submit', async (eve
     form.classList.add('hidden');
     document.getElementById('clubMemberPosition').placeholder = 'Enter their committee position';
     feedback.textContent = `${result.member.name} was added to ${result.member.committee}.`;
-    await loadClubMembers();
+    await loadClubMembers(true);
   } catch (error) {
     feedback.textContent = error.message;
     feedback.classList.add('is-error');
@@ -624,7 +634,7 @@ document.getElementById('saveReviewBtn').addEventListener('click', async () => {
 });
 
 document.getElementById('myFormsButton')?.addEventListener('click', () => {});
-document.getElementById('myFormsBackHomeBtn').addEventListener('click', () => showView('home'));
+document.getElementById('myFormsBackHomeBtn').addEventListener('click', returnToPreviousAppView);
 function setStudentDashboardSection(sectionName, { updateUrl = true } = {}) {
   const section = ['overview', 'applications', 'attendance'].includes(sectionName) ? sectionName : 'overview';
   document.querySelectorAll('[data-student-panel]').forEach((panel) => {
@@ -636,6 +646,7 @@ function setStudentDashboardSection(sectionName, { updateUrl = true } = {}) {
     if (active) button.setAttribute('aria-current', 'page');
     else button.removeAttribute('aria-current');
   });
+  if (section === 'attendance') void window.loadMemberAttendanceAssignments?.();
   if (updateUrl) {
     const url = new URL(window.location.href);
     url.searchParams.set('myForms', '1');
@@ -707,7 +718,7 @@ async function saveInterviewReview(status) {
   await loadApplications();
 }
 
-document.getElementById('logoutBtn').addEventListener('click', async () => {
+document.getElementById('logoutBtn')?.addEventListener('click', async () => {
   await fetch('/api/club-auth/logout', { method: 'POST' });
   await window.refreshHeaderAccountState?.();
   state.clubAccount = null;
@@ -715,9 +726,7 @@ document.getElementById('logoutBtn').addEventListener('click', async () => {
   showView('clubLogin');
 });
 
-document.getElementById('backHomeBtn').addEventListener('click', () => {
-  showView('home');
-});
+document.getElementById('backHomeBtn').addEventListener('click', returnToPreviousAppView);
 
 document.getElementById('presidentClubStatusForm').addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -780,7 +789,15 @@ document.getElementById('adminLoginForm').addEventListener('submit', async (even
     resetClubEditor();
     setAdminFeedback('');
     showView('admin');
-    await Promise.all([loadClubs(), loadHomepageSettings(), loadArchivedClubs()]);
+    await Promise.all([loadClubs(true), loadHomepageSettings(true)]);
+    if (window.siteStartup?.afterStartup) {
+      window.siteStartup.afterStartup(() => loadArchivedClubs().catch((error) => {
+        const list = document.getElementById('archivedClubList');
+        if (list) list.textContent = error.message || 'Archived clubs could not be loaded. Use refresh to try again.';
+      }));
+    } else {
+      void loadArchivedClubs().catch(() => {});
+    }
   } catch (error) {
     setAdminLoginFeedback(error.message, true);
   }
@@ -848,19 +865,15 @@ document.getElementById('createCommitteeHeadForm').addEventListener('submit', as
   }
 });
 
-document.getElementById('adminBackBtn').addEventListener('click', () => {
-  showView('home');
-});
+document.getElementById('adminBackBtn').addEventListener('click', returnToPreviousAppView);
 
-document.getElementById('adminLogoutBtn').addEventListener('click', async () => {
+document.getElementById('adminLogoutBtn')?.addEventListener('click', async () => {
   await fetch('/api/admin/logout', { method: 'POST' });
   await window.refreshHeaderAccountState?.();
   showView('home');
 });
 
-document.getElementById('adminLoginBackBtn').addEventListener('click', () => {
-  showView('home');
-});
+document.getElementById('adminLoginBackBtn').addEventListener('click', returnToPreviousAppView);
 
 document.addEventListener('keydown', (event) => {
   if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'a') {
@@ -887,6 +900,7 @@ document.getElementById('homepageSettingsForm').addEventListener('submit', async
 
     homePageTitle.textContent = result.title;
     homePageSubtitle.textContent = result.subtitle;
+    homepageSettingsLoadedAt = Date.now();
     setAdminFeedback('Homepage text saved.');
   } catch (error) {
     setAdminFeedback(error.message, true);
@@ -949,7 +963,7 @@ clubEditorForm.addEventListener('submit', async (event) => {
     if (!response.ok) throw new Error(result?.message || 'Could not save this club card.');
 
     resetClubEditor();
-    await loadClubs();
+    await loadClubs(true);
     setAdminFeedback(clubId ? 'Club card updated.' : 'Club card added.');
   } catch (error) {
     setAdminFeedback(error.message, true);
@@ -1018,7 +1032,18 @@ function readLastAppView() {
   }
 }
 
+const appViewBackStack = [];
+let returningToAppView = false;
+function returnToPreviousAppView() {
+  const previous = appViewBackStack.pop();
+  if (!previous) { window.miuGoBack?.('/'); return; }
+  returningToAppView = true;
+  showView(previous);
+  returningToAppView = false;
+}
 function showView(viewName) {
+  const current = Object.entries(views).find(([, view]) => view.classList.contains('active'))?.[0];
+  if (!returningToAppView && current && current !== viewName && !['authLoading', 'signIn', 'adminLogin', 'clubLogin'].includes(current)) appViewBackStack.push(current);
   Object.entries(views).forEach(([key, view]) => {
     view.classList.toggle('active', key === viewName);
   });
@@ -1087,7 +1112,15 @@ async function init() {
     return;
   }
 
-  await Promise.all([loadClubs(), loadHomepageSettings()]);
+  await loadClubs();
+  if (window.siteStartup?.afterStartup) {
+    window.siteStartup.afterStartup(async () => {
+      try { await loadHomepageSettings(); }
+      catch { /* Keep the default homepage copy if settings are temporarily unavailable. */ }
+    });
+  } else {
+    await loadHomepageSettings().catch(() => {});
+  }
   {
     const query = new URLSearchParams(window.location.search);
     if (query.has('calendarYear') && query.has('calendarMonth')) {
@@ -1130,4 +1163,21 @@ async function init() {
   }
 }
 
-init();
+const pageStartup = init().catch(() => {
+  // A failed initial API must show an error, not an empty directory or an
+  // indefinite loading screen. Reload retries the real data requests.
+  const panel = document.createElement('section');
+  panel.className = 'hero-panel';
+  panel.setAttribute('role', 'alert');
+  const message = document.createElement('p');
+  message.textContent = 'The page data could not be loaded. Please check your connection and try again.';
+  const retry = document.createElement('button');
+  retry.type = 'button';
+  retry.className = 'primary-btn';
+  retry.textContent = 'Try again';
+  retry.addEventListener('click', () => window.location.reload());
+  panel.append(message, retry);
+  document.querySelector('main').replaceChildren(panel);
+  document.documentElement.classList.remove('auth-route-pending');
+});
+window.siteStartup?.track(pageStartup);
