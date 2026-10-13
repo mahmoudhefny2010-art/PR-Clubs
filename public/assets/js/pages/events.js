@@ -4,18 +4,6 @@
   const feedTimelineSection = document.getElementById('feedTimelineSection');
   const feedTimelineEl = document.getElementById('feedTimeline');
 
-  if (listEl) listEl.addEventListener('click', (clickEvent) => {
-    const item = clickEvent.target.closest('.event-timeline-item');
-    if (!item || typeof window.openEventModal !== 'function') return;
-    const params = new URL(item.href, window.location.origin).searchParams;
-    const event = params.has('university')
-      ? allEvents().find((entry) => Number(entry.universityContentId) === Number(params.get('university')))
-      : allEvents().find((entry) => Number(entry.clubId) === Number(params.get('club')) && entry.eventIndex === Number(params.get('event')));
-    if (!event) return;
-    clickEvent.preventDefault();
-    window.openEventModal(event);
-  });
-
   const parseDate = (value) => {
     const d = new Date(value);
     return Number.isNaN(d.getTime()) ? null : d;
