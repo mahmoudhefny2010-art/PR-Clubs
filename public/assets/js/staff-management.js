@@ -12,6 +12,39 @@
   const searchStatus = document.getElementById('staffSearchStatus');
   const roleFilter = document.getElementById('staffRoleFilter');
   let data;
+  const adminLoginForm = document.getElementById('changeAdminLoginForm');
+  const adminLoginStatus = document.getElementById('adminLoginSettingsStatus');
+  async function loadAdminLoginSettings() {
+    try {
+      const response = await fetch('/api/admin/login-settings', { credentials: 'same-origin', cache: 'no-store' });
+      const settings = await response.json();
+      if (!response.ok) throw new Error(settings.message || 'Could not load administrator settings.');
+      adminLoginStatus.textContent = `Current global administrator: ${settings.email}. ` + (settings.editable
+        ? 'You can replace this login below.' : settings.environmentManaged
+          ? 'Change ADMIN_EMAIL and ADMIN_PASSWORD in the server environment settings, then restart or redeploy.'
+          : 'Open this page on localhost to change the administrator login.');
+      adminLoginForm.hidden = !settings.editable;
+      adminLoginForm.elements.email.value = settings.email;
+    } catch (error) { adminLoginStatus.textContent = error.message; }
+  }
+  adminLoginForm?.addEventListener('submit', async event => {
+    event.preventDefault();
+    const payload = Object.fromEntries(new FormData(adminLoginForm));
+    if (payload.password !== payload.confirmPassword) { adminLoginStatus.textContent = 'The passwords do not match.'; return; }
+    const button = adminLoginForm.querySelector('button'); button.disabled = true;
+    adminLoginStatus.textContent = 'Saving administrator login…';
+    try {
+      const response = await fetch('/api/admin/setup', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const result = await response.json();
+      if (!response.ok || result.savedToDatabase !== true) throw new Error(result.message || 'Administrator save was not confirmed.');
+      adminLoginForm.reset();
+      await load();
+      await loadAdminLoginSettings();
+      adminLoginStatus.textContent = `Administrator login changed to ${result.email}. Previous sessions have been signed out. You can now manage the old email as a separate staff account.`;
+    } catch (error) { adminLoginStatus.textContent = error.message; }
+    finally { button.disabled = false; }
+  });
+  if (adminLoginForm) void loadAdminLoginSettings();
   // Show the page's accessible inline validation instead of the browser's
   // floating "Please fill out this field" tooltip.
   form.noValidate = true;
@@ -171,10 +204,20 @@
     }, 300);
   }
 
+  function formatLastUpdated(value) {
+    const date = value ? new Date(value) : null;
+    return date && Number.isFinite(date.getTime())
+      ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date)
+      : 'Not available';
+  }
+
   function render() {
     accounts.replaceChildren(); const term = search.value.trim().toLowerCase();
-    data.accounts.filter(account => [account.email, ...currentAssignments(account).map(assignmentSummary)].join(' ').toLowerCase().includes(term)
-      && (!roleFilter.value || currentAssignments(account).some(assignment => assignment.role === roleFilter.value))).forEach(account => {
+    const matchingAccounts = data.accounts.filter(account => [account.email, ...currentAssignments(account).map(assignmentSummary)].join(' ').toLowerCase().includes(term)
+      && (!roleFilter.value || currentAssignments(account).some(assignment => assignment.role === roleFilter.value)));
+    matchingAccounts.sort((left, right) => (Date.parse(right.updatedAt || '') || 0) - (Date.parse(left.updatedAt || '') || 0)
+      || left.email.localeCompare(right.email));
+    matchingAccounts.forEach(account => {
       const card = document.createElement('article'); card.className = 'supervisor-record';
       const title = document.createElement('h3'); title.textContent = account.email;
       const badges = document.createElement('div'); badges.className = 'staff-role-badges';
@@ -182,6 +225,8 @@
         const badge = document.createElement('span'); badge.className = 'supervisor-status'; badge.textContent = data.roles[item.role] || item.role; badges.append(badge);
       });
       const scope = document.createElement('p'); scope.textContent = currentAssignments(account).map(assignmentSummary).join(' | ');
+      const updated = document.createElement('p'); updated.className = 'staff-account-updated';
+      updated.textContent = `Last updated: ${formatLastUpdated(account.updatedAt)}`;
       const button = document.createElement('button'); button.type = 'button'; button.className = 'secondary-btn'; button.textContent = 'Edit dashboards'; button.onclick = () => edit(account);
       const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'text-button staff-delete-account'; remove.textContent = 'Delete account';
       remove.setAttribute('aria-label', `Delete staff roles for ${account.email}`);
@@ -205,10 +250,10 @@
       const actions = document.createElement('div'); actions.className = 'staff-account-actions'; actions.append(button);
       if (account.isGlobalAdmin) {
         const protectedNote = document.createElement('small');
-        protectedNote.textContent = 'Global administrator access is managed separately.';
+        protectedNote.textContent = 'Administrator access comes from the Software Development role.';
         actions.append(protectedNote);
       } else actions.append(remove);
-      card.append(title, badges, scope, actions); accounts.append(card);
+      card.append(title, badges, scope, updated, actions); accounts.append(card);
     });
     if (!accounts.children.length) {
       const empty = document.createElement('p');
@@ -229,7 +274,9 @@
     roleFilter.replaceChildren(new Option('All dashboard roles', ''));
     Object.entries(data.roles).forEach(([value, label]) => roleFilter.add(new Option(label, value)));
     rowsHost.replaceChildren(); makeAssignmentRow(); refreshRows();
-    form.hidden = false; render();
+    form.hidden = false;
+    document.getElementById('staffSaveMessages')?.append(feedback);
+    render();
   }
 
   addRoleButton.addEventListener('click', () => { makeAssignmentRow(); refreshRows(); rowsHost.lastElementChild.querySelector('select').focus(); });

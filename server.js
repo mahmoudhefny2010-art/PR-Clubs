@@ -43,7 +43,7 @@ const {
   StudentEmailCode,
   AuditLog
 } = require('./models');
-const { MAX_CV_BYTES, CV_UPLOAD_TTL_MS, requesterKey, speakerInviteTokenHash, publicSpeakerDuplicateKey, validateSpeakerPayload, validatePublicSpeakerInvitePayload, canReviewSpeakerRequest, canClubReviewSpeakerRequest, validClubSpeakerDecision, validSpeakerDecision, speakerResubmissionStatus, validateSpeakerCvAsset, decodeSpeakerCvData } = require('./services/speaker-requests');
+const { MAX_CV_BYTES, CV_UPLOAD_TTL_MS, requesterKey, resolveSpeakerHosting, speakerInviteTokenHash, publicSpeakerDuplicateKey, validateSpeakerPayload, validatePublicSpeakerInvitePayload, canReviewSpeakerRequest, canClubReviewSpeakerRequest, validClubSpeakerDecision, validSpeakerDecision, speakerResubmissionStatus, validateSpeakerCvAsset, decodeSpeakerCvData } = require('./services/speaker-requests');
 require('dotenv').config();
 
 const app = express();
@@ -68,6 +68,16 @@ function getCloudinaryCredentials() {
     return null;
   }
 }
+
+function sendRevalidatedPublicJson(req, res, payload) {
+  const body = JSON.stringify(payload);
+  const etag = `"${crypto.createHash('sha256').update(body).digest('base64url')}"`;
+  res.setHeader('Cache-Control', 'private, no-cache, must-revalidate');
+  res.setHeader('ETag', etag);
+  if (req.get('If-None-Match') === etag) return res.status(304).end();
+  res.type('application/json').send(body);
+}
+
 const cloudinaryCredentials = getCloudinaryCredentials();
 const cloudinaryConfigured = Boolean(cloudinaryCredentials);
 const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024;
@@ -106,10 +116,28 @@ app.use(express.urlencoded({ extended: true }));
 // newly deployed site while they remain open.
 app.get('/api/pwa/version', (req, res) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  let localVersion = '';
+  if (!process.env.VERCEL_DEPLOYMENT_ID && !process.env.VERCEL_GIT_COMMIT_SHA && !process.env.VERCEL_URL) {
+    const hash = crypto.createHash('sha256');
+    const roots = ['public', 'services', 'api', 'server.js', 'models.js'];
+    const extensions = new Set(['.css', '.html', '.js', '.json', '.webmanifest']);
+    const visit = (relativePath) => {
+      const absolutePath = path.join(__dirname, relativePath);
+      let info;
+      try { info = fs.statSync(absolutePath); } catch { return; }
+      if (info.isDirectory()) {
+        for (const entry of fs.readdirSync(absolutePath).sort()) visit(path.join(relativePath, entry));
+      } else if (extensions.has(path.extname(relativePath).toLowerCase())) {
+        hash.update(`${relativePath}:${info.size}:${info.mtimeMs};`);
+      }
+    };
+    roots.forEach(visit);
+    localVersion = `local-${hash.digest('hex').slice(0, 20)}`;
+  }
   res.json({ version: process.env.VERCEL_DEPLOYMENT_ID
     || process.env.VERCEL_GIT_COMMIT_SHA
     || process.env.VERCEL_URL
-    || 'local' });
+    || localVersion });
 });
 
 function signCloudinaryUpload(folder) {
@@ -182,7 +210,8 @@ app.post('/api/uploads/cloudinary-signature', async (req, res) => {
       }
     }
     if (purpose === 'university') {
-      if (!await isAdminSessionValid(req)) return res.status(401).json({ message: 'Admin login required.' });
+      const account = await getClubAccountFromRequest(req);
+      if (account?.role !== 'miu_events' && !await isAdminSessionValid(req)) return res.status(401).json({ message: 'MIU Events dashboard access is required.' });
     } else if (purpose === 'club') {
       const account = await getClubAccountFromRequest(req);
       if (!account || !['president', 'pr', 'english', 'security', 'sso', 'dean'].includes(account.role)) {
@@ -475,7 +504,7 @@ let clubs = readJsonFile(clubsFile, defaultClubs).map((club, index) => ({
 }));
 let clubAccounts = readJsonFile(clubAccountsFile, []).map((account) => ({
   ...account,
-  role: ['head', 'pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'software_development'].includes(account.role) ? account.role : 'president',
+  role: ['head', 'pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'miu_events', 'software_development'].includes(account.role) ? account.role : 'president',
   committee: typeof account.committee === 'string' ? account.committee : ''
 }));
 
@@ -608,6 +637,9 @@ async function removeApplicantPhoto(publicId) {
   if (!cloudinaryConfigured || typeof publicId !== 'string'
     || !publicId.split('/').pop().startsWith(`${cloudinaryFolders.applicant}-`)) return;
   try {
+    // A profile photo can be shared by several applications.
+    if (await require('./services/account-photo').AccountPhoto.exists({ publicId })
+      || await Application.exists({ photoPublicId: publicId })) return;
     await cloudinary.uploader.destroy(publicId, { resource_type: 'image', type: 'upload' });
   } catch (error) {
     console.error('Cloudinary applicant photo cleanup failed:', error.name);
@@ -730,6 +762,18 @@ async function requireAdmin(req, res, next) {
     return res.status(503).json({ message: 'Admin access is temporarily unavailable.' });
   }
   next();
+}
+
+async function requireMiuEventsDashboard(req, res, next) {
+  try {
+    const account = await getClubAccountFromRequest(req);
+    if (account?.role === 'miu_events') { req.clubAccount = account; return next(); }
+    if (account?.role === 'software_development' || await isAdminSessionValid(req)) { req.clubAccount = account || null; return next(); }
+    return res.status(account ? 403 : 401).json({ message: account ? 'MIU Events dashboard access is not assigned to this account.' : 'Sign in with an assigned MIU Events account.' });
+  } catch (error) {
+    console.error('MIU Events session validation failed:', error.name);
+    return res.status(503).json({ message: 'MIU Events dashboard access is temporarily unavailable.' });
+  }
 }
 
 function clubPasswordMatches(password, account) {
@@ -872,7 +916,7 @@ async function getClubAccountFromRequest(req) {
     const email = Buffer.from(cookieParts[1], 'base64url').toString('utf8').toLowerCase();
     account = await ClubAccount.findOne(cookieParts.length === 6 ? { email } : { clubId: Number(clubIdText), email }).lean();
   }
-  if (!account || ['supervisor', 'software_development'].includes(account.role) && ![5, 6].includes(cookieParts.length)) return null;
+  if (!account || ['supervisor', 'miu_events', 'software_development'].includes(account.role) && ![5, 6].includes(cookieParts.length)) return null;
   if (mongoReady) {
     const storedAccount = await ClubAccount.findOne(cookieParts.length === 6
       ? { email: account.email } : { clubId: Number(clubIdText), email: account.email }).lean();
@@ -923,7 +967,7 @@ async function requireClubAuth(req, res, next) {
   try {
     const account = await getClubAccountFromRequest(req);
     if (!account) return res.status(401).json({ message: 'Club login required.' });
-    if (['supervisor', 'software_development'].includes(account.role)) return res.status(403).json({ message: 'Use your assigned dashboard for access.' });
+    if (['supervisor', 'miu_events', 'software_development'].includes(account.role)) return res.status(403).json({ message: 'Use your assigned dashboard for access.' });
     req.clubAccount = account;
     next();
   } catch (error) {
@@ -1002,7 +1046,7 @@ async function identifySiteVisitor(req) {
     const clubAccount = await getClubAccountFromRequest(req);
     if (clubAccount) {
       const club = clubs.find((item) => Number(item.id) === Number(clubAccount.clubId));
-      const roleLabels = { president: 'Club president', head: 'Committee head', pr: 'PR', english: 'English', security: 'Security Office', sso: 'SSO', dean: 'Dean' };
+    const roleLabels = { president: 'Club president', head: 'Committee head', pr: 'PR', english: 'English', security: 'Security Office', sso: 'SSO', dean: 'Dean', miu_events: 'MIU Events' };
       const role = roleLabels[clubAccount.role] || 'Club account';
       return {
         accountType: 'club', accountEmail: clubAccount.email,
@@ -1125,7 +1169,7 @@ function publicSpeakerRequest(record) {
     publicId: record.cvPublicId, name: record.cvName || 'speaker-material.pdf', format: record.cvFormat || 'pdf'
   }] : []);
   return {
-    id: String(record._id), clubId: record.clubId, clubName: record.clubName,
+    id: String(record._id), clubId: record.clubId, clubName: record.clubName, hostingType: record.hostingType || 'club',
     speakerName: record.speakerName, speakerEmail: record.speakerEmail || '', professionalDetails: record.professionalDetails,
     jobTitleCompany: record.jobTitleCompany || '', linkedinProfile: record.linkedinProfile || '',
     speakerSelectionReason: record.speakerSelectionReason || '', expectedStudentBenefit: record.expectedStudentBenefit || '',
@@ -1508,32 +1552,34 @@ app.post('/api/speaker-requests', async (req, res) => {
     if (!identity) return res.status(401).json({ message: 'Sign in as a student or club representative to submit this request.' });
     const validated = validateSpeakerPayload(req.body);
     if (validated.error) return res.status(400).json({ message: validated.error });
-    const clubId = identity.type === 'club' ? identity.clubId : Number(req.body?.clubId);
-    if (!Number.isSafeInteger(clubId) || clubId < 1 || (identity.type === 'club' && Number(req.body?.clubId) !== identity.clubId)) {
-      return res.status(400).json({ message: 'Choose a valid hosting club.' });
+    const hosting = resolveSpeakerHosting(identity, req.body);
+    if (!hosting) {
+      return res.status(400).json({ message: 'Choose a valid hosting club or MIU official university event.' });
     }
-    const club = await Club.findOne({ id: clubId, archivedAt: null }).select('id name').lean();
+    const { hostingType, clubId } = hosting;
+    const club = hostingType === 'miu' ? { id: 0, name: 'MIU (Official University)' }
+      : await Club.findOne({ id: clubId, archivedAt: null }).select('id name').lean();
     if (!club) return res.status(404).json({ message: 'The selected club was not found.' });
     const activeRequesterKey = requesterKey(identity, clubId);
     if (await SpeakerRequest.exists({ activeRequesterKey })) {
-      return res.status(409).json({ message: 'You already have an active speaker request for this club. Update that request instead.' });
+      return res.status(409).json({ message: 'You already have an active speaker request for this hosting organization. Update that request instead.' });
     }
     const upload = await verifySpeakerRequestAttachments(req.body, identity);
     if (upload.error) return res.status(400).json({ message: upload.error });
     const attachments = upload.attachments || [];
     const primaryAttachment = attachments[0];
     const record = await SpeakerRequest.create({
-      ...validated.value, clubId, clubName: club.name, requesterType: identity.type,
+      ...validated.value, clubId, clubName: club.name, hostingType, requesterType: identity.type,
       requesterId: identity.id, requesterEmail: identity.email, requesterRole: identity.role,
       requesterName: identity.name, speakerAttachments: attachments,
       cvPublicId: primaryAttachment?.publicId || '', cvFormat: primaryAttachment?.format || 'pdf', cvName: primaryAttachment?.name || '',
-      status: identity.type === 'club' ? 'pending_supervisor' : 'pending_club', activeRequesterKey,
+      status: identity.type === 'club' ? 'pending_supervisor' : hostingType === 'miu' ? 'pending_dean' : 'pending_club', activeRequesterKey,
       decisionHistory: [{ action: 'submitted', role: identity.role, email: identity.email }]
     });
     await notifySpeakerWorkflow(record.toObject());
     res.status(201).json(publicSpeakerRequest(record.toObject()));
   } catch (error) {
-    if (error?.code === 11000) return res.status(409).json({ message: 'You already have an active speaker request for this club. Update that request instead.' });
+    if (error?.code === 11000) return res.status(409).json({ message: 'You already have an active speaker request for this hosting organization. Update that request instead.' });
     console.error('Speaker request submission failed:', error.name);
     res.status(503).json({ message: 'The speaker request was not saved. Please try again.' });
   }
@@ -1579,7 +1625,7 @@ app.patch('/api/speaker-requests/:id/resubmit', async (req, res) => {
     const validated = validateSpeakerPayload(req.body);
     if (validated.error) return res.status(400).json({ message: validated.error });
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ message: 'This request is not available for changes.' });
-    const existing = await SpeakerRequest.findOne({ _id: req.params.id, status: 'changes_requested' }).select('status speakerEmail clubId requesterType requesterId requesterEmail assignedHeadEmail clubReviewedAt speakerAttachments cvPublicId cvFormat cvName').lean();
+    const existing = await SpeakerRequest.findOne({ _id: req.params.id, status: 'changes_requested' }).select('status speakerEmail clubId hostingType requesterType requesterId requesterEmail assignedHeadEmail clubReviewedAt speakerAttachments cvPublicId cvFormat cvName').lean();
     if (!existing) return res.status(404).json({ message: 'This request is not available for changes.' });
     const isStudentOwner = identity.type === 'student' && existing.requesterType === 'student' && existing.requesterId === identity.id;
     const isClubOwner = identity.type === 'club' && Number(existing.clubId) === identity.clubId
@@ -1893,6 +1939,7 @@ function studentApplicationOwnerFilter(account) {
 
 async function initializeMongoData() {
   await Promise.all([
+    require('./services/event-reports').EventReport.init(),
     Club.init(), Application.init(), SiteSetting.init(), UniversityContent.init(), SiteVisitor.init(), SiteNetwork.init(), SiteVisitorPresence.init(), EventRegistration.init(), AttendanceSession.init(), AttendanceAssignment.init(), AttendanceRecord.init(), LoginAttempt.init(),
     PasswordResetToken.init(), PasswordRecoveryRateLimit.init(), NotificationDispatch.init(), AdminAuthState.init()
   ]);
@@ -1917,7 +1964,7 @@ async function initializeMongoData() {
     await ClubAccount.bulkWrite(clubAccounts.map(({ clubId, email, salt, passwordHash, role, committee, assignedClubIds }) => ({
       updateOne: {
         filter: { email },
-        update: { $setOnInsert: { clubId, email, salt, passwordHash, role: ['head', 'pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'software_development'].includes(role) ? role : 'president', committee: committee || '', assignedClubIds: assignedClubIds || [] } },
+        update: { $setOnInsert: { clubId, email, salt, passwordHash, role: ['head', 'pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'miu_events', 'software_development'].includes(role) ? role : 'president', committee: committee || '', assignedClubIds: assignedClubIds || [] } },
         upsert: true
       }
     })));
@@ -1965,7 +2012,7 @@ async function initializeMongoData() {
   applications = applicationRecords;
   clubAccounts = accountRecords.map((account) => ({
     ...toApiRecord(account),
-    role: ['head', 'pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'software_development'].includes(account.role) ? account.role : 'president',
+    role: ['head', 'pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'miu_events', 'software_development'].includes(account.role) ? account.role : 'president',
     committee: account.committee || ''
   }));
 }
@@ -2043,8 +2090,7 @@ app.get('/api/clubs', async (req, res) => {
       ratingAverage: ratingByClub.get(String(club._id))?.average || 0,
       ratingCount: ratingByClub.get(String(club._id))?.count || 0
     }));
-    res.setHeader('Cache-Control', 'no-store');
-    res.json(records);
+    sendRevalidatedPublicJson(req, res, records);
   } catch (error) {
     console.error('Database operation failed:', error.name);
     res.status(503).json({ message: 'The data store is temporarily unavailable.' });
@@ -2054,17 +2100,17 @@ app.get('/api/clubs', async (req, res) => {
 app.get('/api/university-content', async (req, res) => {
   try {
     if (!mongoReady) return res.status(503).json({ message: 'University updates are temporarily unavailable.' });
-    res.setHeader('Cache-Control', 'no-store');
     const records = await UniversityContent.find()
-      .select('id type title description interaction question options date time location image registrationEnabled attendanceEnabled createdAt')
+      .select('id type title description interaction question options date time location image registrationEnabled attendanceEnabled attendanceAudience createdAt')
       .read('primary').readConcern('majority').sort({ createdAt: -1, id: -1 }).lean();
-    res.json(records.map((record) => ({
+    sendRevalidatedPublicJson(req, res, records.map((record) => ({
       id: record.id, type: record.type, title: record.title, description: record.description,
       interaction: record.interaction || 'none', question: record.question || '', options: record.options || [],
       date: record.date, time: record.time, location: record.location, image: record.image,
       registrationEnabled: record.type === 'event' && record.registrationEnabled === true,
       attendanceEnabled: record.type === 'event' && record.registrationEnabled === true
         ? (typeof record.attendanceEnabled === 'boolean' ? record.attendanceEnabled : null) : false,
+      attendanceAudience: record.type === 'event' ? (record.attendanceAudience === 'members' ? 'members' : 'all_students') : undefined,
       createdAt: record.createdAt
     })));
   } catch (error) {
@@ -2101,16 +2147,61 @@ app.get('/api/admin/session', async (req, res) => {
   }
 });
 
+require('./services/account-photo').registerAccountPhotoRoutes(app, {
+  notifyLater: async (req, email) => {
+    if (!process.env.ONESIGNAL_APP_ID || !process.env.ONESIGNAL_REST_API_KEY || !process.env.ONESIGNAL_SITE_URL) return;
+    const student = await getStudentAccountFromRequest(req);
+    const staff = student ? null : await getClubAccountFromRequest(req);
+    const externalId = student ? String(student._id) : staff
+      ? clubExternalId(staff)
+      : `admin-account:${crypto.createHash('sha256').update(email).digest('hex')}`;
+    const eventKey = `account-photo-reminder:${crypto.createHash('sha256').update(email).digest('hex')}`;
+    const url = new URL('/?myForms=1&addPhoto=1', process.env.ONESIGNAL_SITE_URL).toString();
+    if (!await claimOneSignalDispatch(eventKey, key => NotificationDispatch.create({ eventKey: key, status: 'sending' }))) return;
+    try {
+      const result = await sendOneSignalPush({ appId: process.env.ONESIGNAL_APP_ID, apiKey: process.env.ONESIGNAL_REST_API_KEY,
+        externalIds: [externalId], title: 'Add your profile photo',
+        message: 'You can add your photo anytime: open the account menu and choose Add / change photo.', url });
+      await NotificationDispatch.updateOne({ eventKey }, { $set: { status: result.messageId ? 'sent' : 'no_recipient', providerMessageId: result.messageId } });
+    } catch (error) {
+      await NotificationDispatch.updateOne({ eventKey }, { $set: { status: 'failed', errorCode: 'PUSH_FAILED' } });
+      console.error('Account photo reminder failed:', error.name);
+    }
+  },
+  databaseReady: () => mongoReady,
+  sameOrigin: isSameOriginRequest,
+  validatePhoto: (url, publicId) => readCloudinaryAsset(url, publicId, cloudinaryFolders.applicant),
+  getEmail: async (req, res) => {
+    const student = await getStudentAccountFromRequest(req, res);
+    if (student) return student.email;
+    const staff = await getClubAccountFromRequest(req);
+    if (staff) return staff.email;
+    return await isAdminSessionValid(req) ? getConfiguredAdminEmail() : '';
+  }
+});
+
 app.get('/api/site/account-session', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   try {
-    if (await isAdminSessionValid(req)) {
-      const staff = await getClubAccountFromRequest(req);
-      return res.json({ authenticated: true, type: 'admin', role: staff?.role === 'software_development' ? staff.role : 'admin',
+    // A browser may have both a student login and staff logins. Keep the
+    // student identity as the primary account in the profile menu.
+    const studentAccount = await getStudentAccountFromRequest(req, res);
+    if (studentAccount) {
+      const signedStaff = await getClubAccountFromRequest(req);
+      const staffDashboards = signedStaff ? getStaffDashboardOptions(signedStaff) : [];
+      return res.json({ authenticated: true, type: 'student', role: 'student', name: studentAccount.name || '', email: studentAccount.email || '', dashboards: staffDashboards });
+    }
+    const signedStaff = await getClubAccountFromRequest(req);
+    if (!signedStaff && await isAdminSessionValid(req)) {
+      const configuredEmail = getConfiguredAdminEmail();
+      const staff = mongoReady && configuredEmail
+        ? await ClubAccount.findOne({ email: configuredEmail }).read('primary').readConcern('majority').lean()
+        : null;
+      return res.json({ authenticated: true, type: staff?.role === 'software_development' ? 'club' : 'admin', role: staff?.role === 'software_development' ? staff.role : 'admin',
         name: staff?.role === 'software_development' ? 'Software Development team' : 'Administrator', email: staff?.role === 'software_development' ? staff.email : getConfiguredAdminEmail() || '',
         dashboards: staff ? getStaffDashboardOptions(staff) : [] });
     }
-    const clubAccount = await getClubAccountFromRequest(req);
+    const clubAccount = signedStaff;
     if (clubAccount) {
       const club = clubs.find((item) => Number(item.id) === Number(clubAccount.clubId));
       return res.json({
@@ -2124,8 +2215,6 @@ app.get('/api/site/account-session', async (req, res) => {
         dashboards: getStaffDashboardOptions(clubAccount)
       });
     }
-    const studentAccount = await getStudentAccountFromRequest(req, res);
-    if (studentAccount) return res.json({ authenticated: true, type: 'student', name: studentAccount.name || '', email: studentAccount.email || '' });
     return res.json({ authenticated: false });
   } catch (error) {
     console.error('Site account session check failed:', error.name);
@@ -2254,7 +2343,9 @@ async function notifyAttendanceWorkflow(key, status, action, revision = new Date
 async function dispatchSpeakerRequestStatusPush(request) {
   const statusMessages = {
     pending_supervisor: 'Your speaker request is waiting for the hosting club supervisor.',
-    pending_dean: 'The club supervisor approved your speaker request and sent it to the Dean for review.',
+    pending_dean: request => request.hostingType === 'miu'
+      ? 'Your MIU official university speaker request is waiting for Dean review.'
+      : 'The club supervisor approved your speaker request and sent it to the Dean for review.',
     approved: 'Your speaker request was approved. Sign in to view the review details.',
     rejected: 'Your speaker request was declined. Sign in to view the review details.',
     changes_requested: 'Changes were requested to your speaker request. Sign in to review the feedback.'
@@ -2289,7 +2380,7 @@ async function dispatchSpeakerRequestStatusPush(request) {
       apiKey,
       externalId: String(student._id),
       title: 'MIU Clubs · Speaker request',
-      message: statusMessages[request.status],
+      message: typeof statusMessages[request.status] === 'function' ? statusMessages[request.status](request) : statusMessages[request.status],
       url: notificationUrl
     });
     await NotificationDispatch.updateOne({ eventKey }, {
@@ -2429,11 +2520,12 @@ app.get('/api/club-auth/session', async (req, res) => {
     console.error('Club session validation failed:', error.name);
     return res.status(503).json({ message: 'Club access is temporarily unavailable.' });
   }
-  if (account && ['pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'software_development'].includes(account.role)) {
+  if (account && ['pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'miu_events', 'software_development'].includes(account.role)) {
+    const dashboardName = account.role === 'miu_events' ? 'MIU Events' : account.role === 'software_development' ? 'Software Development team' : account.role.toUpperCase();
     return res.json({
       configured: clubAccounts.length > 0,
       authenticated: true,
-      club: { id: 0, name: account.role.toUpperCase(), image: '/assets/img/pics/logo.svg.png', role: account.role, committee: '' }
+      club: { id: 0, name: dashboardName, image: '/assets/img/pics/logo.svg.png', role: account.role, committee: '' }
     });
   }
   const club = account && clubs.find((item) => item.id === account.clubId);
@@ -2465,7 +2557,11 @@ app.post('/api/club-auth/switch-dashboard', async (req, res) => {
   if (!isSameOriginRequest(req)) return res.status(403).json({ message: 'Reload and try again.' });
   if (!mongoReady) return res.status(503).json({ message: 'Dashboard access is temporarily unavailable.' });
   try {
-    const account = await getClubAccountFromRequest(req);
+    let account = await getClubAccountFromRequest(req);
+    if (!account && await isAdminSessionValid(req)) {
+      const email = getConfiguredAdminEmail();
+      if (email) account = await ClubAccount.findOne({ email }).read('primary').readConcern('majority').lean();
+    }
     if (!account) return res.status(401).json({ message: 'Sign in to switch dashboards.' });
     const assignment = getStaffDashboardOptions(account).find(item => item.role === req.body?.role);
     if (!assignment) return res.status(403).json({ message: 'This dashboard is not assigned to your account.' });
@@ -2499,9 +2595,10 @@ app.post('/api/club-auth/login', async (req, res) => {
   setClubSessionCookie(req, res, account);
   res.append('Set-Cookie', `miu_admin=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/;${secureCookieSuffix(req)}`);
   res.append('Set-Cookie', `miu_student=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/;${secureCookieSuffix(req)}`);
-  const committeeRoles = ['pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'software_development'];
+  const committeeRoles = ['pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'miu_events', 'software_development'];
+  const dashboardName = account.role === 'miu_events' ? 'MIU Events' : account.role === 'software_development' ? 'Software Development team' : account.role.toUpperCase();
   const club = committeeRoles.includes(account.role)
-    ? { id: 0, name: account.role.toUpperCase(), image: '/assets/img/pics/logo.svg.png', role: account.role, committee: '' }
+    ? { id: 0, name: dashboardName, image: '/assets/img/pics/logo.svg.png', role: account.role, committee: '' }
     : clubs.find((item) => item.id === account.clubId);
   res.json({
     authenticated: true,
@@ -2517,7 +2614,10 @@ app.post('/api/club-auth/login', async (req, res) => {
 });
 
 app.post('/api/club-auth/logout', (req, res) => {
-  res.setHeader('Set-Cookie', 'miu_club=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/');
+  res.setHeader('Set-Cookie', [
+    `miu_club=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/;${secureCookieSuffix(req)}`,
+    `miu_admin=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/;${secureCookieSuffix(req)}`
+  ]);
   res.status(204).end();
 });
 
@@ -2578,84 +2678,30 @@ app.patch('/api/club/status', requireClubAuth, async (req, res) => {
   }
 });
 
-app.post('/api/events/:clubId/:eventIndex/registrations', async (req, res) => {
-  const clubId = Number(req.params.clubId);
-  const eventIndex = Number(req.params.eventIndex);
-  if (!Number.isInteger(clubId) || !Number.isInteger(eventIndex) || clubId < 1 || eventIndex < 0) {
-    return res.status(400).json({ message: 'This event could not be found.' });
-  }
-  const name = cleanText(req.body.name, 160);
-  const email = cleanText(req.body.email, 254).toLowerCase();
-  if (!name) return res.status(400).json({ message: 'Enter your name.' });
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return res.status(400).json({ message: 'Enter a valid university email.' });
-  }
-
+require('./services/student-event-registration').registerStudentEvents(app, {
+  Club, Application, EventRegistration, StudentInterest, mongoose, requireStudentAuth,
+  sameOrigin: isSameOriginRequest, databaseReady: () => mongoReady
+});
+// Existing all-student MIU registration keeps the public form, while member-only
+// MIU events require a signed-in student identity and a verified club membership.
+async function requireMiuMemberRegistrationAuth(req, res, next) {
+  const eventId = Number(req.params.id);
+  if (!Number.isSafeInteger(eventId) || eventId < 1) return next();
   try {
     if (!requireLiveDatabase(res)) return;
-    const club = await Club.findOne({ id: clubId, archivedAt: null }).lean();
-    if (!club) return res.status(404).json({ message: 'Club not found.' });
-    const event = Array.isArray(club.events) ? club.events[eventIndex] : null;
-    if (!event) return res.status(404).json({ message: 'This event could not be found.' });
-
-    const existing = await EventRegistration.findOne({ clubId, eventIndex, email }).lean();
-    if (existing) {
-      return res.status(409).json({ message: 'This email is already registered for the event.' });
-    }
-
-    const registration = await EventRegistration.create({
-      id: Date.now(),
-      clubId,
-      eventIndex,
-      eventTitle: cleanText(event.title, 140),
-      name,
-      email
-    });
-    try {
-      const student = await getStudentAccountFromRequest(req, res);
-      if (student?.email === email) {
-        await StudentInterest.updateOne(
-          { studentEmail: student.email, clubId, eventIndex },
-          {
-            $setOnInsert: { studentEmail: student.email, clubId, eventIndex, detailViews: 0 },
-            $set: { eventTitle: cleanText(event.title, 140), registered: true }
-          },
-          { upsert: true, writeConcern: { w: 'majority' } }
-        );
-      }
-    } catch (interestError) {
-      if (interestError.code === 11000) {
-        await StudentInterest.updateOne(
-          { studentEmail: email, clubId, eventIndex },
-          { $set: { eventTitle: cleanText(event.title, 140), registered: true } },
-          { writeConcern: { w: 'majority' } }
-        ).catch((error) => console.error('Student event interest could not be recorded:', error.name));
-      } else {
-        console.error('Student event interest could not be recorded:', interestError.name);
-      }
-    }
-    res.status(201).json({ message: 'You are registered for this event.', registrationId: registration.id });
-  } catch (error) {
-    if (error.code === 11000) {
-      return res.status(409).json({ message: 'This email is already registered for the event.' });
-    }
-    console.error('Database operation failed:', error.name);
-    res.status(503).json({ message: 'This form was not saved. Please try again.' });
+    const event = await UniversityContent.findOne({ id: eventId, type: 'event' }).select('attendanceAudience').lean();
+    if (event?.attendanceAudience === 'members') return requireStudentAuth(req, res, next);
+    next();
+  } catch {
+    res.status(503).json({ message: 'This event registration is temporarily unavailable.' });
   }
-});
-
-// Public registration for university events, stored in the shared registration collection.
-app.post('/api/university-content/:id/registrations', async (req, res) => {
+}
+async function handleUniversityEventRegistration(req, res) {
   const eventId = Number(req.params.id);
   if (!Number.isSafeInteger(eventId) || eventId < 1) {
     return res.status(400).json({ message: 'This event could not be found.' });
   }
-  const name = cleanText(req.body.name, 160);
-  const email = cleanText(req.body.email, 254).toLowerCase();
-  if (!name) return res.status(400).json({ message: 'Enter your name.' });
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return res.status(400).json({ message: 'Enter a valid university email.' });
-  }
+  if (req.method !== 'GET' && !isSameOriginRequest(req)) return res.status(403).json({ message: 'Reload the event page before registering.' });
 
   try {
     if (!requireLiveDatabase(res)) return;
@@ -2665,15 +2711,38 @@ app.post('/api/university-content/:id/registrations', async (req, res) => {
     if (event.registrationEnabled !== true) {
       return res.status(409).json({ message: 'Registration is not open for this event.' });
     }
-    const existing = await EventRegistration.findOne({ clubId: 0, eventIndex: eventId, email }).lean();
-    if (existing) {
-      return res.status(409).json({ message: 'This email is already registered for the event.' });
+    const audience = event.attendanceAudience === 'members' ? 'members' : 'all_students';
+    const student = req.studentAccount;
+    const email = audience === 'members' ? cleanText(student?.email, 254).toLowerCase() : cleanText(req.body?.email, 254).toLowerCase();
+    const name = audience === 'members' ? cleanText(student?.name, 160) : cleanText(req.body?.name, 160);
+    if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ message: audience === 'members' ? 'Complete your signed-in MIU student profile before registering.' : 'Enter your name and a valid university email.' });
     }
-    const registration = new EventRegistration({
-      id: Date.now(), clubId: 0, eventIndex: eventId,
-      eventTitle: cleanText(event.title, 140), name, email
+    const rulesMessage = require('./services/student-event-registration').eventRules(event);
+    if (rulesMessage) return res.status(409).json({ message: rulesMessage });
+    let isClubMember = audience === 'all_students';
+    if (audience === 'members') {
+      const [rosterClubs, acceptedMemberships] = await Promise.all([
+        Club.find({ archivedAt: null, 'memberRoster.email': email }).select('id').lean(),
+        Application.find({ email, status: 'accepted' }).select('clubId').lean()
+      ]);
+      isClubMember = rosterClubs.length > 0 || acceptedMemberships.length > 0;
+    }
+    const existing = await EventRegistration.findOne({ clubId: 0, eventIndex: eventId, email }).lean();
+    if (req.method === 'GET') {
+      const registeredCount = await EventRegistration.countDocuments({ clubId: 0, eventIndex: eventId });
+      return res.json({ registered: Boolean(existing), eligible: isClubMember, audience,
+        message: existing ? 'You are registered for this event.' : !isClubMember ? 'Registration is limited to current members of any MIU club.'
+          : audience === 'members' ? 'Registration is open to current MIU club members.' : 'Registration is open to all university students.',
+        cancellationAllowed: false, capacity: null, registeredCount });
+    }
+    if (!isClubMember) return res.status(403).json({ message: 'Registration is limited to current members of any MIU club.' });
+    if (existing) return res.status(409).json({ message: 'This email is already registered for the event.' });
+    const registration = await EventRegistration.create({
+      id: Date.now() * 1000 + crypto.randomInt(1000), clubId: 0, eventIndex: eventId, eventRequestId: eventId,
+      registrationKey: `miu:${eventId}:${email}`, eventTitle: cleanText(event.title, 140), name, email,
+      ...(student?._id ? { studentAccountId: student._id } : {})
     });
-    await registration.save({ w: 'majority' });
     const confirmed = await EventRegistration.findById(registration._id)
       .read('primary').readConcern('majority').select('_id').lean();
     if (!confirmed) throw new Error('University event registration was not confirmed in the database.');
@@ -2686,7 +2755,9 @@ app.post('/api/university-content/:id/registrations', async (req, res) => {
     console.error('University event registration failed:', error.name);
     res.status(503).json({ message: 'This form was not saved. Please try again.' });
   }
-});
+}
+app.get('/api/university-content/:id/registrations', requireMiuMemberRegistrationAuth, handleUniversityEventRegistration);
+app.post('/api/university-content/:id/registrations', requireMiuMemberRegistrationAuth, handleUniversityEventRegistration);
 
 // Attendance sessions are backed by MongoDB. Only a club president or an IT
 // committee head can create sessions and review the resulting attendance.
@@ -2717,6 +2788,7 @@ app.get('/api/club/attendance-events', requireClubAuth, async (req, res) => {
           itemType,
           eventRequestId,
           title,
+          attendanceAudience: itemType === 'event' && ['members', 'all_students'].includes(item.attendanceAudience) ? item.attendanceAudience : '',
           date,
           time: cleanText(item.time || item.boothOpenTime, 80),
           location: cleanText(item.location || item.boothLocation, 160)
@@ -2787,6 +2859,30 @@ app.post('/api/club/attendance-events/:clubId/:itemType/:eventRequestId/end', re
   }
 });
 
+app.post('/api/miu/attendance-events/:eventRequestId/end', requireAttendanceSessionManager, async (req, res) => {
+  const account = req.clubAccount;
+  const eventRequestId = Number(req.params.eventRequestId);
+  if (!['pr', 'sso', 'dean', 'miu_events', 'admin', 'software_development'].includes(account.role)) return res.status(403).json({ message: 'MIU attendance can be managed by PR, SSO, Dean, the MIU Events team, or the global administrator.' });
+  if (!Number.isSafeInteger(eventRequestId) || eventRequestId <= 0) return res.status(400).json({ message: 'Choose a valid MIU event.' });
+  try {
+    if (!requireLiveDatabase(res)) return;
+    const event = await UniversityContent.findOne({ id: eventRequestId, type: 'event', attendanceEnabled: true }).select('id title date').read('primary').readConcern('majority').lean();
+    if (!event || !isActivityScheduledToday(event.date)) return res.status(409).json({ message: 'Attendance can only be ended for a published MIU event on its event day.' });
+    const key = { clubId: 0, itemType: 'event', eventRequestId };
+    const endedAt = new Date();
+    await AttendanceActivityClosure.updateOne(key, { $setOnInsert: { ...key, eventTitle: event.title, eventDate: event.date,
+      endedByEmail: account.email, endedByRole: account.role, endedAt } }, { upsert: true, writeConcern: { w: 'majority' } });
+    await AttendanceSession.updateMany({ ...key, sourceType: 'miu', active: true }, { $set: { active: false } }, { writeConcern: { w: 'majority' } });
+    const closure = await AttendanceActivityClosure.findOne(key).read('primary').readConcern('majority').lean();
+    if (!closure) throw new Error('MIU attendance closure could not be confirmed.');
+    await notifyAttendanceWorkflow(key, 'pending_supervisor', 'submitted', closure.endedAt);
+    res.json({ ended: true, endedAt: closure.endedAt });
+  } catch (error) {
+    console.error('MIU attendance could not be ended:', error.name);
+    res.status(503).json({ message: 'MIU attendance was not ended. Please retry.' });
+  }
+});
+
 app.post('/api/attendance/admin-self-checkin', requireClubAuth, async (req, res) => {
   const account = req.clubAccount;
   if (!['president', 'head'].includes(account.role)) {
@@ -2797,11 +2893,19 @@ app.post('/api/attendance/admin-self-checkin', requireClubAuth, async (req, res)
   const itemType = ['event', 'booth'].includes(req.body.itemType) ? req.body.itemType : '';
   const name = cleanText(req.body.name, 160);
   const email = cleanText(account.email, 254).toLowerCase();
+  if (typeof req.body.universityId !== 'string' || !req.body.universityId.trim() || req.body.universityId.length > 40
+    || typeof req.body.major !== 'string' || !req.body.major.trim() || req.body.major.length > 120) {
+    return res.status(400).json({ message: 'Enter your MIU ID (maximum 40 characters) and major (maximum 120 characters).' });
+  }
+  let universityId = req.body.universityId.trim(), major = req.body.major.trim();
   if (clubId !== Number(account.clubId) || !Number.isSafeInteger(eventRequestId) || !itemType || !name) {
     return res.status(400).json({ message: 'Enter your name and choose an event or booth from your club.' });
   }
   try {
     if (!requireLiveDatabase(res)) return;
+    const selfProfile = await StudentAccount.findOne({ email }).select('universityId major').lean();
+    universityId = selfProfile?.universityId || universityId;
+    major = selfProfile?.major || major;
     const club = await Club.findOne({ id: clubId, archivedAt: null })
       .select('id name events booths').read('primary').readConcern('majority').lean();
     const items = itemType === 'event' ? club?.events : club?.booths;
@@ -2843,7 +2947,7 @@ app.post('/api/attendance/admin-self-checkin', requireClubAuth, async (req, res)
     try {
       const record = await AttendanceRecord.create({
         sessionId: session._id, clubId, itemType, eventRequestId, eventTitle,
-        eventDate, eventTime, name, email, deviceHash, attendedAt: new Date()
+        eventDate, eventTime, name, email, universityId, major, deviceHash, attendedAt: new Date()
       });
       const confirmed = await AttendanceRecord.findById(record._id).select('email clubId eventRequestId')
         .read('primary').readConcern('majority').lean();
@@ -2870,8 +2974,11 @@ app.post('/api/attendance/admin-self-checkin', requireClubAuth, async (req, res)
   }
 });
 
-app.post('/api/club/attendance-sessions', requireClubAuth, async (req, res) => {
-  if (!canManageAttendance(req.clubAccount)) {
+app.post('/api/club/attendance-sessions', requireAttendanceSessionManager, async (req, res) => {
+  const role = req.clubAccount.role;
+  const isMiuReviewer = ['pr', 'sso', 'dean', 'miu_events', 'admin', 'software_development'].includes(role);
+  const isMiuSession = Number(req.body.clubId) === 0;
+  if (!(isMiuSession ? isMiuReviewer : canManageAttendance(req.clubAccount))) {
     return res.status(403).json({ message: 'Attendance tools are available to club presidents and the IT head.' });
   }
   const clubId = Number(req.body.clubId);
@@ -2880,15 +2987,20 @@ app.post('/api/club/attendance-sessions', requireClubAuth, async (req, res) => {
   if (!Number.isInteger(clubId) || !Number.isInteger(eventRequestId)) {
     return res.status(400).json({ message: 'Choose a valid event.' });
   }
-  if (req.clubAccount.role === 'president' && clubId !== Number(req.clubAccount.clubId)) {
+  if (!isMiuSession && role === 'president' && clubId !== Number(req.clubAccount.clubId)) {
     return res.status(403).json({ message: 'You can only create attendance QR codes for your own club.' });
   }
+  if (isMiuSession && itemType !== 'event') return res.status(400).json({ message: 'MIU attendance is available for university events.' });
   try {
     if (!requireLiveDatabase(res)) return;
-    const club = await Club.findOne({ id: clubId, archivedAt: null }).select('id name events booths').lean();
+    const [club, miuEvent] = await Promise.all([
+      isMiuSession ? Promise.resolve(null) : Club.findOne({ id: clubId, archivedAt: null }).select('id name events booths').lean(),
+      isMiuSession ? UniversityContent.findOne({ id: eventRequestId, type: 'event', attendanceEnabled: true }).select('id title date time attendanceEnabled attendanceAudience').lean() : Promise.resolve(null)
+    ]);
     const items = itemType === 'event' ? club?.events : club?.booths;
     let selectedEvent;
-    if (eventRequestId > 0) {
+    if (isMiuSession) selectedEvent = miuEvent ? { ...miuEvent, requestId: miuEvent.id } : null;
+    else if (eventRequestId > 0) {
       selectedEvent = items?.find((item) => Number(item.requestId) === eventRequestId);
     } else {
       const legacyOffset = itemType === 'booth' ? 1_000_000 : 0;
@@ -2897,7 +3009,7 @@ app.post('/api/club/attendance-sessions', requireClubAuth, async (req, res) => {
       if (selectedEvent?.requestId) selectedEvent = null;
     }
     const title = cleanText(selectedEvent?.title || selectedEvent?.boothName, 140);
-    if (!club || !selectedEvent || !title) {
+    if ((!club && !isMiuSession) || !selectedEvent || !title) {
       return res.status(404).json({ message: 'This published event or booth could not be found.' });
     }
     if (itemType === 'event' && selectedEvent.attendanceEnabled === false) return res.status(409).json({ message: 'This event was published without attendance tracking.' });
@@ -2908,28 +3020,96 @@ app.post('/api/club/attendance-sessions', requireClubAuth, async (req, res) => {
     if (await isAttendanceActivityManuallyEnded(clubId, itemType, eventRequestId)) {
       return res.status(409).json({ message: 'Attendance has ended for this event or booth.' });
     }
-    const token = crypto.randomBytes(32).toString('base64url');
-    const session = await AttendanceSession.create({
+    const miuAssignments = isMiuSession
+      ? (Array.isArray(req.body.assignments) ? req.body.assignments : [{ supervisorEmail: req.body.supervisorEmail, attendanceTakerEmail: req.body.attendanceTakerEmail }])
+        .map((assignment) => ({
+          supervisorEmail: cleanText(assignment?.supervisorEmail, 254).toLowerCase(),
+          attendanceTakerEmail: cleanText(assignment?.attendanceTakerEmail, 254).toLowerCase()
+        }))
+      : [];
+    let assignedSupervisorEmail = '';
+    let assignedMemberEmail = '';
+    const createdMiuSessionIds = [];
+    if (isMiuSession) {
+      if (!miuAssignments.length || miuAssignments.length > 20
+        || miuAssignments.some((assignment) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(assignment.supervisorEmail)
+          || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(assignment.attendanceTakerEmail))) {
+        return res.status(400).json({ message: 'Add between 1 and 20 valid supervisor and usher account pairs.' });
+      }
+      const usherEmails = miuAssignments.map((assignment) => assignment.attendanceTakerEmail);
+      if (new Set(usherEmails).size !== usherEmails.length) return res.status(400).json({ message: 'Each attendance usher account can be assigned only once to this event.' });
+      if (miuAssignments.some((assignment) => assignment.supervisorEmail === assignment.attendanceTakerEmail)) {
+        return res.status(400).json({ message: 'Assign each event review and usher task to different accounts.' });
+      }
+      const supervisorEmails = [...new Set(miuAssignments.map((assignment) => assignment.supervisorEmail))];
+      const [supervisors, students, staff, existingTasks] = await Promise.all([
+        ClubAccount.find({ email: { $in: supervisorEmails }, $or: [{ role: 'supervisor' }, { 'roleAssignments.role': 'supervisor' }] }).select('email').lean(),
+        StudentAccount.find({ email: { $in: usherEmails } }).select('email').lean(),
+        ClubAccount.find({ email: { $in: usherEmails } }).select('email').lean(),
+        AttendanceSession.find({ sourceType: 'miu', active: true, assignedMemberEmail: { $in: usherEmails }, eventDate }).select('assignedMemberEmail').lean()
+      ]);
+      const validSupervisors = new Set(supervisors.map((account) => account.email));
+      if (supervisorEmails.some((email) => !validSupervisors.has(email))) return res.status(400).json({ message: 'Every assigned reviewer must be an active Supervisor account.' });
+      const validUshers = new Set([...students, ...staff].map((account) => account.email));
+      if (usherEmails.some((email) => !validUshers.has(email))) return res.status(400).json({ message: 'Every usher must have an existing student or staff account.' });
+      if (existingTasks.length) return res.status(409).json({ message: `An assigned usher already has an active MIU attendance task today: ${existingTasks[0].assignedMemberEmail}` });
+      assignedSupervisorEmail = miuAssignments[0].supervisorEmail;
+      assignedMemberEmail = miuAssignments[0].attendanceTakerEmail;
+    }
+    const sessionId = new mongoose.Types.ObjectId();
+    const token = isMiuSession ? assignedMiuAttendanceToken(sessionId, assignedMemberEmail) : crypto.randomBytes(32).toString('base64url');
+    const attendanceAudience = isMiuSession
+      ? (selectedEvent.attendanceAudience === 'members' ? 'members' : 'all_students')
+      : itemType === 'event' && ['members', 'all_students'].includes(selectedEvent.attendanceAudience)
+        ? selectedEvent.attendanceAudience
+        : req.body.audience === 'all_students' ? 'all_students' : 'members';
+    const sessionFields = {
+      _id: sessionId,
       clubId,
+      sourceType: isMiuSession ? 'miu' : 'club',
+      attendanceAudience,
+      assignedSupervisorEmail,
       itemType,
       eventRequestId,
       eventTitle: title,
       eventDate,
       eventTime: cleanText(selectedEvent.time || selectedEvent.boothOpenTime, 80),
       tokenHash: attendanceTokenHash(token),
-      createdBy: req.clubAccount.email
-    });
+      createdBy: req.clubAccount.email,
+      assignedMemberEmail
+    };
+    let session;
+    if (isMiuSession) {
+      const createdSessions = [];
+      try {
+        for (const assignment of miuAssignments) {
+          const assignedId = new mongoose.Types.ObjectId();
+          const assignedToken = assignedMiuAttendanceToken(assignedId, assignment.attendanceTakerEmail);
+          const created = await AttendanceSession.create({ ...sessionFields, _id: assignedId,
+            assignedSupervisorEmail: assignment.supervisorEmail, assignedMemberEmail: assignment.attendanceTakerEmail,
+            tokenHash: attendanceTokenHash(assignedToken) });
+          createdMiuSessionIds.push(created._id);
+          createdSessions.push(created);
+        }
+        const safeSessions = createdSessions.map((created) => {
+          const { _id, __v, tokenHash, ...safeSession } = created.toObject();
+          return safeSession;
+        });
+        return res.status(201).json({ sessions: safeSessions, assignmentsCreated: safeSessions.length });
+      } catch (error) {
+        await AttendanceSession.deleteMany({ _id: { $in: createdMiuSessionIds } }).catch(() => {});
+        throw error;
+      }
+    }
+    session = await AttendanceSession.create(sessionFields);
     try {
-      await AttendanceSession.updateMany({
-        clubId, itemType, eventRequestId, active: true,
-        assignedMemberEmail: { $in: ['', null] }, _id: { $ne: session._id }
-      }, { $set: { active: false } });
+      await AttendanceSession.updateMany({ clubId, itemType, eventRequestId, active: true, assignedMemberEmail: { $in: ['', null] }, _id: { $ne: session._id } }, { $set: { active: false } });
     } catch (error) {
       await AttendanceSession.deleteOne({ _id: session._id }).catch(() => {});
       throw error;
     }
     const { _id, __v, tokenHash, ...safeSession } = session.toObject();
-    res.status(201).json({ session: safeSession, token });
+    res.status(201).json({ session: safeSession, ...(isMiuSession ? {} : { token }) });
   } catch (error) {
     console.error('Attendance session could not be created:', error.name);
     res.status(503).json({ message: 'The QR code was not created. No attendance data was saved.' });
@@ -2994,6 +3174,80 @@ app.post('/api/member/attendance-assignments/:id/session', requireStudentAuth, a
     console.error('Delegated attendance session could not be created:', error.name);
     res.status(503).json({ message: 'The attendance QR was not saved. Please try again.' });
   }
+});
+
+async function requireAttendanceTaskAuth(req, res, next) {
+  try {
+    const student = await getStudentAccountFromRequest(req, res);
+    if (student) { req.attendanceTaskAccount = student; return next(); }
+    const staff = await getClubAccountFromRequest(req);
+    if (staff) { req.attendanceTaskAccount = staff; return next(); }
+    return res.status(401).json({ message: 'Sign in to the student or staff account assigned to this task.' });
+  } catch { return res.status(503).json({ message: 'Could not verify the account assigned to this task.' }); }
+}
+
+app.get('/api/miu-attendance-task', requireAttendanceTaskAuth, async (req, res) => {
+  try {
+    if (!requireLiveDatabase(res)) return;
+    const session = await AttendanceSession.findOne({ sourceType: 'miu', active: true, assignedMemberEmail: req.attendanceTaskAccount.email })
+      .select('eventTitle eventDate eventTime assignedMemberAccepted assignedMemberEmail').sort({ createdAt: -1 }).lean();
+    res.json({ task: session ? { eventTitle: session.eventTitle, eventDate: session.eventDate, eventTime: session.eventTime, accepted: session.assignedMemberAccepted === true } : null });
+  } catch { res.status(503).json({ message: 'Could not load your MIU attendance task.' }); }
+});
+
+app.get('/pages/my-attendance-task.html', requireAttendanceTaskAuth, async (req, res) => {
+  try {
+    if (!requireLiveDatabase(res)) return;
+    const assignedTask = await AttendanceSession.exists({
+      sourceType: 'miu', active: true, assignedMemberEmail: req.attendanceTaskAccount.email
+    });
+    if (!assignedTask) return res.status(404).send('Attendance task not found.');
+    return res.sendFile(path.join(__dirname, 'public/pages/my-attendance-task.html'));
+  } catch {
+    return res.status(503).send('Attendance task is temporarily unavailable.');
+  }
+});
+
+app.post('/api/miu-attendance-task/accept', requireAttendanceTaskAuth, async (req, res) => {
+  try {
+    if (!requireLiveDatabase(res)) return;
+    const session = await AttendanceSession.findOne({ sourceType: 'miu', active: true, assignedMemberEmail: req.attendanceTaskAccount.email }).sort({ createdAt: -1 });
+    if (!session) return res.status(404).json({ message: 'No MIU attendance task is assigned to your account.' });
+    if (!isActivityScheduledToday(session.eventDate)) return res.status(410).json({ message: 'This attendance task is only available on the event day.' });
+    session.assignedMemberAccepted = true; session.assignedAcceptedAt = new Date();
+    await session.save({ writeConcern: { w: 'majority' } });
+    res.json({ accepted: true, message: 'Task accepted. Open the QR panel on the device you will use at the event.' });
+  } catch { res.status(503).json({ message: 'Your attendance task acceptance could not be saved.' }); }
+});
+
+app.post('/api/miu-attendance-task/session', requireAttendanceTaskAuth, async (req, res) => {
+  try {
+    if (!requireLiveDatabase(res)) return;
+    const session = await AttendanceSession.findOne({ sourceType: 'miu', active: true, assignedMemberEmail: req.attendanceTaskAccount.email, assignedMemberAccepted: true }).sort({ createdAt: -1 }).lean();
+    if (!session) return res.status(403).json({ message: 'Accept your assigned attendance task before opening its QR.' });
+    if (!isActivityScheduledToday(session.eventDate) || await isAttendanceActivityManuallyEnded(0, 'event', session.eventRequestId)) return res.status(410).json({ message: 'Attendance has ended for this MIU event.' });
+    const token = assignedMiuAttendanceToken(session._id, req.attendanceTaskAccount.email);
+    if (attendanceTokenHash(token) !== session.tokenHash) return res.status(503).json({ message: 'The assigned QR could not be confirmed.' });
+    res.json({ token, eventTitle: session.eventTitle, eventDate: session.eventDate });
+  } catch { res.status(503).json({ message: 'The assigned QR could not be opened.' }); }
+});
+
+app.post('/api/miu-attendance-task/qr-challenge', requireAttendanceTaskAuth, async (req, res) => {
+  const token = String(req.body.token || '');
+  if (!/^[A-Za-z0-9_-]{40,60}$/.test(token)) return res.status(400).json({ message: 'Attendance session is invalid.' });
+  try {
+    if (!requireLiveDatabase(res)) return;
+    const session = await AttendanceSession.findOne({ tokenHash: attendanceTokenHash(token), sourceType: 'miu', active: true,
+      assignedMemberEmail: req.attendanceTaskAccount.email, assignedMemberAccepted: true }).select('_id clubId itemType eventRequestId eventDate assignedDeviceHash').read('primary').readConcern('majority').lean();
+    if (!session || !isActivityScheduledToday(session.eventDate) || await isAttendanceActivityManuallyEnded(0, 'event', session.eventRequestId)) return res.status(410).json({ message: 'This attendance task is no longer active.' });
+    const deviceHash = attendanceDeviceHash(ensureMemberAttendanceDeviceCookie(req, res));
+    if (session.assignedDeviceHash && session.assignedDeviceHash !== deviceHash) return res.status(403).json({ message: 'This attendance task is tied to the device where you first opened its QR.' });
+    if (!session.assignedDeviceHash) {
+      const updated = await AttendanceSession.updateOne({ _id: session._id, assignedMemberEmail: req.attendanceTaskAccount.email, assignedDeviceHash: '' }, { $set: { assignedDeviceHash: deviceHash } }, { writeConcern: { w: 'majority' } });
+      if (!updated.modifiedCount) return res.status(403).json({ message: 'This attendance task has already been opened on another device.' });
+    }
+    res.setHeader('Cache-Control', 'no-store'); res.json(attendanceQrChallenge(token));
+  } catch { res.status(503).json({ message: 'A fresh attendance QR could not be created.' }); }
 });
 
 const ATTENDANCE_QR_PERIOD_MS = 20_000;
@@ -3102,18 +3356,22 @@ function clearAttendanceScanProofCookie(req, res) {
   res.setHeader('Set-Cookie', `miu_attendance_scan=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/api/attendance/;${secure}`);
 }
 
-app.post('/api/club/attendance-qr-challenge', requireClubAuth, async (req, res) => {
-  if (!canManageAttendance(req.clubAccount)) return res.status(403).json({ message: 'You cannot create attendance QR codes.' });
+app.post('/api/club/attendance-qr-challenge', requireAttendanceSessionManager, async (req, res) => {
+  const isMiuReviewer = ['pr', 'sso', 'dean', 'miu_events', 'admin', 'software_development'].includes(req.clubAccount.role);
+  if (!canManageAttendance(req.clubAccount) && !isMiuReviewer) return res.status(403).json({ message: 'You cannot create attendance QR codes.' });
   const token = String(req.body.token || '');
   if (!/^[A-Za-z0-9_-]{40,60}$/.test(token)) return res.status(400).json({ message: 'Attendance session is invalid.' });
   try {
     if (!requireLiveDatabase(res)) return;
-    const session = await AttendanceSession.findOne({ tokenHash: attendanceTokenHash(token), active: true }).select('clubId itemType eventRequestId eventDate').lean();
+    const session = await AttendanceSession.findOne({ tokenHash: attendanceTokenHash(token), active: true }).select('clubId sourceType itemType eventRequestId eventDate').lean();
     if (!session) return res.status(404).json({ message: 'This attendance session has expired.' });
+    if (req.clubAccount.role === 'miu_events' && session.sourceType !== 'miu') return res.status(403).json({ message: 'MIU Events accounts can only create QR codes for university events.' });
     if (!isActivityScheduledToday(session.eventDate)) return res.status(410).json({ message: 'This attendance QR has expired because the event day is over.' });
     if (await isAttendanceActivityManuallyEnded(session.clubId, session.itemType || 'event', session.eventRequestId)) {
       return res.status(410).json({ message: 'Attendance has ended for this event or booth.' });
     }
+    if (session.sourceType === 'miu' && !isMiuReviewer) return res.status(403).json({ message: 'Only PR, SSO, Dean, or the global administrator may manage an MIU attendance session.' });
+    if (session.sourceType !== 'miu' && isMiuReviewer) return res.status(403).json({ message: 'This account can only manage MIU attendance sessions.' });
     if (req.clubAccount.role === 'president' && Number(session.clubId) !== Number(req.clubAccount.clubId)) {
       return res.status(403).json({ message: 'You can only create QR codes for your own club.' });
     }
@@ -3131,19 +3389,27 @@ app.post('/api/member/attendance-qr-challenge', requireStudentAuth, async (req, 
   try {
     if (!requireLiveDatabase(res)) return;
     const session = await AttendanceSession.findOne({ tokenHash: attendanceTokenHash(token), active: true })
-      .select('clubId itemType eventRequestId eventDate createdBy assignedMemberEmail assignedDeviceHash').read('primary').readConcern('majority').lean();
-    if (!session || session.createdBy !== req.studentAccount.email || !isActivityScheduledToday(session.eventDate)) {
+      .select('clubId sourceType itemType eventRequestId eventDate createdBy assignedMemberEmail assignedDeviceHash assignedMemberAccepted').read('primary').readConcern('majority').lean();
+    const assignedMiuUsher = session?.sourceType === 'miu' && session.assignedMemberEmail === req.studentAccount.email && session.assignedMemberAccepted === true;
+    if (!session || session.createdBy !== req.studentAccount.email && !assignedMiuUsher || !isActivityScheduledToday(session.eventDate)) {
       return res.status(403).json({ message: 'This QR session is no longer available to your account.' });
     }
     if (await isAttendanceActivityManuallyEnded(session.clubId, session.itemType || 'event', session.eventRequestId)) {
       return res.status(410).json({ message: 'Attendance has ended for this event or booth.' });
     }
-    const assignment = await currentMemberAttendanceAssignment(req.studentAccount.email);
-    if (!assignment || assignment.status !== 'accepted' || assignment.clubId !== session.clubId
+    const assignment = assignedMiuUsher ? null : await currentMemberAttendanceAssignment(req.studentAccount.email);
+    const memberDeviceHash = attendanceDeviceHash(ensureMemberAttendanceDeviceCookie(req, res));
+    const memberHashMatches = session.assignedDeviceHash && session.assignedDeviceHash === memberDeviceHash;
+    if (assignedMiuUsher) {
+      if (session.assignedDeviceHash && !memberHashMatches) return res.status(403).json({ message: 'This attendance task is tied to the device where you accepted it.' });
+      if (!session.assignedDeviceHash) {
+        const updated = await AttendanceSession.updateOne({ _id: session._id, assignedMemberEmail: req.studentAccount.email, assignedMemberAccepted: true, assignedDeviceHash: '' }, { $set: { assignedDeviceHash: memberDeviceHash } }, { writeConcern: { w: 'majority' } });
+        if (!updated.modifiedCount && !memberHashMatches) return res.status(403).json({ message: 'This attendance task has already been opened on another device.' });
+      }
+    } else if (!assignment || assignment.status !== 'accepted' || assignment.clubId !== session.clubId
       || assignment.itemType !== session.itemType || assignment.eventRequestId !== session.eventRequestId
       || String(session.assignedMemberEmail || session.createdBy).trim().toLowerCase() !== String(req.studentAccount.email || '').trim().toLowerCase()
-      || !session.assignedDeviceHash || session.assignedDeviceHash !== attendanceDeviceHash(memberAttendanceDeviceId(req))
-      || session.assignedDeviceHash !== assignment.checkInDeviceHash) {
+      || !memberHashMatches || session.assignedDeviceHash !== assignment.checkInDeviceHash) {
       return res.status(403).json({ message: 'This account no longer has this attendance assignment.' });
     }
     res.setHeader('Cache-Control', 'no-store');
@@ -3172,7 +3438,7 @@ app.post('/api/member/attendance-assignments/:id/check-in', requireStudentAuth, 
     if (!assignedDeviceHash) return res.status(403).json({ message: 'This attendance task is tied to the device where you accepted it.' });
     const [club, acceptedApplication] = await Promise.all([
       Club.findOne({ id: assignment.clubId, archivedAt: null }).select('id name memberRoster events booths').read('primary').readConcern('majority').lean(),
-      Application.findOne({ clubId: assignment.clubId, status: 'accepted', email }).select('id').read('primary').readConcern('majority').lean()
+      Application.findOne({ clubId: assignment.clubId, status: 'accepted', email }).select('id universityId major studentName').read('primary').readConcern('majority').lean()
     ]);
     const rosterMember = (club?.memberRoster || []).find((member) => String(member.email || '').trim().toLowerCase() === email);
     if (!club || (!rosterMember && !acceptedApplication)) {
@@ -3216,7 +3482,9 @@ app.post('/api/member/attendance-assignments/:id/check-in', requireStudentAuth, 
       const record = await AttendanceRecord.create({
         sessionId: session._id, clubId: assignment.clubId, itemType: assignment.itemType,
         eventRequestId: assignment.eventRequestId, eventTitle, eventDate: assignment.eventDate,
-        eventTime: assignment.eventTime, name: cleanText(rosterMember?.name || assignment.memberName, 160),
+        eventTime: assignment.eventTime, name: cleanText(req.studentAccount.name || rosterMember?.name || assignment.memberName, 160),
+        universityId: cleanText(req.studentAccount.universityId || acceptedApplication?.universityId, 40),
+        major: cleanText(req.studentAccount.major || acceptedApplication?.major, 120),
         email, deviceHash: assignedDeviceHash, attendedAt: new Date()
       });
       const confirmed = await AttendanceRecord.findById(record._id).select('email clubId itemType eventRequestId')
@@ -3314,7 +3582,7 @@ app.get('/api/committee/attendance-overview', requireClubAuth, async (req, res) 
       if (!activitiesByKey.has(key)) {
         activitiesByKey.set(key, {
           clubId: record.clubId,
-          clubName: clubsById.get(Number(record.clubId))?.name || `Club ${record.clubId}`,
+          clubName: Number(record.clubId) === 0 ? 'MIU events' : clubsById.get(Number(record.clubId))?.name || `Club ${record.clubId}`,
           itemType,
           eventRequestId: record.eventRequestId,
           title: record.eventTitle || '(Archived activity)',
@@ -3326,7 +3594,7 @@ app.get('/api/committee/attendance-overview', requireClubAuth, async (req, res) 
     const knownClubIds = new Set(clubs.map((club) => Number(club.id)));
     attendanceRecords.forEach((record) => {
       if (!knownClubIds.has(Number(record.clubId))) {
-        clubsById.set(Number(record.clubId), { id: record.clubId, name: `Club ${record.clubId}` });
+        clubsById.set(Number(record.clubId), { id: record.clubId, name: Number(record.clubId) === 0 ? 'MIU events' : `Club ${record.clubId}` });
         knownClubIds.add(Number(record.clubId));
       }
     });
@@ -3363,7 +3631,7 @@ app.get('/api/committee/attendance-records', requireClubAuth, async (req, res) =
     if (!requireLiveDatabase(res)) return;
     const records = await AttendanceRecord.find(query).sort({ attendedAt: -1 }).lean();
     const clubIds = [...new Set(records.map((record) => Number(record.clubId)))];
-    const clubsById = new Map((await Club.find({ id: { $in: clubIds } }).select('id name image').lean()).map((club) => [Number(club.id), club]));
+    const clubsById = new Map((await Club.find({ id: { $in: clubIds.filter(id => id > 0) } }).select('id name image').lean()).map((club) => [Number(club.id), club]));
     const closureMap = await attendanceClosureMapFor(records);
     res.setHeader('Cache-Control', 'no-store');
     res.json(records.map(({ _id, __v, ...record }) => {
@@ -3372,7 +3640,7 @@ app.get('/api/committee/attendance-records', requireClubAuth, async (req, res) =
         ...record,
         attendanceEnded: isAttendanceActivityEnded(record.eventDate) || Boolean(closure),
         attendanceEndedAt: closure?.endedAt || null,
-        clubName: clubsById.get(Number(record.clubId))?.name || `Club ${record.clubId}`,
+        clubName: Number(record.clubId) === 0 ? 'MIU events' : clubsById.get(Number(record.clubId))?.name || `Club ${record.clubId}`,
         clubImage: clubsById.get(Number(record.clubId))?.image || ''
       };
     }));
@@ -3397,7 +3665,7 @@ app.get('/api/attendance/:token', async (req, res) => {
     if (!hasProof && !isCurrentAttendanceQrChallenge(token, req.query.code)) {
       return res.status(410).json({ message: 'This QR code has changed. Scan the current code shown by the club.' });
     }
-    const club = await Club.findOne({ id: session.clubId }).select('name').lean();
+    const club = session.sourceType === 'miu' ? { name: 'MIU events' } : await Club.findOne({ id: session.clubId }).select('name').lean();
     res.setHeader('Cache-Control', 'no-store');
     ensureAttendanceDeviceCookie(req, res);
     if (!hasProof) setAttendanceScanProofCookie(req, res, session._id);
@@ -3406,7 +3674,8 @@ app.get('/api/attendance/:token', async (req, res) => {
       itemType: session.itemType || 'event',
       eventTitle: session.eventTitle,
       eventDate: session.eventDate || '',
-      eventTime: session.eventTime || ''
+      eventTime: session.eventTime || '',
+      attendanceAudience: session.attendanceAudience || 'members'
     });
   } catch (error) {
     console.error('Attendance QR could not be checked:', error.name);
@@ -3433,16 +3702,27 @@ app.post('/api/attendance/:token', requireStudentAuth, async (req, res) => {
     }
     const normalizedEmail = String(email || '').trim().toLowerCase();
     const assignedMemberEmail = String(session.assignedMemberEmail || '').trim().toLowerCase();
-    const [activityClub, acceptedApplication] = await Promise.all([
-      Club.findOne({ id: session.clubId, archivedAt: null })
-        .select('memberRoster').read('primary').readConcern('majority').lean(),
-      Application.findOne({ clubId: session.clubId, status: 'accepted', email: normalizedEmail })
-        .select('_id').read('primary').readConcern('majority').lean(),
+    const isMiuSession = session.sourceType === 'miu';
+    const isAllStudents = session.attendanceAudience === 'all_students';
+    const [activityClub, acceptedApplication, memberClubs, acceptedMemberships] = await Promise.all([
+      session.clubId > 0 ? Club.findOne({ id: session.clubId, archivedAt: null })
+        .select('memberRoster').read('primary').readConcern('majority').lean() : Promise.resolve(null),
+      session.clubId > 0 ? Application.findOne({ clubId: session.clubId, status: 'accepted', email: normalizedEmail })
+        .select('_id').read('primary').readConcern('majority').lean() : Promise.resolve(null),
+      isAllStudents || isMiuSession ? Club.find({ archivedAt: null, 'memberRoster.email': normalizedEmail }).select('name memberRoster').lean() : Promise.resolve([]),
+      isAllStudents || isMiuSession ? Application.find({ email: normalizedEmail, status: 'accepted' }).select('clubId').lean() : Promise.resolve([])
     ]);
     const isRosterMember = (activityClub?.memberRoster || []).some((member) =>
       String(member.email || '').trim().toLowerCase() === normalizedEmail);
-    if (!activityClub || (!isRosterMember && !acceptedApplication)) {
-      return res.status(403).json({ message: 'Attendance is limited to current members of this club. Sign in with the MIU email on your accepted membership.' });
+    const isAnyClubMember = isRosterMember || Boolean(acceptedApplication) || memberClubs.length > 0 || acceptedMemberships.length > 0;
+    if (!isAllStudents && !(isMiuSession ? isAnyClubMember : activityClub && isAnyClubMember)) {
+      return res.status(403).json({ message: isMiuSession
+        ? 'Attendance is limited to current members of an MIU club. Sign in with the MIU email on your membership.'
+        : 'Attendance is limited to current members of this club. Sign in with the MIU email on your accepted membership.' });
+    }
+    if (isMiuSession) {
+      const published = await UniversityContent.exists({ id: session.eventRequestId, type: 'event', attendanceEnabled: true, date: session.eventDate });
+      if (!published) return res.status(410).json({ message: 'This MIU event is no longer published for attendance.' });
     }
     if (!hasAttendanceScanProof(req, session._id)) {
       return res.status(410).json({ message: 'Scan the current QR code to confirm attendance.' });
@@ -3464,7 +3744,21 @@ app.post('/api/attendance/:token', requireStudentAuth, async (req, res) => {
       clearAttendanceScanProofCookie(req, res);
       return res.status(410).json({ message: 'Attendance has ended for this event or booth.' });
     }
+    const memberClubIds = new Set(acceptedMemberships.map((membership) => Number(membership.clubId)));
+    const memberClubNames = memberClubs.filter((club) => (club.memberRoster || []).some((member) => String(member.email || '').trim().toLowerCase() === normalizedEmail))
+      .map((club) => cleanText(club.name, 100));
+    if (memberClubIds.size) {
+      const acceptedClubs = await Club.find({ id: { $in: [...memberClubIds] }, archivedAt: null }).select('name').lean();
+      acceptedClubs.forEach((memberClub) => { if (!memberClubNames.includes(memberClub.name)) memberClubNames.push(cleanText(memberClub.name, 100)); });
+    }
+    const uniqueMemberClubNames = [...new Set(memberClubNames)];
     const attendanceRecord = new AttendanceRecord({
+      universityId: cleanText(req.studentAccount.universityId, 40),
+      major: cleanText(req.studentAccount.major, 120),
+      attendanceAudience: isAllStudents ? 'all_students' : 'members',
+      membershipStatus: isAllStudents ? (uniqueMemberClubNames.length ? 'member' : 'non_member') : isMiuSession ? 'member' : 'unknown',
+      memberClubNames: uniqueMemberClubNames,
+      supervisorEmail: cleanText(session.assignedSupervisorEmail, 254).toLowerCase(),
       sessionId: session._id,
       clubId: session.clubId,
       itemType,
@@ -3548,8 +3842,26 @@ function canManageAttendance(account) {
   return account?.role === 'president' || isItCommitteeHead(account);
 }
 
+async function requireAttendanceSessionManager(req, res, next) {
+  try {
+    const account = await getClubAccountFromRequest(req);
+    if (account) { req.clubAccount = account; return next(); }
+    if (isAdminSessionValid(req)) {
+      req.clubAccount = { role: 'admin', email: adminAuthState?.email || getConfiguredAdminEmail() || '' };
+      return next();
+    }
+    return res.status(401).json({ message: 'Sign in to an authorized dashboard to manage attendance.' });
+  } catch { return res.status(503).json({ message: 'Could not verify attendance management access.' }); }
+}
+
 function attendanceTokenHash(token) {
   return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+function assignedMiuAttendanceToken(sessionId, email) {
+  return crypto.createHmac('sha256', sessionSecret)
+    .update(`miu-attendance-usher:${String(sessionId)}:${String(email || '').trim().toLowerCase()}`)
+    .digest('base64url');
 }
 
 function cairoDateKey(date = new Date()) {
@@ -4291,17 +4603,19 @@ app.get('/api/committee/attendance-reviews', requireClubAuth, async (req, res) =
     const reviews = new Map();
     reviewableRecords.forEach((record) => {
       const itemType = record.itemType === 'booth' ? 'booth' : 'event';
-      const key = `${record.clubId}:${itemType}:${record.eventRequestId}`;
-      const club = clubsById.get(Number(record.clubId));
+      const attendanceAudience = record.attendanceAudience === 'all_students' ? 'all_students' : 'members';
+      const key = `${record.clubId}:${itemType}:${record.eventRequestId}:${attendanceAudience}`;
+      const club = Number(record.clubId) === 0 ? { name: 'MIU events', image: '' } : clubsById.get(Number(record.clubId));
       if (!reviews.has(key)) reviews.set(key, {
         clubId: Number(record.clubId), clubName: club?.name || `Club ${record.clubId}`, clubImage: club?.image || '',
-        itemType, eventRequestId: record.eventRequestId, eventTitle: record.eventTitle, attendanceEnded: true,
+        itemType, eventRequestId: record.eventRequestId, attendanceAudience, eventTitle: record.eventTitle, attendanceEnded: true,
         attendanceEndedAt: closureMap.get(attendanceActivityKey(record))?.endedAt || null,
         eventDate: record.eventDate || '', eventTime: record.eventTime || '', records: [], notes: []
       });
       const review = reviews.get(key);
       review.records.push({
-        name: record.name, email: record.email, note: record.note || '', attendedAt: record.attendedAt
+        name: record.name, email: record.email, note: record.note || '', attendedAt: record.attendedAt,
+        membershipStatus: record.membershipStatus || '', memberClubNames: record.memberClubNames || []
       });
       (record.approvalHistory || []).filter((entry) => entry.note).forEach((entry) => {
         const note = {
@@ -4329,20 +4643,22 @@ app.post('/api/committee/attendance-reviews/:clubId/:itemType/:eventRequestId/ap
   const clubId = Number(req.params.clubId);
   const eventRequestId = Number(req.params.eventRequestId);
   const itemType = req.params.itemType;
+  const audience = req.query.audience === 'all_students' ? 'all_students' : req.query.audience === 'members' || req.query.audience === undefined ? 'members' : '';
   const action = ['approve', 'reject', 'note'].includes(req.body.action) ? req.body.action : 'approve';
   const note = cleanText(req.body.note, 500);
+  if (!audience) return res.status(400).json({ message: 'Choose a valid attendance lane.' });
   if (!Number.isSafeInteger(clubId) || !Number.isSafeInteger(eventRequestId) || !['event', 'booth'].includes(itemType)) {
     return res.status(400).json({ message: 'Choose a valid event or booth review.' });
   }
   if (action === 'note' && !note) return res.status(400).json({ message: 'Write a note before saving it.' });
   if (action === 'reject' && !note) return res.status(400).json({ message: 'Add a short reason before rejecting this attendance list.' });
-  const reviewFilter = { clubId, itemType, eventRequestId };
+  const reviewFilter = { clubId, itemType, eventRequestId, ...(audience === 'all_students' ? { attendanceAudience: 'all_students' } : { attendanceAudience: { $in: ['members', null] } }) };
   const stageFilter = role === 'pr'
     ? { $or: [{ approvalStatus: stage }, { approvalStatus: { $exists: false } }] }
     : { approvalStatus: stage };
   try {
     if (!requireLiveDatabase(res)) return;
-    const pendingRecords = await AttendanceRecord.find({ ...reviewFilter, ...stageFilter })
+    const pendingRecords = await AttendanceRecord.find({ $and: [reviewFilter, stageFilter] })
       .select('clubId itemType eventRequestId eventDate').read('primary').readConcern('majority').lean();
     if (!pendingRecords.length) return res.status(409).json({ message: `This activity is no longer waiting for ${attendanceApprovalNames[role]} approval.` });
     const closureMap = await attendanceClosureMapFor(pendingRecords);
@@ -4357,7 +4673,7 @@ app.post('/api/committee/attendance-reviews/:clubId/:itemType/:eventRequestId/ap
     } } };
     if (action === 'approve') update.$set = { approvalStatus: role === 'dean' ? 'approved' : role === 'pr' ? 'pending_sso' : 'pending_dean' };
     if (action === 'reject') update.$set = { approvalStatus: 'rejected' };
-    const result = await AttendanceRecord.updateMany({ ...reviewFilter, ...stageFilter }, update);
+    const result = await AttendanceRecord.updateMany({ $and: [reviewFilter, stageFilter] }, update);
     if (!result.modifiedCount) return res.status(409).json({ message: `This activity is no longer waiting for ${attendanceApprovalNames[role]} approval.` });
     await notifyAttendanceWorkflow(reviewFilter, action === 'approve' ? (role === 'dean' ? 'approved' : role === 'pr' ? 'pending_sso' : 'pending_dean') : action === 'reject' ? 'rejected' : stage, action);
     res.setHeader('Cache-Control', 'no-store');
@@ -4531,6 +4847,7 @@ function buildPublishedItem(record, club) {
   if (record.type === 'event') {
     item.registrationEnabled = record.registrationEnabled !== false;
     item.attendanceEnabled = record.registrationEnabled !== false && record.attendanceEnabled === true;
+    item.attendanceAudience = record.attendanceAudience === 'members' ? 'members' : 'all_students';
   }
   if (record.type === 'sponsor') {
     Object.assign(item, {
@@ -4750,6 +5067,12 @@ async function createContentRequest(req, res, type) {
       || (type === 'sponsor' ? cleanText(req.body.sponsorDescription, 2000) : '')
       || (type === 'booth' ? cleanText(req.body.boothDescription, 2000) : '')
       || (type === 'entry_permit' ? (Array.isArray(req.body.permitItems) ? req.body.permitItems.map((item) => cleanText(item.details, 1000)).filter(Boolean).join(' · ').slice(0, 2000) : '') : '');
+    if (type === 'event' && req.body.attendanceAudience !== undefined && !['members', 'all_students'].includes(req.body.attendanceAudience)) {
+      return res.status(400).json({ message: 'Choose whether this event is for club members or all university students.' });
+    }
+    if (type === 'event' && req.body.submit === true && !['members', 'all_students'].includes(req.body.attendanceAudience)) {
+      return res.status(400).json({ message: 'Choose an audience before submitting this event for review.' });
+    }
     if (type === 'entry_permit' && req.body.submit === true && !validEntryPermitItems(req.body.permitItems)) {
       return res.status(400).json({ message: 'Add at least one complete permit row with a valid quantity, number, and details.' });
     }
@@ -4776,7 +5099,8 @@ async function createContentRequest(req, res, type) {
       time: cleanText(req.body.time, 40),
       ...(type === 'event' ? {
         registrationEnabled: req.body.registrationEnabled === undefined ? true : req.body.registrationEnabled === true,
-        attendanceEnabled: req.body.registrationEnabled !== false && req.body.attendanceEnabled === true
+        attendanceEnabled: req.body.registrationEnabled !== false && req.body.attendanceEnabled === true,
+        attendanceAudience: req.body.attendanceAudience === 'members' ? 'members' : req.body.attendanceAudience === 'all_students' ? 'all_students' : undefined
       } : {}),
       location: type === 'booth' ? (cleanText(req.body.boothLocation, 140) || cleanText(req.body.location, 120)) : cleanText(req.body.location, 120),
       budget: cleanText(req.body.budget, 80),
@@ -4814,6 +5138,10 @@ app.put('/api/club/content/:id', requireClubAuth, async (req, res) => {
     }
     // The content type is fixed by the module that created the request.
     const type = record.type;
+    if (type === 'event' && req.body.submit === true
+      && !['members', 'all_students'].includes(req.body.attendanceAudience ?? record.attendanceAudience)) {
+      return res.status(400).json({ message: 'Choose an audience before submitting this event for review.' });
+    }
     const title = contentTitle(type, req.body);
     if (title && contentRequiresTitle(type)) record.title = title;
     else if (title && (type === 'sponsor' || type === 'booth')) record.title = title;
@@ -4831,6 +5159,9 @@ app.put('/api/club/content/:id', requireClubAuth, async (req, res) => {
     }
     if (type === 'event' && req.body.attendanceEnabled !== undefined) {
       record.attendanceEnabled = record.registrationEnabled && req.body.attendanceEnabled === true;
+    }
+    if (type === 'event' && req.body.attendanceAudience !== undefined) {
+      record.attendanceAudience = req.body.attendanceAudience;
     }
     if (req.body.location !== undefined) record.location = cleanText(req.body.location, 120);
     if (req.body.budget !== undefined) record.budget = cleanText(req.body.budget, 80);
@@ -5606,6 +5937,7 @@ app.post('/api/auth/login', async (req, res) => {
     res.append('Set-Cookie', `miu_student=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/;${secureCookieSuffix(req)}`);
     const roleRedirects = {
       software_development: '/admin',
+      miu_events: '/dashboards/miu-events-dashboard.html',
       supervisor: '/dashboards/supervisor-dashboard.html',
       president: '/club-dashboard',
       head: '/club-dashboard',
@@ -6026,6 +6358,11 @@ app.post('/api/password-reset/confirm', limitPasswordResetRequests, async (req, 
 
 registerFeedbackRoutes(app, { Club, UniversityContent, requireStudentAuth, isAdminSessionValid, getClubAccountFromRequest, requireLiveDatabase });
 app.use('/api/admin', requireAdmin);
+app.get('/api/admin/login-settings', (req, res) => {
+  res.json({ email: getConfiguredAdminEmail() || '',
+    editable: isLoopbackRequest(req) && !(process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD),
+    environmentManaged: Boolean(process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD) });
+});
 require('./services/staff-account-admin').registerStaffAccountAdmin(app, {
   ClubAccount, Club, databaseReady: () => mongoReady, sameOrigin: isSameOriginRequest, isAdminEmail: emailMatches,
   refreshAccount(account) {
@@ -6051,9 +6388,27 @@ require('./services/supervisor-admin').registerSupervisorAdmin(app, {
     writePrivateClubAccountsFile();
   }
 });
+require('./services/miu-event-admin').registerMiuEventAdmin(app, {
+  UniversityContent, databaseReady: () => mongoReady, sameOrigin: isSameOriginRequest, cleanText, parseInteraction,
+  readCloudinaryAsset, cloudinary, cloudinaryFolders, cloudinaryConfigured,
+  dispatchPublishedContentNotifications, toApiRecord, requireMiuEventsDashboard
+});
+require('./services/report-downloads').registerReportDownloads(app, {
+  Club, UniversityContent, ContentRequest, AttendanceRecord, AttendanceSession, EventRegistration, StudentAccount,
+  databaseReady: () => mongoReady,
+  getAccount: async req => {
+    const account = await getClubAccountFromRequest(req);
+    if (account) return account.role === 'software_development' ? { role: 'admin' } : account;
+    return await isAdminSessionValid(req) ? { role: 'admin' } : null;
+  }
+});
+require('./services/event-reports').registerEventReports(app, {
+  getAccount: getClubAccountFromRequest, databaseReady: () => mongoReady,
+  Club, EventRegistration, AttendanceRecord, sameOrigin: isSameOriginRequest
+});
 require('./services/supervisor-dashboard').registerSupervisorDashboard(app, {
   getAccount: getClubAccountFromRequest, databaseReady: () => mongoReady,
-  Club, ContentRequest, SpeakerRequest, AttendanceRecord, Review: SupervisorReview,
+  Club, ContentRequest, SpeakerRequest, AttendanceRecord, AttendanceSession, Review: SupervisorReview,
   sameOrigin: isSameOriginRequest, publicSpeakerRequest,
   notifyContent: notifyContentRequest, notifySpeaker: notifySpeakerWorkflow, notifyAttendance: notifyAttendanceWorkflow,
   attendanceClosureMapFor, attendanceActivityKey, isAttendanceActivityEnded
@@ -6151,6 +6506,9 @@ app.post('/api/admin/university-content', async (req, res) => {
   if (!type || !title || !description) {
     return res.status(400).json({ message: 'Enter a title and description.' });
   }
+  if (type === 'event' && !['members', 'all_students'].includes(req.body.attendanceAudience)) {
+    return res.status(400).json({ message: 'Choose who can register and check in for this MIU event.' });
+  }
   let image = '/assets/img/pics/logo.svg.png';
   let imagePublicId = '';
   if (useCustomImage) {
@@ -6171,6 +6529,7 @@ app.post('/api/admin/university-content', async (req, res) => {
       id: (last?.id || 0) + 1, type, title, description, date, time,
       registrationEnabled: type === 'event' && req.body.registrationEnabled === true,
       attendanceEnabled: type === 'event' && req.body.registrationEnabled === true && req.body.attendanceEnabled === true,
+      attendanceAudience: type === 'event' ? req.body.attendanceAudience : undefined,
       location,
       image, imagePublicId, publishedBy: getConfiguredAdminEmail() || 'MIU Admin'
     });
@@ -6670,6 +7029,11 @@ app.get('/admin/club-credentials', requireAdmin, (req, res) => {
 app.get('/admin/global', requireAdmin, (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.sendFile(path.join(__dirname, 'private', 'global-admin.html'));
+});
+
+app.get('/dashboards/miu-events-dashboard.html', requireMiuEventsDashboard, (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.sendFile(path.join(__dirname, 'public', 'dashboards', 'miu-events-dashboard.html'));
 });
 
 app.get('/api/admin/homepage', async (req, res) => {
@@ -7355,7 +7719,10 @@ app.get('/club-application.html', (req, res) => {
 app.get('/committee-dashboard.html', (req, res) => res.redirect(302, '/club-login'));
 app.get('/attendance', (req, res) => res.sendFile(path.join(__dirname, 'public', 'attendance.html')));
 
-app.use(express.static(path.join(__dirname, 'public')));
+app.get('/assets/vendor/exceljs.min.js', (req, res) => res.sendFile(path.join(__dirname, 'node_modules', 'exceljs', 'dist', 'exceljs.min.js')));
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders: require('./services/static-assets').staticAssetHeaders
+}));
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (character) => ({

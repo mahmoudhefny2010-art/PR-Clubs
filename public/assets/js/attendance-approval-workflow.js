@@ -19,7 +19,7 @@
   const escapePathPart = (value) => encodeURIComponent(String(value));
   const reviewKeys = (data) => (Array.isArray(data.reviews) ? data.reviews : []).map((review) => {
     const latest = review.records?.reduce((value, person) => Math.max(value, new Date(person.attendedAt || 0).getTime() || 0), 0) || 0;
-    return `${data.stage}:${review.clubId}:${review.itemType}:${review.eventRequestId}:${latest}`;
+    return `${data.stage}:${review.clubId}:${review.itemType}:${review.eventRequestId}:${review.attendanceAudience || 'members'}:${latest}`;
   });
 
   async function request(url, options = {}) {
@@ -48,7 +48,7 @@
       title.textContent = `${review.itemType === 'booth' ? 'Booth' : 'Event'} · ${review.eventTitle || 'Untitled activity'}`;
       const meta = document.createElement('p');
       meta.className = 'attendance-review-meta';
-      meta.textContent = [review.clubName, review.eventDate, window.formatSiteTime(review.eventTime), `${review.records.length} attendee${review.records.length === 1 ? '' : 's'}`].filter(Boolean).join(' · ');
+      meta.textContent = [review.clubName, review.attendanceAudience === 'all_students' ? 'Open student attendance' : 'Club member attendance', review.eventDate, window.formatSiteTime(review.eventTime), `${review.records.length} attendee${review.records.length === 1 ? '' : 's'}`].filter(Boolean).join(' · ');
       const heading = document.createElement('div');
       heading.className = 'attendance-review-heading';
       const avatar = document.createElement('div');
@@ -91,16 +91,19 @@
         identity.textContent = person.name || 'Student';
         const email = document.createElement('small');
         email.textContent = person.email || 'No email';
+        const membership = document.createElement('small');
+        if (person.membershipStatus) membership.textContent = person.membershipStatus === 'member'
+          ? `Member · ${(person.memberClubNames || []).join(', ') || 'club membership'}` : 'Non-member';
         const note = document.createElement('small');
         note.textContent = person.note ? `Note: ${person.note}` : 'No note';
         const checkin = document.createElement('small');
         checkin.textContent = `Checked in: ${htmlDate(person.attendedAt)}`;
-        row.append(identity, email, note, checkin);
+        row.append(identity, email, ...(person.membershipStatus ? [membership] : []), note, checkin);
         people.append(row);
       });
       const sheet = document.createElement('details');
       sheet.className = 'attendance-review-sheet';
-      sheet.dataset.reviewKey = `${review.clubId}:${review.itemType}:${review.eventRequestId}`;
+      sheet.dataset.reviewKey = `${review.clubId}:${review.itemType}:${review.eventRequestId}:${review.attendanceAudience || 'members'}`;
       sheet.open = openSheets.has(sheet.dataset.reviewKey);
       const sheetSummary = document.createElement('summary');
       sheetSummary.textContent = `View all attendance sheet · ${review.records.length} attendee${review.records.length === 1 ? '' : 's'}`;
@@ -172,7 +175,7 @@
     message.textContent = action === 'approve' ? 'Approving the full attendance list…'
       : action === 'reject' ? 'Rejecting the full attendance list…' : 'Saving your note…';
     message.classList.remove('is-error');
-    const url = `/api/committee/attendance-reviews/${escapePathPart(review.clubId)}/${escapePathPart(review.itemType)}/${escapePathPart(review.eventRequestId)}/approve`;
+    const url = `/api/committee/attendance-reviews/${escapePathPart(review.clubId)}/${escapePathPart(review.itemType)}/${escapePathPart(review.eventRequestId)}/approve?audience=${escapePathPart(review.attendanceAudience || 'members')}`;
     try {
       const data = await request(url, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },

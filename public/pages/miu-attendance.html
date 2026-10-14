@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MIU event attendance · MIU Clubs</title>
+  <link rel="stylesheet" href="/assets/css/base.css"><link rel="stylesheet" href="/assets/css/responsive.css">
+  <link rel="stylesheet" href="/assets/css/dark.css"><link rel="stylesheet" href="/assets/css/features.css">
+  <link rel="stylesheet" href="/assets/css/pages/event-reports.css?v=20261014mobileoptions1">
+  <script src="/assets/js/theme.js" defer></script><script src="/assets/js/install-welcome.js?v=20261014promptqueue1" defer></script>
+  <script src="/assets/js/pages/miu-attendance.js?v=20261014mobileoptions1" defer></script>
+</head>
+<body class="miu-attendance-page"><div id="site-header"></div>
+  <main class="app-container event-reports"><section class="committee-card miu-attendance-card">
+    <a class="secondary-btn" href="/admin" data-history-back>← Back</a>
+    <h1>MIU event attendance</h1>
+    <p>Create attendance teams for a published MIU event. Each team has one Supervisor reviewer and one student or staff usher with their own rotating QR. Check-ins require an authenticated student and remain separate from club attendance.</p>
+    <form id="miuAttendanceForm" class="miu-attendance-form">
+      <label>MIU event<select id="miuAttendanceEvent" required><option value="">Loading events</option></select><small id="miuAttendanceEventDetails" class="miu-attendance-event-details" hidden></small></label>
+      <div class="miu-assignment-heading"><h2>Attendance teams</h2><p>Add a Supervisor reviewer and a student or staff usher for each check-in lane, up to 20 teams.</p></div>
+      <div id="miuAttendanceAssignments" class="miu-assignment-list">
+        <fieldset class="miu-assignment-row">
+          <legend>Team 1</legend>
+          <label>Assigned Supervisor email<input data-supervisor-email type="email" required maxlength="254" autocomplete="email" placeholder="supervisor@miuegypt.edu.eg"></label>
+          <label>Student or staff usher MIU email<input data-usher-email type="email" required maxlength="254" autocomplete="email" placeholder="student@miuegypt.edu.eg"></label>
+          <button class="miu-remove-assignment secondary-btn" type="button" aria-label="Remove team 1" hidden>Remove</button>
+        </fieldset>
+      </div>
+      <div class="miu-attendance-actions"><button id="miuAttendanceAdd" class="secondary-btn" type="button">+ Add another attendance team</button><button id="miuAttendanceStart" class="primary-btn" type="submit" disabled>Assign teams</button></div>
+    </form>
+    <p id="miuAttendanceFeedback" role="status" aria-live="polite">Loading eligible events</p>
+    <p>Each assigned usher signs in, accepts their task, then opens their own QR from the account menu’s “Attendance usher task” link. All teams share one event attendance list.</p>
+    <section id="miuAttendanceQr" class="attendance-qr-result hidden" aria-live="polite">
+      <h2 id="miuAttendanceTitle"></h2><p id="miuAttendanceAssignmentsResult"></p><ul id="miuAttendanceAssignedList"></ul>
+      <button id="miuAttendanceEnd" class="secondary-btn" type="button">End attendance</button>
+    </section>
+  </section></main><div id="site-footer"></div>
+</body></html>

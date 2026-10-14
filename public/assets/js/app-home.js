@@ -27,6 +27,32 @@ let universityContentLoaded = false;
 let universityContentLoadPromise = null;
 let universityContentPrefetchScheduled = false;
 let memberAttendancePrefetchScheduled = false;
+const publicDataCacheKeys = {
+  clubs: 'miu-public-clubs-v1',
+  universityContent: 'miu-public-university-content-v1',
+};
+
+function readPublicDataCache(key) {
+  try {
+    const cached = JSON.parse(localStorage.getItem(key) || 'null');
+    return cached && Array.isArray(cached.data) ? cached.data : null;
+  } catch {
+    return null;
+  }
+}
+
+function writePublicDataCache(key, data) {
+  try {
+    const snapshot = JSON.stringify({ savedAt: Date.now(), data });
+    if (snapshot.length <= 3 * 1024 * 1024) localStorage.setItem(key, snapshot);
+  } catch {
+    // The public pages still work when storage is disabled or full.
+  }
+}
+
+function samePublicData(left, right) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
 
 const views = {
   authLoading: document.getElementById('authLoadingView'),
@@ -288,14 +314,30 @@ async function loadClubs(force = false) {
     renderAdminClubList();
     return;
   }
+  if (!clubsLoaded) {
+    const cachedClubs = readPublicDataCache(publicDataCacheKeys.clubs);
+    if (cachedClubs) {
+      state.clubs = cachedClubs;
+      clubsLoaded = true;
+      renderClubGrid();
+      renderAdminClubList();
+    }
+  }
   if (!clubsLoadPromise) {
     clubsLoadPromise = (async () => {
-      const response = await fetch('/api/clubs?media=links', { cache: 'no-store' });
+      const response = await fetch('/api/clubs?media=links', { cache: 'no-cache' });
       if (!response.ok) throw new Error('Could not load club events.');
       const records = await response.json();
-      state.clubs = Array.isArray(records) ? records : [];
+      const nextClubs = Array.isArray(records) ? records : [];
+      const changed = !samePublicData(nextClubs, state.clubs);
+      state.clubs = nextClubs;
+      writePublicDataCache(publicDataCacheKeys.clubs, nextClubs);
       clubsLoaded = true;
       clubsLoadedAt = Date.now();
+      if (changed) {
+        renderClubGrid();
+        renderAdminClubList();
+      }
     })();
   }
   try {
@@ -303,8 +345,6 @@ async function loadClubs(force = false) {
   } finally {
     clubsLoadPromise = null;
   }
-  renderClubGrid();
-  renderAdminClubList();
   if (!universityContentPrefetchScheduled && window.siteStartup?.afterStartup) {
     universityContentPrefetchScheduled = true;
     window.siteStartup.afterStartup(loadUniversityContentInBackground);
@@ -315,9 +355,19 @@ async function loadClubs(force = false) {
 
 async function loadUniversityContentInBackground() {
   if (universityContentLoaded) return;
+  if (!universityContentLoaded) {
+    const cachedContent = readPublicDataCache(publicDataCacheKeys.universityContent);
+    if (cachedContent) {
+      state.universityContent = cachedContent;
+      universityContentLoaded = true;
+      renderEventsSlideshow();
+      renderTodayEvents();
+    }
+  }
   if (!universityContentLoadPromise) {
     universityContentLoadPromise = refreshUniversityContentFromDatabase()
       .then(() => { universityContentLoaded = true; })
+      .catch(() => {})
       .finally(() => { universityContentLoadPromise = null; });
   }
   await universityContentLoadPromise;
@@ -359,6 +409,9 @@ function createApprovalRequestCheckpoint(request) {
   const labels = isEntryPermit
     ? ['Submitted', 'Supervisor review', 'PR review', 'Security review', 'PR final approval', 'Dean view only']
     : ['Submitted', 'Supervisor review', 'PR review', 'English review', 'Dean review', 'Published'];
+  const compactLabels = isEntryPermit
+    ? ['Submit', 'Supv.', 'PR', 'Sec.', 'PR final', 'Dean']
+    : ['Submit', 'Supv.', 'PR', 'Eng.', 'Dean', 'Live'];
   const stageByRole = { club: 0, supervisor: 1, pr: 2, english: 3, security: 3, dean: 4 };
   const statusIndex = isEntryPermit
     ? { draft: -1, pending_supervisor: 1, pending_security: 3, pending_dean: 4, approved: 5 }
@@ -407,8 +460,7 @@ function createApprovalRequestCheckpoint(request) {
   heading.append(identity, state);
 
   const requestTrack = document.createElement('div');
-  requestTrack.className = 'approval-request-track';
-  requestTrack.style.gridTemplateColumns = `repeat(${labels.length}, minmax(0, 1fr))`;
+  requestTrack.className = `approval-request-track${labels.length === 6 ? ' is-six-stage' : ''}`;
   requestTrack.style.setProperty('--request-progress', `${currentIndex < 0 ? 0 : currentIndex / (labels.length - 1) * 100}%`);
   labels.forEach((label, index) => {
     const step = document.createElement('div');
@@ -422,7 +474,9 @@ function createApprovalRequestCheckpoint(request) {
     marker.className = 'approval-request-marker';
     marker.setAttribute('aria-hidden', 'true');
     const stepTitle = document.createElement('span');
-    stepTitle.textContent = label;
+    stepTitle.textContent = compactLabels[index] || label;
+    stepTitle.title = label;
+    step.setAttribute('aria-label', label);
     step.append(marker, stepTitle);
     requestTrack.append(step);
   });
@@ -940,7 +994,7 @@ async function openClubPortal(initialSession = null) {
 }
 
 function setPresidentDashboardSection(sectionId) {
-  const sectionIds = ['presidentOverviewPanel', 'presidentClubStatusPanel', 'presidentHeadManager', 'presidentFormManager', 'interviewFormManager', 'presidentApplicantsPanel', 'speakerRequestDashboardPanel', 'speakerInviteDashboardPanel'];
+  const sectionIds = ['presidentOverviewPanel', 'presidentClubStatusPanel', 'presidentHeadManager', 'presidentFormManager', 'interviewFormManager', 'presidentApplicantsPanel', 'speakerRequestDashboardPanel', 'speakerInviteDashboardPanel', 'reportInlinePanel'];
   if (state.clubAccount?.role === 'president' && sectionIds.includes(sectionId)) {
     try { localStorage.setItem(`miu-club-dashboard-section:${state.clubAccount.id}`, sectionId); } catch { /* The section still changes for this visit. */ }
   }
@@ -1102,16 +1156,17 @@ function getAllEvents() {
 async function refreshUniversityContentFromDatabase() {
   const refreshId = ++universityContentRefreshId;
   try {
-    const response = await fetch('/api/university-content', { cache: 'no-store' });
+    const response = await fetch('/api/university-content', { cache: 'no-cache' });
     if (!response.ok) throw new Error('University updates are unavailable.');
     const latest = await response.json();
     if (refreshId !== universityContentRefreshId) return;
     const nextItems = Array.isArray(latest) ? latest : [];
-    if (JSON.stringify(nextItems) === JSON.stringify(state.universityContent)) return;
+    if (samePublicData(nextItems, state.universityContent)) return;
     state.universityContent = nextItems;
+    writePublicDataCache(publicDataCacheKeys.universityContent, nextItems);
   } catch {
-    if (refreshId !== universityContentRefreshId || !state.universityContent.length) return;
-    state.universityContent = [];
+    // Keep the last public snapshot visible when the database is temporarily unavailable.
+    return;
   }
   renderEventsSlideshow();
   renderTodayEvents();

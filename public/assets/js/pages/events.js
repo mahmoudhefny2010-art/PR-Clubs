@@ -18,8 +18,8 @@
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   }[ch]));
 
-  let clubs = [];
-  let universityContent = [];
+  let clubs = window.miuPublicDataCache?.read('clubs') || [];
+  let universityContent = window.miuPublicDataCache?.read('universityContent') || [];
   const allEvents = () => clubs.flatMap((club) =>
     (Array.isArray(club.events) ? club.events : []).map((event, eventIndex) => ({
       ...event,
@@ -95,6 +95,8 @@
           </span>
           <span class="event-timeline-body">
             <strong class="feed-timeline-title">${escapeHtml(event.title || 'Event')}</strong>
+            ${!event.university && event.registrationEnabled !== false && event.date >= new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(new Date()) ? '<span class="event-timeline-location">Student registration · Open event to check availability</span>' : ''}
+            ${event.registrationEnabled !== false ? `<span class="event-timeline-location">${event.attendanceAudience === 'members' ? event.university ? 'MIU club members only' : 'Club members only' : 'Open to all university students'}</span>` : ''}
             ${event.attendanceEnabled === true ? '<span class="event-attendance-status">Attendance taken</span>' : ''}
             ${event.location ? `<span class="event-timeline-location">${escapeHtml(event.location)}</span>` : ''}
             ${event.description ? `<span class="feed-timeline-text">${escapeHtml(event.description)}</span>` : ''}
@@ -150,29 +152,44 @@
       const latest = await response.json();
       if (refreshId !== universityRefreshId) return;
       universityContent = Array.isArray(latest) ? latest : [];
+      window.miuPublicDataCache?.write('universityContent', universityContent);
     } catch {
       if (refreshId !== universityRefreshId) return;
-      universityContent = [];
+      return;
     }
     renderList();
     renderFeedTimeline();
   }
 
-  fetch('/api/clubs?media=links', { cache: 'no-store' })
-    .then((response) => {
+  if (clubs.length) { renderList(); renderFeedTimeline(); }
+  if (universityContent.length) { renderList(); renderFeedTimeline(); }
+
+  async function refreshClubs() {
+    try {
+      const response = await fetch('/api/clubs?media=links', { cache: 'no-store' });
       if (!response.ok) throw new Error('Could not load events.');
-      return response.json();
-    })
-    .then((data) => {
-      clubs = Array.isArray(data) ? data : [];
-      renderList();
-      renderFeedTimeline();
+      const records = await response.json();
+      const next = Array.isArray(records) ? records : [];
+      const changed = !window.miuPublicDataCache?.same(clubs, next);
+      clubs = next;
+      window.miuPublicDataCache?.write('clubs', clubs);
+      if (changed) { renderList(); renderFeedTimeline(); }
+      return true;
+    } catch {
+      if (!clubs.length && listEl) listEl.innerHTML = '<p class="events-empty">Could not load events right now.</p>';
+      return false;
+    }
+  }
+
+  void refreshClubs().then((loaded) => {
+      if (!loaded) return;
+      if (universityContent.length) { renderList(); renderFeedTimeline(); }
       if (window.siteStartup?.afterStartup) window.siteStartup.afterStartup(refreshUniversityContent);
       else void refreshUniversityContent();
-    })
-    .catch(() => {
-      if (listEl) listEl.innerHTML = '<p class="events-empty">Could not load events right now.</p>';
     });
+  window.setInterval(() => {
+    if (document.visibilityState === 'visible') void refreshClubs();
+  }, 60_000);
   window.setInterval(() => {
     if (document.visibilityState === 'visible') refreshUniversityContent();
   }, 60_000);

@@ -19,7 +19,7 @@
     .section-heading p { margin: 4px 0 0; color: var(--text-muted); font-size: .92rem; }
     .toolbar { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
     .toolbar label { display: flex; align-items: center; gap: 8px; font-size: .88rem; color: var(--text-muted); }
-    .toolbar select { padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-panel); color: var(--text-main); font: inherit; }
+    .toolbar select { box-sizing: border-box; width: min(280px, 100%); min-width: min(220px, 100%); min-height: 44px; padding: 8px 36px 8px 12px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-panel); color: var(--text-main); font: inherit; }
     .records { display: grid; gap: 10px; }
     .record { background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 14px; padding: 16px 18px; }
     .record-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
@@ -83,7 +83,7 @@
     .university-publisher-form { display: grid; gap: 12px; padding: 18px; border: 1px solid var(--border-color); border-radius: 16px; background: var(--bg-panel); }
     .university-publisher-form h3 { margin: 0; }
     .university-publisher-form label { display: grid; gap: 6px; color: var(--text-main); font-size: .86rem; font-weight: 700; }
-    .university-publisher-form input, .university-publisher-form select, .university-publisher-form textarea { width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-panel); color: var(--text-main); font: inherit; }
+    .university-publisher-form input, .university-publisher-form select, .university-publisher-form textarea { box-sizing: border-box; width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-panel); color: var(--text-main); font: inherit; }
     .university-publisher-form textarea { min-height: 110px; resize: vertical; }
     .university-publisher-form [hidden] { display: none !important; }
     .university-image-options { display: flex; gap: 14px; flex-wrap: wrap; }
@@ -92,7 +92,7 @@
     .university-publisher-preview { display: grid; justify-items: center; gap: 12px; padding: 18px; border: 1px dashed var(--border-color); border-radius: 16px; background: var(--bg-soft); text-align: center; }
     .university-publisher-preview img { width: min(100%, 260px); max-height: 210px; aspect-ratio: 1.3; object-fit: contain; border-radius: 12px; background: #fff; padding: 8px; }
     .university-publisher-preview p { margin: 0; color: var(--text-muted); font-size: .82rem; }
-    @media (max-width: 740px) { .university-publisher { grid-template-columns: 1fr; } }
+    @media (max-width: 740px) { .university-publisher { grid-template-columns: minmax(0, 1fr); gap: 12px; } .university-publisher-form { min-width: 0; padding: 14px; } .university-publisher-form input, .university-publisher-form select, .university-publisher-form textarea { min-height: 44px; font-size: 16px; } .university-publisher-form button { width: 100%; } .university-publisher-preview { min-width: 0; } }
     .activity-history { margin-top: 12px; border-top: 1px solid var(--border-color); padding-top: 10px; }
     .activity-history summary { width: fit-content; color: var(--text-muted); font-size: .73rem; font-weight: 700; cursor: pointer; }
     .activity-history-content { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 9px; }
@@ -233,6 +233,7 @@
     @media (max-width: 480px) { .committee-availability-row { align-items: stretch; flex-direction: column; } }
   </style>
   <script src="/assets/js/student-feedback.js?v=6"></script>
+  <link rel="stylesheet" href="/assets/css/pages/event-reports.css?v=20261013miuadminsurface3">
 </head>
 <body>
   <div class="page-shell">
@@ -246,6 +247,7 @@
           <p id="adminSubtitle">Manage clubs, heads, and applications globally.</p>
         </div>
         <div class="top-actions">
+
           <a id="adminBackBtn" class="secondary-btn" href="/admin">Back</a>
         </div>
       </section>
@@ -255,7 +257,6 @@
         <button class="tab-btn" data-tab="heads" type="button">Club Heads</button>
         <button class="tab-btn" data-tab="clubs" type="button">Clubs</button>
         <button class="tab-btn" data-tab="analysis" type="button">Analysis</button>
-        <button class="tab-btn" data-tab="university" type="button">MIU Posts</button>
         <button class="tab-btn" data-tab="feedback" type="button">Student feedback</button>
         <button class="tab-btn" data-tab="miu-feedback" type="button">MIU polls &amp; evaluations</button>
         <button class="tab-btn" data-tab="applications" type="button">Applications</button>
@@ -321,7 +322,7 @@
         </section>
       </section>
 
-      <section class="section tab-panel" id="tab-university">
+      <section class="section tab-panel" id="tab-university" hidden>
         <div class="section-heading">
           <div><h2>Publish as MIU</h2><p>Post university announcements and events directly to the public website. Published items sync from the database.</p></div>
           <button class="secondary-btn" id="refreshUniversityPostsBtn" type="button">Refresh from database</button>
@@ -344,6 +345,14 @@
               <label for="universityPostLocation">Location<input id="universityPostLocation" name="location" maxlength="160" placeholder="Building or venue" /></label>
               <label for="universityPostRegistration">Event registration
                 <select id="universityPostRegistration" name="registrationEnabled"><option value="false" selected>No registration</option><option value="true">Allow students to register</option></select>
+              </label>
+              <label id="universityAudienceField" for="universityPostAudience">Who can register and check in?
+                <select id="universityPostAudience" name="attendanceAudience">
+                  <option value="" selected disabled>Choose the event audience</option>
+                  <option value="all_students">All university students, including non-members</option>
+                  <option value="members">Current members of any MIU club</option>
+                </select>
+                <small>Member-only MIU events accept students with an active membership in at least one club.</small>
               </label>
               <label id="universityAttendanceField" for="universityPostAttendance" hidden>Attendance tracking
                 <select id="universityPostAttendance" name="attendanceEnabled"><option value="false" selected>Attendance will not be recorded</option><option value="true">Attendance will be recorded</option></select>
@@ -493,7 +502,7 @@
 
   <div id="site-footer"></div>
 
-  <script src="/assets/js/layout.js?v=11" defer></script>
+  <script src="/assets/js/layout.js?v=20261013formattedexcel10" defer></script>
   <script src="/assets/js/theme.js?v=20261009c" defer></script>
   <script src="/assets/js/cloudinary-upload.js?v=2"></script>
   <script>
@@ -670,7 +679,7 @@
               <div>
                 <h3 class="record-title">${escapeHtml(post.title)}</h3>
                 <p class="record-meta">${post.type === 'event' ? 'Event' : 'Announcement'}${post.date ? ` · ${escapeHtml(post.date)}` : post.type === 'event' ? ' · Date to be announced' : ''}${post.time ? ` · ${escapeHtml(window.formatSiteTime ? window.formatSiteTime(post.time) : post.time)}` : ''}${post.location ? ` · ${escapeHtml(post.location)}` : ''}${post.type === 'event' ? (post.registrationEnabled ? ' · Registration open' : ' · No registration') : ''}</p>
-                ${post.type === 'event' && post.registrationEnabled ? `<p class="record-meta">${post.attendanceEnabled === true ? 'Attendance will be recorded' : 'Attendance will not be recorded'}</p>` : ''}
+                ${post.type === 'event' ? `<p class="record-meta">${post.attendanceAudience === 'members' ? 'Current members of any MIU club' : 'All university students'}${post.registrationEnabled ? ` · ${post.attendanceEnabled === true ? 'Attendance will be recorded' : 'Attendance will not be recorded'}` : ''}</p>` : ''}
               </div>
               <div class="record-actions"><button class="danger" type="button" data-delete-university-post="${Number(post.id)}">Delete</button></div>
             </div>
@@ -703,6 +712,8 @@
     const universityEventDate = byId('universityPostDate');
     const universityEventType = byId('universityPostType');
     const universityRegistration = byId('universityPostRegistration');
+    const universityAudience = byId('universityPostAudience');
+    const universityAudienceField = byId('universityAudienceField');
     const universityAttendance = byId('universityPostAttendance');
     const universityAttendanceField = byId('universityAttendanceField');
     const universityImageInput = byId('universityPostImage');
@@ -711,6 +722,8 @@
     function updateUniversityEventFields() {
       const isEvent = universityEventType.value === 'event';
       universityEventFields.hidden = !isEvent;
+      universityAudienceField.hidden = !isEvent;
+      universityAudience.required = isEvent;
       universityAttendanceField.hidden = !isEvent || universityRegistration.value !== 'true';
       if (universityAttendanceField.hidden) universityAttendance.value = 'false';
       universityEventDate.required = false;
@@ -769,6 +782,7 @@
           location: byId('universityPostLocation').value.trim(),
           registrationEnabled,
           attendanceEnabled: registrationEnabled && universityAttendance.value === 'true',
+          attendanceAudience: universityAudience.value,
           imageChoice
         };
         if (imageChoice === 'custom') {
@@ -1270,5 +1284,7 @@
     }
     init();
   </script>
+  <script src="/assets/js/pages/report-downloads.js?v=20261013openattendance1" defer></script>
+  <script src="/assets/js/report-dashboard-panels.js?v=20261013inline2" defer></script>
 </body>
 </html>

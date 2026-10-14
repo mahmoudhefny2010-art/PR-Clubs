@@ -99,13 +99,28 @@
     });
   }
 
-  fetch('/api/clubs?media=links')
+  clubs = window.miuPublicDataCache?.read('clubs') || [];
+  if (clubs.length) renderList();
+  fetch('/api/clubs?media=links', { cache: 'no-store' })
     .then((response) => response.json())
     .then((data) => {
       clubs = Array.isArray(data) ? data : [];
+      window.miuPublicDataCache?.write('clubs', clubs);
       renderList();
     })
     .catch(() => {
-      if (listEl) listEl.innerHTML = '<p class="events-empty">Could not load booths right now.</p>';
+      if (!clubs.length && listEl) listEl.innerHTML = '<p class="events-empty">Could not load booths right now.</p>';
     });
+  window.setInterval(async () => {
+    if (document.visibilityState !== 'visible') return;
+    try {
+      const response = await fetch('/api/clubs?media=links', { cache: 'no-store' });
+      if (!response.ok) return;
+      const latest = await response.json();
+      if (!Array.isArray(latest) || window.miuPublicDataCache?.same(clubs, latest)) return;
+      clubs = latest;
+      window.miuPublicDataCache?.write('clubs', clubs);
+      renderList();
+    } catch { /* Keep the last loaded club list visible. */ }
+  }, 60_000);
 })();

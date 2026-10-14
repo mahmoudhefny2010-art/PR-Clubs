@@ -82,7 +82,7 @@
   .topbar-nav, .topbar, .brand-wrap, .welcome-box, .hero-panel, .committee-card,
   .app-form-card, .summary-card, .stat-box, .stat-card, .detail-box,
   .club-card, .club-detail-card, .club-login-panel, .admin-panel, .admin-login-panel,
-  .application-card, .application-row, .record, .modal-card, .section,
+  .application-card, .application-row, .record, .modal-card,
   .committee-sidebar, .committee-sidebar-link.is-active, .president-sidebar,
   .president-sidebar-action.is-active, .sso-hero, .attendance-review-panel,
   .request-dialog-inner, .member-directory-inner, .member-directory-card, .panel,
@@ -95,7 +95,7 @@
   .calendar-detail, .calendar-day, .event-tile, .post-tile, .post-detail,
   .event-timeline-content, .feed-timeline-content, .event-page-content,
   .event-modal-panel, .calendar-day-events-panel, .events-slideshow, .detail-logo-frame, .detail-requirements, .details-section,
-  .committee-requests-section, .committee-request-card, .attendance-record-card,
+  .committee-request-card, .attendance-record-card,
   .member-dialog-inner, .club-review-notice-dialog, .admin-section,
   .empty-state, .my-form-card, .admin-member-directory-card
 ) {
@@ -104,11 +104,22 @@
   border-color: var(--border-color) !important;
   box-shadow: var(--shadow-sm);
 }
+:root[data-theme="dark"] body dialog.committee-inline-panel[open] .attendance-review-panel {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+/* Keep attendance review copy on the page surface instead of a nested square panel. */
+:root[data-theme="dark"] body .attendance-review-panel {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
 :root[data-theme="dark"] body > main:not(.app-container):not(.dedicated-event-page) {
-  background-color: var(--bg-panel) !important;
+  background-color: transparent !important;
   color: var(--text-main) !important;
-  border-color: var(--border-color) !important;
-  box-shadow: var(--shadow-lg);
+  border-color: transparent !important;
+  box-shadow: none !important;
 }
 
 :root[data-theme="dark"] body :is(.bg-soft, .detail-info, .approval-checkpoint-track, .calendar-event, .event-tile-body, .event-performance-metrics span) {
@@ -280,6 +291,10 @@
 }
 :root[data-theme="dark"] body :is(.content-form-assignment, .content-card, .module-card) { color: var(--text-main) !important; }
 :root[data-theme="dark"] body .content-card-type { background: var(--bg-strong) !important; color: var(--text-muted) !important; }
+:root[data-theme="dark"] body .content-card .meta { color: var(--text-muted) !important; }
+:root[data-theme="dark"] body .content-review-update { border-color: rgba(255, 210, 121, .24) !important; border-left-color: #f0b648 !important; background: rgba(217, 119, 6, .12) !important; color: #e5edf7 !important; }
+:root[data-theme="dark"] body .content-review-update strong { color: #ffd279 !important; }
+:root[data-theme="dark"] body .content-task-assignment { color: var(--text-muted) !important; }
 :root[data-theme="dark"] body :is(.review-history-badge.request_edit, .speaker-status.changes_requested, .speaker-status.pending_club) { background: var(--warning-bg) !important; color: #ffd279 !important; border-color: var(--warning-border) !important; }
 :root[data-theme="dark"] body .review-history-badge.reject,
 :root[data-theme="dark"] body .speaker-status.rejected { background: var(--danger-bg) !important; color: #ffabb1 !important; border-color: var(--danger-border) !important; }
@@ -303,6 +318,12 @@
   background-color: var(--bg-panel) !important;
   color: var(--text-main) !important;
   border-color: var(--border-color) !important;
+}
+:root[data-theme="dark"] body #attendanceReviewDialog.committee-inline-panel[open],
+:root[data-theme="dark"] body #attendanceReviewDialog.committee-inline-panel[open] .attendance-review-panel {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
 }
 :root[data-theme="dark"] body :is(dialog, .modal)::backdrop { background: rgba(2, 6, 15, .74) !important; backdrop-filter: blur(5px); }
 :root[data-theme="dark"] .event-page-content { background: var(--bg-panel) !important; color: var(--text-main) !important; }
@@ -346,6 +367,32 @@
   .modal-actions { grid-template-columns: 1fr; }
   .application-row { flex-direction: column; }
   .card-actions { gap: 8px; }
+}
+
+/* The interview review modal is shared across application-review entry points. */
+@media (max-width: 560px) {
+  #reviewModal .modal-actions {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    align-items: stretch;
+    gap: 8px;
+  }
+  #reviewModal .modal-actions > .action-btn {
+    box-sizing: border-box;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 48px !important;
+    height: auto !important;
+    padding: 8px 5px !important;
+    font-size: .82rem !important;
+    line-height: 1.2;
+    white-space: normal;
+    overflow-wrap: normal;
+  }
+}
+@media (max-width: 360px) {
+  #reviewModal .modal-actions { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  #reviewModal #saveReviewBtn { grid-column: 1 / -1; }
 }
 @media (max-width: 700px) {
   .my-forms-panel .admin-header { align-items: flex-start; flex-direction: column; }

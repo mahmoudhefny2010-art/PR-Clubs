@@ -104,10 +104,8 @@
       ['Session format', 'sessionFormat'], ['Availability', 'availability'], ['Special requirements', 'specialRequirements'],
       ['Hosting club', 'clubName'], ['Status', 'status'], ['Submitted at', 'submittedAt'], ['Attachments', 'attachmentNames']
     ];
-    const rows = [columns.map(([label]) => csvCell(label)).join(','), ...visibleRecords().map((item) => columns.map(([, key]) => csvCell(key === 'attachmentNames' ? requestAttachments(item).map((attachment) => attachment.name).join('; ') : item[key])).join(','))];
-    const url = URL.createObjectURL(new Blob([`\uFEFF${rows.join('\r\n')}`], { type: 'text/csv;charset=utf-8' }));
-    const link = document.createElement('a'); link.href = url; link.download = 'university-speaker-requests.csv'; link.click();
-    URL.revokeObjectURL(url);
+    const rows = [columns.map(([label]) => label), ...visibleRecords().map(item => columns.map(([, key]) => key === 'attachmentNames' ? requestAttachments(item).map(attachment => attachment.name).join('; ') : item[key]))];
+    window.downloadFormattedExcel(rows, 'university-speaker-requests.xlsx').catch(error => window.alert(error.message));
   }
   search.addEventListener('input', filterCards);
   statusFilter.addEventListener('change', filterCards);

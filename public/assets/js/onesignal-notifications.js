@@ -38,10 +38,6 @@
   }
 
   function maybeShowNotificationWelcome() {
-    if (document.querySelector('dialog[open]')) {
-      document.querySelector('dialog[open]').addEventListener('close', maybeShowNotificationWelcome, { once: true });
-      return;
-    }
     if (!oneSignalInstance || !oneSignalInstance.Notifications.isPushSupported()) return;
     if (oneSignalInstance.User.PushSubscription.optedIn) return;
     if (typeof Notification !== 'undefined' && Notification.permission === 'denied') return;
@@ -86,7 +82,11 @@
       });
     }
 
-    if (!welcomeDialog.open) welcomeDialog.showModal();
+    window.queueSitePrompt('notifications', welcomeDialog, {
+      eligible: () => Boolean(currentSession?.authenticated && oneSignalInstance
+        && !hasSeenWelcome() && !oneSignalInstance.User.PushSubscription.optedIn
+        && (typeof Notification === 'undefined' || Notification.permission !== 'denied'))
+    });
   }
 
   function withTimeout(promise, milliseconds, code) {

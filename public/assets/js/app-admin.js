@@ -909,6 +909,7 @@ async function openApplicationForm(clubId, allowClosedClub = false) {
 
   state.selectedClub = club;
   state.editingMyForm = null;
+  state.defaultApplicantPhoto = null;
   applicationForm.reset();
   clearApplicantPhotoPreview();
   applicantPhotoInput.required = true;
@@ -923,7 +924,19 @@ async function openApplicationForm(clubId, allowClosedClub = false) {
   applicationFormIntro.textContent = club.applicationIntro || `Complete your details and answer ${club.name}'s questions.`;
   renderApplicationFields(club);
   showView('application');
-  const [profile] = await Promise.all([loadStudentProfile(), loadApplicationCommittees(clubId)]);
+  const [profile, , accountPhoto] = await Promise.all([
+    loadStudentProfile(), loadApplicationCommittees(clubId),
+    window.loadAccountPhoto?.().catch(() => null)
+  ]);
+  if (state.selectedClub?.id !== clubId || state.editingMyForm) return;
+  if (accountPhoto?.url && !applicantPhotoInput.files[0]) {
+    state.defaultApplicantPhoto = accountPhoto;
+    applicantPhotoInput.required = false;
+    applicantPhotoPreview.src = accountPhoto.url;
+    applicantPhotoPreview.classList.remove('hidden');
+    applicantPhotoPlaceholder.classList.add('hidden');
+    applicationForm.querySelector('.applicant-photo-field small').textContent = 'Your account photo is selected. Choose a file to use a different photo.';
+  }
   state.studentProfile = profile;
   if (profile) {
     const emailLocalPart = String(profile.email || '').split('@')[0];
@@ -1012,6 +1025,11 @@ function clearApplicantPhotoPreview() {
   applicantPhotoPreview.removeAttribute('src');
   applicantPhotoPreview.classList.add('hidden');
   applicantPhotoPlaceholder.classList.remove('hidden');
+  if (!state.editingMyForm && state.defaultApplicantPhoto?.url) {
+    applicantPhotoPreview.src = state.defaultApplicantPhoto.url;
+    applicantPhotoPreview.classList.remove('hidden');
+    applicantPhotoPlaceholder.classList.add('hidden');
+  }
 }
 
 applicantPhotoInput.addEventListener('change', () => {
@@ -1073,7 +1091,7 @@ applicationForm.addEventListener('submit', async (event) => {
 
   const formData = new FormData(applicationForm);
   const applicantPhoto = applicantPhotoInput.files[0];
-  if (!applicantPhoto && !state.editingMyForm) {
+  if (!applicantPhoto && !state.editingMyForm && !state.defaultApplicantPhoto) {
     applicationFeedback.textContent = 'Upload your photo before submitting.';
     applicationFeedback.classList.add('is-error');
     return;
@@ -1121,6 +1139,9 @@ applicationForm.addEventListener('submit', async (event) => {
       const uploadedPhoto = await window.uploadImageToCloudinary(applicantPhoto, 'applicant');
       payload.photo = uploadedPhoto.url;
       payload.photoPublicId = uploadedPhoto.publicId;
+    } else if (!state.editingMyForm && state.defaultApplicantPhoto) {
+      payload.photo = state.defaultApplicantPhoto.url;
+      payload.photoPublicId = state.defaultApplicantPhoto.publicId;
     }
     if (!state.editingMyForm && !payload.photo) throw new Error('Upload your photo before submitting.');
     const editing = state.editingMyForm;

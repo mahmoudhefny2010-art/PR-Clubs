@@ -53,7 +53,7 @@ function registerFeedbackRoutes(app, { Club, UniversityContent, requireStudentAu
       return { id: target.id, title: target.name || target.title, question: target.question || '', interaction: target.interaction || 'evaluation', options: target.options || [], count: rows.length,
         average: rows.length && target.interaction !== 'poll' ? rows.reduce((sum, row) => sum + row.value, 0) / rows.length : null,
         counts: (target.options || []).map((option, index) => ({ option, count: rows.filter(row => row.value === index).length })),
-        responses: rows.map(({ email, value, comment, updatedAt }) => ({ email, value, comment, updatedAt })) };
+        responses: rows.map(({ email, value, comment, updatedAt }) => ({ ...(kind === 'club' ? { email } : {}), value, comment, updatedAt })) };
     }));
   }));
   app.put('/api/feedback/:kind/:id', requireStudentAuth, safe(async (req, res) => {

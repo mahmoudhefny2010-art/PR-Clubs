@@ -776,6 +776,14 @@ button:disabled,
   padding-right: 48px !important;
 }
 
+.password-input-wrap { position: relative; display: block; width: 100%; min-width: 0; }
+.password-input-wrap > input { box-sizing: border-box; width: 100%; margin: 0 !important; }
+.password-input-wrap > .password-visibility-toggle {
+  top: 50%; bottom: auto; right: 8px; transform: translateY(-50%);
+  width: 34px; min-width: 34px; height: 34px; min-height: 34px;
+  margin: 0; padding: 0; line-height: 1;
+}
+
 .password-visibility-toggle {
   position: absolute;
   right: 8px;
@@ -1561,6 +1569,7 @@ button:disabled,
   content: "";
   background: linear-gradient(to right, var(--primary-700) 0 var(--request-progress), var(--border-color) var(--request-progress) 100%);
 }
+.approval-request-track.is-six-stage { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 .approval-request-checkpoint:not(.is-approved):not(.is-failed) .approval-request-track::before { background: linear-gradient(to right, var(--primary-700) 0 var(--request-progress), #facc15 var(--request-progress) 100%); }
 .approval-request-step { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--text-light); font-size: .66rem; white-space: nowrap; }
 .approval-request-step:not(:last-child)::after { content: "\2192"; position: absolute; top: 0; right: -7px; z-index: 2; color: var(--slate-400); font-size: 13px; font-weight: 800; line-height: 14px; }
@@ -1656,7 +1665,9 @@ button:disabled,
   .president-dashboard-section .stats-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .member-form-grid { grid-template-columns: 1fr; }
   .member-roster-card { align-items: flex-start; flex-direction: column; }
-  .member-roster-actions { width: 100%; justify-content: space-between; }
+  .member-roster-actions { display: flex; width: 100%; min-width: 0; align-items: center; justify-content: space-between; gap: 8px; }
+  .member-roster-actions .member-type-pill { flex: 0 1 auto; min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: normal; text-wrap: balance; }
+  .member-roster-actions .member-role-edit-btn { flex: 0 0 auto; width: max-content; min-width: max-content; white-space: nowrap; overflow-wrap: normal; }
   .member-role-edit-form { grid-template-columns: 1fr; }
   .member-manager-launch, .member-dialog-toolbar, .member-form-actions { align-items: stretch; flex-direction: column; }
   .admin-member-directory-card { align-items: stretch; flex-direction: column; }
@@ -1669,8 +1680,18 @@ button:disabled,
   .approval-request-checkpoint { min-width: 0; }
   .approval-request-track,
   .approval-request-track.is-attendance { width: 100%; min-width: 0; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .approval-request-track.is-six-stage { grid-template-columns: repeat(6, minmax(0, 1fr)); }
   .approval-request-step { min-width: 0; font-size: .58rem; text-align: center; white-space: normal; }
   .approval-request-step > span:last-child { max-width: 100%; overflow-wrap: anywhere; text-wrap: balance; }
+  .approval-request-heading { flex-direction: column; gap: 3px; }
+  .approval-request-state { flex: 0 1 auto; max-width: 100%; overflow-wrap: anywhere; }
+  .approval-request-track,
+  .approval-request-track.is-attendance { gap: 2px; }
+  .approval-request-step { padding-inline: 1px; font-size: .62rem; line-height: 1.15; overflow-wrap: normal; }
+  .approval-request-step > span:last-child { display: block; width: 100%; overflow-wrap: normal; word-break: normal; }
+  .approval-request-step:not(:last-child)::after { right: -6px; }
+  .approval-request-track.is-six-stage .approval-request-step:not(:last-child)::after { display: none; }
+  .approval-request-marker { flex: 0 0 14px; }
   .member-form-actions > div { justify-content: flex-end; }
 }
 @media (max-width: 430px) {

@@ -29,6 +29,39 @@ body :is(
   transition: background-color .18s ease, border-color .18s ease, box-shadow .18s ease, transform .18s ease;
 }
 
+/* A zero-height rail keeps only the close button visible as its panel scrolls. */
+.modal-close-rail,
+.request-dialog .request-dialog-close-rail {
+  position: sticky !important;
+  top: var(--modal-close-safe-top) !important;
+  z-index: 31;
+  display: flex;
+  justify-content: flex-end;
+  height: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.modal-close-rail > :is(button, .club-detail-close, .calendar-close-btn, .close-btn, .request-dialog-close, .club-review-notice-close, .club-feedback-dialog-close, .attachment-preview-close),
+.request-dialog .request-dialog-close-rail .request-dialog-close {
+  position: relative !important;
+  top: 8px !important;
+  margin: 0 !important;
+  pointer-events: auto;
+}
+
+/* Let the surrounding title rows scroll normally; the close button has its own rail. */
+:is(.calendar-panel > .calendar-head, .member-dialog-inner > .member-dialog-header,
+    .member-directory-inner > .member-directory-header, .approval-checkpoint-more-header,
+    #reviewModal .modal-header, .admin-data-status-header, .attendance-review-panel > header,
+    .review-history-head, .club-feedback-dialog-heading) {
+  position: static !important;
+  top: auto !important;
+  z-index: auto !important;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
 .event-modal-panel > .event-modal-close {
   position: sticky !important;
   top: var(--modal-close-safe-top) !important;
@@ -125,8 +158,24 @@ dialog::backdrop {
   :is(.req-card, .application-card, .record, .content-card, .speaker-request-card)
   :is(.req-actions, .card-actions, .record-actions, .application-actions, .content-card-actions)
   > :is(.delete, .delete-request, [data-action="delete"]) { grid-column: 1 / -1; }
+
+  /* Keep request-card actions balanced: decision buttons and edit/delete share rows. */
+  .req-card .req-actions > :is(.changes, .delete) { grid-column: auto; }
+  /* Applicant Preview and Delete stay balanced; the generic delete rule spans a row. */
+  .head-applicant-card .head-applicant-actions > [data-action="delete"] { grid-column: auto; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   body :is(button[aria-label*="close" i], button[aria-label*="exit" i], .club-detail-close, .calendar-close-btn, .close-btn, .request-dialog-close, .club-review-notice-close, .club-feedback-dialog-close, .attachment-preview-close) { transition: none; }
+}
+
+/* Inline dashboard sections keep their dismissal in dashboard navigation. */
+body .committee-inline-panel .attendance-review-panel .attendance-review-actions > [data-close-attendance-reviews] {
+  position: static !important;
+  top: auto !important;
+  z-index: auto !important;
+  margin: 0;
+  box-shadow: none;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
 }

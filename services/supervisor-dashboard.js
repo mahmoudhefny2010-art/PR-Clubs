@@ -6,8 +6,8 @@ function assignedIds(account) {
 }
 
 function registerSupervisorDashboard(app, deps) {
-  const { getAccount, databaseReady, Club, ContentRequest, SpeakerRequest, AttendanceRecord, Review,
-    sameOrigin, publicSpeakerRequest } = deps;
+  const { getAccount, databaseReady, Club, ContentRequest, SpeakerRequest, AttendanceRecord, AttendanceSession, Review,
+    sameOrigin, publicSpeakerRequest, attendanceClosureMapFor, attendanceActivityKey, isAttendanceActivityEnded } = deps;
   const router = express.Router();
   router.use(async (req, res, next) => {
     res.setHeader('Cache-Control', 'no-store');
@@ -27,6 +27,50 @@ function registerSupervisorDashboard(app, deps) {
       res.json({ clubs });
     } catch { res.status(503).json({ message: 'Could not load assigned clubs.' }); }
   });
+  router.get('/miu-attendance', async (req, res) => {
+    try {
+      const records = await AttendanceRecord.find({ clubId: 0, attendanceAudience: 'all_students', supervisorEmail: req.supervisor.email, approvalStatus: 'pending_supervisor' }).sort({ attendedAt: -1 }).lean();
+      const closureMap = await attendanceClosureMapFor(records);
+      const reviewable = records.filter(record => isAttendanceActivityEnded(record.eventDate) || closureMap.has(attendanceActivityKey(record)));
+      const groups = new Map();
+      for (const record of reviewable) {
+        const key = `${record.itemType}:${record.eventRequestId}`;
+        if (!groups.has(key)) groups.set(key, { clubId: 0, clubName: 'MIU events', itemType: record.itemType, eventRequestId: record.eventRequestId,
+          eventTitle: record.eventTitle, eventDate: record.eventDate, eventTime: record.eventTime, attendanceEnded: true,
+          attendanceEndedAt: closureMap.get(attendanceActivityKey(record))?.endedAt || null, records: [] });
+        groups.get(key).records.push({ name: record.name, email: record.email, membershipStatus: record.membershipStatus,
+          memberClubNames: record.memberClubNames || [], attendedAt: record.attendedAt });
+      }
+      res.json({ reviews: [...groups.values()] });
+    } catch { res.status(503).json({ message: 'Could not load MIU attendance assigned to your supervisor account.' }); }
+  });
+  router.post('/miu-attendance/:eventRequestId/decision', async (req, res) => {
+    if (!sameOrigin(req)) return res.status(403).json({ message: 'Reload and try again.' });
+    const eventRequestId = Number(req.params.eventRequestId), action = req.body.action;
+    const comment = typeof req.body.comment === 'string' ? req.body.comment.trim().slice(0, 500) : '';
+    if (!Number.isSafeInteger(eventRequestId) || eventRequestId <= 0 || !['approve', 'reject'].includes(action) || action === 'reject' && !comment) {
+      return res.status(400).json({ message: 'Choose a decision and provide a reason for rejection.' });
+    }
+    try {
+      const filter = { clubId: 0, itemType: 'event', eventRequestId, attendanceAudience: 'all_students', supervisorEmail: req.supervisor.email, approvalStatus: 'pending_supervisor' };
+      const records = await AttendanceRecord.find(filter).select('sessionId eventDate').lean();
+      if (!records.length) return res.status(409).json({ message: 'This MIU attendance list is no longer assigned to you.' });
+      const closureMap = await attendanceClosureMapFor(records.map(record => ({ ...record, clubId: 0, itemType: 'event', eventRequestId })));
+      if (records.some(record => !isAttendanceActivityEnded(record.eventDate)
+        && !closureMap.has(attendanceActivityKey({ ...record, clubId: 0, itemType: 'event', eventRequestId })))) {
+        return res.status(409).json({ message: 'End MIU event attendance before reviewing its check-in list.' });
+      }
+      const sessions = await AttendanceSession.find({ _id: { $in: records.map(record => record.sessionId) } }).select('createdBy assignedMemberEmail').lean();
+      if (sessions.some(session => session.createdBy === req.supervisor.email || session.assignedMemberEmail === req.supervisor.email)) return res.status(403).json({ message: 'You cannot review attendance for an event you created or operated.' });
+      const status = action === 'approve' ? 'pending_pr' : 'rejected';
+      const result = await AttendanceRecord.updateMany(filter, { $set: { approvalStatus: status }, $push: { approvalHistory: {
+        role: 'supervisor', email: req.supervisor.email, action: action === 'approve' ? 'approved' : 'rejected', note: comment, createdAt: new Date()
+      } } });
+      if (!result.modifiedCount) return res.status(409).json({ message: 'This list was already reviewed. Refresh and try again.' });
+      try { await deps.notifyAttendance?.({ clubId: 0, itemType: 'event', eventRequestId }, status, action); } catch {}
+      res.json({ status, recordsUpdated: result.modifiedCount });
+    } catch { res.status(503).json({ message: 'The MIU attendance decision could not be saved.' }); }
+  });
   router.use('/clubs/:clubId', (req, res, next) => {
     const id = Number(req.params.clubId);
     if (!/^\d+$/.test(req.params.clubId) || !req.assignedIds.includes(id)) {
@@ -44,8 +88,9 @@ function registerSupervisorDashboard(app, deps) {
         ContentRequest.find({ clubId }).select('id clubId type title description date time location status clubNotice comments supervisorNextStage createdAt updatedAt').sort({ createdAt: -1 }).lean(),
         SpeakerRequest.find({ clubId }).sort({ submittedAt: -1 }).lean(),
         AttendanceRecord.aggregate([{ $match: { clubId } }, { $group: {
-          _id: { eventRequestId: '$eventRequestId', itemType: '$itemType', approvalStatus: '$approvalStatus' },
-          title: { $first: '$eventTitle' }, date: { $first: '$eventDate' }, count: { $sum: 1 }
+          _id: { eventRequestId: '$eventRequestId', itemType: '$itemType', approvalStatus: '$approvalStatus', attendanceAudience: '$attendanceAudience' },
+          title: { $first: '$eventTitle' }, date: { $first: '$eventDate' }, count: { $sum: 1 },
+          people: { $push: { name: '$name', email: '$email', membershipStatus: '$membershipStatus', memberClubNames: '$memberClubNames', attendedAt: '$attendedAt' } }
         } }]),
         Review.find({ clubId, supervisorId: req.supervisor._id }).sort({ updatedAt: -1 }).lean()
       ]);

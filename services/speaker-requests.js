@@ -10,6 +10,17 @@ function requesterKey(identity, clubId) {
   return crypto.createHash('sha256').update(raw).digest('hex');
 }
 
+function resolveSpeakerHosting(identity, payload = {}) {
+  if (identity?.type === 'club') {
+    const clubId = Number(identity.clubId);
+    return Number.isSafeInteger(clubId) && clubId > 0 ? { hostingType: 'club', clubId } : null;
+  }
+  if (identity?.type !== 'student') return null;
+  if (payload.hostingType === 'miu') return { hostingType: 'miu', clubId: 0 };
+  const clubId = Number(payload.clubId);
+  return Number.isSafeInteger(clubId) && clubId > 0 ? { hostingType: 'club', clubId } : null;
+}
+
 function validateSpeakerPayload(payload = {}) {
   const fields = {
     speakerName: String(payload.speakerName || '').trim(),
@@ -124,7 +135,8 @@ function validSpeakerDecision(status, action) {
 }
 
 function speakerResubmissionStatus(record) {
-  return record?.clubReviewedAt || record?.requesterType === 'club' || record?.reviewerRole === 'supervisor' ? 'pending_supervisor' : 'pending_club';
+  return record?.hostingType === 'miu' ? 'pending_dean'
+    : record?.clubReviewedAt || record?.requesterType === 'club' || record?.reviewerRole === 'supervisor' ? 'pending_supervisor' : 'pending_club';
 }
 
 function validateSpeakerCvAsset(asset) {
@@ -166,4 +178,4 @@ function decodeSpeakerCvData(dataUrl) {
   return { buffer, format };
 }
 
-module.exports = { MAX_CV_BYTES, CV_UPLOAD_TTL_MS, requesterKey, validateSpeakerPayload, validatePublicSpeakerInvitePayload, speakerInviteTokenHash, publicSpeakerDuplicateKey, canReviewSpeakerRequest, canClubReviewSpeakerRequest, validClubSpeakerDecision, validSpeakerDecision, speakerResubmissionStatus, validateSpeakerCvAsset, decodeSpeakerCvData };
+module.exports = { MAX_CV_BYTES, CV_UPLOAD_TTL_MS, requesterKey, resolveSpeakerHosting, validateSpeakerPayload, validatePublicSpeakerInvitePayload, speakerInviteTokenHash, publicSpeakerDuplicateKey, canReviewSpeakerRequest, canClubReviewSpeakerRequest, validClubSpeakerDecision, validSpeakerDecision, speakerResubmissionStatus, validateSpeakerCvAsset, decodeSpeakerCvData };

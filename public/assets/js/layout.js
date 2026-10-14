@@ -1,5 +1,23 @@
 // Shared page navigation: keep Back separate from the explicit Home links.
 (() => {
+  window.loadAccountPhoto = async () => {
+    const response = await fetch('/api/site/account-photo', { cache: 'no-store' });
+    if (response.status === 401) return null;
+    if (!response.ok) throw new Error('Could not load your account photo.');
+    return response.json();
+  };
+  let spreadsheetLibraries;
+  window.downloadFormattedExcel = async (rows, filename) => {
+    if (!spreadsheetLibraries) spreadsheetLibraries = Promise.all(['/assets/vendor/exceljs.min.js', '/assets/js/spreadsheet-export.js?v=20261013formatted1'].map(src => new Promise((resolve, reject) => {
+      const script = document.createElement('script'); script.src = src; script.onload = resolve; script.onerror = () => reject(new Error('Could not load Excel export. Please retry.')); document.head.append(script);
+    }))).catch(error => { spreadsheetLibraries = null; throw error; });
+    await spreadsheetLibraries;
+    const workbook = new window.ExcelJS.Workbook();
+    window.formatSpreadsheetSheet(workbook, rows);
+    const bytes = await workbook.xlsx.writeBuffer();
+    const url = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    const link = document.createElement('a'); link.href = url; link.download = filename.replace(/\.(csv|xlsx)$/i, '') + '.xlsx'; document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
   let qrCodeLibraryPromise = null;
   window.ensureQRCode = () => {
     if (typeof window.QRCode === 'function') return Promise.resolve();
@@ -37,6 +55,7 @@
     sessionStorage.setItem('miu:page-navigation', JSON.stringify({ current, previous }));
   } catch { /* Private browsing can disable storage. */ }
   window.miuGoBack = (fallback = '/') => {
+    if (window.miuDashboardGoBack?.()) return;
     if (previous) {
       if (document.referrer && safePrevious(document.referrer) === previous && history.length > 1) history.back();
       else location.assign(previous);
@@ -44,8 +63,8 @@
   };
   document.addEventListener('click', event => {
     if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
-    const control = event.target.closest('[data-history-back], a');
-    if (!control || (!control.hasAttribute('data-history-back') && !/^(Back(?:\s|$)|Exit$)/i.test(control.textContent.trim()))) return;
+    const control = event.target.closest('[data-history-back], a, button');
+    if (!control || (!control.hasAttribute('data-history-back') && !/^(?:Back|Exit)(?:\b|$)/i.test(control.textContent.trim()))) return;
     if (control.closest('.recovery-card') || /(?:forgot-password|reset-password)/.test(location.pathname)) return;
     event.preventDefault(); event.stopImmediatePropagation();
     window.miuGoBack(control.getAttribute('href') || '/');
@@ -71,6 +90,35 @@ window.formatSiteTime = (value) => {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+  const closeButtonSelector = 'button[aria-label*="close" i], button[aria-label*="exit" i], button[title*="close" i], button[class*="close" i], button[id*="close" i], .club-detail-close, .calendar-close-btn, .close-btn, .request-dialog-close, .club-review-notice-close, .club-feedback-dialog-close, .attachment-preview-close';
+  const closeRailTargetSelector = '.request-dialog-inner, .calendar-panel, .modal-card, .event-modal-panel, .member-directory-inner, .member-dialog-inner, .status-overview-inner, .review-history-inner, .approval-checkpoint-more-inner, .attachment-preview-panel, .club-feedback-dialog, .club-review-notice-content, .attendance-review-panel, .admin-data-status-dialog, .committee-attendance-inner, .committee-availability-dialog, .attendance-review-dialog, .committee-sidebar, .president-sidebar, .student-dashboard-sidebar, .report-admin-sidebar, .homepage-admin-sidebar, #adminTabs';
+  const moveCloseButtonToRail = (button) => {
+    if (!(button instanceof HTMLElement) || button.closest('.modal-close-rail, .request-dialog-close-rail')) return;
+    if (button.closest('.committee-inline-panel')) return;
+    const panel = button.closest(closeRailTargetSelector);
+    if (!panel) return;
+    const rail = document.createElement('div');
+    rail.className = 'modal-close-rail';
+    panel.prepend(rail);
+    rail.append(button);
+  };
+  const scanCloseButtons = (root) => {
+    if (!(root instanceof Element)) return;
+    if (root.matches(closeButtonSelector)) moveCloseButtonToRail(root);
+    root.querySelectorAll(closeButtonSelector).forEach(moveCloseButtonToRail);
+  };
+  scanCloseButtons(document.documentElement);
+  new MutationObserver((records) => records.forEach((record) => record.addedNodes.forEach(scanCloseButtons)))
+    .observe(document.body, { childList: true, subtree: true });
+
+  const navigationScript = document.createElement('script'); navigationScript.src = '/assets/js/dashboard-navigation.js?v=20261014freshvisit1'; document.head.append(navigationScript);
+  const drawerStyles = document.createElement('link'); drawerStyles.rel = 'stylesheet'; drawerStyles.href = '/assets/css/mobile-sidebars.css?v=20261014hidescrollbar1';
+  const drawerScript = document.createElement('script'); drawerScript.src = '/assets/js/mobile-sidebars.js?v=20261014unifieddrawer2';
+  let drawerStarted = false;
+  const loadMobileDrawers = () => { if (drawerStarted) return; drawerStarted = true; document.head.append(drawerScript); };
+  drawerStyles.addEventListener('load', loadMobileDrawers, { once: true });
+  drawerStyles.addEventListener('error', loadMobileDrawers, { once: true });
+  document.head.append(drawerStyles);
   document.querySelectorAll('input[type="password"]').forEach((input) => {
     if (input.dataset.passwordToggleInitialized === 'true') return;
     input.dataset.passwordToggleInitialized = 'true';
@@ -78,6 +126,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!field) return;
     field.classList.add('has-password-toggle');
     input.classList.add('password-toggle-input');
+    const inputWrap = document.createElement('span');
+    inputWrap.className = 'password-input-wrap';
+    input.before(inputWrap);
+    inputWrap.append(input);
 
     const toggle = document.createElement('button');
     toggle.className = 'password-visibility-toggle';
@@ -98,7 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
       input.focus();
       if (start !== null && end !== null) input.setSelectionRange(start, end);
     });
-    field.append(toggle);
+    inputWrap.append(toggle);
   });
 
   const pingSiteVisitor = () => {
@@ -178,7 +230,7 @@ document.addEventListener('DOMContentLoaded', () => {
           initHeader();
           if (!document.querySelector('script[data-miu-push-client]')) {
             const pushClient = document.createElement('script');
-            pushClient.src = '/assets/js/onesignal-notifications.js?v=20261013notificationretry2';
+            pushClient.src = '/assets/js/onesignal-notifications.js?v=20261014promptqueue1';
             pushClient.async = true;
             pushClient.dataset.miuPushClient = 'true';
             document.head.appendChild(pushClient);
@@ -251,15 +303,112 @@ document.addEventListener('DOMContentLoaded', () => {
     const studentProfileMenu = document.getElementById('headerStudentProfileMenu');
     const studentProfileTrigger = document.getElementById('headerStudentProfileTrigger');
     const studentProfileDropdown = document.getElementById('headerStudentProfileDropdown');
+    const studentProfileLink = document.getElementById('headerStudentProfileLink');
     const studentProfileName = document.getElementById('headerStudentName');
     const studentProfileEmail = document.getElementById('headerStudentEmail');
     const studentProfileAvatar = document.getElementById('headerStudentAvatar');
+    const accountPhotoButton = document.getElementById('headerAccountPhotoButton');
+    const accountPhotoInput = document.getElementById('headerAccountPhotoInput');
+    const accountPhotoStatus = document.getElementById('headerAccountPhotoStatus');
+    let photoPrompt;
+    const showPhotoPrompt = (photo) => {
+      const requestedPhoto = new URLSearchParams(window.location.search).get('addPhoto') === '1';
+      if (photo?.url || (photo?.promptDismissed && !requestedPhoto) || photoPrompt) return;
+      if (requestedPhoto) {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('addPhoto');
+        window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
+      }
+      photoPrompt = document.createElement('dialog');
+      photoPrompt.className = 'account-photo-prompt';
+      photoPrompt.setAttribute('aria-labelledby', 'accountPhotoPromptTitle');
+      photoPrompt.innerHTML = `<h2 id="accountPhotoPromptTitle">Add your profile photo</h2>
+        <p>Your photo will appear on your account and fill personal photo fields in applications.</p>
+        <p>You can add or change it anytime: open the account menu and choose <strong>Add / change photo</strong>.</p>
+        <p data-photo-prompt-status role="status" aria-live="polite"></p>
+        <div class="account-photo-prompt-actions"><button type="button" data-photo-add>Add photo</button><button type="button" data-photo-later>Maybe later</button></div>`;
+      document.body.append(photoPrompt);
+      photoPrompt.addEventListener('cancel', event => event.preventDefault());
+      photoPrompt.querySelector('[data-photo-add]').addEventListener('click', () => accountPhotoInput?.click());
+      photoPrompt.querySelector('[data-photo-later]').addEventListener('click', async (event) => {
+        if (event.target.dataset.saved === 'true') { photoPrompt.close(); return; }
+        event.target.disabled = true;
+        const status = photoPrompt.querySelector('[data-photo-prompt-status]');
+        try {
+          const response = await fetch('/api/site/account-photo', {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ promptDismissed: true })
+          });
+          if (!response.ok) throw new Error('Could not save your choice. Please try again.');
+          status.textContent = 'You can add it later: account menu → Add / change photo.';
+          photoPrompt.querySelector('[data-photo-add]').hidden = true;
+          event.target.textContent = 'Got it';
+          event.target.disabled = false;
+          event.target.dataset.saved = 'true';
+        } catch (error) {
+          status.textContent = error.message;
+          event.target.disabled = false;
+        }
+      });
+      const promptEmail = currentHeaderSession?.email;
+      window.queueSitePrompt('account-photo', photoPrompt, {
+        eligible: () => currentHeaderSession?.authenticated && currentHeaderSession?.email === promptEmail
+      });
+    };
+    const renderAccountPhoto = (photo) => {
+      if (!studentProfileAvatar || !photo?.url) return;
+      const image = document.createElement('img');
+      image.src = photo.url;
+      image.alt = '';
+      studentProfileAvatar.replaceChildren(image);
+    };
+    accountPhotoButton?.addEventListener('click', () => accountPhotoInput?.click());
+    accountPhotoInput?.addEventListener('change', async () => {
+      const file = accountPhotoInput.files[0];
+      if (!file) return;
+      accountPhotoButton.disabled = true;
+      accountPhotoStatus.hidden = false;
+      accountPhotoStatus.textContent = 'Saving photo...';
+      const promptStatus = photoPrompt?.querySelector('[data-photo-prompt-status]');
+      if (promptStatus) promptStatus.textContent = 'Saving photo...';
+      photoPrompt?.querySelectorAll('button').forEach(button => { button.disabled = true; });
+      try {
+        if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 10 * 1024 * 1024) {
+          throw new Error('Choose a PNG, JPG, or WebP photo up to 10 MB.');
+        }
+        if (!window.uploadImageToCloudinary) await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = '/assets/js/cloudinary-upload.js?v=2';
+          script.onload = resolve;
+          script.onerror = () => reject(new Error('Could not load photo upload. Please retry.'));
+          document.head.append(script);
+        });
+        const uploaded = await window.uploadImageToCloudinary(file, 'applicant');
+        const response = await fetch('/api/site/account-photo', {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(uploaded)
+        });
+        const photo = await response.json();
+        if (!response.ok) throw new Error(photo?.message || 'Could not save your photo.');
+        renderAccountPhoto(photo);
+        photoPrompt?.close();
+        window.dispatchEvent(new CustomEvent('miu:account-photo-changed', { detail: photo }));
+        accountPhotoStatus.textContent = 'Photo saved. It will be used in personal photo fields.';
+      } catch (error) {
+        accountPhotoStatus.textContent = error.message;
+        if (promptStatus) promptStatus.textContent = error.message;
+      } finally {
+        accountPhotoButton.disabled = false;
+        accountPhotoInput.value = '';
+        photoPrompt?.querySelectorAll('button').forEach(button => { button.disabled = false; });
+      }
+    });
     const accountDashboardLink = document.getElementById('headerAccountDashboardLink');
     const dashboardChoices = document.getElementById('headerDashboardChoices');
     const dashboardChoiceList = document.getElementById('headerDashboardChoiceList');
     const dashboardSwitchStatus = document.getElementById('headerDashboardSwitchStatus');
     const studentFormsLink = document.getElementById('headerStudentFormsLink');
+    const attendanceUsherTaskLink = document.getElementById('headerAttendanceUsherTaskLink');
     let currentHeaderSession = null;
+    let headerAccountRequestId = 0;
     const closeStudentProfileMenu = () => {
       if (!studentProfileDropdown || !studentProfileTrigger) return;
       studentProfileDropdown.hidden = true;
@@ -271,6 +420,18 @@ document.addEventListener('DOMContentLoaded', () => {
       studentProfileDropdown.hidden = !open;
       studentProfileTrigger.setAttribute('aria-expanded', String(Boolean(open)));
     });
+    studentProfileLink?.addEventListener('click', async (event) => {
+      event.preventDefault();
+      studentProfileLink.setAttribute('aria-busy', 'true');
+      try {
+        const response = await fetch('/api/student-auth/session', { cache: 'no-store' });
+        window.location.assign(response.ok
+          ? '/?myForms=1'
+          : '/pages/applicant-login.html?redirect=%2F%3FmyForms%3D1');
+      } catch {
+        window.location.assign('/pages/applicant-login.html?redirect=%2F%3FmyForms%3D1');
+      }
+    });
     document.addEventListener('click', (event) => {
       if (studentProfileMenu && !studentProfileMenu.contains(event.target)) closeStudentProfileMenu();
     });
@@ -278,6 +439,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeStudentProfileMenu(); });
     if (authBtn) {
       const refreshHeaderAccountState = async () => {
+        const requestId = ++headerAccountRequestId;
+        if (attendanceUsherTaskLink) attendanceUsherTaskLink.hidden = true;
         try {
           const response = await fetch('/api/site/account-session', { cache: 'no-store', siteStartupNonBlocking: true });
           if (!response.ok) return;
@@ -286,16 +449,17 @@ document.addEventListener('DOMContentLoaded', () => {
           window.__miuAccountSession = session;
           window.dispatchEvent(new CustomEvent('miu:push-account-session-changed', { detail: session }));
           const destinations = {
-            admin: { label: 'Dashboard', href: '/admin' },
-            president: { label: 'Dashboard', href: '/club-dashboard' },
-            head: { label: 'Dashboard', href: '/club-dashboard' },
-            pr: { label: 'Dashboard', href: '/dashboards/pr-dashboard.html' },
-            english: { label: 'Dashboard', href: '/dashboards/english-dashboard.html' },
-            security: { label: 'Dashboard', href: '/dashboards/security-dashboard.html' },
-            sso: { label: 'Dashboard', href: '/dashboards/sso-dashboard.html' },
-            supervisor: { label: 'Dashboard', href: '/dashboards/supervisor-dashboard.html' },
-            dean: { label: 'Dashboard', href: '/dashboards/dean-dashboard.html' },
-            software_development: { label: 'Dashboard', href: '/admin' },
+            admin: { label: 'Admin Dashboard', href: '/admin' },
+            president: { label: 'Club President Dashboard', href: '/club-dashboard' },
+            head: { label: 'Committee Head Dashboard', href: '/club-dashboard' },
+            pr: { label: 'PR Dashboard', href: '/dashboards/pr-dashboard.html' },
+            english: { label: 'English Dashboard', href: '/dashboards/english-dashboard.html' },
+            security: { label: 'Security Dashboard', href: '/dashboards/security-dashboard.html' },
+            sso: { label: 'SSO Dashboard', href: '/dashboards/sso-dashboard.html' },
+            supervisor: { label: 'Supervisor Dashboard', href: '/dashboards/supervisor-dashboard.html' },
+            dean: { label: 'Dean Dashboard', href: '/dashboards/dean-dashboard.html' },
+            software_development: { label: 'Software Development Dashboard', href: '/admin' },
+            miu_events: { label: 'MIU Events Dashboard', href: '/dashboards/miu-events-dashboard.html' },
             student: { label: 'My Dashboard', href: '/?myForms=1' }
           };
           const account = session?.authenticated
@@ -317,24 +481,32 @@ document.addEventListener('DOMContentLoaded', () => {
           }
           const isAuthenticated = Boolean(account && session?.authenticated);
           const isStudent = session?.type === 'student' && isAuthenticated;
+          const isSoftwareDeveloper = session?.type === 'club' && session?.role === 'software_development' && isAuthenticated;
+          const studentDashboardHref = '/?myForms=1';
+          if (studentProfileLink) studentProfileLink.href = studentDashboardHref;
           if (studentProfileMenu) studentProfileMenu.hidden = !isAuthenticated;
           if (authBtn) authBtn.hidden = isAuthenticated;
           if (studentSignoutBtn) studentSignoutBtn.hidden = !isAuthenticated;
           if (accountDashboardLink && account) {
-            accountDashboardLink.href = account.href;
-            accountDashboardLink.textContent = account.label;
+            accountDashboardLink.href = isStudent ? studentDashboardHref : account.href;
+            accountDashboardLink.textContent = isStudent ? 'Student dashboard' : isSoftwareDeveloper ? 'Software Development dashboard' : 'Dashboard';
+            accountDashboardLink.title = isStudent ? 'Student dashboard and forms' : account.label;
+            accountDashboardLink.hidden = false;
           }
           if (dashboardChoiceList) {
             dashboardChoiceList.replaceChildren();
             const choices = Array.isArray(session.dashboards)
-              ? session.dashboards.filter(item => item.role && item.role !== session.role) : [];
-            if (dashboardChoices) dashboardChoices.hidden = choices.length === 0;
+              ? session.dashboards.filter(item => destinations[item.role]) : [];
+            if (dashboardChoices) dashboardChoices.hidden = choices.length === 0 || isStudent;
             choices.forEach(choice => {
               const button = document.createElement('button');
               button.type = 'button';
               button.className = 'nav-profile-item nav-profile-dashboard-option';
               button.setAttribute('role', 'menuitem');
-              button.textContent = [choice.label, choice.committee, choice.clubName].filter(Boolean).join(' · ');
+              const shortLabels = { president: 'President', head: 'Committee head', software_development: 'Developer', miu_events: 'MIU Events', pr: 'PR', sso: 'SSO', dean: 'Dean', english: 'English', security: 'Security', supervisor: 'Supervisor' };
+              button.textContent = [shortLabels[choice.role] || choice.label, choice.clubName || choice.committee].filter(Boolean).join(' · ');
+              button.title = [destinations[choice.role].label, choice.committee, choice.clubName].filter(Boolean).join(' · ');
+              if (choice.role === session.role) button.setAttribute('aria-current', 'page');
               button.addEventListener('click', async () => {
                 button.disabled = true;
                 if (dashboardSwitchStatus) dashboardSwitchStatus.textContent = `Opening ${choice.label}...`;
@@ -357,6 +529,16 @@ document.addEventListener('DOMContentLoaded', () => {
             });
           }
           if (studentFormsLink) studentFormsLink.hidden = !isStudent;
+          if (attendanceUsherTaskLink && isAuthenticated) {
+            fetch('/api/miu-attendance-task', { credentials: 'same-origin', cache: 'no-store', siteStartupNonBlocking: true })
+              .then(response => response.ok ? response.json() : null)
+              .then(result => {
+                if (requestId === headerAccountRequestId) attendanceUsherTaskLink.hidden = !Boolean(result?.task);
+              })
+              .catch(() => {
+                if (requestId === headerAccountRequestId) attendanceUsherTaskLink.hidden = true;
+              });
+          }
           const notificationToggle = document.getElementById('headerNotificationToggle');
           const notificationStatus = document.getElementById('headerNotificationStatus');
           const emailNotificationToggle = document.getElementById('headerEmailNotificationToggle');
@@ -371,6 +553,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (studentProfileName) studentProfileName.textContent = accountIdentity;
             if (studentProfileEmail) studentProfileEmail.textContent = '';
             if (studentProfileAvatar) studentProfileAvatar.textContent = accountName.charAt(0).toUpperCase() || 'A';
+            window.loadAccountPhoto().then(photo => {
+              if (requestId === headerAccountRequestId) {
+                renderAccountPhoto(photo);
+                showPhotoPrompt(photo);
+              }
+            }).catch(() => {});
             if (studentProfileTrigger) studentProfileTrigger.setAttribute('aria-label', `Account menu for ${accountName}`);
           }
           if (!isAuthenticated) closeStudentProfileMenu();
@@ -420,6 +608,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  inject('site-header', '/components/site-header.html?v=20261013multipleroles2');
+  inject('site-header', '/components/site-header.html?v=20261014accountphoto1');
   inject('site-footer', '/components/site-footer.html');
 });

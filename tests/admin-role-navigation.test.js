@@ -59,3 +59,19 @@ test('Back returns to same-site context and excludes external or login pages', (
   assert.deepEqual(navigation('', { current: '/current', previous: '/events' }), ['/events']);
   assert.deepEqual(navigation(''), ['/fallback']);
 });
+
+test('descriptive Exit buttons return to the single saved previous page', () => {
+  const source = fs.readFileSync(require.resolve('../public/assets/js/layout.js'), 'utf8').split('window.formatSiteTime')[0];
+  const calls = []; let clickListener;
+  const location = { origin: 'https://clubs.example', href: 'https://clubs.example/current', pathname: '/current', search: '', hash: '', assign: value => calls.push(value) };
+  const context = {
+    URL, location, window: {}, history: { length: 8, back: () => calls.push('history-back') },
+    document: { referrer: '', addEventListener: (name, callback) => { if (name === 'click') clickListener = callback; } },
+    sessionStorage: { getItem: () => JSON.stringify({ current: '/current', previous: '/immediate' }), setItem() {} }
+  };
+  vm.runInNewContext(source, context);
+  const control = { textContent: 'Exit to dashboard', hasAttribute: () => false, getAttribute: () => '/fallback', closest: () => null };
+  const event = { button: 0, target: { closest: () => control }, preventDefault() {}, stopImmediatePropagation() {} };
+  clickListener(event);
+  assert.deepEqual(calls, ['/immediate']);
+});

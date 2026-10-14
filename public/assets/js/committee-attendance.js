@@ -1,7 +1,6 @@
 (() => {
   const openButton = document.getElementById('openCommitteeAttendanceBtn');
   const dialog = document.getElementById('committeeAttendanceDialog');
-  const closeButton = document.querySelector('[data-close-committee-attendance]');
   const feedback = document.getElementById('committeeAttendanceFeedback');
   const recordsList = document.getElementById('committeeAttendanceRecords');
   const searchInput = document.getElementById('committeeAttendanceSearch');
@@ -47,7 +46,7 @@
     const eventDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(parsed);
     return eventDay < cairoTodayKey();
   };
-  const groupKey = (record) => `${record.clubId}:${record.itemType || 'event'}:${record.eventRequestId}`;
+  const groupKey = (record) => `${record.clubId}:${record.itemType || 'event'}:${record.eventRequestId}:${record.attendanceAudience === 'all_students' ? 'all_students' : 'members'}`;
 
   function makeGroups(records) {
     const groups = new Map();
@@ -56,7 +55,7 @@
       if (!groups.has(key)) groups.set(key, {
         key, clubId: record.clubId, clubName: record.clubName || `Club ${record.clubId}`,
         clubImage: record.clubImage || '', itemType: record.itemType === 'booth' ? 'booth' : 'event',
-        eventRequestId: record.eventRequestId, eventTitle: record.eventTitle || 'Untitled activity',
+        eventRequestId: record.eventRequestId, attendanceAudience: record.attendanceAudience === 'all_students' ? 'all_students' : 'members', eventTitle: record.eventTitle || 'Untitled activity',
         eventDate: record.eventDate || '', eventTime: record.eventTime || '', attendanceEnded: false, records: [], notes: []
       });
       const group = groups.get(key);
@@ -90,17 +89,10 @@
     if (!rows.length) return;
     const columns = [
       ['Club', 'clubName'], ['Activity', 'eventTitle'], ['Type', 'itemType'], ['Date', 'eventDate'],
-      ['Name', 'name'], ['Email', 'email'], ['Checked in', 'attendedAt'], ['Approval status', 'approvalStatus']
+      ['Name', 'name'], ['Email', 'email'], ['Membership', 'membershipStatus'], ['Member clubs', 'memberClubNames'], ['Checked in', 'attendedAt'], ['Approval status', 'approvalStatus']
     ];
-    const escapeCsv = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
-    const csv = [columns.map(([label]) => escapeCsv(label)).join(','), ...rows.map((record) =>
-      columns.map(([, key]) => escapeCsv(key === 'attendedAt' ? formatDateTime(record[key]) : record[key])).join(','))].join('\r\n');
-    const url = URL.createObjectURL(new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' }));
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `attendance-${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    window.downloadFormattedExcel([columns.map(([label]) => label), ...rows.map(record => columns.map(([, key]) => key === 'attendedAt' ? formatDateTime(record[key]) : key === 'membershipStatus' ? record[key] === 'member' ? 'Member' : record[key] === 'non_member' ? 'Non-member' : 'Club member' : Array.isArray(record[key]) ? record[key].join('; ') : record[key]))], 'attendance.xlsx')
+      .catch(error => { feedback.textContent = error.message; });
   }
 
   function renderRecords() {
@@ -146,15 +138,15 @@
       const meta = document.createElement('p');
       meta.className = 'attendance-activity-meta';
       meta.textContent = [group.clubName, group.itemType === 'booth' ? 'Booth' : 'Event', group.eventDate,
-        window.formatSiteTime(group.eventTime), `${group.records.length} check-in${group.records.length === 1 ? '' : 's'}`].filter(Boolean).join(' · ');
+        group.attendanceAudience === 'all_students' ? 'Open student attendance' : 'Club member attendance', window.formatSiteTime(group.eventTime), `${group.records.length} check-in${group.records.length === 1 ? '' : 's'}`].filter(Boolean).join(' · ');
       const badge = document.createElement('span');
       const status = statusFor(group);
       badge.className = `attendance-activity-status${status === 'approved' ? ' is-approved' : status === 'rejected' ? ' is-rejected' : ' is-pending'}`;
       badge.textContent = status === 'pending_pr' && group.attendanceEnded
         ? 'Processing · PR review'
         : status === 'mixed' ? 'Mixed review stages' : approvalStatusLabels[status] || 'Waiting for PR';
-      content.append(title, meta, badge);
-      card.append(avatar, content);
+      content.append(title, meta);
+      card.append(avatar, content, badge);
 
       if (group.notes.length) {
         const notes = document.createElement('div');
@@ -173,7 +165,7 @@
       sheet.dataset.attendanceGroup = group.key;
       sheet.open = openSheets.has(group.key);
       const sheetSummary = document.createElement('summary');
-      sheetSummary.textContent = `View all attendance sheet · ${group.records.length} attendee${group.records.length === 1 ? '' : 's'}`;
+      sheetSummary.textContent = `Attendance sheet · ${group.records.length} attendee${group.records.length === 1 ? '' : 's'}`;
       const people = document.createElement('div');
       people.className = 'attendance-activity-people';
       group.records.forEach((record) => {
@@ -183,9 +175,11 @@
         name.textContent = record.name || 'Student';
         const email = document.createElement('small');
         email.textContent = record.email || 'No email';
+        const membership = document.createElement('small');
+        membership.textContent = record.membershipStatus === 'member' ? `Member · ${(record.memberClubNames || []).join(', ') || 'club membership'}` : record.membershipStatus === 'non_member' ? 'Non-member' : 'Club member';
         const checkin = document.createElement('small');
         checkin.textContent = `Checked in ${formatDateTime(record.attendedAt)}`;
-        person.append(name, email, checkin);
+        person.append(name, email, ...(group.attendanceAudience === 'all_students' ? [membership] : []), checkin);
         people.append(person);
       });
       sheet.append(sheetSummary, people);
@@ -248,7 +242,7 @@
     buttons.forEach((button) => { button.disabled = true; });
     feedback.textContent = action === 'approve' ? 'Approving all check-ins…' : action === 'reject' ? 'Rejecting this attendance list…' : 'Saving note…';
     feedback.classList.remove('is-error');
-    const url = `/api/committee/attendance-reviews/${encodeURIComponent(group.clubId)}/${encodeURIComponent(group.itemType)}/${encodeURIComponent(group.eventRequestId)}/approve`;
+    const url = `/api/committee/attendance-reviews/${encodeURIComponent(group.clubId)}/${encodeURIComponent(group.itemType)}/${encodeURIComponent(group.eventRequestId)}/approve?audience=${encodeURIComponent(group.attendanceAudience)}`;
     try {
       const result = await apiJson(url, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -339,7 +333,6 @@
     finally { refreshButton.disabled = false; }
   });
   document.getElementById('overviewAttendanceBtn')?.addEventListener('click', openAttendance);
-  closeButton?.addEventListener('click', () => window.dashboardPanels?.showOverview());
   searchInput?.addEventListener('input', renderRecords);
   window.siteStartup?.afterStartup?.(() => refreshAttendanceBadge());
   if (!window.siteStartup?.afterStartup) refreshAttendanceBadge();

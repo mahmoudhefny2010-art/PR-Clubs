@@ -23,6 +23,7 @@ const committeeAvailabilitySchema = new mongoose.Schema({
 }, { _id: false });
 
 const clubSchema = new mongoose.Schema({
+  registrationRevision: { type: Number, default: 0 },
   id: { type: Number, required: true, unique: true, index: true },
   sortOrder: { type: Number, required: true, default: 0, index: true },
   name: { type: String, required: true, trim: true },
@@ -103,6 +104,7 @@ const universityContentSchema = new mongoose.Schema({
   time: { type: String, default: '' },
   registrationEnabled: { type: Boolean, default: false },
   attendanceEnabled: { type: Boolean, default: false },
+  attendanceAudience: { type: String, enum: ['members', 'all_students'], default: 'all_students', index: true },
   location: { type: String, default: '', trim: true, maxlength: 160 },
   image: { type: String, default: '' },
   imagePublicId: { type: String, default: '' },
@@ -136,7 +138,7 @@ const siteVisitorPresenceSchema = new mongoose.Schema({
 }, { versionKey: false });
 
 const clubRoleAssignmentSchema = new mongoose.Schema({
-  role: { type: String, enum: ['president', 'head', 'pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'software_development'], required: true },
+  role: { type: String, enum: ['president', 'head', 'pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'miu_events', 'software_development'], required: true },
   clubId: { type: Number, required: true, default: 0 },
   assignedClubIds: { type: [Number], default: [] },
   committee: { type: String, default: '' }
@@ -151,7 +153,7 @@ const clubAccountSchema = new mongoose.Schema({
   sessionVersion: { type: Number, default: 0 },
   passwordChangedAt: { type: Date, default: null },
   lastLoginAt: { type: Date, default: null },
-  role: { type: String, enum: ['president', 'head', 'pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'software_development'], default: 'president' },
+  role: { type: String, enum: ['president', 'head', 'pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'miu_events', 'software_development'], default: 'president' },
   roleAssignments: { type: [clubRoleAssignmentSchema], default: [] },
   assignedClubIds: { type: [Number], default: [] },
   committee: { type: String, default: '' }
@@ -169,6 +171,7 @@ const contentRequestSchema = new mongoose.Schema({
   time: { type: String, default: '' },
   registrationEnabled: { type: Boolean, default: true },
   attendanceEnabled: { type: Boolean, default: true },
+  attendanceAudience: { type: String, enum: ['members', 'all_students'], default: undefined, index: true },
   location: { type: String, default: '' },
   budget: { type: String, default: '' },
   image: { type: String, default: '' },
@@ -240,6 +243,7 @@ const contentRequestSchema = new mongoose.Schema({
 const speakerRequestSchema = new mongoose.Schema({
   clubId: { type: Number, required: true, index: true },
   clubName: { type: String, required: true, trim: true, maxlength: 120 },
+  hostingType: { type: String, enum: ['club', 'miu'], default: 'club', index: true },
   requesterType: { type: String, enum: ['student', 'club', 'speaker'], required: true },
   requesterId: { type: String, required: true, index: true },
   requesterEmail: { type: String, required: true, lowercase: true, trim: true, maxlength: 254 },
@@ -334,6 +338,9 @@ const auditLogSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 const eventRegistrationSchema = new mongoose.Schema({
+  studentAccountId: { type: mongoose.Schema.Types.ObjectId, ref: 'StudentAccount' },
+  eventRequestId: { type: Number },
+  registrationKey: { type: String },
   id: { type: Number, required: true, unique: true, index: true },
   clubId: { type: Number, required: true, index: true },
   eventIndex: { type: Number, required: true },
@@ -342,9 +349,13 @@ const eventRegistrationSchema = new mongoose.Schema({
   email: { type: String, required: true, trim: true, lowercase: true, maxlength: 254 }
 }, { timestamps: true });
 eventRegistrationSchema.index({ clubId: 1, eventIndex: 1, email: 1 }, { unique: true });
+eventRegistrationSchema.index({ registrationKey: 1 }, { unique: true, sparse: true });
 
 const attendanceSessionSchema = new mongoose.Schema({
   clubId: { type: Number, required: true, index: true },
+  sourceType: { type: String, enum: ['club', 'miu'], default: 'club', index: true },
+  attendanceAudience: { type: String, enum: ['members', 'all_students'], default: 'members', index: true },
+  assignedSupervisorEmail: { type: String, default: '', lowercase: true, trim: true },
   itemType: { type: String, enum: ['event', 'booth'], default: 'event', index: true },
   eventRequestId: { type: Number, required: true },
   eventTitle: { type: String, required: true, trim: true },
@@ -354,7 +365,9 @@ const attendanceSessionSchema = new mongoose.Schema({
   active: { type: Boolean, default: true, index: true },
   createdBy: { type: String, required: true, lowercase: true, trim: true },
   assignedMemberEmail: { type: String, default: '', lowercase: true, trim: true, index: true },
-  assignedDeviceHash: { type: String, default: '' }
+  assignedDeviceHash: { type: String, default: '' },
+  assignedMemberAccepted: { type: Boolean, default: false },
+  assignedAcceptedAt: { type: Date, default: null }
 }, { timestamps: true });
 attendanceSessionSchema.index({ clubId: 1, itemType: 1, eventRequestId: 1, active: 1 });
 
@@ -365,7 +378,7 @@ const attendanceActivityClosureSchema = new mongoose.Schema({
   eventTitle: { type: String, required: true, trim: true },
   eventDate: { type: String, default: '' },
   endedByEmail: { type: String, required: true, lowercase: true, trim: true },
-  endedByRole: { type: String, enum: ['president', 'head'], required: true },
+  endedByRole: { type: String, enum: ['president', 'head', 'pr', 'sso', 'dean', 'admin', 'software_development'], required: true },
   endedAt: { type: Date, default: Date.now }
 }, { timestamps: true });
 attendanceActivityClosureSchema.index({ clubId: 1, itemType: 1, eventRequestId: 1 }, { unique: true });
@@ -395,6 +408,12 @@ attendanceAssignmentSchema.index({ activeMemberDayKey: 1 }, {
 });
 
 const attendanceRecordSchema = new mongoose.Schema({
+  universityId: { type: String, default: '', trim: true, maxlength: 40 },
+  major: { type: String, default: '', trim: true, maxlength: 120 },
+  attendanceAudience: { type: String, enum: ['members', 'all_students'], default: 'members', index: true },
+  membershipStatus: { type: String, enum: ['member', 'non_member', 'unknown'], default: 'unknown', index: true },
+  memberClubNames: { type: [String], default: [] },
+  supervisorEmail: { type: String, default: '', lowercase: true, trim: true },
   sessionId: { type: mongoose.Schema.Types.ObjectId, required: true, index: true },
   clubId: { type: Number, required: true, index: true },
   itemType: { type: String, enum: ['event', 'booth'], default: 'event', index: true },

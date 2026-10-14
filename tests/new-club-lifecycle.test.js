@@ -42,7 +42,7 @@ function fixture() {
     StudentAccount: { exists: async () => studentCollision },
     Application: { aggregate: () => chain([]) },
     require: () => ({ StudentFeedback: { aggregate: () => chain([]) } }),
-    publicFields: '', publicClubProjection: () => ({}),
+    publicFields: '', publicClubProjection: () => ({}), sendRevalidatedPublicJson: (req, res, records) => res.json(records),
     toApiRecord: value => value,
     cleanText: (value, limit) => String(value || '').trim().slice(0, limit), positiveNumber: value => Math.max(0, Number(value) || 0),
     normalizeApplicationFields: value => value || [],

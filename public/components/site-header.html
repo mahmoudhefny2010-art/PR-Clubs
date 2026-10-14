@@ -61,17 +61,21 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
         </button>
         <div class="nav-profile-dropdown" id="headerStudentProfileDropdown" role="menu" hidden>
-          <div class="nav-profile-account" role="group" aria-label="My Account">
+          <a class="nav-profile-account" id="headerStudentProfileLink" href="/?myForms=1" role="menuitem" aria-label="Open your student dashboard and forms">
             <span class="nav-profile-avatar" id="headerStudentAvatar" aria-hidden="true">S</span>
             <span class="nav-profile-account-copy"><strong>My Account</strong><span id="headerStudentName">Student account</span><span id="headerStudentEmail"></span></span>
-          </div>
+          </a>
+          <button class="nav-profile-item" id="headerAccountPhotoButton" type="button" role="menuitem">Add / change photo</button>
+          <input id="headerAccountPhotoInput" type="file" accept="image/png,image/jpeg,image/webp" hidden />
+          <span class="nav-profile-notice" id="headerAccountPhotoStatus" role="status" aria-live="polite" hidden></span>
           <a class="nav-profile-item" id="headerAccountDashboardLink" href="/?myForms=1" role="menuitem">Dashboard</a>
           <div class="nav-profile-dashboard-choices" id="headerDashboardChoices" hidden>
-            <span class="nav-profile-dashboard-label">Switch dashboard</span>
+            <span class="nav-profile-dashboard-label">My dashboards</span>
             <div id="headerDashboardChoiceList"></div>
             <span id="headerDashboardSwitchStatus" class="visually-hidden" role="status" aria-live="polite"></span>
           </div>
           <a class="nav-profile-item" id="headerStudentFormsLink" href="/?myForms=1&amp;section=forms" role="menuitem">Forms</a>
+          <a class="nav-profile-item" id="headerAttendanceUsherTaskLink" href="/pages/my-attendance-task.html" role="menuitem" hidden>Attendance usher task</a>
           <button class="nav-profile-item" id="headerNotificationToggle" type="button" role="menuitem" hidden>Turn on notifications</button>
           <span class="nav-profile-notice" id="headerNotificationStatus" role="status" aria-live="polite" hidden></span>
           <button class="nav-profile-item" id="headerEmailNotificationToggle" type="button" role="menuitem" hidden>Turn on email updates</button>

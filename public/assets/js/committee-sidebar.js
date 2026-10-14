@@ -79,7 +79,13 @@
       if (active) panel.removeAttribute('aria-hidden');
       else panel.setAttribute('aria-hidden', 'true');
     });
-    target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    // Open dashboard sections from the top of the content area consistently;
+    // nearest could leave attendance/reports halfway down a long dashboard.
+    // Measure the persistent dashboard shell, not the previous panel: it has
+    // already been hidden above and would otherwise report a stale/zero rect.
+    const scrollTarget = layout || target;
+    const targetTop = scrollTarget.getBoundingClientRect().top + window.scrollY - 12;
+    window.scrollTo({ top: Math.max(0, targetTop), left: 0, behavior: 'instant' });
     window.dispatchEvent(new CustomEvent('dashboard:panel-change', { detail: { panelId } }));
   }
 

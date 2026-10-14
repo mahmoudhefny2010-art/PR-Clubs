@@ -38,8 +38,17 @@ test('one MIU account can have distinct, correctly scoped dashboard roles', () =
   assert.ok(validateStaffAssignments({ email: base.email, assignments: [] }).error);
 });
 
+test('MIU Events can be assigned without club scope and gets its standalone dashboard', () => {
+  const result = validateStaffAssignments({ email: base.email, assignments: [
+    { role: 'miu_events', assignedClubIds: [] }
+  ] });
+  assert.equal(result.error, undefined);
+  assert.equal(result.value.roleAssignments[0].clubId, 0);
+  assert.equal(STAFF_ROUTES.miu_events, '/dashboards/miu-events-dashboard.html');
+});
+
 async function fixture(t) {
-  let account = null; let fail = false; let raced = false; let saved; let failReadback = false; let writeOptions;
+  let account = null; let fail = false; let raced = false; let saved; let failReadback = false; let writeOptions; let otherSoftwareDevelopmentAccounts = 0;
   const writes = [];
   const app = express(); app.use(express.json());
   app.use('/api/admin', (req, res, next) => req.headers['x-test-admin'] === 'yes' ? next() : res.status(403).json({ message: 'Admin required' }));
@@ -47,11 +56,13 @@ async function fixture(t) {
     ClubAccount: {
       find: () => query(account ? [account] : []),
       findOne: () => { if (fail) throw new Error('DB_DOWN'); return query(failReadback ? null : account); },
-      create: async (value, options) => { writes.push(value); writeOptions = options; account = { ...value, _id: 'created' }; saved = account; return { toObject: () => account }; },
+      countDocuments: () => { const result = Promise.resolve(otherSoftwareDevelopmentAccounts); result.read = () => result; result.readConcern = () => result; return result; },
+      deleteOne: async () => { account = null; return { deletedCount: 1 }; },
+      create: async (value, options) => { writes.push(value); writeOptions = options; account = { ...value, _id: 'created', updatedAt: new Date() }; saved = account; return { toObject: () => account }; },
       findOneAndUpdate: (filter, update) => {
         writes.push({ filter, update });
         if (raced) return query(null);
-        account = { ...account, ...update.$set, sessionVersion: account.sessionVersion + 1 };
+        account = { ...account, ...update.$set, sessionVersion: account.sessionVersion + 1, updatedAt: new Date() };
         saved = account;
         return query(account);
       }
@@ -64,18 +75,50 @@ async function fixture(t) {
   t.after(() => new Promise(resolve => server.close(resolve)));
   const request = async (body, headers = {}, method = 'PUT') => {
     const response = await fetch(`http://127.0.0.1:${server.address().port}/api/admin/staff-accounts`, {
-      method, headers: { 'Content-Type': 'application/json', 'x-test-admin': 'yes', ...headers }, ...(method === 'PUT' ? { body: JSON.stringify(body) } : {})
+      method, headers: { 'Content-Type': 'application/json', 'x-test-admin': 'yes', ...headers }, ...(body ? { body: JSON.stringify(body) } : {})
     });
     return { status: response.status, body: await response.json() };
   };
-  return { request, writes, saved: () => saved, writeOptions: () => writeOptions, set: value => { account = value; }, fail: () => { fail = true; }, race: () => { raced = true; }, failReadback: () => { failReadback = true; } };
+  return { request, writes, saved: () => saved, writeOptions: () => writeOptions, set: value => { account = value; }, otherAdmins: value => { otherSoftwareDevelopmentAccounts = value; }, fail: () => { fail = true; }, race: () => { raced = true; }, failReadback: () => { failReadback = true; } };
 }
-test('only admin can assign roles, with same-origin and protected global-admin checks', async t => {
+test('only admin can assign roles and all changes require same-origin requests', async t => {
   const state = await fixture(t);
   assert.equal((await state.request(base, { 'x-test-admin': 'no' })).status, 403);
   assert.equal((await state.request(base, { 'x-test-origin': 'invalid' })).status, 403);
-  assert.equal((await state.request({ ...base, email: 'admin@miuegypt.edu.eg' })).status, 409);
+  const result = await state.request({ ...base, email: 'admin@miuegypt.edu.eg' });
+  assert.equal(result.status, 200, 'the configured global-admin email is not forced to keep this staff role');
+  assert.equal(state.saved().email, 'admin@miuegypt.edu.eg');
+});
+test('the final Software Development administrator cannot lose the role', async t => {
+  const state = await fixture(t);
+  state.set({ _id: 'last-admin', email: base.email, role: 'software_development', roleAssignments: [
+    { role: 'software_development', clubId: 0, assignedClubIds: [], committee: '' }
+  ], sessionVersion: 2 });
+  const result = await state.request({ ...base, role: 'supervisor', assignedClubIds: [1] });
+  assert.equal(result.status, 409);
+  assert.match(result.body.message, /at least one Software Development administrator account/);
   assert.equal(state.writes.length, 0);
+  const deletion = await state.request({ email: base.email }, {}, 'DELETE');
+  assert.equal(deletion.status, 409, 'the last Software Development account cannot be deleted either');
+});
+test('Software Development role can be transferred away from the configured global-admin email when another account has it', async t => {
+  const state = await fixture(t);
+  state.set({ _id: 'configured-admin', email: 'admin@miuegypt.edu.eg', role: 'software_development', roleAssignments: [
+    { role: 'software_development', clubId: 0, assignedClubIds: [], committee: '' }
+  ], sessionVersion: 2 });
+  state.otherAdmins(1);
+  const result = await state.request({ email: 'admin@miuegypt.edu.eg', assignments: [{ role: 'pr', assignedClubIds: [] }] });
+  assert.equal(result.status, 200);
+  assert.deepEqual(state.saved().roleAssignments.map(item => item.role), ['pr']);
+});
+test('a Software Development account can be deleted when another administrator account remains', async t => {
+  const state = await fixture(t);
+  state.set({ _id: 'admin-to-remove', email: base.email, role: 'software_development', roleAssignments: [
+    { role: 'software_development', clubId: 0, assignedClubIds: [], committee: '' }
+  ] });
+  state.otherAdmins(1);
+  const result = await state.request({ email: base.email }, {}, 'DELETE');
+  assert.equal(result.status, 200);
 });
 test('Google-only staff creation saves a hashed secret and validates clubs without returning credentials', async t => {
   const state = await fixture(t);
@@ -86,6 +129,7 @@ test('Google-only staff creation saves a hashed secret and validates clubs witho
   assert.deepEqual(state.writeOptions(), { writeConcern: { w: 'majority' } });
   assert.equal(state.saved().role, 'supervisor'); assert.equal(state.saved().passwordHash.length, 128);
   assert.deepEqual(state.saved().roleAssignments.map(item => item.role), ['supervisor']);
+  assert.ok(Number.isFinite(Date.parse(result.body.updatedAt)));
   assert.equal(result.body.passwordHash, undefined); assert.equal(result.body.salt, undefined);
 });
 test('staff account API persists multiple dashboard assignments under one Google email', async t => {
@@ -107,6 +151,7 @@ test('changing a role revokes old sessions and preserves the linked Google ident
     googleSub: 'verified-subject', passwordHash: 'existing-hash', salt: 'existing-salt', assignedClubIds: [1] });
   const result = await state.request({ ...base, role: 'pr', assignedClubIds: [] });
   assert.equal(result.status, 200); assert.equal(result.body.savedToDatabase, true); assert.equal(result.body.role, 'pr');
+  assert.ok(Number.isFinite(Date.parse(result.body.updatedAt)));
   assert.equal(state.writes[0].update.$inc.sessionVersion, 1);
   assert.equal(state.writes[0].update.$set.googleSub, undefined);
   assert.equal(state.writes[0].update.$set.passwordHash, undefined);

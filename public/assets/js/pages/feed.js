@@ -2,8 +2,10 @@
   const list = document.getElementById('communityFeedList');
   const status = document.getElementById('communityFeedStatus');
   const filters = [...document.querySelectorAll('.feed-filter')];
-  let entries = [];
-  let loadedClubs = [];
+  let loadedClubs = window.miuPublicDataCache?.read('clubs') || [];
+  let universityEntries = window.miuPublicDataCache?.read('universityContent') || [];
+  let entries = buildEntries(loadedClubs, universityEntries);
+  let universityRefreshScheduled = false;
   let activeFilter = 'all';
   const requestedPost = Number(new URLSearchParams(window.location.search).get('post'));
   let requestedPostFocused = false;
@@ -117,35 +119,45 @@
     try {
       const response = await fetch('/api/university-content', { cache: 'no-store' });
       if (!response.ok) throw new Error('University updates are unavailable.');
-      const universityContent = await response.json();
-      entries = buildEntries(loadedClubs, Array.isArray(universityContent) ? universityContent : []);
+      const latest = await response.json();
+      universityEntries = Array.isArray(latest) ? latest : [];
+      window.miuPublicDataCache?.write('universityContent', universityEntries);
+      entries = buildEntries(loadedClubs, universityEntries);
       render();
     } catch {
-      entries = buildEntries(loadedClubs);
-      render();
+      if (!entries.length) { entries = buildEntries(loadedClubs); render(); }
     }
   };
 
-  fetch('/api/clubs?media=links', { cache: 'no-store' }).then((response) => {
+  if (entries.length) render();
+  const refreshClubs = async () => {
+    try {
+      const response = await fetch('/api/clubs?media=links', { cache: 'no-store' });
       if (!response.ok) throw new Error('Could not load community updates.');
-      return response.json();
-    })
-    .then((clubs) => {
-      if (!Array.isArray(clubs)) throw new Error('Could not load community updates.');
-      loadedClubs = clubs;
-      entries = buildEntries(loadedClubs);
-      render();
-      if (window.siteStartup?.afterStartup) window.siteStartup.afterStartup(refreshUniversityFeed);
-      else void refreshUniversityFeed();
-    })
-    .catch(() => {
-      status.textContent = 'Community updates are unavailable right now. Please try again later.';
-      status.hidden = false;
-      list.innerHTML = '';
-    });
+      const latest = await response.json();
+      if (!Array.isArray(latest)) throw new Error('Could not load community updates.');
+      const changed = !window.miuPublicDataCache?.same(loadedClubs, latest);
+      loadedClubs = latest;
+      window.miuPublicDataCache?.write('clubs', loadedClubs);
+      if (changed) { entries = buildEntries(loadedClubs, universityEntries); render(); }
+      if (!universityRefreshScheduled) {
+        universityRefreshScheduled = true;
+        if (window.siteStartup?.afterStartup) window.siteStartup.afterStartup(refreshUniversityFeed);
+        else void refreshUniversityFeed();
+      }
+    } catch {
+      if (!loadedClubs.length) {
+        status.textContent = 'Community updates are unavailable right now. Please try again later.';
+        status.hidden = false;
+        list.innerHTML = '';
+      }
+    }
+  };
+  void refreshClubs();
 
   window.setInterval(async () => {
     if (document.visibilityState !== 'visible') return;
+    await refreshClubs();
     await refreshUniversityFeed();
   }, 60_000);
 })();

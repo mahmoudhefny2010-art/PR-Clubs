@@ -5,7 +5,7 @@ const vm = require('node:vm');
 const express = require('express');
 const { STAFF_ROUTES, resolveStaffGoogleAccount, resolveAdminGoogleAccount } = require('../services/staff-google-auth');
 const { registerSupervisorAdmin } = require('../services/supervisor-admin');
-const query = value => ({ select() { return this; }, lean: async () => value });
+const query = value => ({ select() { return this; }, read() { return this; }, readConcern() { return this; }, lean: async () => value });
 
 function staffModel(role = 'supervisor') {
   let account = { _id: 'staff-1', email: 'staff@miuegypt.edu.eg', role, assignedClubIds: [12], sessionVersion: 5 };
@@ -78,7 +78,7 @@ test('MIU supervisors can be assigned without a portal password; existing passwo
   let account = null; let saved;
   const app = express(); app.use(express.json());
   registerSupervisorAdmin(app, {
-    ClubAccount: { findOne: async () => account, create: async value => { saved = value; return { ...value, toObject: () => value }; } },
+    ClubAccount: { findOne: async () => account, create: async value => { saved = value; account = value; return { ...value, toObject: () => value }; } },
     StudentAccount: { exists: async () => true }, Club: { countDocuments: async () => 1 },
     databaseReady: () => true, sameOrigin: () => true, refreshAccount: () => {}
   });
@@ -116,4 +116,30 @@ test('configured MIU administrator signs in through the verified Google endpoint
   assert.equal(context.adminAuthState.sessionVersion, 7);
   assert.ok(cleared.some(value => value.startsWith('miu_club=;')));
   assert.ok(cleared.some(value => value.startsWith('miu_student=;')));
+});
+
+test('account session prefers student identity and labels software development as staff', async () => {
+  const source = fs.readFileSync(require.resolve('../server'), 'utf8');
+  const account = { email: identity.email, role: 'software_development' };
+  const start = source.indexOf("app.get('/api/site/account-session',");
+  const end = source.indexOf("app.get('/api/notifications/config',", start);
+  let handler;
+  const context = {
+    app: { get: (_path, callback) => { handler = callback; } },
+    getStudentAccountFromRequest: async () => ({ name: 'Mahmoud', email: identity.email }),
+    getClubAccountFromRequest: async () => account,
+    getStaffDashboardOptions: () => [{ role: 'software_development' }],
+    isAdminSessionValid: async () => false,
+    getSoftwareDevelopmentSession: async () => false,
+    getConfiguredAdminEmail: () => identity.email,
+    ClubAccount: { findOne: () => query(account) }, mongoReady: true, console
+  };
+  vm.createContext(context);
+  vm.runInContext(source.slice(start, end), context);
+  let result;
+  const res = { setHeader() {}, status() { return this; }, json(value) { result = value; } };
+  await handler({}, res);
+  assert.equal(result.type, 'student');
+  assert.equal(result.name, 'Mahmoud');
+  assert.deepEqual(result.dashboards.map(item => item.role), ['software_development']);
 });

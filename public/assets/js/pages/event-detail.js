@@ -50,6 +50,8 @@
 
   registrationForm.addEventListener('submit', async (event) => {
     event.preventDefault();
+    if (!(universityContentId > 0)) return;
+    if (registrationForm.dataset.studentManaged === 'true') return;
     const name = document.getElementById('regName').value.trim();
     const email = document.getElementById('regEmail').value.trim();
     feedbackEl.textContent = '';
@@ -92,8 +94,19 @@
         metaEl.textContent = [event.date ? formatDate(event.date) : 'Date to be announced', window.formatSiteTime ? window.formatSiteTime(event.time) : event.time, event.location].filter(Boolean).join(' · ');
         descriptionEl.textContent = event.description || '';
         showAttendanceStatus(event);
+        if (event.registrationEnabled === true) {
+          const audience = document.createElement('p');
+          audience.className = 'event-timeline-location';
+          audience.textContent = event.attendanceAudience === 'members' ? 'Registration and QR check-in are limited to current members of any MIU club.' : 'Open to all university students, including non-members.';
+          descriptionEl.before(audience);
+        }
         contentEl.insertAdjacentHTML('beforeend', window.studentFeedbackForm('university', event.id, event.interaction, event.question, event.options));
         registrationForm.hidden = event.registrationEnabled !== true;
+        registrationForm.dataset.studentManaged = event.attendanceAudience === 'members' ? 'true' : 'false';
+        if (event.registrationEnabled === true && event.attendanceAudience === 'members') {
+          import('/assets/js/student-event-registration.js?v=20261014registrationbuttons1').then(() => window.mountStudentEventRegistration(registrationForm, feedbackEl, `/api/university-content/${event.id}/registrations`))
+            .catch(() => { feedbackEl.textContent = 'Registration controls could not load. Please reload.'; });
+        }
         statusEl.hidden = true;
         contentEl.hidden = false;
         document.title = `${event.title || 'University Event'} - MIU`;
@@ -140,7 +153,16 @@
       metaEl.textContent = [formatDate(event.date), window.formatSiteTime ? window.formatSiteTime(event.time) : event.time, event.location].filter(Boolean).join(' · ');
       descriptionEl.textContent = event.description || '';
       showAttendanceStatus(event);
+      if (event.registrationEnabled !== false) {
+        const audience = document.createElement('p');
+        audience.className = 'event-timeline-location';
+        audience.textContent = event.attendanceAudience === 'members' ? 'Registration and QR check-in are limited to current club members.' : 'Open to all university students, including non-members.';
+        descriptionEl.before(audience);
+      }
       registrationForm.hidden = event.registrationEnabled === false;
+      registrationForm.dataset.studentManaged = 'false';
+          import('/assets/js/student-event-registration.js?v=20261014registrationbuttons1').then(() => window.mountStudentEventRegistration(registrationForm, feedbackEl, `/api/events/${clubId}/${eventIndex}/registrations`))
+        .catch(() => { feedbackEl.textContent = 'Registration controls could not load. Please reload.'; });
       statusEl.hidden = true;
       contentEl.hidden = false;
       document.title = `${event.title || 'Event'} - MIU Clubs`;

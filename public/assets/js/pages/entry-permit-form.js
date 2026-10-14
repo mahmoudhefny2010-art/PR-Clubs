@@ -15,7 +15,7 @@ document.querySelectorAll('[data-open-picker]').forEach((button) => {
 });
 function addEntryPermitRow(values = {}) {
   const row = document.createElement('tr');
-  row.innerHTML = '<td><input name="quantity" type="number" min="1" max="10000" step="1" required aria-label="Quantity"></td><td><input name="number" maxlength="80" required aria-label="Number or ID"></td><td><input name="details" maxlength="1000" required aria-label="Item or person details" placeholder="Name, equipment, or item details"></td><td><button class="entry-permit-row-remove" type="button" aria-label="Remove row">&times;</button></td>';
+  row.innerHTML = '<td data-label="Quantity"><input name="quantity" type="number" min="1" max="10000" step="1" required aria-label="Quantity"></td><td data-label="Number / ID"><input name="number" maxlength="80" required aria-label="Number or ID"></td><td data-label="Details"><input name="details" maxlength="1000" required aria-label="Item or person details" placeholder="Name, equipment, or item details"></td><td data-label="Remove"><button class="entry-permit-row-remove" type="button" aria-label="Remove row">&times;</button></td>';
   row.querySelector('[name="quantity"]').value = Number(values.quantity) || 1;
   row.querySelector('[name="number"]').value = values.number || '';
   row.querySelector('[name="details"]').value = values.details || '';

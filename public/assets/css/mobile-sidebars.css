@@ -1,0 +1,298 @@
+.dashboard-drawer-toggle, .dashboard-drawer-close, .dashboard-drawer-heading, .dashboard-drawer-overlay { display: none; }
+.homepage-admin-layout { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 24px; align-items: start; }
+.homepage-admin-content { min-width: 0; }
+.admin-panel .homepage-admin-sidebar { position: sticky; top: 90px; display: flex; flex-direction: column; flex-wrap: nowrap; gap: 1px; max-height: calc(100dvh - 110px); overflow-y: auto; padding: 14px 12px; margin: 0; border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-soft); }
+.admin-panel .homepage-admin-sidebar > :is(a, button) { display: flex; align-items: center; justify-content: flex-start; box-sizing: border-box; width: 100%; min-height: 44px; margin: 0; padding: 10px 12px; border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--text-main); box-shadow: none; font-size: .9rem; line-height: 1.4; text-align: left; white-space: normal; }
+.admin-panel .homepage-admin-sidebar > :is(a, button):hover { background: var(--bg-soft); color: var(--primary-700); }
+.admin-panel .homepage-admin-sidebar > :is(a, button) { font: inherit; font-size: .9rem; font-weight: 650; line-height: 1.4; text-decoration: none; cursor: pointer; }
+:root[data-theme="dark"] body .admin-panel .homepage-admin-sidebar > :is(a, button) { background-color: transparent !important; color: var(--text-main) !important; border-color: transparent !important; }
+.homepage-admin-sidebar { scrollbar-width: none !important; }
+.homepage-admin-sidebar::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
+@media (max-width: 760px) {
+  .dashboard-drawer-toggle { display: inline-flex; align-items: center; gap: 8px; justify-self: start; min-height: 44px; margin: 0 0 12px; }
+  .dashboard-drawer-toggle:has(+ .hidden), .dashboard-drawer-toggle:has(+ [hidden]) { display: none; }
+  body.dashboard-drawer-open { overflow: hidden; }
+  .dashboard-drawer-overlay:not([hidden]) { display: block; position: fixed; inset: 0; z-index: 9998; background: rgba(8, 15, 28, .55); }
+  .mobile-dashboard-drawer, #adminTabs.mobile-dashboard-drawer {
+    position: fixed !important; inset: 0 auto 0 0 !important; z-index: 9999;
+    display: flex !important; flex-direction: column !important; flex-wrap: nowrap !important;
+    width: min(288px, calc(100vw - 56px)) !important; max-width: calc(100vw - 56px) !important;
+    height: 100dvh !important; max-height: 100dvh !important; box-sizing: border-box;
+    padding: max(18px, env(safe-area-inset-top, 0px)) 16px max(18px, env(safe-area-inset-bottom, 0px)) !important;
+    margin: 0 !important; gap: 4px !important; overflow-x: hidden !important; overflow-y: auto !important; overscroll-behavior: contain; scrollbar-width: thin;
+    background: var(--bg-panel, #fff) !important; border-radius: 0 18px 18px 0 !important;
+    transform: translateX(-105%); visibility: hidden; transition: transform .22s ease, visibility .22s;
+  }
+  .mobile-dashboard-drawer.drawer-open,
+  #adminTabs.mobile-dashboard-drawer.drawer-open { transform: translateX(0); visibility: visible; }
+  .mobile-dashboard-drawer > :is(a, button), #adminTabs.mobile-dashboard-drawer > * { width: 100% !important; flex: 0 0 auto !important; min-height: 44px; text-align: left; white-space: normal !important; }
+  .mobile-dashboard-drawer > :is(h2, h3, .president-sidebar-title, .president-sidebar-group-title) { display: block !important; }
+  .mobile-dashboard-drawer > .dashboard-drawer-heading,
+  #adminTabs.mobile-dashboard-drawer > .dashboard-drawer-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 0 0 12px; margin-bottom: 8px; border-bottom: 1px solid var(--border-color); font-size: 16px; }
+  .mobile-dashboard-drawer .dashboard-drawer-close { display: grid; place-items: center; width: 40px; height: 40px; min-height: 40px; padding: 0; margin: 0; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-soft); color: var(--text-main); font: inherit; font-size: 24px; line-height: 1; box-shadow: none; cursor: pointer; }
+  #adminTabs.mobile-dashboard-drawer > :is(button, a), .admin-panel .homepage-admin-sidebar > :is(button, a) { min-height: 44px; padding: 10px 12px; font-size: 14px; line-height: 1.4; box-shadow: none; }
+  #adminTabs.mobile-dashboard-drawer > :is(.active, .is-active) { box-shadow: inset 3px 0 var(--primary-700); }
+  .mobile-dashboard-drawer > h2 { display: none !important; }
+  .committee-dashboard-layout, .president-dashboard-layout, .student-dashboard-layout, .report-admin-layout, .homepage-admin-layout { grid-template-columns: minmax(0, 1fr) !important; }
+}
+@media (prefers-reduced-motion: reduce) { .mobile-dashboard-drawer { transition: none !important; } }
+
+/* Keep every dashboard drawer readable and aligned consistently on phones. */
+@media (max-width: 760px) {
+  .mobile-dashboard-drawer {
+    align-items: stretch !important;
+    text-align: left !important;
+  }
+  .mobile-dashboard-drawer > .dashboard-drawer-heading,
+  #adminTabs.mobile-dashboard-drawer > .dashboard-drawer-heading {
+    text-align: left !important;
+  }
+  .mobile-dashboard-drawer > .dashboard-drawer-heading > strong {
+    margin-right: auto;
+    text-align: left !important;
+  }
+  .mobile-dashboard-drawer > :is(h2, h3, .president-sidebar-title, .president-sidebar-group-title) {
+    display: block !important;
+    width: 100%;
+    box-sizing: border-box;
+    text-align: left !important;
+  }
+  .mobile-dashboard-drawer > :is(a, button):not(.dashboard-drawer-close),
+  #adminTabs.mobile-dashboard-drawer > :is(a, button):not(.dashboard-drawer-close),
+  .admin-panel .homepage-admin-sidebar.mobile-dashboard-drawer > :is(a, button) {
+    justify-content: flex-start !important;
+    min-width: 0 !important;
+    min-height: 44px;
+    padding: 10px 12px !important;
+    border: 1px solid transparent !important;
+    border-radius: 10px !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: var(--text-main) !important;
+    font-size: .92rem;
+    line-height: 1.35;
+    text-align: left !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+  }
+  .mobile-dashboard-drawer > :is(a, button):not(.dashboard-drawer-close):hover,
+  .mobile-dashboard-drawer > :is(a, button).is-active:not(.dashboard-drawer-close),
+  #adminTabs.mobile-dashboard-drawer > :is(a, button).is-active:not(.dashboard-drawer-close),
+  .admin-panel .homepage-admin-sidebar.mobile-dashboard-drawer > :is(a, button):hover {
+    border-color: var(--border-color) !important;
+    background: var(--bg-soft) !important;
+    color: var(--primary-700) !important;
+  }
+  .mobile-dashboard-drawer > h3,
+  .mobile-dashboard-drawer > .president-sidebar-group-title {
+    margin: 8px 0 3px !important;
+    padding: 10px 10px 6px !important;
+    border-top: 1px solid var(--border-color);
+    color: var(--text-muted);
+    font-size: .72rem;
+    letter-spacing: .07em;
+  }
+}
+
+/* One shared drawer layout for committee, MIU Events, club, student and admin dashboards. */
+@media (max-width: 760px) {
+  body .committee-dashboard-layout .committee-sidebar.mobile-dashboard-drawer,
+  body .president-dashboard-layout .president-sidebar.mobile-dashboard-drawer,
+  body .student-dashboard-layout .student-dashboard-sidebar.mobile-dashboard-drawer,
+  body .admin-panel .homepage-admin-sidebar.mobile-dashboard-drawer,
+  body #adminTabs.mobile-dashboard-drawer,
+  body .mobile-dashboard-drawer {
+    position: fixed !important;
+    inset: 0 auto 0 0 !important;
+    z-index: 9999 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    flex-wrap: nowrap !important;
+    align-items: stretch !important;
+    width: min(300px, calc(100vw - 48px)) !important;
+    max-width: calc(100vw - 48px) !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    min-height: 0 !important;
+    max-height: 100dvh !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    padding: max(18px, env(safe-area-inset-top)) 16px max(18px, env(safe-area-inset-bottom)) !important;
+    margin: 0 !important;
+    gap: 5px !important;
+    overflow-x: hidden !important;
+    overflow-y: scroll !important;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y pinch-zoom;
+    overscroll-behavior-y: contain;
+    scrollbar-width: none !important;
+    background: var(--bg-panel, #fff) !important;
+    border: 0 !important;
+    border-right: 1px solid var(--border-color) !important;
+    border-radius: 0 20px 20px 0 !important;
+    box-shadow: 0 16px 44px rgba(15, 23, 42, .2) !important;
+    text-align: center !important;
+    transform: translateX(-105%);
+    visibility: hidden;
+    transition: transform .22s ease, visibility .22s;
+  }
+  body .mobile-dashboard-drawer::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
+  body .committee-dashboard-layout .committee-sidebar.mobile-dashboard-drawer.drawer-open,
+  body .president-dashboard-layout .president-sidebar.mobile-dashboard-drawer.drawer-open,
+  body .student-dashboard-layout .student-dashboard-sidebar.mobile-dashboard-drawer.drawer-open,
+  body .admin-panel .homepage-admin-sidebar.mobile-dashboard-drawer.drawer-open,
+  body #adminTabs.mobile-dashboard-drawer.drawer-open,
+  body .mobile-dashboard-drawer.drawer-open { transform: translateX(0); visibility: visible; }
+  body .mobile-dashboard-drawer > .dashboard-drawer-heading {
+    position: sticky !important;
+    top: 0;
+    z-index: 2;
+    display: flex !important;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    width: 100%;
+    min-height: 58px;
+    padding: 0 0 12px !important;
+    margin: 0 0 4px !important;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-panel, #fff);
+    text-align: center !important;
+  }
+  body .mobile-dashboard-drawer > .dashboard-drawer-heading > strong {
+    position: absolute;
+    inset-inline: 0;
+    text-align: center !important;
+    pointer-events: none;
+  }
+  body .mobile-dashboard-drawer > .dashboard-drawer-heading .dashboard-drawer-close {
+    flex: 0 0 48px;
+    display: grid !important;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    min-height: 48px;
+    padding: 0 !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 14px !important;
+    background: var(--bg-soft) !important;
+    color: var(--primary-700) !important;
+    font-size: 26px;
+  }
+  body .mobile-dashboard-drawer > h2,
+  body .mobile-dashboard-drawer > :is(.student-sidebar-label, .president-sidebar-group-title, h3) {
+    display: flex !important;
+    position: relative;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 38px;
+    box-sizing: border-box;
+    margin: 5px 0 3px !important;
+    padding: 11px 8px 5px !important;
+    border: 0 !important;
+    color: var(--text-muted) !important;
+    font-size: .76rem !important;
+    font-weight: 800;
+    letter-spacing: .07em;
+    line-height: 1.3;
+    text-align: center !important;
+  }
+  body .mobile-dashboard-drawer > h2 { font-size: .88rem !important; }
+  body .committee-dashboard-layout .committee-sidebar.mobile-dashboard-drawer > :is(h2, h3, .supervisor-club-label) {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    text-align: center !important;
+  }
+  body .mobile-dashboard-drawer > .president-sidebar-title { display: none !important; }
+  body .president-dashboard-layout .president-sidebar.mobile-dashboard-drawer > .president-sidebar-title { display: none !important; }
+  body .mobile-dashboard-drawer > :is(.president-sidebar-group-title, h3)::before {
+    position: absolute;
+    top: 0;
+    left: 25%;
+    width: 50%;
+    height: 1px;
+    background: var(--border-color);
+    content: '';
+  }
+  body .student-dashboard-layout .student-dashboard-sidebar.mobile-dashboard-drawer > .student-dashboard-nav {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    width: 100%;
+    min-width: 0;
+    gap: 5px;
+    overflow: visible;
+  }
+  body .committee-dashboard-layout .committee-sidebar.mobile-dashboard-drawer #supervisorClub {
+    flex: 0 0 auto !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    text-align: center;
+  }
+  body .mobile-dashboard-drawer > :is(a, button):not(.dashboard-drawer-close),
+  body .mobile-dashboard-drawer .student-dashboard-nav-item,
+  body .mobile-dashboard-drawer > .student-dashboard-explore,
+  body .committee-dashboard-layout .committee-sidebar.mobile-dashboard-drawer > :is(a, button):not(.dashboard-drawer-close),
+  body .president-dashboard-layout .president-sidebar.mobile-dashboard-drawer > :is(a, button):not(.dashboard-drawer-close),
+  body .student-dashboard-layout .student-dashboard-sidebar.mobile-dashboard-drawer .student-dashboard-nav-item,
+  body .student-dashboard-layout .student-dashboard-sidebar.mobile-dashboard-drawer > .student-dashboard-explore,
+  body .admin-panel .homepage-admin-sidebar.mobile-dashboard-drawer > :is(a, button),
+  body #adminTabs.mobile-dashboard-drawer > :is(a, button):not(.dashboard-drawer-close) {
+    display: flex !important;
+    flex: 0 0 auto !important;
+    align-items: center;
+    justify-content: center !important;
+    gap: 8px;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 48px !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    padding: 10px 14px !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 999px !important;
+    background: var(--bg-panel) !important;
+    color: var(--text-muted) !important;
+    box-shadow: none !important;
+    font: inherit;
+    font-size: .92rem !important;
+    font-weight: 700 !important;
+    line-height: 1.3 !important;
+    text-align: center !important;
+    text-decoration: none;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+  }
+  body .mobile-dashboard-drawer > :is(a, button).is-active:not(.dashboard-drawer-close),
+  body .mobile-dashboard-drawer > :is(a, button).active:not(.dashboard-drawer-close),
+  body .mobile-dashboard-drawer > :is(a, button)[aria-current="page"],
+  body .mobile-dashboard-drawer .student-dashboard-nav-item.is-active,
+  body .committee-dashboard-layout .committee-sidebar.mobile-dashboard-drawer > :is(a, button).is-active,
+  body .president-dashboard-layout .president-sidebar.mobile-dashboard-drawer > :is(a, button).is-active,
+  body .student-dashboard-layout .student-dashboard-sidebar.mobile-dashboard-drawer .student-dashboard-nav-item.is-active,
+  body #adminTabs.mobile-dashboard-drawer > :is(a, button).is-active,
+  body #adminTabs.mobile-dashboard-drawer > :is(a, button).active {
+    border-color: rgba(185, 28, 28, .28) !important;
+    background: var(--primary-50, #fff1f2) !important;
+    background: color-mix(in srgb, var(--primary-50, #fff1f2) 78%, var(--bg-panel)) !important;
+    color: var(--primary-800, #991b1b) !important;
+  }
+  :root[data-theme="dark"] body .admin-panel .homepage-admin-sidebar.mobile-dashboard-drawer > :is(a, button) {
+    border-color: var(--border-color) !important;
+    background: var(--bg-panel) !important;
+    color: var(--text-muted) !important;
+  }
+  :root[data-theme="dark"] body .admin-panel .homepage-admin-sidebar.mobile-dashboard-drawer > :is(a, button).is-active {
+    border-color: rgba(185, 28, 28, .28) !important;
+    background: rgba(185, 28, 28, .13) !important;
+    color: #ff9299 !important;
+  }
+  body .mobile-dashboard-drawer .sidebar-unread-badge,
+  body .mobile-dashboard-drawer .student-nav-count { margin: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) { body .mobile-dashboard-drawer { transition: none !important; } }

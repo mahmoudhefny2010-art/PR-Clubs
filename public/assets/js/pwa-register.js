@@ -54,40 +54,21 @@
   window.miuRefreshPage = refreshPage;
 
   // Detect a new Vercel deployment even when sw.js itself did not change.
-  // Reload immediately when safe; if a form has unsaved edits, offer a refresh
-  // action instead of discarding the user's work.
+  // Only reload when the deployment marker changes, never on a timer.
   let deploymentVersion = '';
-  let updateNotice;
   let checkingDeployment = false;
+  let versionPollTimer = 0;
+  let refreshAfterDirtyForm = false;
   const hasDirtyForm = () => Boolean(document.querySelector('form[data-miu-dirty="true"]'));
-  const showUpdateNotice = () => {
-    if (!updateNotice) {
-      updateNotice = document.createElement('div');
-      updateNotice.setAttribute('role', 'status');
-      updateNotice.setAttribute('aria-live', 'polite');
-      Object.assign(updateNotice.style, {
-        position: 'fixed', inset: 'auto 12px 16px', zIndex: '2147483646', margin: '0 auto',
-        width: 'max-content', maxWidth: 'min(560px, calc(100vw - 24px))', padding: '10px 12px',
-        display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', justifyContent: 'center',
-        borderRadius: '12px', background: '#172033', color: '#fff', boxShadow: '0 8px 28px #0004',
-        font: '600 14px/1.45 system-ui, sans-serif'
-      });
-      const label = document.createElement('span');
-      label.textContent = 'A new version is ready.';
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.textContent = 'Refresh';
-      Object.assign(button.style, {
-        border: '0', borderRadius: '8px', padding: '7px 12px', background: '#fff', color: '#172033',
-        font: '700 14px system-ui, sans-serif', cursor: 'pointer'
-      });
-      button.addEventListener('click', async () => {
-        if (await refreshPage()) updateNotice?.remove();
-      });
-      updateNotice.append(label, button);
-      document.body.appendChild(updateNotice);
-    }
-    updateNotice.hidden = false;
+  const clearCachedPages = async () => {
+    const controller = navigator.serviceWorker?.controller;
+    if (!controller || typeof MessageChannel === 'undefined') return;
+    await new Promise((resolve) => {
+      const channel = new MessageChannel();
+      const timeout = setTimeout(resolve, 500);
+      channel.port1.onmessage = () => { clearTimeout(timeout); resolve(); };
+      controller.postMessage({ type: 'MIU_CLEAR_CACHED_PAGES' }, [channel.port2]);
+    });
   };
   const checkDeploymentVersion = async () => {
     if (checkingDeployment || !navigator.onLine || document.visibilityState === 'hidden') return;
@@ -104,21 +85,45 @@
         return;
       }
       if (deploymentVersion === payload.version) return;
+      if (hasDirtyForm()) {
+        refreshAfterDirtyForm = true;
+        return;
+      }
+      await clearCachedPages();
       deploymentVersion = payload.version;
-      if (hasDirtyForm()) showUpdateNotice();
-      else window.location.reload();
+      window.location.reload();
     } catch {
       // The site remains usable if the deployment check is temporarily unavailable.
     } finally {
       checkingDeployment = false;
     }
   };
-  window.addEventListener('load', checkDeploymentVersion, { once: true });
-  window.addEventListener('focus', checkDeploymentVersion);
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') checkDeploymentVersion();
+  const scheduleVersionCheck = () => {
+    clearTimeout(versionPollTimer);
+    if (document.visibilityState === 'hidden') return;
+    versionPollTimer = setTimeout(async () => {
+      await checkDeploymentVersion();
+      scheduleVersionCheck();
+    }, 60000);
+  };
+  const initialVersionCheck = () => {
+    void checkDeploymentVersion();
+    scheduleVersionCheck();
+  };
+  window.addEventListener('load', initialVersionCheck, { once: true });
+  window.addEventListener('focus', () => {
+    void checkDeploymentVersion();
+    scheduleVersionCheck();
   });
-  window.setInterval(checkDeploymentVersion, 120000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      void checkDeploymentVersion();
+      scheduleVersionCheck();
+    } else {
+      clearTimeout(versionPollTimer);
+    }
+  });
+  window.addEventListener('online', () => void checkDeploymentVersion());
 
   // Native browsers usually provide pull-to-refresh; this adds the same gesture
   // to installed PWAs and provides a consistent indicator on touch devices.
@@ -145,7 +150,7 @@
 
     document.addEventListener('touchstart', (event) => {
       if (refreshing || event.touches.length !== 1 || window.scrollY > 1) return;
-      if (event.target.closest('a, button, input, select, textarea, [contenteditable="true"], [data-no-pull-refresh]')) return;
+      if (event.target.closest('.mobile-dashboard-drawer, a, button, input, select, textarea, [contenteditable="true"], [data-no-pull-refresh]')) return;
       startX = event.touches[0].clientX;
       startY = event.touches[0].clientY;
       trackingPull = true;
@@ -194,6 +199,19 @@
 
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
+      const isLocalDevelopment = ['localhost', '127.0.0.1', '::1'].includes(location.hostname);
+      if (isLocalDevelopment) {
+        Promise.all([
+          navigator.serviceWorker.getRegistrations().then((registrations) => Promise.all(
+            registrations.filter((registration) => new URL(registration.scope).pathname === '/')
+              .map((registration) => registration.unregister())
+          )),
+          caches.keys().then((names) => Promise.all(names
+            .filter((name) => name.startsWith('miu-clubs-static-'))
+            .map((name) => caches.delete(name))))
+        ]).catch(() => {});
+        return;
+      }
       navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch((error) => {
         console.warn('PWA service worker registration failed:', error);
       });

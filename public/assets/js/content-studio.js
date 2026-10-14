@@ -52,7 +52,7 @@ const ContentStudio = (() => {
 
   function renderPermitItems(item) {
     if (item.type !== 'entry_permit' || !Array.isArray(item.permitItems) || !item.permitItems.length) return '';
-    return `<div class="entry-permit-table-wrap content-card-permit-items"><table class="entry-permit-table"><thead><tr><th>Qty</th><th>Number / ID</th><th>Details</th></tr></thead><tbody>${item.permitItems.map((row) => `<tr><td>${escapeHtml(row.quantity)}</td><td>${escapeHtml(row.number)}</td><td>${escapeHtml(row.details)}</td></tr>`).join('')}</tbody></table></div>`;
+    return `<div class="entry-permit-table-wrap content-card-permit-items"><table class="entry-permit-table"><thead><tr><th>Qty</th><th>Number / ID</th><th>Details</th></tr></thead><tbody>${item.permitItems.map((row) => `<tr><td data-label="Quantity">${escapeHtml(row.quantity)}</td><td data-label="Number / ID">${escapeHtml(row.number)}</td><td data-label="Details">${escapeHtml(row.details)}</td></tr>`).join('')}</tbody></table></div>`;
   }
 
   let accountRole = '';
@@ -72,9 +72,9 @@ const ContentStudio = (() => {
         <div class="meta"><span class="type-badge type-${escapeHtml(item.type)}">${escapeHtml(label)}</span>${escapeHtml(contentMeta(item)) || 'no details'}</div>
         ${renderPermitItems(item)}
         <div><span class="status-badge status-${escapeHtml(item.status)}" title="Request status">${escapeHtml(item.status.replaceAll('_', ' '))}</span></div>
-        ${item.clubNotice ? `<div role="status" style="margin-top:8px;padding:9px 11px;border-radius:10px;background:#fff1d5;color:#92400e;font-size:.85rem"><strong>Review update:</strong> ${escapeHtml(item.clubNotice)}</div>` : ''}
+        ${item.clubNotice ? `<div class="content-review-update" role="status"><strong>Review update:</strong> ${escapeHtml(item.clubNotice)}</div>` : ''}
         ${activeComment ? `<section class="review-comments" style="margin-top:10px"><strong>Active comment</strong><p class="meta" style="margin:5px 0;white-space:pre-wrap"><strong>${reviewerNames[activeComment.role]}:</strong> ${escapeHtml(activeComment.text)}</p></section>` : ''}
-        <div class="content-task-actions" style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <div class="content-task-actions">
           ${accountRole === 'head'
             ? `<a class="mini-btn" href="/pages/${escapeHtml(item.type.replace('_', '-'))}-form.html?edit=${Number(item.id)}">Open assigned task</a>`
             : `${['draft', 'changes_requested', 'rejected'].includes(item.status) ? `<button class="mini-btn" data-edit="${item.id}">Edit</button><button class="mini-btn" data-submit="${item.id}">Submit</button>` : ''}
@@ -288,6 +288,11 @@ const ContentStudio = (() => {
       if (window.validateDataEntryForm && !window.validateDataEntryForm(contentForm)) return;
       const payload = { ...(collect ? collect() : {}), submit };
       if (assignedHeadSelect) payload.assignedHeadEmail = assignedHeadSelect.value;
+      if (submit && type === 'event' && !['members', 'all_students'].includes(payload.attendanceAudience)) {
+        formFeedback.textContent = 'Choose whether this event is for club members or all university students.';
+        document.getElementById('eventAudienceInput')?.focus();
+        return;
+      }
       if (submit && (type === 'event' || type === 'feed') && !String(payload.image || '').trim()) {
         formFeedback.textContent = 'Add an image before submitting this content for review.';
         document.getElementById('imageInput')?.focus();

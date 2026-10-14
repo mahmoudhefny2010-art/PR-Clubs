@@ -1,0 +1,96 @@
+.event-reports { padding-block: 2rem; }
+.event-reports.committee-inline-panel { padding: 16px 0; min-width: 0; }
+.event-reports.committee-inline-panel[hidden], .event-reports.hidden { display: none !important; }
+.report-admin-layout { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 24px; align-items: start; }
+.report-admin-content { box-sizing: border-box; min-width: 0; background: transparent !important; border: 0; box-shadow: none; }
+.report-admin-content > .tab-panel,
+.report-admin-content > .tab-panel.active,
+.report-admin-content > .tab-panel.section,
+.report-admin-content > .tab-panel.section.active { box-sizing: border-box; min-width: 0; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent !important; box-shadow: none !important; }
+#adminTabs.report-admin-sidebar { position: sticky; top: 90px; display: flex; flex-direction: column; flex-wrap: nowrap; gap: 1px; max-height: calc(100dvh - 110px); overflow-y: auto; padding: 14px 12px; margin: 0; border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-soft); scrollbar-width: none !important; }
+#adminTabs.report-admin-sidebar::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
+#adminTabs.report-admin-sidebar > :is(button, a) { display: flex; align-items: center; width: 100%; box-sizing: border-box; min-height: 44px; padding: 10px 12px; margin: 0; border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--text-main); font: inherit; font-size: .9rem; font-weight: 650; line-height: 1.4; text-align: left; white-space: normal; text-decoration: none; cursor: pointer; }
+#adminTabs.report-admin-sidebar > :is(button, a):hover { background: var(--bg-soft); color: var(--primary-700); }
+:root[data-theme="dark"] body #adminTabs.report-admin-sidebar > :is(a, button) { background-color: transparent !important; color: var(--text-main) !important; border-color: transparent !important; }
+:root[data-theme="dark"] body #adminTabs.report-admin-sidebar > :is(.active, .is-active) { background-color: var(--bg-panel) !important; color: var(--primary-700) !important; }
+#adminTabs.report-admin-sidebar > :is(.active, .is-active) { background: var(--bg-soft); color: var(--primary-700); border-color: var(--border-color); box-shadow: inset 3px 0 var(--primary-700); }
+@media (max-width: 760px) { .report-admin-layout { grid-template-columns: minmax(0, 1fr); } #adminTabs.report-admin-sidebar { flex-direction: row; flex-wrap: wrap; } #adminTabs.report-admin-sidebar > * { width: auto; flex: 1 1 150px; } }
+.event-reports [hidden] { display: none !important; }
+.report-filters { display: flex; flex-wrap: wrap; gap: 1rem; align-items: end; }
+.event-reports label { display: grid; gap: .4rem; flex: 1 1 180px; }
+.event-reports input, .event-reports select, .event-reports textarea { width: 100%; padding: .7rem; color: inherit; background: var(--bg-card, transparent); border: 1px solid var(--border-color, #aaa); border-radius: .6rem; font: inherit; box-sizing: border-box; }
+.event-reports textarea { min-height: 100px; resize: vertical; }
+.event-report { box-sizing: border-box; min-width: 0; margin-block: 1.5rem; padding: 1.25rem; border: 1px solid var(--border-color, #aaa); border-radius: 16px; background: var(--bg-card, transparent); overflow-wrap: anywhere; }
+.event-report form { display: grid; gap: 1rem; }
+.event-report > :is(h2, p) { max-width: 100%; overflow-wrap: anywhere; }
+.event-report > h2 { margin: 0 0 .65rem; }
+.event-report > p { margin-block: .55rem; }
+.report-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), max-content)); align-items: stretch; gap: .75rem; margin-top: 1rem; min-width: 0; }
+.report-actions > button { box-sizing: border-box; width: 100%; min-width: 0; min-height: 48px; padding: .75rem 1rem; line-height: 1.35; white-space: normal; overflow-wrap: anywhere; }
+.report-metrics { display: flex; flex-wrap: wrap; gap: 1rem; padding-block: 1rem; }
+.report-metrics span { padding: .8rem; border: 1px solid var(--border-color, #aaa); border-radius: .6rem; }
+.event-report dd { white-space: pre-wrap; margin: .4rem 0 1rem; overflow-wrap: anywhere; }
+
+@media (max-width: 600px) {
+  .event-report { margin-block: 1rem; padding: 1rem; border-radius: 14px; }
+  .report-actions { grid-template-columns: minmax(0, 1fr); gap: .65rem; }
+  .report-actions > button { width: 100%; min-height: 48px; }
+}
+
+/* MIU attendance owns the full viewport shell so the shared navbar and footer
+   stay aligned at browser zoom levels and on narrow screens. */
+body.miu-attendance-page,
+body.miu-attendance-page * { box-sizing: border-box; }
+body.miu-attendance-page { width: 100%; max-width: 100%; min-width: 0; overflow-x: clip; }
+body.miu-attendance-page > #site-header,
+body.miu-attendance-page > #site-footer,
+body.miu-attendance-page > #site-header > .topbar-nav,
+body.miu-attendance-page > #site-footer > .site-footer { width: 100%; max-width: 100%; min-width: 0; flex: 0 0 auto; }
+body.miu-attendance-page > main.event-reports { width: min(100%, 1480px); max-width: 1480px; min-width: 0; flex: 1 0 auto; padding-inline: clamp(12px, 3vw, 36px); }
+body.miu-attendance-page .committee-card, .miu-attendance-card { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.miu-attendance-card .miu-attendance-form { display: grid; gap: 18px; min-width: 0; }
+.miu-attendance-card .miu-assignment-heading h2 { margin: 0 0 4px; }
+.miu-attendance-card .miu-assignment-heading p { margin: 0; color: var(--text-muted); }
+.miu-attendance-card .miu-assignment-list { display: grid; gap: 12px; min-width: 0; }
+.miu-attendance-card .miu-assignment-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)) auto; align-items: end; gap: 12px; min-width: 0; margin: 0; padding: 14px; border: 1px solid var(--border-color); border-radius: 12px; }
+.miu-attendance-card .miu-assignment-row legend { padding-inline: 6px; font-weight: 750; }
+.miu-attendance-card .miu-assignment-row label { min-width: 0; }
+.miu-attendance-card .miu-attendance-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.miu-attendance-card .miu-attendance-actions > button { min-height: 46px; }
+.miu-attendance-card #miuAttendanceAssignedList { display: grid; gap: 8px; padding-left: 1.4rem; overflow-wrap: anywhere; }
+.miu-attendance-card #miuAttendanceAssignedList li { padding-left: 3px; }
+body.miu-attendance-page .footer-container { width: min(100%, 1240px); }
+
+@media (max-width: 760px) {
+  body.miu-attendance-page > main.event-reports { padding: 16px 12px 28px; }
+  .miu-attendance-card { padding: clamp(16px, 4vw, 24px); }
+  .miu-attendance-card .miu-assignment-row { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .miu-attendance-card .miu-assignment-row .miu-remove-assignment:not([hidden]) { width: 100%; }
+  .miu-attendance-card .miu-attendance-actions { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .miu-attendance-card .miu-attendance-actions > button { width: 100%; }
+  body.miu-attendance-page .footer-main,
+  body.miu-attendance-page .footer-bottom { min-width: 0; }
+}
+
+@media (max-width: 380px) {
+  body.miu-attendance-page > main.event-reports { padding-inline: 8px; }
+  .miu-attendance-card { padding: 14px 12px; }
+  body.miu-attendance-page .footer-links { grid-template-columns: minmax(0, 1fr); }
+}
+
+.miu-attendance-card #miuAttendanceEvent {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.miu-attendance-event-details {
+  display: block;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: .88rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.miu-attendance-event-details[hidden] { display: none !important; }

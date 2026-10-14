@@ -28,6 +28,7 @@
 
   window.openEventModal = function (event) {
     if (!event) return;
+    window.unmountStudentEventRegistration?.(form);
     activeEvent = event;
     if (!event.university && Number.isInteger(Number(event.clubId)) && Number.isInteger(Number(event.eventIndex))) {
       fetch(`/api/events/${encodeURIComponent(event.clubId)}/${encodeURIComponent(event.eventIndex)}/view`, { method: 'POST', cache: 'no-store' }).catch(() => {});
@@ -41,9 +42,20 @@
     attendance.hidden = event.attendanceEnabled !== true;
     attendance.textContent = 'Attendance taken';
     description.textContent = event.description || '';
+    if (event.registrationEnabled === true && event.attendanceAudience) {
+      description.textContent += `\n\n${event.attendanceAudience === 'members'
+        ? event.university ? 'MIU club members only.' : 'Club members only.'
+        : 'Open to all university students, including non-members.'}`;
+    }
     feedback.textContent = '';
     form.reset();
     form.hidden = event.registrationEnabled === false;
+    if (!event.university) import('/assets/js/student-event-registration.js?v=20261014registrationbuttons1').then(() => {
+      if (activeEvent === event) window.mountStudentEventRegistration(form, feedback, `/api/events/${event.clubId}/${event.eventIndex}/registrations`);
+    }).catch(() => { feedback.textContent = 'Registration controls could not load. Please reload.'; });
+    else if (event.attendanceAudience === 'members' && event.registrationEnabled === true) import('/assets/js/student-event-registration.js?v=20261014registrationbuttons1').then(() => {
+      if (activeEvent === event) window.mountStudentEventRegistration(form, feedback, `/api/university-content/${encodeURIComponent(event.universityContentId || event.id)}/registrations`);
+    }).catch(() => { feedback.textContent = 'Registration controls could not load. Please reload.'; });
     modal.classList.remove('hidden');
     document.body.classList.add('modal-open');
     closeButton.focus();
@@ -54,6 +66,7 @@
   document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !modal.classList.contains('hidden')) close(); });
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
+    if (!activeEvent?.university || activeEvent.attendanceAudience === 'members') return;
     const name = document.getElementById('eventModalName').value.trim();
     const email = document.getElementById('eventModalEmail').value.trim();
     feedback.textContent = '';

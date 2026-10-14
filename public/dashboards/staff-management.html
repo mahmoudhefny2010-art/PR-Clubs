@@ -2,22 +2,23 @@
 <html lang="en"><head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Staff roles · MIU Clubs</title>
-  <script src="/assets/js/site-loading.js?v=20261013startupfullcover1"></script>
-  <link rel="stylesheet" href="/assets/css/base.css?v=20261013startupfullcover1">
-  <link rel="stylesheet" href="/assets/css/responsive.css?v=20261013mobilefooterbg1">
-  <link rel="stylesheet" href="/assets/css/dark.css?v=20261013darkglobal2">
-  <link rel="stylesheet" href="/assets/css/features.css?v=20261013backbutton1">
+  <script src="/assets/js/site-loading.js?v=20261014promptqueue1"></script>
+  <link rel="stylesheet" href="/assets/css/base.css?v=20261014approvaltrack1">
+  <link rel="stylesheet" href="/assets/css/responsive.css?v=20261014profilelink1">
+  <link rel="stylesheet" href="/assets/css/dark.css?v=20261014permitcards2">
+  <link rel="stylesheet" href="/assets/css/features.css?v=20261014permititemlayout1">
   <link rel="stylesheet" href="/assets/css/pages/supervisor-dashboard.css?v=20261013navscroll1">
-  <link rel="stylesheet" href="/assets/css/pages/supervisor-management.css?v=20261013responsive1">
+  <link rel="stylesheet" href="/assets/css/pages/supervisor-management.css?v=20261014lastupdated1">
   <script src="/assets/js/theme.js?v=20261009c" defer></script>
-  <script src="/assets/js/layout.js?v=20261013stagedload3" defer></script>
-  <script src="/assets/js/staff-management.js?v=20261013staffrolelookup8" defer></script>
-  <link rel="stylesheet" href="/assets/css/modal-controls.css?v=20261013modalclose2">
+    <script src="/assets/js/layout.js?v=20261014promptqueue1" defer></script>
+  <script src="/assets/js/staff-management.js?v=20261014lastupdated1" defer></script>
+  <link rel="stylesheet" href="/assets/css/modal-controls.css?v=20261014pairedappactions1">
   <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/pics/pwa-icon-192.png?v=20261013favicon1">
 </head><body><div id="site-header"></div>
 <main class="app-container supervisor-main supervisor-management"><section class="committee-card supervisor-management-shell">
   <header class="supervisor-management-heading"><div><span class="committee-label">ADMINISTRATION</span><h1>Staff accounts &amp; roles</h1><p>Assign an MIU Google email to its dashboard and club responsibilities.</p></div><a class="secondary-btn" href="/admin">Back to dashboard</a></header>
-  <p id="staffFeedback" role="status" aria-live="polite">Loading staff accounts…</p>
+  <p id="staffFeedback" role="status" aria-live="polite">Loading staff accounts&</p>
+  <p>Administrator and Global Admin access use the Software Development team dashboard role. Assign or change it below.</p>
   <form id="staffForm" class="supervisor-admin-form" hidden>
     <div class="supervisor-form-heading"><h2>Assign dashboard roles</h2><p>One MIU Google account can have several dashboards. Saving changes signs out its current sessions.</p></div>
     <div class="supervisor-account-fields">
@@ -27,7 +28,7 @@
     </div>
     <div id="staffRoleAssignments" class="staff-role-assignments"></div>
     <button id="staffAddRoleBtn" class="secondary-btn" type="button">Add another dashboard</button>
-    <div class="supervisor-form-footer"><p>Each dashboard checks its role and club scope on the server.</p><button class="primary-btn" type="submit">Save dashboard roles</button></div>
+    <div class="supervisor-form-footer"><div id="staffSaveMessages"><p>Each dashboard checks its role and club scope on the server.</p></div><button class="primary-btn" type="submit">Save dashboard roles</button></div>
   </form>
   <section class="supervisor-management-section"><div class="supervisor-section-heading"><h2>Assigned staff</h2><p>Find an account and edit its role or club assignments.</p></div>
     <div class="staff-directory-filters">

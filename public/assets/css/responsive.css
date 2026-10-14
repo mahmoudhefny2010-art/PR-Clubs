@@ -428,6 +428,24 @@
   .welcome-box, .committee-card, .app-form-card, .admin-panel, .admin-login-panel, .club-login-panel { padding: 18px 14px; }
   .card-actions, .modal-actions { display: grid; grid-template-columns: 1fr; }
   .card-actions > *, .modal-actions > * { width: 100%; min-width: 0; }
+  /* Keep interview decision actions compact instead of stretching into tall cards. */
+  #reviewModal .modal-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: stretch;
+    gap: 8px;
+  }
+  #reviewModal .modal-actions > .action-btn {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    min-height: 46px;
+    padding: 9px 6px;
+    font-size: .84rem;
+    line-height: 1.2;
+    overflow-wrap: normal;
+    text-wrap: initial;
+  }
   .club-actions { gap: 8px; }
   .club-actions > button, .club-actions > a { min-height: 46px; padding: 8px; font-size: .84rem; }
 }
@@ -438,6 +456,8 @@
   .nav-signout-btn { max-width: 76px; overflow: hidden; text-overflow: ellipsis; }
   .stats-summary, #homeView .stats-summary { grid-template-columns: 1fr; }
   .club-actions { grid-template-columns: 1fr; }
+  #reviewModal .modal-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #reviewModal #saveReviewBtn { grid-column: 1 / -1; }
 }
 
 @media (max-width: 1000px) {
@@ -597,6 +617,8 @@
 .nav-profile-dashboard-choices[hidden] { display: none !important; }
 .nav-profile-dashboard-label { padding: 6px 12px 2px; color: var(--text-muted); font-size: .75rem; font-weight: 750; }
 .nav-profile-dashboard-option:disabled { cursor: wait; opacity: .65; }
+.nav-profile-dashboard-choices .nav-profile-dashboard-option { display: block; min-height: 44px; padding: 8px 12px; font-size: .85rem; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nav-profile-dashboard-choices .nav-profile-dashboard-option[aria-current="page"] { color: var(--primary-700); background: var(--bg-soft); }
 
 /* Size club management cards from their actual panel width, including narrow desktop columns. */
 #adminClubList { min-width: 0; container-type: inline-size; }
@@ -685,6 +707,26 @@
       .event-info-btn, .club-detail-apply, .club-rate-button):disabled {
     white-space: normal;
   }
+
+  /* Keep interview Preview/Delete aligned as a pair after shared card-action rules. */
+  .head-applicant-card .head-applicant-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+    gap: 8px;
+  }
+  .head-applicant-card .head-applicant-actions > :is(.preview-btn, .delete-btn) {
+    box-sizing: border-box;
+    flex: initial;
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    margin: 0;
+    padding: 9px 8px;
+    font-size: .86rem;
+    line-height: 1.2;
+    white-space: normal;
+  }
 }
 
 @media (max-width: 520px) {
@@ -693,8 +735,17 @@
 @media (max-width: 400px) {
   .nav-right .nav-refresh-btn { display: none !important; }
 }
-.nav-profile-account { display: flex; min-width: 0; align-items: center; gap: 12px; margin: 2px 3px 5px; padding: 12px 9px 14px; border-bottom: 1px solid var(--border-color); }
-.nav-profile-avatar { display: grid; flex: 0 0 42px; width: 42px; height: 42px; place-items: center; border: 1px solid rgba(185, 28, 28, .14); border-radius: 50%; background: var(--primary-50); color: var(--primary-800); font-size: 1.05rem; font-weight: 800; }
+.nav-profile-account { display: flex; min-width: 0; align-items: center; gap: 12px; margin: 2px 3px 5px; padding: 12px 9px 14px; border-bottom: 1px solid var(--border-color); color: inherit; text-decoration: none; border-radius: 10px 10px 0 0; cursor: pointer; }
+.nav-profile-account:hover, .nav-profile-account:focus-visible { background: var(--bg-soft); outline: none; }
+.nav-profile-avatar { display: grid; flex: 0 0 42px; width: 42px; height: 42px; place-items: center; overflow: hidden; border: 1px solid rgba(185, 28, 28, .14); border-radius: 50%; background: var(--primary-50); color: var(--primary-800); font-size: 1.05rem; font-weight: 800; }
+.nav-profile-avatar img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.account-photo-prompt { width: min(440px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; box-sizing: border-box; padding: 26px; border: 1px solid var(--border-color); border-radius: 20px; background: var(--bg-panel); color: var(--text-main); box-shadow: var(--shadow-sm); }
+.account-photo-prompt::backdrop { background: rgba(0, 0, 0, .55); }
+.account-photo-prompt h2 { margin-top: 0; }
+.account-photo-prompt p { line-height: 1.6; }
+.account-photo-prompt-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.account-photo-prompt-actions button { min-height: 44px; padding: 10px 18px; border: 1px solid var(--border-color); border-radius: 10px; font: inherit; cursor: pointer; background: var(--bg-soft); color: var(--text-main); }
+.account-photo-prompt-actions [data-photo-add] { background: var(--primary-800); color: #fff; }
 .nav-profile-account-copy { display: grid; min-width: 0; gap: 3px; }
 .nav-profile-account-copy strong { color: var(--text-main); font-size: .9rem; font-weight: 800; }
 .nav-profile-account-copy > span { overflow: hidden; color: var(--text-muted); font-size: .8rem; line-height: 1.35; text-overflow: ellipsis; }

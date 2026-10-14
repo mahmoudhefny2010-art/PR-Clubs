@@ -26,6 +26,7 @@
           location: document.getElementById('locationInput').value,
           registrationEnabled: document.getElementById('registrationEnabledInput').value === 'true',
           attendanceEnabled: registrationInput.value === 'true' && attendanceInput.value === 'true',
+          attendanceAudience: document.getElementById('eventAudienceInput').value,
           budget: document.getElementById('budgetInput').value,
           description: document.getElementById('descInput').value,
           image: currentImage
@@ -37,6 +38,7 @@
           document.getElementById('locationInput').value = item.location || '';
           document.getElementById('registrationEnabledInput').value = item.registrationEnabled === false ? 'false' : 'true';
           attendanceInput.value = item.attendanceEnabled === true ? 'true' : 'false';
+          document.getElementById('eventAudienceInput').value = ['members', 'all_students'].includes(item.attendanceAudience) ? item.attendanceAudience : '';
           updateAttendanceField();
           document.getElementById('budgetInput').value = item.budget || '';
           document.getElementById('descInput').value = item.description || '';

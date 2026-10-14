@@ -4,27 +4,31 @@
       <link rel="manifest" href="/manifest.webmanifest">
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <script src="/assets/js/site-loading.js?v=20261013startupfullcover1"></script>
+    <script src="/assets/js/site-loading.js?v=20261014promptqueue1"></script>
     <title>Committee Review</title>
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" /></noscript>
-    <link rel="stylesheet" href="/assets/css/base.css?v=20261013startupfullcover1" />
-    <link rel="stylesheet" href="/assets/css/responsive.css?v=20261013mobilefooterbg1" />
-    <link rel="stylesheet" href="/assets/css/dark.css?v=20261013darkglobal2" />
-    <link rel="stylesheet" href="/assets/css/features.css?v=20261013attendancemobile1" />
-    <link rel="stylesheet" href="/assets/css/pages/speaker-requests.css?v=20261013responsivedark1" />
+    <link rel="stylesheet" href="/assets/css/base.css?v=20261014approvaltrack1" />
+    <link rel="stylesheet" href="/assets/css/responsive.css?v=20261014profilelink1" />
+    <link rel="stylesheet" href="/assets/css/dark.css?v=20261014permitcards2" />
+    <link rel="stylesheet" href="/assets/css/features.css?v=20261014permititemlayout1" />
+    <link rel="stylesheet" href="/assets/css/pages/speaker-requests.css?v=20261014mobilefit1" />
     <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/pics/pwa-icon-192.png?v=20261013favicon1">
     <link rel="stylesheet" href="/assets/css/pages/dean-dashboard.css?v=1" />
   <script src="/assets/js/student-feedback.js?v=20261013stagedload3"></script>
-      <script defer src="/assets/js/pwa-register.js"></script>
-    <link rel="stylesheet" href="/assets/css/modal-controls.css?v=20261013modalclose2">
+      <script defer src="/assets/js/pwa-register.js?v=20261014localfresh1"></script>
+    <link rel="stylesheet" href="/assets/css/modal-controls.css?v=20261014pairedappactions1">
+  <link rel="stylesheet" href="/assets/css/pages/event-reports.css?v=20261014mobileoptions1">
 </head>
   <body>
     <div id="site-header"></div>
     <main class="app-container committee-dashboard-layout">
       <aside class="committee-sidebar" data-unread-scope="dean" aria-label="Dean dashboard navigation">
         <h2>DASHBOARD</h2><a class="committee-sidebar-link is-active" href="#committeeOverviewPanel" data-dashboard-panel="committeeOverviewPanel">Overview</a><a class="committee-sidebar-link" href="#pendingRequestsSection" data-dashboard-panel="pendingRequestsSection">Pending requests <span class="sidebar-unread-badge" data-unread-badge="requests" hidden></span></a>
-        <h3>CLUB OPERATIONS</h3><button id="openCommitteeAttendanceBtn" class="committee-sidebar-link" data-dashboard-panel="committeeAttendanceDialog" type="button">Event attendance <span class="sidebar-unread-badge" data-unread-badge="eventAttendance" hidden></span></button><button id="openAttendanceReviewBtn" class="committee-sidebar-link" data-dashboard-panel="attendanceReviewDialog" type="button">Attendance approvals <span class="sidebar-unread-badge" data-unread-badge="attendanceApprovals" hidden></span></button><button id="studentFeedbackNav" class="committee-sidebar-link" type="button" data-dashboard-panel="studentFeedbackPanel" data-unread-section="studentFeedback">Student feedback <span class="sidebar-unread-badge" data-unread-badge="studentFeedback" hidden></span></button>
+        <h3>CLUB OPERATIONS</h3>
+        <a class="committee-sidebar-link" href="/pages/report-downloads.html?type=reports">Download all event reports</a>
+
+        <button id="openCommitteeAttendanceBtn" class="committee-sidebar-link" data-dashboard-panel="committeeAttendanceDialog" type="button">Event attendance <span class="sidebar-unread-badge" data-unread-badge="eventAttendance" hidden></span></button><button id="openAttendanceReviewBtn" class="committee-sidebar-link" data-dashboard-panel="attendanceReviewDialog" type="button">Attendance approvals <span class="sidebar-unread-badge" data-unread-badge="attendanceApprovals" hidden></span></button><button id="studentFeedbackNav" class="committee-sidebar-link" type="button" data-dashboard-panel="studentFeedbackPanel" data-unread-section="studentFeedback">Student feedback <span class="sidebar-unread-badge" data-unread-badge="studentFeedback" hidden></span></button>
         <h3>REQUESTS</h3><button id="openEntryPermitStatusBtn" class="committee-sidebar-link" data-dashboard-panel="statusOverviewDialog" data-status-mode="entry_permits" data-entry-permit-overview type="button">Entry permits</button><button id="openStatusOverviewBtn" class="committee-sidebar-link" data-dashboard-panel="statusOverviewDialog" type="button">All requests <span class="sidebar-unread-badge" data-unread-badge="allRequests" hidden></span></button>
         <h3>SPEAKERS</h3><button class="committee-sidebar-link" type="button" data-dashboard-panel="deanSpeakerInviteSection">Create speaker link</button><button class="committee-sidebar-link" type="button" data-dashboard-panel="speakerReviewPanel">External speaker requests</button>
       </aside>
@@ -44,7 +48,7 @@
           <div class="committee-overview-stats overview-grid-4"><button class="overview-stat-card" type="button" data-dashboard-panel="pendingRequestsSection"><span>Requests awaiting decision</span><strong data-overview-count="requests">&#8212;</strong><small>Open final review queue</small></button><button class="overview-stat-card" type="button" data-entry-permit-overview><span>Entry permits</span><strong data-entry-permit-count>&#8212;</strong><small>View permit status (Dean is view-only)</small></button><button class="overview-stat-card" type="button" id="overviewAttendanceBtn"><span>Event attendance</span><strong data-overview-count="eventAttendance">&#8212;</strong><small>View check-in records</small></button><button class="overview-stat-card" type="button" id="overviewReviewsBtn"><span>Attendance reviews</span><strong data-overview-count="attendanceApprovals">&#8212;</strong><small>Review SSO approvals</small></button></div>
         </section>
         <section id="pendingRequestsSection" class="committee-requests-section" hidden><h2>Pending requests</h2><p id="hintText"></p><div id="requestsList"></div></section>
-        <section id="studentFeedbackPanel" class="committee-inline-panel student-feedback-inline-panel" hidden aria-labelledby="studentFeedbackTitle"><header class="student-feedback-inline-header"><div><span class="committee-label">STUDENT FEEDBACK</span><h2 id="studentFeedbackTitle">Club ratings &amp; MIU results</h2><p>Review student ratings, polls, and evaluations.</p></div><button id="refreshStudentFeedbackBtn" class="secondary-btn" type="button">Refresh results</button></header><div id="studentFeedbackResults" class="feedback-results student-feedback-results" aria-live="polite">Loading feedbackâ€¦</div></section>
+        <section id="studentFeedbackPanel" class="committee-inline-panel student-feedback-inline-panel" hidden aria-labelledby="studentFeedbackTitle"><header class="student-feedback-inline-header"><div><span class="committee-label">STUDENT FEEDBACK</span><h2 id="studentFeedbackTitle">Club ratings &amp; MIU results</h2><p>Review student ratings, polls, and evaluations.</p></div><button id="refreshStudentFeedbackBtn" class="secondary-btn" type="button">Refresh results</button></header><div id="studentFeedbackResults" class="feedback-results student-feedback-results" aria-live="polite">Loading feedback&</div></section>
         <section id="deanSpeakerInviteSection" class="committee-inline-panel speaker-dashboard-panel" hidden aria-labelledby="deanSpeakerInviteTitle">
           <div id="deanSpeakerInvitePanel" class="speaker-panel">
             <span class="committee-label">SPEAKER INVITATIONS</span><h2 id="deanSpeakerInviteTitle">Create a speaker form link</h2>
@@ -64,7 +68,7 @@
         <section id="speakerReviewPanel" class="committee-inline-panel speaker-dashboard-panel" hidden aria-labelledby="speakerReviewTitle">
           <div class="speaker-panel">
             <span class="committee-label">FINAL REVIEW</span><h2 id="speakerReviewTitle">External speaker requests</h2>
-            <p id="speakerReviewMessage" class="speaker-message" role="status" aria-live="polite">Checking reviewer accessâ€¦</p>
+            <p id="speakerReviewMessage" class="speaker-message" role="status" aria-live="polite">Checking reviewer access&</p>
             <div id="speakerReviewTools" class="speaker-review-tools" hidden>
               <label>Search requests<input id="speakerReviewSearch" type="search" autocomplete="off" placeholder="Name, email, topic, or company"></label>
               <label>Filter by status<select id="speakerReviewFilter"><option value="all">All statuses</option><option value="pending_club">Pending club</option><option value="pending_dean">Pending Dean</option><option value="approved">Approved</option><option value="rejected">Rejected</option><option value="changes_requested">Changes requested</option></select></label>
@@ -77,9 +81,10 @@
     </main>
     <dialog id="requestDialog" class="request-dialog" aria-labelledby="detailTitle">
       <div class="request-dialog-inner">
+        <div class="request-dialog-close-rail"><button type="button" id="detailsCancelBtn" class="request-dialog-close" aria-label="Close request details">&times;</button></div>
         <div class="request-details-hero">
           <div id="requestDetailImageWrap" class="request-detail-image-wrap" hidden><img id="requestDetailImage" class="request-detail-image" alt="Club request image" /></div>
-          <div class="request-dialog-head request-details-head"><div><div class="committee-label">REQUEST DETAILS</div><h2 id="detailTitle"></h2></div><button type="button" id="detailsCancelBtn" class="request-dialog-close" aria-label="Close request details">&times;</button></div>
+          <div class="request-dialog-head request-details-head"><div><div class="committee-label">REQUEST DETAILS</div><h2 id="detailTitle"></h2></div></div>
         </div>
         <div id="requestDetails" class="detail-grid"></div>
         <div class="dialog-actions"><button id="dialogApproveBtn" class="approve" data-dialog-action="approve">Accept</button><button id="dialogRejectBtn" class="reject" data-dialog-action="reject">Reject</button><button id="requestChangesBtn" class="changes" data-dialog-action="request_edit" hidden>Request Edit</button><button id="reopenRequestBtn" class="reopen-review" type="button" hidden>Restart Review</button><button id="returnToPrBtn" class="return-review" type="button" hidden>Send back to PR</button><button id="returnToEnglishBtn" class="return-review" type="button" hidden>Send back to English</button><button id="returnToSecurityBtn" class="return-review" type="button" hidden>Send back to Security Office</button><button id="deleteRequestBtn" class="delete-request" type="button" hidden>Delete</button></div>
@@ -113,20 +118,21 @@
       <div class="committee-attendance-inner">
         <header class="committee-attendance-header">
           <div><span class="admin-eyebrow">EVENT ATTENDANCE</span><h2 id="committeeAttendanceTitle">Attendance by event</h2><p>Review check-ins grouped by event or booth after the club ends attendance.</p></div>
-          <button class="calendar-close-btn" type="button" data-close-committee-attendance aria-label="Close attendance records">&times;</button>
         </header>
-        <div class="committee-attendance-toolbar"><label class="committee-attendance-search">Search events, clubs, or attendees<input id="committeeAttendanceSearch" type="search" placeholder="Search by event, club, name, or email"></label><button id="refreshCommitteeAttendanceBtn" class="secondary-btn" type="button">Refresh</button><button id="downloadCommitteeAttendanceBtn" class="secondary-btn" type="button" disabled>Download CSV</button></div>
+        <div class="committee-attendance-toolbar"><label class="committee-attendance-search">Search events, clubs, or attendees<input id="committeeAttendanceSearch" type="search" placeholder="Search by event, club, name, or email"></label><button id="refreshCommitteeAttendanceBtn" class="secondary-btn" type="button">Refresh</button></div>
         <p id="committeeAttendanceFeedback" class="admin-feedback" role="status" aria-live="polite"></p>
         <div id="committeeAttendanceRecords" class="committee-attendance-records" aria-live="polite"></div>
       </div>
     </section>
     <div id="site-footer"></div>
-    <script src="/assets/js/speaker-review.js?v=20261013stagedload3"></script>
+    <script src="/assets/js/speaker-review.js?v=20261013formattedexcel10"></script>
     <script src="/assets/js/committee-sidebar.js?v=20261013lighter1"></script>
-    <script src="/assets/js/committee-dashboard.js?v=20261013stagedload1"></script>
-    <script src="/assets/js/committee-attendance.js?v=20261013stagedload4"></script>
-    <script src="/assets/js/attendance-approval-workflow.js?v=20261013stagedload3"></script>
-      <script src="/assets/js/layout.js?v=20261013stagedload3" defer></script>
+    <script src="/assets/js/committee-dashboard.js?v=20261014reviewnotice1"></script>
+    <script src="/assets/js/committee-attendance.js?v=20261014no-inline-exit1"></script>
+    <script src="/assets/js/attendance-approval-workflow.js?v=20261013openattendance1"></script>
+      <script src="/assets/js/layout.js?v=20261014promptqueue1" defer></script>
       <script src="/assets/js/theme.js?v=20261009c" defer></script>
-  </body>
+    <script src="/assets/js/pages/report-downloads.js?v=20261014progressive1" defer></script>
+    <script src="/assets/js/report-dashboard-panels.js?v=20261014progressive1" defer></script>
+</body>
 </html>

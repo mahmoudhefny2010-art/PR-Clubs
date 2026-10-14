@@ -68,15 +68,17 @@ function registerSupervisorDecisions(router, deps) {
   router.post('/clubs/:clubId/attendance/:itemType/:eventRequestId/decision', async (req, res) => {
     if (!sameOrigin(req)) return res.status(403).json({ message: 'Reload and try again.' });
     const { itemType, eventRequestId } = req.params;
+    const audience = req.query.audience === 'all_students' ? 'all_students' : req.query.audience === 'members' || req.query.audience === undefined ? 'members' : '';
     const action = req.body.action;
     const comment = typeof req.body.comment === 'string' ? req.body.comment.trim() : '';
-    if (!['event', 'booth'].includes(itemType) || !/^-?\d+$/.test(eventRequestId)
+    if (!audience || !['event', 'booth'].includes(itemType) || !/^-?\d+$/.test(eventRequestId)
       || !Number.isSafeInteger(Number(eventRequestId)) || !['approve', 'reject'].includes(action)
       || comment.length > 500 || action === 'reject' && !comment) {
       return res.status(400).json({ message: 'Choose an attendance decision and provide a reason for rejection (up to 500 characters).' });
     }
     try {
-      const filter = { clubId: req.supervisorClubId, itemType, eventRequestId: Number(eventRequestId), approvalStatus: 'pending_supervisor' };
+      const filter = { clubId: req.supervisorClubId, itemType, eventRequestId: Number(eventRequestId), approvalStatus: 'pending_supervisor',
+        ...(audience === 'all_students' ? { attendanceAudience: 'all_students' } : { attendanceAudience: { $in: ['members', null] } }) };
       const records = await AttendanceRecord.find(filter).lean();
       if (!records.length) return res.status(409).json({ message: 'This attendance list is not awaiting supervisor approval.' });
       const closures = await attendanceClosureMapFor(records);

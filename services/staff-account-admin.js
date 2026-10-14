@@ -49,11 +49,19 @@ async function verifyStaffAssignmentsSaved(ClubAccount, email, expectedAssignmen
   return persisted;
 }
 
+async function countOtherSoftwareDevelopmentAccounts(ClubAccount, email) {
+  const query = ClubAccount.countDocuments({ email: { $ne: email }, $or: [
+    { role: 'software_development' }, { roleAssignments: { $elemMatch: { role: 'software_development' } } }
+  ] });
+  return query.read('primary').readConcern('majority');
+}
+
 function registerStaffAccountAdmin(app, { ClubAccount, Club, databaseReady, sameOrigin, refreshAccount, removeAccount = () => {}, isAdminEmail = () => false }) {
   const publicAccount = account => ({ email: account.email, role: account.role, clubId: account.clubId,
     committee: account.committee || '', assignedClubIds: account.role === 'supervisor' ? account.assignedClubIds || []
       : ['president', 'head'].includes(account.role) ? [account.clubId] : [], assignments: staffRoleAssignments(account),
-    isGlobalAdmin: isAdminEmail(account.email) });
+    isGlobalAdmin: staffRoleAssignments(account).some(item => item.role === 'software_development'),
+    updatedAt: account.updatedAt || null });
   app.get('/api/admin/staff-accounts', async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     if (!databaseReady()) return res.status(503).json({ message: 'Staff accounts are temporarily unavailable.' });
@@ -63,14 +71,14 @@ function registerStaffAccountAdmin(app, { ClubAccount, Club, databaseReady, same
         if (!/^[a-z0-9._%+-]+@miuegypt\.edu\.eg$/i.test(email) || email.length > 254) {
           return res.status(400).json({ message: 'Enter a valid MIU Google email.' });
         }
-        const account = await ClubAccount.findOne({ email }).select('email role roleAssignments clubId assignedClubIds committee')
+        const account = await ClubAccount.findOne({ email }).select('email role roleAssignments clubId assignedClubIds committee updatedAt')
           .read('primary').readConcern('majority').lean();
         const hasRoles = account && staffRoleAssignments(account).length > 0;
         return res.json({ account: hasRoles ? publicAccount(account) : null });
       }
       const [storedAccounts, clubs] = await Promise.all([
-        ClubAccount.find({}).select('email role roleAssignments clubId assignedClubIds committee')
-          .read('primary').readConcern('majority').sort({ email: 1 }).lean(),
+        ClubAccount.find({}).select('email role roleAssignments clubId assignedClubIds committee updatedAt')
+          .read('primary').readConcern('majority').sort({ updatedAt: -1, email: 1 }).lean(),
         Club.find({ archivedAt: null }).select('id name').sort({ name: 1 }).lean()
       ]);
       const accounts = storedAccounts.filter(account => staffRoleAssignments(account).length > 0);
@@ -86,10 +94,6 @@ function registerStaffAccountAdmin(app, { ClubAccount, Club, databaseReady, same
     const passwordError = passwordInputError(req.body);
     if (passwordError) return res.status(400).json({ message: passwordError });
     const value = validated.value;
-    const isGlobalAdmin = isAdminEmail(value.email);
-    if (isGlobalAdmin && req.body.password) {
-      return res.status(409).json({ message: 'Leave the password blank for the global administrator account; its sign-in password is managed separately.' });
-    }
     let writeAcknowledged = false;
     try {
       const ids = [...new Set(value.roleAssignments.flatMap(item => item.role === 'supervisor'
@@ -98,13 +102,20 @@ function registerStaffAccountAdmin(app, { ClubAccount, Club, databaseReady, same
         return res.status(400).json({ message: 'Select existing, active clubs.' });
       }
       const existing = await ClubAccount.findOne({ email: value.email }).read('primary').readConcern('majority').lean();
+      if (staffRoleAssignments(existing).some(item => item.role === 'software_development')
+        && !value.roleAssignments.some(item => item.role === 'software_development')
+        && await countOtherSoftwareDevelopmentAccounts(ClubAccount, value.email) < 1) {
+        return res.status(409).json({ message: 'Keep at least one Software Development administrator account assigned before removing this role.' });
+      }
       const passwordFields = req.body.password ? await hashAccountPassword(req.body.password) : {};
       let saved;
       if (existing) {
         const currentSessionVersion = Number.isSafeInteger(Number(existing.sessionVersion)) ? Number(existing.sessionVersion) : 0;
         const versionMatch = [{ sessionVersion: currentSessionVersion }];
         if (existing.sessionVersion == null) versionMatch.push({ sessionVersion: { $exists: false } }, { sessionVersion: null });
-        saved = await ClubAccount.findOneAndUpdate({ _id: existing._id, email: value.email, $or: versionMatch },
+        const accountVersionFilter = { _id: existing._id, email: value.email, $or: versionMatch };
+        if (existing.sessionVersion != null) accountVersionFilter.sessionVersion = currentSessionVersion;
+        saved = await ClubAccount.findOneAndUpdate(accountVersionFilter,
           { $set: { ...value, ...passwordFields }, $inc: { sessionVersion: 1 } }, { new: true, runValidators: true, writeConcern: { w: 'majority' } }).lean();
         if (!saved) return res.status(409).json({ message: 'This account changed while saving. Reload its current roles and try again.' });
         writeAcknowledged = true;
@@ -121,9 +132,7 @@ function registerStaffAccountAdmin(app, { ClubAccount, Club, databaseReady, same
         throw new Error('STAFF_ASSIGNMENTS_SAVE_UNCONFIRMED');
       }
       refreshAccount(verified);
-      const message = isGlobalAdmin
-        ? 'Dashboard role saved and verified in the database. The global administrator sign-in and access remain managed separately.'
-        : req.body.password
+      const message = req.body.password
           ? 'Account saved and verified in the database; the password was checked. Sign in with the new password or MIU Google.'
           : 'Dashboard role saved and verified in the database. Use MIU Google or the existing password; no new password was set.';
       res.json({ ...publicAccount(verified), savedToDatabase: true, passwordUpdated: Boolean(req.body.password), message });
@@ -141,10 +150,13 @@ function registerStaffAccountAdmin(app, { ClubAccount, Club, databaseReady, same
     if (!/^[a-z0-9._%+-]+@miuegypt\.edu\.eg$/i.test(email) || email.length > 254) {
       return res.status(400).json({ message: 'Enter a valid MIU Google email.' });
     }
-    if (isAdminEmail(email)) return res.status(409).json({ message: 'The global administrator account cannot be deleted here.' });
     try {
       const account = await ClubAccount.findOne({ email }).read('primary').lean();
       if (!account || !staffRoleAssignments(account).length) return res.status(404).json({ message: 'No saved staff dashboard roles match this email.' });
+      if (staffRoleAssignments(account).some(item => item.role === 'software_development')
+        && await countOtherSoftwareDevelopmentAccounts(ClubAccount, email) < 1) {
+        return res.status(409).json({ message: 'Assign Software Development to another account before deleting this one.' });
+      }
       const result = await ClubAccount.deleteOne({ _id: account._id, email }, { writeConcern: { w: 'majority' } });
       if (result.deletedCount !== 1) return res.status(409).json({ message: 'The account changed. Reload the staff list and try again.' });
       const remaining = await ClubAccount.findOne({ _id: account._id }).read('primary').readConcern('majority').select('_id').lean();

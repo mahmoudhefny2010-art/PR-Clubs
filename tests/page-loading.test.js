@@ -19,48 +19,58 @@ function loader(fetch) {
   const timers = new Map();
   const frames = [];
   let nextTimer = 0;
-  const classList = { add: (name) => classes.add(name), remove: (name) => classes.delete(name), toggle() {} };
+  let now = 0;
+  const elements = [];
+  const classList = {
+    add: value => classes.add(value), remove: value => classes.delete(value), contains: value => classes.has(value)
+  };
   const document = {
     documentElement: { classList }, readyState: 'complete',
-    body: { append() {} }, addEventListener() {},
-    createElement: () => ({ classList: { toggle() {}, remove() {} }, setAttribute() {} })
+    body: { append() {} }, addEventListener() {}, getElementById: () => null, querySelector: () => null,
+    createElement: () => {
+      const element = { classList: { toggle() {}, remove() {} }, setAttribute() {}, remove() { this.removed = true; } };
+      elements.push(element); return element;
+    }
   };
   const window = {
-    fetch, history: {}, location: { href: 'https://example.test/', origin: 'https://example.test' },
-    setTimeout: (callback) => { timers.set(++nextTimer, callback); return nextTimer; },
+    fetch, history: {}, addEventListener() {}, location: { href: 'https://example.test/', origin: 'https://example.test' },
+    setTimeout: (callback, delay = 0) => { timers.set(++nextTimer, { callback, at: now + delay }); return nextTimer; },
     clearTimeout: (id) => timers.delete(id),
     requestAnimationFrame: (callback) => frames.push(callback), cancelAnimationFrame() {}, scrollTo() {}
   };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../public/assets/js/site-loading.js'), 'utf8'),
-    { window, document, Request, URL, Promise });
+    { window, document, Request, URL, Promise, setTimeout: window.setTimeout, clearTimeout: window.clearTimeout,
+      MutationObserver: class { observe() {} }, performance: { getEntriesByType: () => [{ type: 'navigate' }] }, location: { hash: '' }, decodeURIComponent });
   return {
     window, pending: () => classes.has('site-startup-pending'),
-    async settle() {
+    covers: () => elements.filter(e => e.className === 'site-startup-cover' && !e.removed).length,
+    async settle(milliseconds = 200) {
+      now += milliseconds;
       // Flush promise consumers, the quiet timer, then both paint frames.
       for (let i = 0; i < 12; i++) {
         await Promise.resolve();
-        const callbacks = [...timers.values()]; timers.clear();
-        callbacks.forEach((callback) => callback());
+        for (const [id, timer] of [...timers]) if (timer.at <= now) { timers.delete(id); timer.callback(); }
         frames.splice(0).forEach((callback) => callback());
       }
     }
   };
 }
 
-test('startup stays covered after headers while JSON is still loading', async () => {
+test('the page appears after first paint while JSON continues loading', async () => {
   const body = deferred();
   const app = loader(async () => ({ json: () => body.promise }));
   const response = await app.window.fetch('/api/clubs');
   const consuming = response.json();
   await app.settle();
-  assert.equal(app.pending(), true);
+  assert.equal(app.pending(), false);
+  assert.equal(app.covers(), 0);
   body.resolve([{ id: 1 }]);
   assert.deepEqual(await consuming, [{ id: 1 }]);
   await app.settle();
   assert.equal(app.pending(), false);
 });
 
-test('page rendering and chained requests hold startup without an expiry', async () => {
+test('slow dashboard rendering does not hold the startup cover over the page', async () => {
   const render = deferred();
   const app = loader(async () => new Response('{"ok":true}'));
   const ready = app.window.siteStartup.track((async () => {
@@ -69,11 +79,38 @@ test('page rendering and chained requests hold startup without an expiry', async
     await render.promise;
   })());
   await app.settle();
-  assert.equal(app.pending(), true);
+  assert.equal(app.pending(), false);
+  assert.equal(app.covers(), 0);
   render.resolve();
   await ready;
   await app.settle();
   assert.equal(app.pending(), false);
+});
+
+test('stalled data stays in the background without blocking the first view', async () => {
+  const data = deferred();
+  const app = loader(() => data.promise);
+  const pending = app.window.fetch('/api/club-auth/session');
+  await app.settle(200);
+  assert.equal(app.pending(), false);
+  await app.settle(1300);
+  assert.equal(app.pending(), false);
+  assert.equal(app.covers(), 0);
+  data.resolve(new Response('{}'));
+  await pending;
+  await app.settle();
+  assert.equal(app.pending(), false);
+});
+
+test('background requests never recreate a full-screen cover after initial release', async () => {
+  const data = deferred();
+  const app = loader(() => data.promise);
+  await app.settle();
+  assert.equal(app.pending(), false);
+  const pending = app.window.fetch('/api/notifications');
+  await app.settle();
+  assert.equal(app.covers(), 0);
+  data.resolve(new Response('{}')); await pending;
 });
 
 test('failed reads release startup after the page can display its error', async () => {
@@ -124,7 +161,9 @@ test('compressed public pages and shared assets preserve bytes while reducing tr
     res.setHeader('Cache-Control', 'private, no-store');
     res.json({ records: Array.from({ length: 100 }, (_, id) => ({ id, title: `Example ${id}`, status: 'pending' })) });
   });
-  app.use(express.static(path.join(__dirname, '../public')));
+  app.use(express.static(path.join(__dirname, '../public'), {
+    setHeaders: require('../services/static-assets').staticAssetHeaders
+  }));
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   t.after(() => new Promise((resolve) => server.close(resolve)));
@@ -145,5 +184,12 @@ test('compressed public pages and shared assets preserve bytes while reducing tr
     if (url.startsWith('/api/')) assert.equal(packed.headers['cache-control'], 'private, no-store');
     assert.ok(packed.body.length < plain.body.length * 0.6);
     t.diagnostic(`${url}: ${plain.body.length} -> ${packed.body.length} bytes`);
+  }
+  const versionedScript = await get('/assets/js/site-loading.js?v=performance2', 'identity');
+  assert.match(versionedScript.headers['cache-control'], /no-cache, must-revalidate/);
+  const stylesheet = await get('/assets/css/base.css', 'identity');
+  assert.match(stylesheet.headers['cache-control'], /no-cache, must-revalidate/);
+  for (const url of ['/index.html', '/sw.js', '/assets/js/site-loading.js']) {
+    assert.match((await get(url, 'identity')).headers['cache-control'], /no-store, no-cache, must-revalidate/);
   }
 });

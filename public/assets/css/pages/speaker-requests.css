@@ -120,3 +120,41 @@
   .speaker-public-brand { gap: 8px; }
   .speaker-public-brand-copy { font-size: .74rem; }
 }
+
+/* Keep every speaker workflow usable on narrow phones and embedded dashboards. */
+.speaker-page,
+.speaker-shell,
+.speaker-panel,
+.speaker-columns,
+.speaker-dashboard-content { box-sizing: border-box; min-width: 0; }
+.speaker-panel label,
+.speaker-panel :is(input, textarea, select),
+.speaker-form-actions,
+.speaker-request-card { min-width: 0; }
+.speaker-panel input[type="file"] { max-width: 100%; font-size: .92rem; }
+.speaker-panel :is(input, textarea, select) { max-width: 100%; }
+.speaker-form-actions > * { min-width: 0; }
+
+@media (max-width: 760px) {
+  .speaker-page { width: 100%; padding: 16px 12px 32px; }
+  .speaker-shell { padding: clamp(15px, 4vw, 22px); }
+  .speaker-columns,
+  .speaker-dashboard-content { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .speaker-panel { padding: clamp(14px, 4vw, 18px); }
+  .speaker-invite-club-select { min-width: 0; width: 100%; }
+}
+
+@media (max-width: 520px) {
+  .speaker-page { padding-inline: 9px; }
+  .speaker-shell,
+  .speaker-panel { border-radius: 14px; }
+  .speaker-shell h1 { font-size: clamp(1.5rem, 7vw, 2rem); line-height: 1.15; overflow-wrap: anywhere; }
+  .speaker-panel h2 { font-size: 1.15rem; line-height: 1.3; }
+  .speaker-panel :is(input, textarea, select) { font-size: 16px; }
+  .speaker-form-actions { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .speaker-form-actions > *,
+  .speaker-form-actions button,
+  .speaker-request-card :is(button, a) { width: 100%; max-width: 100%; min-height: 44px; }
+  .speaker-request-card { padding: 13px; overflow-wrap: anywhere; }
+  .speaker-invite-result input { min-width: 0; }
+}

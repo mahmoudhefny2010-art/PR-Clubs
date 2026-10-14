@@ -21,7 +21,7 @@
 .supervisor-management #staffClubs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0; padding: 16px; min-width: 0; background: var(--bg-panel); }
 .supervisor-management #staffClubs[hidden], .supervisor-management #staffCommitteeLabel[hidden] { display: none; }
 .staff-account-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 20px; }
-.staff-directory-filters { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(240px, .8fr); align-items: end; gap: 16px; margin-top: 20px; }
+.staff-directory-filters { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(240px, .8fr); align-items: start; gap: 16px; margin-top: 20px; }
 .staff-directory-filters > label { display: grid; gap: 8px; min-width: 0; font-size: .9rem; font-weight: 700; }
 .staff-directory-filters > label > small { color: var(--text-muted); font-size: .82rem; font-weight: 400; }
 .staff-directory-filters input, .staff-directory-filters select { width: 100%; min-height: 48px; }
@@ -43,6 +43,7 @@
 .supervisor-management .supervisor-record { margin: 0; padding: 20px; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
 .supervisor-management .supervisor-record h3 { font-size: 1rem; line-height: 1.5; }
 .supervisor-management .supervisor-record p { margin: 0 0 18px; color: var(--text-muted); font-size: .87rem; line-height: 1.6; }
+.supervisor-management .supervisor-record .staff-account-updated { margin-top: auto; margin-bottom: 12px; font-size: .78rem; }
 .supervisor-management .supervisor-record button { margin-top: auto; min-height: 40px; font-size: .85rem; }
 .supervisor-management .staff-account-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: auto; }
 .supervisor-management .staff-account-actions button { margin-top: 0; }
@@ -89,6 +90,8 @@
 .supervisor-management #staffFeedback { margin: 16px 0 0; color: var(--text-muted); line-height: 1.5; }
 .supervisor-management #staffFeedback.is-error { color: var(--danger); }
 .supervisor-management #staffFeedback:empty { display: none; }
+.supervisor-management #staffSaveMessages { flex: 1 1 auto; min-width: 0; text-align: left; }
+.supervisor-management #staffSaveMessages #staffFeedback { margin: 6px 0 0; font-size: .95rem; font-weight: 600; overflow-wrap: anywhere; }
 .supervisor-management .staff-email-role-status { display: block; margin-top: 7px; color: var(--text-muted); font-size: .9rem; font-weight: 500; line-height: 1.45; }
 .supervisor-management .staff-email-role-status[hidden] { display: none; }
 .supervisor-form-footer { padding-top: 4px; }

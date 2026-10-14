@@ -10,14 +10,53 @@ const statusOverviewList = document.getElementById('statusOverviewList');
 const reviewHistoryDialog = document.getElementById('reviewHistoryDialog');
 const reviewHistoryList = document.getElementById('reviewHistoryList');
 let currentRole = '';
+let currentClubId = '';
 let activeRequest = null;
 let activeReviewHistoryItem = null;
 let historyReturnTarget = '';
 let activeDetailContext = 'pending';
 let currentRequests = [];
+let cachedRequestsSnapshot = null;
 let statusOverviewMode = 'all';
 let cachedStatusOverview = null;
 let statusOverviewLoadedAt = 0;
+const statusOverviewFreshMs = 25_000;
+const statusOverviewCacheKey = () => `miu:committee-status:${currentClubId}:${currentRole}`;
+const requestsCacheKey = () => `miu:committee-requests:${currentClubId}:${currentRole}`;
+
+function restoreStatusOverviewCache() {
+  try {
+    const requests = JSON.parse(sessionStorage.getItem(requestsCacheKey()) || 'null');
+    if (Array.isArray(requests?.items)) cachedRequestsSnapshot = requests.items;
+    const snapshot = JSON.parse(sessionStorage.getItem(statusOverviewCacheKey()) || 'null');
+    if (Array.isArray(snapshot?.items)) {
+      cachedStatusOverview = snapshot.items;
+      statusOverviewLoadedAt = Number(snapshot.savedAt) || 0;
+    }
+  } catch { /* A missing or invalid snapshot falls back to the database. */ }
+}
+
+function clearStatusOverviewCache() {
+  cachedStatusOverview = null;
+  statusOverviewLoadedAt = 0;
+  try { sessionStorage.removeItem(statusOverviewCacheKey()); } catch { /* Session storage is optional. */ }
+}
+
+function storeStatusOverviewSnapshot(items) {
+  cachedStatusOverview = items;
+  statusOverviewLoadedAt = Date.now();
+  try { sessionStorage.setItem(statusOverviewCacheKey(), JSON.stringify({ savedAt: statusOverviewLoadedAt, items })); } catch { /* The dashboard remains usable if storage is full or disabled. */ }
+}
+
+function storeRequestsSnapshot(items) {
+  cachedRequestsSnapshot = items;
+  try { sessionStorage.setItem(requestsCacheKey(), JSON.stringify({ savedAt: Date.now(), items })); } catch { /* The dashboard remains usable if storage is full or disabled. */ }
+}
+
+function clearRequestsSnapshot() {
+  cachedRequestsSnapshot = null;
+  try { sessionStorage.removeItem(requestsCacheKey()); } catch { /* Session storage is optional. */ }
+}
 
 const CONTENT_TYPE_LABELS = { event: 'Event', feed: 'Feed', sponsor: 'Sponsor', booth: 'Booth', entry_permit: 'Entry Permit' };
 const CONTENT_ITEM_LABELS = { event: 'event', feed: 'feed post', sponsor: 'sponsor request', booth: 'booth request', entry_permit: 'Entry Permit' };
@@ -71,6 +110,8 @@ async function ensureSession() {
       return false;
     }
     currentRole = data.club.role;
+    currentClubId = String(data.club.id || '');
+    restoreStatusOverviewCache();
     const memberDirectoryButton = document.getElementById('prMemberDirectoryBtn');
     if (memberDirectoryButton) memberDirectoryButton.hidden = currentRole !== 'pr';
     const titles = { pr: 'PR Department — Approvals', english: 'English Department — Preview & Approve', security: 'Security Office — Entry Permits', dean: 'Dean — Final Approval' };
@@ -241,8 +282,9 @@ function openDetails(item, context = 'pending') {
       const tbody = document.createElement('tbody');
       item.permitItems.forEach((permitItem) => {
         const row = document.createElement('tr');
-        [permitItem.quantity, permitItem.number, permitItem.details].forEach((value) => {
+        [['Quantity', permitItem.quantity], ['Number / ID', permitItem.number], ['Details', permitItem.details]].forEach(([label, value]) => {
           const cell = document.createElement('td');
+          cell.dataset.label = label;
           cell.textContent = value == null ? '' : String(value);
           row.append(cell);
         });
@@ -449,16 +491,29 @@ async function deleteOwnComment(item) {
   }
 }
 
-async function loadRequests(sharedResponse = null) {
-  cachedStatusOverview = null;
-  statusOverviewLoadedAt = 0;
+async function loadRequests(sharedResponse = null, invalidateStatus = true) {
+  if (invalidateStatus) { clearStatusOverviewCache(); clearRequestsSnapshot(); }
   window.dashboardSync?.report('requests', 'loading');
   try {
-    const response = await (sharedResponse || fetch('/api/committee/requests', { cache: 'no-store' }));
+    let responsePromise = sharedResponse;
+    if (Array.isArray(cachedRequestsSnapshot)) {
+      const saved = cachedRequestsSnapshot;
+      const liveResponsePromise = sharedResponse || fetch('/api/committee/requests', { cache: 'no-store' });
+      responsePromise = Promise.resolve(new Response(JSON.stringify(saved), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+      void liveResponsePromise.then(async (liveResponse) => {
+        const latest = await liveResponse.clone().json();
+        if (liveResponse.ok && Array.isArray(latest) && JSON.stringify(latest) !== JSON.stringify(saved)) {
+          storeRequestsSnapshot(latest);
+          await loadRequests(liveResponse, false);
+        }
+      }).catch(() => {});
+    }
+    const response = await (responsePromise || fetch('/api/committee/requests', { cache: 'no-store' }));
     const items = await response.clone().json();
     if (!response.ok) throw new Error(items.message || 'Could not load requests.');
     if (!Array.isArray(items)) throw new Error('Unexpected pending requests response.');
     currentRequests = items;
+    storeRequestsSnapshot(items);
     window.dashboardSync?.report('requests', 'success');
     window.dashboardUnread?.update('requests', items.map((item) => `${item.id}:${item.updatedAt || item.status || ''}`));
     window.dashboardUnread?.setOverview('requests', items.length);
@@ -482,6 +537,7 @@ async function loadRequests(sharedResponse = null) {
         card.append(image);
       }
       const summary = document.createElement('div');
+      summary.className = 'req-summary';
       summary.style.flex = '1';
       const title = document.createElement('strong');
       title.textContent = item.title || 'Untitled request';
@@ -527,7 +583,7 @@ async function loadRequests(sharedResponse = null) {
       actions.append(viewButton);
       summary.append(title, meta);
       if (item.clubNotice) {
-        const notice = document.createElement('div'); notice.className = 'status-overview-meta'; notice.textContent = item.clubNotice; summary.append(notice);
+        const notice = document.createElement('div'); notice.className = 'content-review-update'; notice.setAttribute('role', 'status'); notice.textContent = `Review update: ${item.clubNotice}`; summary.append(notice);
       }
       const returnAction = Array.isArray(item.workflowHistory)
         ? [...item.workflowHistory].reverse().find((event) => event.role === 'dean' && event.action === `returned_to_${currentRole}`)
@@ -539,8 +595,7 @@ async function loadRequests(sharedResponse = null) {
         note.textContent = `Dean's note for ${{ pr: 'PR', english: 'English', security: 'Security Office' }[currentRole] || 'committee'}: ${returnAction.comment}`;
         summary.append(note);
       }
-      summary.append(actions);
-      card.append(summary);
+      card.append(summary, actions);
       requestsList.append(card);
     }
   } catch (error) {
@@ -562,6 +617,12 @@ async function refreshUnreadRequestBadges(sharedPendingResponse = null) {
     if (!statusResponse.ok) throw new Error(statuses.message || 'Could not sync request status.');
     if (!Array.isArray(pending)) throw new Error('Unexpected pending requests response.');
     if (!Array.isArray(statuses)) throw new Error('Unexpected request status response.');
+    const requestsChanged = JSON.stringify(cachedRequestsSnapshot) !== JSON.stringify(pending);
+    storeRequestsSnapshot(pending);
+    if (requestsChanged) await loadRequests(Promise.resolve(new Response(JSON.stringify(pending), { status: 200, headers: { 'Content-Type': 'application/json' } })), false);
+    const statusesChanged = JSON.stringify(cachedStatusOverview) !== JSON.stringify(statuses);
+    storeStatusOverviewSnapshot(statuses);
+    if (statusesChanged && statusOverviewDialog?.open) await loadStatusOverview(statuses);
     document.querySelectorAll('[data-entry-permit-count]').forEach((node) => {
       node.textContent = String(statuses.filter((item) => item.type === 'entry_permit'
         && (currentRole !== 'pr' || isPendingCommitteeRequest(item))).length);
@@ -591,9 +652,14 @@ async function showStatusOverview() {
   statusOverviewMode = 'all';
   if (currentRole === 'security') window.dashboardUnread?.activate('entryPermits');
   document.getElementById('statusOverviewTitle').textContent = 'All Requests';
-  statusOverviewList.textContent = 'Loading request statuses…';
   window.dashboardPanels?.show('statusOverviewDialog');
-  await loadStatusOverview();
+  if (Array.isArray(cachedStatusOverview)) {
+    await loadStatusOverview(cachedStatusOverview);
+    void refreshStatusOverviewInBackground();
+  } else {
+    statusOverviewList.textContent = 'Loading request statuses…';
+    await loadStatusOverview();
+  }
 }
 
 async function showEntryPermitOverview() {
@@ -601,39 +667,57 @@ async function showEntryPermitOverview() {
   statusOverviewMode = 'entry_permits';
   window.dashboardUnread?.activate('entryPermits');
   document.getElementById('statusOverviewTitle').textContent = 'Entry Permits';
-  statusOverviewList.textContent = 'Loading Entry Permits…';
   const entryPermitNav = document.querySelector('.committee-sidebar [data-entry-permit-overview]');
   document.querySelectorAll('.committee-sidebar-link').forEach((item) => item.classList.toggle('is-active', item === entryPermitNav));
   window.dashboardPanels?.show('statusOverviewDialog');
-  await loadStatusOverview();
+  if (Array.isArray(cachedStatusOverview)) {
+    await loadStatusOverview(cachedStatusOverview);
+    void refreshStatusOverviewInBackground();
+  } else {
+    statusOverviewList.textContent = 'Loading Entry Permits…';
+    await loadStatusOverview();
+  }
 }
 
 async function showRestartOverview() {
   if (!statusOverviewDialog || !statusOverviewList) return;
   statusOverviewMode = 'restartable';
   document.getElementById('statusOverviewTitle').textContent = 'Restart Review';
-  statusOverviewList.textContent = 'Loading requests…';
   window.dashboardPanels?.show('statusOverviewDialog');
-  await loadStatusOverview();
+  if (Array.isArray(cachedStatusOverview)) {
+    await loadStatusOverview(cachedStatusOverview);
+    void refreshStatusOverviewInBackground();
+  } else {
+    statusOverviewList.textContent = 'Loading requests…';
+    await loadStatusOverview();
+  }
 }
 
-async function fetchStatusOverviewItems() {
-  if (Array.isArray(cachedStatusOverview) && Date.now() - statusOverviewLoadedAt < 25_000) {
+async function fetchStatusOverviewItems(force = false) {
+  if (!force && Array.isArray(cachedStatusOverview) && Date.now() - statusOverviewLoadedAt < statusOverviewFreshMs) {
     return cachedStatusOverview;
   }
   const response = await fetch('/api/committee/status', { cache: 'no-store' });
   const items = await response.json();
   if (!response.ok) throw new Error(items.message || 'Could not load request statuses.');
   if (!Array.isArray(items)) throw new Error('Unexpected request status response.');
-  cachedStatusOverview = items;
-  statusOverviewLoadedAt = Date.now();
+  storeStatusOverviewSnapshot(items);
   return cachedStatusOverview;
 }
 
-async function loadStatusOverview() {
+async function refreshStatusOverviewInBackground() {
+  if (Array.isArray(cachedStatusOverview) && Date.now() - statusOverviewLoadedAt < statusOverviewFreshMs) return;
+  try {
+    const previous = JSON.stringify(cachedStatusOverview);
+    const items = await fetchStatusOverviewItems(true);
+    if (previous !== JSON.stringify(items) && statusOverviewDialog?.open) await loadStatusOverview(items);
+  } catch { /* Keep showing the last saved status list when refresh is unavailable. */ }
+}
+
+async function loadStatusOverview(itemsSnapshot = null) {
   if (!statusOverviewList) return;
   try {
-    let items = [...await fetchStatusOverviewItems()];
+    let items = [...(itemsSnapshot || await fetchStatusOverviewItems())];
     if (statusOverviewMode === 'restartable') {
       items = items.filter((item) => !['draft', 'changes_requested', 'pending_english', 'pending_security'].includes(item.status)
         && (currentRole !== 'security' || item.type === 'entry_permit'));
@@ -1119,6 +1203,8 @@ document.getElementById('historyReturnComment')?.addEventListener('input', (even
   document.getElementById('submitHistoryReturnBtn').disabled = !canReturn || !event.currentTarget.value.trim();
 });
 document.getElementById('logoutBtn')?.addEventListener('click', async () => {
+  clearStatusOverviewCache();
+  clearRequestsSnapshot();
   await fetch('/api/club-auth/logout', { method: 'POST' });
   window.location.href = '/';
 });
@@ -1126,7 +1212,7 @@ document.getElementById('logoutBtn')?.addEventListener('click', async () => {
 (async () => {
 if (await ensureSession()) {
   const pendingResponse = fetch('/api/committee/requests', { cache: 'no-store' });
-  await Promise.all([loadRequests(pendingResponse), refreshUnreadRequestBadges(pendingResponse)]);
+  await Promise.all([loadRequests(pendingResponse, false), refreshUnreadRequestBadges(pendingResponse)]);
   window.siteStartup?.afterStartup?.(() => fetchStatusOverviewItems());
   window.setInterval(() => {
     if (document.visibilityState === 'visible') refreshUnreadRequestBadges();

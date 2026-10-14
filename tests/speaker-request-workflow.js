@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const { SpeakerRequest, SpeakerCvUpload, SpeakerInvite } = require('../models');
 const {
   requesterKey,
+  resolveSpeakerHosting,
   speakerInviteTokenHash,
   publicSpeakerDuplicateKey,
   validateSpeakerPayload,
@@ -47,6 +48,10 @@ const student = { type: 'student', id: 'student-id', email: 'a@miuegypt.edu.eg' 
 assert.equal(requesterKey(student, 7), requesterKey(student, 7));
 assert.notEqual(requesterKey(student, 7), requesterKey(student, 8));
 assert.notEqual(requesterKey(student, 7), requesterKey({ ...student, id: 'other-student' }, 7));
+assert.deepEqual(resolveSpeakerHosting(student, { hostingType: 'miu' }), { hostingType: 'miu', clubId: 0 });
+assert.deepEqual(resolveSpeakerHosting(student, { clubId: '7' }), { hostingType: 'club', clubId: 7 });
+assert.equal(resolveSpeakerHosting(student, { clubId: 'miu' }), null);
+assert.deepEqual(resolveSpeakerHosting({ type: 'club', clubId: 7 }, { hostingType: 'miu', clubId: 8 }), { hostingType: 'club', clubId: 7 });
 assert.equal(speakerInviteTokenHash('a'.repeat(64)), speakerInviteTokenHash('a'.repeat(64)));
 assert.notEqual(speakerInviteTokenHash('a'.repeat(64)), speakerInviteTokenHash('b'.repeat(64)));
 assert.equal(publicSpeakerDuplicateKey(7, 'SPEAKER@example.edu'), publicSpeakerDuplicateKey(7, 'speaker@example.edu'));
@@ -72,6 +77,7 @@ assert.equal(validClubSpeakerDecision('pending', 'reject'), true);
 assert.equal(validClubSpeakerDecision('pending_dean', 'accept'), false);
 assert.equal(speakerResubmissionStatus({ clubReviewedAt: null }), 'pending_club');
 assert.equal(speakerResubmissionStatus({ clubReviewedAt: new Date() }), 'pending_supervisor');
+assert.equal(speakerResubmissionStatus({ hostingType: 'miu', clubReviewedAt: null }), 'pending_dean');
 assert.equal(validateSpeakerCvAsset({ format: 'pdf', bytes: 1024, public_id: 'miu-speaker-cvs/uuid.pdf' }), true);
 assert.equal(validateSpeakerCvAsset({ format: 'docx', bytes: 1024, public_id: 'miu-speaker-cvs/uuid.pdf' }), false);
 assert.equal(validateSpeakerCvAsset({ format: 'docx', bytes: 1024, public_id: 'miu-speaker-cvs/uuid.docx' }), true);
@@ -89,6 +95,7 @@ assert.match(decodeSpeakerCvData('data:application/msword;base64,JVBERi0=').erro
 assert(SpeakerRequest.schema.indexes().some(([keys, options]) => keys.activeRequesterKey === 1 && options.unique && options.sparse));
 assert(SpeakerRequest.schema.path('status').enumValues.includes('pending_club'));
 assert(SpeakerRequest.schema.path('status').enumValues.includes('pending_dean'));
+assert(SpeakerRequest.schema.path('hostingType').enumValues.includes('miu'));
 assert(SpeakerRequest.schema.path('requesterType').enumValues.includes('speaker'));
 assert(SpeakerRequest.schema.path('speakerSelectionReason'));
 assert(SpeakerRequest.schema.path('expectedStudentBenefit'));

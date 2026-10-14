@@ -1,8 +1,44 @@
 (() => {
+  const prompts = [];
+  const promptKeys = new Set();
+  let promptTimer;
+  const schedulePrompt = () => {
+    clearTimeout(promptTimer);
+    promptTimer = setTimeout(openNextPrompt, 350);
+  };
+  const openNextPrompt = () => {
+    if (!prompts.length || document.visibilityState !== 'visible'
+      || document.documentElement.classList.contains('site-startup-pending')
+      || document.querySelector('dialog[open], .modal:not(.hidden), .calendar-modal:not(.hidden), .modal.show, .modal.is-open')) return;
+    const next = prompts.shift();
+    if (next.eligible && !next.eligible()) {
+      promptKeys.delete(next.key);
+      schedulePrompt();
+      return;
+    }
+    next.dialog.addEventListener('close', () => {
+      promptKeys.delete(next.key);
+      schedulePrompt();
+    }, { once: true });
+    next.dialog.showModal();
+    next.onOpen?.();
+  };
+  window.queueSitePrompt = (key, dialog, { eligible, onOpen } = {}) => {
+    if (promptKeys.has(key) || dialog.open) return;
+    promptKeys.add(key);
+    prompts.push({ key, dialog, eligible, onOpen });
+    schedulePrompt();
+  };
+  new MutationObserver(schedulePrompt).observe(document.documentElement, {
+    subtree: true, childList: true, attributes: true, attributeFilter: ['open', 'class', 'hidden']
+  });
+  document.addEventListener('visibilitychange', schedulePrompt);
+  document.addEventListener('close', schedulePrompt, true);
+
   const root = document.documentElement;
-  // Let the browser restore scroll once. A second delayed restoration caused
-  // visible jumps while dynamic page content was still settling.
-  if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'auto';
+  // New documents and fresh in-page views always start at the top. Handle
+  // Back/Forward separately so the browser can restore its own saved position.
+  if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual';
   let scrollResetFrame = 0;
   window.resetPageScroll = () => {
     window.cancelAnimationFrame(scrollResetFrame);
@@ -12,11 +48,24 @@
       window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     });
   };
+  const navigationEntry = performance.getEntriesByType('navigation')[0];
+  const isReload = navigationEntry?.type === 'reload';
+  const isHistoryTraversal = navigationEntry?.type === 'back_forward';
+  const hasPageAnchor = Boolean(location.hash && document.getElementById(decodeURIComponent(location.hash.slice(1))));
+  // A true reload keeps its last position. Links to a section and browser
+  // history traversal also retain their intended target/position.
+  if (!isReload && !isHistoryTraversal && !hasPageAnchor) {
+    window.resetPageScroll();
+    window.addEventListener('pageshow', event => {
+      if (!event.persisted) window.resetPageScroll();
+    }, { once: true });
+  }
   const nativeFetch = window.fetch.bind(window);
   let pendingRequests = 0;
   let domReady = document.readyState !== 'loading';
   let revealTimer = 0;
   let startupReleaseTimer = 0;
+  let startupDeadlineTimer = 0;
   let indicator = null;
   let startupRing = null;
   let startupCover = null;
@@ -31,6 +80,7 @@
     if (startupReleased) return;
     startupReleased = true;
     window.clearTimeout(startupReleaseTimer);
+    window.clearTimeout(startupDeadlineTimer);
     root.classList.remove('site-startup-pending');
     startupCover?.remove();
     startupCover = null;
@@ -59,27 +109,34 @@
 
   function releaseWhenReady() {
     window.clearTimeout(startupReleaseTimer);
-    if (!domReady || pendingRequests > 0 || startupReleased) return;
-    // Give chained startup requests (for example session -> dashboard data) time to begin.
+    if (!domReady || startupReleased) return;
+    // Reveal the page after its first paint; API work continues behind it and
+    // is reported by the small loading indicator instead of blocking the view.
     startupReleaseTimer = window.setTimeout(() => {
-      // Allow JSON consumers and their DOM updates to paint before uncovering
-      // the page. Recheck because a chained request may have started meanwhile.
       window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
-        if (domReady && pendingRequests === 0) releaseStartupScreen();
+        if (domReady) releaseStartupScreen();
       }));
     }, 180);
+  }
+
+  function armStartupDeadline() {
+    if (startupReleased || startupDeadlineTimer) return;
+    // Data can continue loading with the small indicator. Never block the
+    // whole document indefinitely on a slow or stalled API.
+    startupDeadlineTimer = window.setTimeout(releaseStartupScreen, 1500);
   }
 
   document.addEventListener('DOMContentLoaded', () => {
     domReady = true;
     ensureIndicators();
+    armStartupDeadline();
     releaseWhenReady();
   }, { once: true });
   if (domReady) {
+    armStartupDeadline();
     releaseWhenReady();
   }
-  // Keep the branded cover visible until the document and its tracked startup
-  // requests have finished. Slow startup data must never reveal an empty page.
+  // Authentication views keep their own session gate after the cover releases.
 
   function requestNeedsIndicator(input) {
     try {
@@ -97,13 +154,13 @@
 
   function ensureIndicators() {
     if (!document.body) return false;
-    if (!startupCover) {
+    if (!startupReleased && !startupCover) {
       startupCover = document.createElement('div');
       startupCover.className = 'site-startup-cover';
       startupCover.setAttribute('aria-hidden', 'true');
       document.body.append(startupCover);
     }
-    if (!startupRing) {
+    if (!startupReleased && !startupRing) {
       startupRing = document.createElement('span');
       startupRing.className = 'site-startup-ring';
       startupRing.setAttribute('aria-hidden', 'true');
@@ -127,7 +184,6 @@
 
   function trackWork(work) {
     pendingRequests += 1;
-    window.clearTimeout(startupReleaseTimer);
     window.clearTimeout(revealTimer);
     revealTimer = window.setTimeout(updateIndicators, 160);
 

@@ -142,9 +142,12 @@ test('real club submission handlers gate all modules and re-enter supervisor rev
   const start = source.indexOf('async function createContentRequest(req, res, type)');
   const end = source.indexOf("app.put('/api/club/content/:id'", start);
   vm.runInContext(source.slice(start, end), context);
-  const req = { body: { title: 'Proposal', submit: true }, clubAccount: { clubId: 1, role: 'president', email: 'club@example.edu' }, params: { id: '1' } };
+  const req = { body: { title: 'Proposal', submit: true, attendanceAudience: 'all_students' }, clubAccount: { clubId: 1, role: 'president', email: 'club@example.edu' }, params: { id: '1' } };
   let code = 200;
   const res = { status(value) { code = value; return this; }, json() {} };
+  await context.createContentRequest({ ...req, body: { title: 'Proposal', submit: true } }, res, 'event');
+  assert.equal(code, 400);
+  assert.equal(record, undefined);
   for (const type of ['event', 'feed', 'sponsor', 'booth', 'entry_permit']) {
     await context.createContentRequest(req, res, type);
     assert.equal(code, 201);

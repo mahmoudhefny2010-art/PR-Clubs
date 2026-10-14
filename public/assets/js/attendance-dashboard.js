@@ -153,6 +153,7 @@
       option.dataset.itemType = event.itemType || 'event';
       option.dataset.eventRequestId = String(event.eventRequestId);
       option.dataset.title = event.title;
+      option.dataset.attendanceAudience = event.attendanceAudience || '';
       eventSelect.add(option);
     });
     if (selfCheckinEvent) {
@@ -306,7 +307,7 @@
     const table = document.createElement('table');
     table.className = 'attendance-records-table';
     const head = table.createTHead().insertRow();
-    ['Name', 'Email', 'Activity', 'Activity date', 'Activity time', 'Club', 'Check-in date', 'Check-in time', 'Approval status', 'Note'].forEach((label) => {
+    ['Name', 'Email', 'Membership', 'Member clubs', 'Activity', 'Activity date', 'Activity time', 'Club', 'Check-in date', 'Check-in time', 'Approval status', 'Note'].forEach((label) => {
       const cell = document.createElement('th');
       cell.scope = 'col';
       cell.textContent = label;
@@ -315,7 +316,8 @@
     const body = table.createTBody();
     records.forEach((record) => {
       const row = body.insertRow();
-      const values = [record.name, record.email, `${record.itemType === 'booth' ? 'Booth' : 'Event'}: ${record.eventTitle || ''}`, record.eventDate, window.formatSiteTime(record.eventTime), record.clubName, formatDate(record.attendedAt), formatTime(record.attendedAt)];
+      const membership = record.membershipStatus === 'member' ? 'Member' : record.membershipStatus === 'non_member' ? 'Non-member' : 'Club member';
+      const values = [record.name, record.email, membership, (record.memberClubNames || []).join(', '), `${record.itemType === 'booth' ? 'Booth' : 'Event'}: ${record.eventTitle || ''}`, record.eventDate, window.formatSiteTime(record.eventTime), record.clubName, formatDate(record.attendedAt), formatTime(record.attendedAt)];
       values.forEach((value) => { row.insertCell().textContent = value || '—'; });
       const statusCell = row.insertCell();
       const statusBadge = document.createElement('span');
@@ -408,6 +410,8 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name,
+          universityId: document.getElementById('attendanceSelfCheckinId').value.trim(),
+          major: document.getElementById('attendanceSelfCheckinMajor').value.trim(),
           clubId: Number(option.dataset.clubId),
           itemType: option.dataset.itemType,
           eventRequestId: Number(option.dataset.eventRequestId)
@@ -465,6 +469,10 @@
     event.preventDefault();
     const option = eventSelect.selectedOptions[0];
     if (!option?.dataset.clubId) return;
+    const audienceControl = document.getElementById('attendanceAllStudents');
+    if (audienceControl && option.dataset.attendanceAudience) {
+      audienceControl.checked = option.dataset.attendanceAudience === 'all_students';
+    }
     const button = document.getElementById('createAttendanceQrBtn');
     stopQrRotation();
     button.disabled = true;
@@ -479,7 +487,8 @@
         body: JSON.stringify({
           clubId: Number(option.dataset.clubId),
           itemType: option.dataset.itemType,
-          eventRequestId: Number(option.dataset.eventRequestId)
+          eventRequestId: Number(option.dataset.eventRequestId),
+          audience: option.dataset.attendanceAudience || (audienceControl?.checked ? 'all_students' : 'members')
         })
       });
       activeQrToken = result.token;
@@ -497,5 +506,13 @@
     } finally {
       button.disabled = eventSelect.disabled;
     }
+  });
+  eventSelect.addEventListener('change', () => {
+    const option = eventSelect.selectedOptions[0];
+    const control = document.getElementById('attendanceAllStudents');
+    if (!control) return;
+    const configuredAudience = option?.dataset.attendanceAudience || '';
+    control.disabled = Boolean(configuredAudience);
+    if (configuredAudience) control.checked = configuredAudience === 'all_students';
   });
 })();

@@ -4,18 +4,18 @@
       <link rel="manifest" href="/manifest.webmanifest">
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <script src="/assets/js/site-loading.js?v=20261013startupfullcover1"></script>
+    <script src="/assets/js/site-loading.js?v=20261014promptqueue1"></script>
     <title>Event Studio</title>
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" /></noscript>
-    <link rel="stylesheet" href="/assets/css/base.css?v=20261013startupfullcover1" />
-    <link rel="stylesheet" href="/assets/css/responsive.css?v=20261013mobilefooterbg1" />
-    <link rel="stylesheet" href="/assets/css/dark.css?v=20261013darkglobal2" />
-    <link rel="stylesheet" href="/assets/css/features.css?v=20261013backbutton1" />
+    <link rel="stylesheet" href="/assets/css/base.css?v=20261014approvaltrack1" />
+    <link rel="stylesheet" href="/assets/css/responsive.css?v=20261014profilelink1" />
+    <link rel="stylesheet" href="/assets/css/dark.css?v=20261014permitcards2" />
+    <link rel="stylesheet" href="/assets/css/features.css?v=20261014permititemlayout1" />
     <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/pics/pwa-icon-192.png?v=20261013favicon1">
-    <link rel="stylesheet" href="/assets/css/pages/content-form.css?v=20261013assignedhead1" />
-      <script defer src="/assets/js/pwa-register.js"></script>
-    <link rel="stylesheet" href="/assets/css/modal-controls.css?v=20261013modalclose2">
+    <link rel="stylesheet" href="/assets/css/pages/content-form.css?v=20261014reviewcontrast2" />
+      <script defer src="/assets/js/pwa-register.js?v=20261014localfresh1"></script>
+    <link rel="stylesheet" href="/assets/css/modal-controls.css?v=20261014pairedappactions1">
 </head>
   <body>
     <div id="site-header"></div>
@@ -57,6 +57,13 @@
                 <option value="true">Yes, let students register</option>
               </select>
               <small class="meta">When enabled, students will see the registration form on the public event page.</small>
+              <label for="eventAudienceInput">Who can attend this event?</label>
+              <select id="eventAudienceInput">
+                <option value="" selected disabled>Choose the event audience</option>
+                <option value="all_students">All university students (club members and non-members)</option>
+                <option value="members">Members of this club only</option>
+              </select>
+              <small class="meta">This controls who can register and whose university account can check in using the event QR code.</small>
               <div id="attendanceEnabledField" hidden>
                 <label for="attendanceEnabledInput">Will attendance be recorded?</label>
                 <select id="attendanceEnabledInput">
@@ -72,7 +79,7 @@
               <label>Image (required for review)</label>
               <input id="imageInput" type="file" accept="image/*" />
               <small class="meta">Events published on the website need an image. Drafts can be saved without one.</small>
-              <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+              <div class="content-form-actions">
                 <button class="primary-btn" type="submit" name="action" value="draft">Save as draft</button>
                 <button class="secondary-btn" type="button" id="submitReviewBtn">Submit for review</button>
                 <button class="secondary-btn" type="button" id="resetFormBtn">Clear</button>
@@ -88,10 +95,10 @@
       </section>
     </main>
     <div id="site-footer"></div>
-    <script src="/assets/js/content-studio.js?v=20261013lighter1"></script>
+    <script src="/assets/js/content-studio.js?v=20261014reviewcolors2"></script>
     <script src="/assets/js/date-time-picker.js?v=20261010pickers1"></script>
-    <script src="/assets/js/pages/event-form.js?v=20261013attendance2"></script>
-    <script src="/assets/js/layout.js?v=20261013stagedload3" defer></script>
+    <script src="/assets/js/pages/event-form.js?v=20261013audience1"></script>
+    <script src="/assets/js/layout.js?v=20261014promptqueue1" defer></script>
     <script src="/assets/js/theme.js?v=20261009c" defer></script>
   </body>
 </html>

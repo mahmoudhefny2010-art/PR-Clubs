@@ -6,6 +6,7 @@
   const submitButton = document.getElementById('speakerSubmit');
   const cancelButton = document.getElementById('speakerCancelEdit');
   const list = document.getElementById('speakerRequestsList');
+  const hostingHelp = document.getElementById('speakerHostingHelp');
   const fileInput = document.getElementById('speakerFiles');
   const invitePanel = document.getElementById('speakerInvitePanel');
   const inviteButton = document.getElementById('generateSpeakerInvite');
@@ -180,6 +181,11 @@
 
   function startEdit(item) {
     editingId = item.id;
+    const clubSelect = form.elements.clubId;
+    if (clubSelect) {
+      clubSelect.value = item.hostingType === 'miu' ? 'miu' : String(item.clubId || '');
+      clubSelect.disabled = true;
+    }
     form.elements.speakerName.value = item.speakerName || '';
     form.elements.jobTitleCompany.value = item.jobTitleCompany || item.professionalDetails || '';
     form.elements.linkedinProfile.value = item.linkedinProfile || '';
@@ -188,13 +194,17 @@
     form.elements.expectedStudentBenefit.value = item.expectedStudentBenefit || '';
     fileInput.value = '';
     document.getElementById('speakerFormTitle').textContent = 'Update speaker request';
-    submitButton.textContent = item.clubReviewedAt ? 'Resubmit for supervisor review' : 'Resubmit for club review';
+    submitButton.textContent = item.hostingType === 'miu' ? 'Resubmit to Dean' : item.clubReviewedAt ? 'Resubmit for supervisor review' : 'Resubmit for club review';
+    if (hostingHelp) hostingHelp.textContent = 'The hosting organization stays the same when you resubmit a request.';
     cancelButton.hidden = false;
     form.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   function clearEdit() {
     editingId = ''; form.reset();
+    const clubSelect = form.elements.clubId;
+    if (clubSelect) clubSelect.disabled = false;
+    if (hostingHelp) hostingHelp.textContent = '';
     document.getElementById('speakerFormTitle').textContent = 'Propose a speaker';
     submitButton.textContent = 'Submit request'; cancelButton.hidden = true;
   }
@@ -239,15 +249,18 @@
       const payload = Object.fromEntries(formData.entries());
       payload.requesterType = identity.type;
       payload.clubId = identity.type === 'club' ? identity.clubId : payload.clubId;
+      payload.hostingType = identity.type === 'student' && payload.clubId === 'miu' ? 'miu' : 'club';
       payload.attachmentUploads = attachmentUploads;
       const endpoint = editingId ? `/api/speaker-requests/${encodeURIComponent(editingId)}/resubmit` : '/api/speaker-requests';
       const method = editingId ? 'PATCH' : 'POST';
       const saved = await requestJson(endpoint, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       requests = editingId ? requests.map((item) => item.id === saved.id ? saved : item) : [saved, ...requests];
       clearEdit(); renderRequests();
-      showMessage(formMessage, saved.status === 'pending_supervisor'
-        ? 'Your request was sent to the club supervisor for approval.'
-        : 'Your request was sent to the hosting club for review.', 'success');
+      showMessage(formMessage, saved.hostingType === 'miu'
+        ? 'Your official MIU university request was sent directly to the Dean for review.'
+        : saved.status === 'pending_supervisor'
+          ? 'Your request was sent to the club supervisor for approval.'
+          : 'Your request was sent to the hosting club for review.', 'success');
     } catch (error) { showMessage(formMessage, error.message, 'error'); }
     finally { submitButton.disabled = false; }
   });
@@ -273,6 +286,13 @@
         }
       } else {
         for (const club of context.clubs) clubSelect.add(new Option(club.name, club.id));
+        clubSelect.add(new Option('MIU — Official University (all students)', 'miu'));
+        clubSelect.addEventListener('change', () => {
+          if (!hostingHelp) return;
+          hostingHelp.textContent = clubSelect.value === 'miu'
+            ? 'This is an official university event, open to all MIU students. Requests go directly to the Dean for review.'
+            : '';
+        });
       }
       requests = context.requests || [];
       renderRequests(); content.hidden = false; message.textContent = '';

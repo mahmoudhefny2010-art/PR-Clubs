@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Semester event reports · MIU Clubs</title>
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <link rel="stylesheet" href="/assets/css/responsive.css">
+  <link rel="stylesheet" href="/assets/css/dark.css">
+  <link rel="stylesheet" href="/assets/css/features.css">
+  <link rel="stylesheet" href="/assets/css/pages/event-reports.css">
+  <script src="/assets/js/theme.js" defer></script>
+  <script src="/assets/js/install-welcome.js?v=20261014promptqueue1" defer></script>
+  <script src="/assets/js/pages/event-reports.js" defer></script>
+</head>
+<body>
+  <div id="site-header"></div>
+  <main class="app-container event-reports">
+    <section class="committee-card">
+      <h1>Semester event reports</h1>
+      <p>Supply the university’s official semester start and end dates. Both dates are included. No academic dates are configured automatically.</p>
+      <form id="reportFilters" class="report-filters">
+        <label>Club<select id="reportClub" required disabled></select></label>
+        <label>Period start<input id="reportStart" type="date" required></label>
+        <label>Period end<input id="reportEnd" type="date" required></label>
+        <button class="primary-btn" type="submit">Load semester</button>
+      </form>
+      <p id="reportFeedback" role="status" aria-live="polite">Loading authorized clubs…</p>
+      <div id="reportOverview"></div>
+      <div id="reportEvents"></div>
+    </section>
+  </main>
+  <div id="site-footer"></div>
+</body>
+</html>

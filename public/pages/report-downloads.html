@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Download reports · MIU Clubs</title>
+  <link rel="stylesheet" href="/assets/css/base.css"><link rel="stylesheet" href="/assets/css/responsive.css">
+  <link rel="stylesheet" href="/assets/css/dark.css"><link rel="stylesheet" href="/assets/css/features.css">
+  <link rel="stylesheet" href="/assets/css/pages/event-reports.css">
+  <script src="/assets/js/theme.js" defer></script><script src="/assets/js/install-welcome.js?v=20261014promptqueue1" defer></script>
+  <script src="/assets/js/pages/report-downloads.js?v=20261014progressive1" defer></script>
+</head>
+<body>
+  <div id="site-header"></div>
+  <main class="app-container event-reports"><section class="committee-card">
+    <h1 id="downloadTitle">Event reports</h1>
+    <p id="downloadIntro">Choose a calendar year or a custom period. Both date boundaries are included.</p>
+    <form id="downloadForm" class="report-filters">
+      <label>Club<select id="downloadClub" required disabled></select></label>
+      <label id="downloadEventLabel">Event<select id="downloadEvent" disabled><option value="">Select a published event</option></select></label>
+      <label>Period<select id="downloadPeriod"><option value="range">From date to date</option><option value="year">Full calendar year</option></select></label>
+      <label id="downloadYearLabel" hidden>Year<input id="downloadYear" type="number" min="1900" max="9998" step="1" disabled></label>
+      <label id="downloadStartLabel">From<input id="downloadStart" type="date" required></label>
+      <label id="downloadEndLabel">To<input id="downloadEnd" type="date" required></label>
+      <button id="downloadButton" class="primary-btn" type="submit" disabled>Download Excel</button>
+    </form>
+    <p id="downloadFeedback" role="status" aria-live="polite">Loading download permissions…</p>
+    <p id="downloadHelp"></p>
+    <div id="downloadEvents"></div>
+  </section></main><div id="site-footer"></div>
+</body>
+</html>

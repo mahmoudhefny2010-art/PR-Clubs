@@ -4,7 +4,7 @@
       .panel { background: #fff; border: 1px solid #f0d7d7; border-radius: 18px; padding: 18px; }
       .panel h2 { margin: 0 0 12px; font-size: 1.05rem; }
       .panel label { display: block; font-weight: 700; font-size: .82rem; margin: 10px 0 4px; }
-      .panel input, .panel select, .panel textarea { width: 100%; padding: 10px 12px; border: 1px solid #e5cfd0; border-radius: 10px; font: inherit; }
+      .panel input, .panel select, .panel textarea { box-sizing: border-box; width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid #e5cfd0; border-radius: 10px; font: inherit; }
       .date-time-picker { display: grid; grid-template-columns: minmax(0, 1fr) 44px; align-items: center; gap: 8px; }
       .date-time-picker input { min-width: 0; min-height: 46px; cursor: pointer; -webkit-appearance: none; appearance: none; }
       .date-time-picker input::-webkit-calendar-picker-indicator { width: 0; margin: 0; padding: 0; opacity: 0; }
@@ -16,7 +16,15 @@
       .panel textarea { min-height: 90px; }
       .content-form-assignment { display: grid !important; gap: 6px; margin: 14px 0 8px !important; font-size: .9rem !important; }
       .content-form-assignment select { box-sizing: border-box; min-height: 42px; }
+      .content-form-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+      .content-form-actions > button { min-height: 44px; }
       .content-list { display: flex; flex-direction: column; gap: 12px; }
+      .content-task-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; gap: 8px; min-width: 0; margin-top: 6px; }
+      .content-task-actions > :is(button, a) { box-sizing: border-box; width: 100%; min-width: 0; min-height: 42px; padding: 8px 10px; text-align: center; overflow-wrap: anywhere; }
+      .content-task-actions > .content-task-assignment { grid-column: 1 / -1; }
+      .content-task-actions > button[data-delete] { grid-column: 1 / -1; }
+      :root[data-theme="dark"] body .content-task-assignment { color: var(--text-muted); }
+      :root[data-theme="dark"] body .content-task-assignment select { border-color: var(--border-color); background: var(--bg-soft); color: var(--text-main); }
       .content-card { border: 1px solid #eee; border-radius: 14px; padding: 12px; display: flex; gap: 12px; }
       .content-card img { width: 70px; height: 70px; object-fit: cover; border-radius: 12px; }
       .content-card .meta { font-size: .8rem; color: #6b7280; }
@@ -26,6 +34,10 @@
       .status-changes_requested { background: #fde8e8; color: #b71c1c; }
       .status-rejected { background: #fee2e2; color: #991b1b; }
       .status-published { background: #dcfce7; color: #166534; }
+      .content-review-update { margin-top: 8px; padding: 9px 11px; border: 1px solid #f1d39a; border-left: 3px solid #d97706; border-radius: 10px; background: #fff7e6; color: #78350f; font-size: .85rem; overflow-wrap: anywhere; }
+      .content-review-update strong { color: #92400e; }
+      :root[data-theme="dark"] body .content-review-update { border-color: rgba(255, 210, 121, .24); border-left-color: #f0b648; background: rgba(217, 119, 6, .12); color: #e5edf7; }
+      :root[data-theme="dark"] body .content-review-update strong { color: #ffd279; }
       body.embed .topbar { display: none; }
       body.embed .app-container { max-width: 100%; margin: 0; padding: 0; }
       body.embed #site-header,
@@ -46,6 +58,15 @@
       @media (max-width: 760px) {
         .module-nav { flex-wrap: nowrap; max-width: 100%; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; scrollbar-width: thin; scrollbar-color: var(--primary-700) var(--bg-soft); padding: 2px 2px 8px; }
         .module-nav a { flex: 0 0 auto; min-height: 40px; display: inline-flex; align-items: center; white-space: nowrap; }
+        .content-layout, .content-layout > .panel { min-width: 0; max-width: 100%; }
+        .panel input, .panel select, .panel textarea { min-height: 44px; font-size: 16px; }
+        .content-form-assignment, .content-form-assignment select { box-sizing: border-box; width: 100%; min-width: 0; }
+        .content-form-actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+        .content-form-actions > button { width: 100%; min-width: 0; padding-inline: 8px; white-space: normal; }
+        .content-form-actions > button:first-child { grid-column: 1 / -1; }
+        .content-list, .content-card, .content-card-body { min-width: 0; max-width: 100%; }
+        .content-card { flex-wrap: wrap; overflow-wrap: anywhere; }
+        .content-card-body { flex: 1 1 100%; }
         .module-nav::-webkit-scrollbar { height: 5px; }
         .module-nav::-webkit-scrollbar-track { background: var(--bg-soft); border-radius: 999px; }
         .module-nav::-webkit-scrollbar-thumb { background: var(--primary-700); border-radius: 999px; }

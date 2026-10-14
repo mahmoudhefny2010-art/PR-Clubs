@@ -1,5 +1,6 @@
 const STAFF_ROUTES = {
   software_development: '/admin',
+  miu_events: '/dashboards/miu-events-dashboard.html',
   president: '/club-dashboard', head: '/club-dashboard', supervisor: '/dashboards/supervisor-dashboard.html',
   pr: '/dashboards/pr-dashboard.html', english: '/dashboards/english-dashboard.html',
   security: '/dashboards/security-dashboard.html', sso: '/dashboards/sso-dashboard.html', dean: '/dashboards/dean-dashboard.html'
@@ -7,7 +8,7 @@ const STAFF_ROUTES = {
 
 const STAFF_ROLE_LABELS = { president: 'Club president', head: 'Committee head', supervisor: 'Club supervisor',
   pr: 'PR', english: 'English Department', security: 'Security Office', sso: 'SSO', dean: 'Dean',
-  software_development: 'Software Development team' };
+  software_development: 'Software Development team', miu_events: 'MIU Events' };
 
 function staffRoleAssignments(account) {
   const assignments = Array.isArray(account?.roleAssignments) ? account.roleAssignments : [];

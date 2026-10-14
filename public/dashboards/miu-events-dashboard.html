@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101827"><title>MIU Events Dashboard Â· MIU Clubs</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/assets/css/base.css?v=20261014approvaltrack1">
+  <link rel="stylesheet" href="/assets/css/responsive.css?v=20261014profilelink1">
+  <link rel="stylesheet" href="/assets/css/dark.css?v=20261014permitcards2">
+  <link rel="stylesheet" href="/assets/css/features.css?v=20261014permititemlayout1">
+  <link rel="stylesheet" href="/assets/css/pages/event-reports.css?v=20261014mobileoptions1">
+  <link rel="stylesheet" href="/assets/css/pages/miu-events-dashboard.css?v=20261014design3">
+  <script src="/assets/js/site-loading.js?v=20261014promptqueue1"></script>
+  <script src="/assets/js/theme.js?v=20261009c" defer></script>
+  <script src="/assets/js/install-welcome.js?v=20261014promptqueue1" defer></script>
+  <script src="/assets/js/cloudinary-upload.js?v=20261013audience1" defer></script>
+  <script src="/assets/js/pwa-register.js?v=20261014localfresh1" defer></script>
+</head>
+<body class="miu-events-dashboard-page"><div id="site-header"></div>
+  <main class="app-container committee-dashboard-layout">
+    <aside class="committee-sidebar" data-unread-scope="miu_events" aria-label="MIU Events dashboard navigation">
+      <h2>MIU EVENTS</h2>
+      <a class="committee-sidebar-link is-active" href="#miuEventsOverview" data-dashboard-panel="miuEventsOverview">Overview</a>
+      <h3>EVENT MANAGEMENT</h3>
+      <a class="committee-sidebar-link" href="#miuEventsPanel" data-dashboard-panel="miuEventsPanel">MIU events &amp; posts</a>
+      <h3>DOWNLOADS</h3>
+      <a class="committee-sidebar-link" href="/pages/miu-attendance.html">Take MIU event attendance</a>
+    </aside>
+    <section id="committee-overview" class="committee-card miu-events-dashboard-content">
+      <header class="committee-top"><div><span class="committee-label">MIU EVENTS OPERATIONS</span><h1>MIU Events Dashboard</h1><p>Publish university updates, manage MIU events, open event attendance and download MIU event reports.</p></div><div class="top-actions"><a class="secondary-btn" href="/">Home</a></div></header>
+      <section id="miuEventsOverview" class="committee-overview-panel">
+        <h2>Overview</h2><p>Manage MIU posts and events from the sidebar. Attendance files and semester event reports are available under Downloads.</p>
+        <div class="committee-overview-stats overview-grid-1"><button class="overview-stat-card" type="button" data-dashboard-panel="miuEventsPanel"><span>Published MIU updates</span><strong id="miuEventsCount">—</strong><small>Open event and post management</small></button></div>
+      </section>
+      <section id="miuEventsPanel" class="committee-overview-panel" hidden>
+        <header class="miu-events-section-heading"><div><span class="committee-label">MIU POSTS</span><h2>Manage MIU events and posts</h2><p>Changes publish to the existing public Events &amp; News and Community Feed.</p></div><div class="miu-events-section-actions"><button id="refreshUniversityPostsBtn" class="secondary-btn" type="button">Refresh from database</button></div></header>
+        <div class="miu-events-management-grid">
+          <form id="universityPostForm" class="university-publisher-form">
+            <h3>New university update</h3>
+            <label for="universityPostType">Post type<select id="universityPostType" name="type"><option value="event">Event</option><option value="announcement">Announcement</option></select></label>
+            <label for="universityPostTitle">Title<input id="universityPostTitle" name="title" required maxlength="140" placeholder="e.g. University welcome event"></label>
+            <label for="universityPostDescription">Details<textarea id="universityPostDescription" name="description" required maxlength="2000" placeholder="Write the information students need to know"></textarea></label>
+            <label>Student response<select id="universityInteraction"><option value="none">No response</option><option value="poll">Poll — choose one option</option><option value="evaluation">Evaluation — rate from 1 to 5</option></select></label>
+            <label id="universityQuestionField" hidden>Poll or evaluation question<input id="universityQuestion" maxlength="300"></label>
+            <label id="universityOptionsField" hidden>Poll options (one per line, 2–20 options)<textarea id="universityOptions"></textarea></label>
+            <p class="publisher-help">Students can update their response. Results are visible only to admin and PR.</p>
+            <div class="form-row" id="universityEventFields">
+              <label for="universityPostDate">Event date (optional)<input id="universityPostDate" name="date" type="date"></label>
+              <label for="universityPostTime">Time (optional)<input id="universityPostTime" name="time" type="time"></label>
+              <label for="universityPostLocation">Location<input id="universityPostLocation" name="location" maxlength="160" placeholder="Building or venue"></label>
+              <label for="universityPostRegistration">Event registration<select id="universityPostRegistration" name="registrationEnabled"><option value="false">No registration</option><option value="true">Allow students to register</option></select></label>
+              <label id="universityAudienceField" for="universityPostAudience">Who can register and check in?<select id="universityPostAudience" name="attendanceAudience"><option value="" selected disabled>Choose the event audience</option><option value="all_students">All university students, including non-members</option><option value="members">Current members of any MIU club</option></select><small>Member-only MIU events accept students with active membership in at least one club.</small></label>
+              <label id="universityAttendanceField" for="universityPostAttendance" hidden>Attendance tracking<select id="universityPostAttendance" name="attendanceEnabled"><option value="false">Attendance will not be recorded</option><option value="true">Attendance will be recorded</option></select></label>
+            </div>
+            <fieldset class="university-image-choice"><legend>Image shown with the post</legend><label><input type="radio" name="imageChoice" value="logo" checked> MIU logo</label><label><input type="radio" name="imageChoice" value="custom"> Upload my image</label></fieldset>
+            <label id="universityImageField" for="universityPostImage" hidden>Upload image<input id="universityPostImage" type="file" accept="image/png,image/jpeg,image/webp"></label>
+            <button id="publishUniversityPostBtn" class="primary-btn" type="submit">Publish to website</button>
+            <p id="universityPostMessage" class="message" role="status" aria-live="polite"></p>
+          </form>
+          <aside class="university-publisher-preview"><img id="universityPostPreview" src="/assets/img/pics/logo.svg.png" alt="MIU post image preview"><strong>Misr International University</strong><p>Published updates appear in Events &amp; News and the Community Feed.</p></aside>
+        </div>
+        <section class="miu-post-records"><h3>Published MIU updates</h3><p id="universityPostListMessage" class="message" role="status" aria-live="polite">Loading updates</p><div id="universityPostRecords" class="records"></div></section>
+      </section>
+    </section>
+  </main>
+  <div id="site-footer"></div>
+  <script src="/assets/js/committee-sidebar.js?v=20261013lighter1" defer></script>
+  <script src="/assets/js/pages/report-downloads.js?v=20261014progressive1" defer></script>
+  <script src="/assets/js/report-dashboard-panels.js?v=20261014progressive1" defer></script>
+  <script src="/assets/js/miu-events-dashboard.js?v=20261014progressive1" defer></script>
+</body></html>
