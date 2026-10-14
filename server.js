@@ -468,7 +468,8 @@ const defaultClubs = [
   }
 ];
 
-const dataDirectory = path.join(__dirname, 'data');
+const dataDirectory = process.env.LOCAL_DATA_DIRECTORY
+  ? path.resolve(process.env.LOCAL_DATA_DIRECTORY) : path.join(__dirname, 'data');
 const clubsFile = path.join(dataDirectory, 'clubs.json');
 const homepageFile = path.join(dataDirectory, 'homepage.json');
 const adminCredentialsFile = path.join(dataDirectory, 'admin.json');

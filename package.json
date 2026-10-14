@@ -20,6 +20,8 @@
     "sql:import": "node scripts/sqlserver-migrate.cjs --import",
     "sql:validate": "node scripts/sqlserver-migrate.cjs --validate",
     "sql:cleanup": "node scripts/sqlserver-cleanup.cjs",
+    "sql:backup": "node scripts/sqlserver-operations.cjs backup",
+    "sql:operations:verify": "node scripts/verify-sql-operations.cjs",
     "test:sql": "node --test tests/sqlserver*.test.js",
     "sql:routes:verify": "node scripts/verify-provider-routes.cjs --write",
     "sql:api:compare": "node scripts/verify-database-api-parity.cjs"

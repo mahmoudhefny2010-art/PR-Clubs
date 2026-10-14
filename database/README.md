@@ -4,6 +4,8 @@ The existing Express routes select MongoDB, Microsoft SQL Server or Azure SQL th
 
 ## Choose the database
 
+Local SQL maintenance is now installed: checksum-verified daily backups at 03:00 and hourly TTL cleanup, both running as SYSTEM. The restored-backup website verification passed 54 HTTP checks and actual browser sign-in for 12 account types. See [maintenance schedules, recovery, private evidence and commands](../docs/database-migration/SQL-OPERATIONS-2026-10-14.md). For local manual cleanup, pass `--directory <private-backup-directory>`; deletion requires a verified backup from the last 36 hours. Azure cleanup continues to use its managed-backup/external-scheduler setup.
+
 | `DATABASE_PROVIDER` | Connection profile | Backend/HTTP behavior |
 | --- | --- | --- |
 | `mongodb` | Existing `MONGO_URI` | Existing Mongoose persistence. |

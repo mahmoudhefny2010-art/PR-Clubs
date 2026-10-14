@@ -6,6 +6,9 @@ selected. The running website at `http://localhost:1111` now serves SQL data.
 
 ## Connection and data
 
+Subsequent local backup scheduling, expiry cleanup, restored-database HTTP QA,
+and browser sign-in checks are recorded in [the SQL operations report](SQL-OPERATIONS-2026-10-14.md).
+
 - SQL instance: `DESKTOP-I3P8NGR\MSSQLSERVER01`, reached locally through
   `localhost:14330`. TCP/IP and mixed SQL/Windows authentication were enabled
   with Administrator approval. Existing logins/passwords were not changed.
