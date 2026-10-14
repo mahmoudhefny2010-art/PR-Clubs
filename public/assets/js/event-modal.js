@@ -20,7 +20,7 @@
   }
 
   function close() {
-    modal.classList.add('hidden');
+    window.MiuUI.modals.close(modal);
     document.body.classList.remove('modal-open');
   }
 
@@ -56,7 +56,7 @@
     else if (event.attendanceAudience === 'members' && event.registrationEnabled === true) import('/assets/js/student-event-registration.js?v=20261014registrationbuttons1').then(() => {
       if (activeEvent === event) window.mountStudentEventRegistration(form, feedback, `/api/university-content/${encodeURIComponent(event.universityContentId || event.id)}/registrations`);
     }).catch(() => { feedback.textContent = 'Registration controls could not load. Please reload.'; });
-    modal.classList.remove('hidden');
+    window.MiuUI.modals.open(modal);
     document.body.classList.add('modal-open');
     closeButton.focus();
   };

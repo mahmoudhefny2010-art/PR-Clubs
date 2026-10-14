@@ -4,6 +4,8 @@
   "description": "University clubs dashboard with head review workflow",
   "main": "server.js",
   "scripts": {
+    "build:frontend": "node scripts/build-frontend.cjs",
+    "check:frontend": "node scripts/build-frontend.cjs --check && node tests/verify-structure.js",
     "start": "node server.js",
     "dev": "node dev.js",
     "seed": "node seed.js",

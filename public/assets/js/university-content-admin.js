@@ -11,9 +11,7 @@
   const adminView = document.getElementById('adminView');
   if (!panel || !form || !adminView) return;
 
-  const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  })[character]);
+  const escapeHtml = window.MiuUI.escapeHtml;
   let loaded = false;
   let loading = false;
 

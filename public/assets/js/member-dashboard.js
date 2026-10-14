@@ -20,21 +20,12 @@
     const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
     return `${values.year}-${values.month}-${values.day}`;
   };
-  const apiJson = async (url, options) => {
-    const response = await fetch(url, { cache: 'no-store', ...options });
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(result.message || 'Could not complete this request.');
-    return result;
-  };
+  const apiJson = window.MiuUI.createJsonClient({
+    defaults: {"cache":"no-store"},
+    fallbackMessage: "Could not complete this request.", tolerateInvalidJson: true, includeStatus: false
+  });
 
-  function button(label, className, onClick) {
-    const element = document.createElement('button');
-    element.type = 'button';
-    element.className = className;
-    element.textContent = label;
-    element.addEventListener('click', onClick);
-    return element;
-  }
+  const button = window.MiuUI.button;
 
   function render() {
     list.replaceChildren();

@@ -8,9 +8,7 @@
   const detailTitle = document.getElementById('detailTitle');
   const detailDesc = document.getElementById('detailDesc');
 
-  const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-  }[ch]));
+  const escapeHtml = window.MiuUI.escapeHtml;
 
   let clubs = [];
   const allSponsors = () => clubs.flatMap((club) =>

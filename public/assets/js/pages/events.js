@@ -14,9 +14,7 @@
     window.location.replace(`/pages/event.html?club=${encodeURIComponent(legacyParams.get('club'))}&event=${encodeURIComponent(legacyParams.get('event'))}`);
   }
 
-  const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-  }[ch]));
+  const escapeHtml = window.MiuUI.escapeHtml;
 
   let clubs = window.miuPublicDataCache?.read('clubs') || [];
   let universityContent = window.miuPublicDataCache?.read('universityContent') || [];

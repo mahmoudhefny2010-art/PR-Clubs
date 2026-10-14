@@ -47,12 +47,10 @@
     rejected: 'Rejected'
   })[status] || 'Waiting for PR';
   const attendanceActivityKey = (activity) => `${activity.clubId}:${activity.itemType || 'event'}:${activity.eventRequestId}`;
-  const apiJson = async (url, options) => {
-    const response = await fetch(url, { cache: 'no-store', ...options });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.message || 'The request failed.');
-    return payload;
-  };
+  const apiJson = window.MiuUI.createJsonClient({
+    defaults: {"cache":"no-store"},
+    fallbackMessage: "The request failed.", tolerateInvalidJson: true, includeStatus: false
+  });
   function cairoTodayKey() {
     const parts = new Intl.DateTimeFormat('en', {
       timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit'

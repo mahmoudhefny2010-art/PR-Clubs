@@ -10,14 +10,12 @@
   let clubLoadedAt = 0;
   let miuReviewsLoadedAt = 0;
   const DATA_FRESH_MS = 25_000;
-  const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+  const escape = window.MiuUI.escapeHtml;
   const text = value => escape(String(value || '').replace(/_/g, ' '));
-  async function api(path, options = {}) {
-    const response = await fetch(path, { credentials: 'same-origin', cache: 'no-store', ...options });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.message || 'Could not load supervisor data.');
-    return result;
-  }
+  const api = window.MiuUI.createJsonClient({
+    defaults: {"credentials":"same-origin","cache":"no-store"},
+    fallbackMessage: "Could not load supervisor data.", tolerateInvalidJson: false, includeStatus: false
+  });
   const empty = message => `<p class="supervisor-muted">${escape(message)}</p>`;
   function renderMiuAttendance() {
     content.innerHTML = '<h2>MIU event attendance</h2>' + (miuReviews.map(review => `<article class="supervisor-record"><h3>${escape(review.eventTitle)}</h3><p>${escape(review.eventDate)} · ${review.records.length} verified check-ins</p><div>${review.records.map(person => `<p><strong>${escape(person.name)}</strong> · ${escape(person.email)} · ${person.membershipStatus === 'member' ? `Member · ${escape((person.memberClubNames || []).join(', '))}` : 'Non-member'}</p>`).join('')}</div><form data-miu-attendance-id="${review.eventRequestId}"><label>Review note<textarea name="comment" maxlength="500" placeholder="Required if rejecting"></textarea></label><div class="supervisor-decision-actions"><button class="primary-btn" name="action" value="approve">Approve and send to PR</button><button class="secondary-btn" name="action" value="reject">Reject</button></div><span role="status" aria-live="polite"></span></form></article>`).join('') || empty('No MIU event attendance is waiting for your review.'));

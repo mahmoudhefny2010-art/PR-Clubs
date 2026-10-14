@@ -4,11 +4,7 @@ const ContentStudio = (() => {
   const reviewerNames = { pr: 'PR Department', english: 'English Department', security: 'Security Office', dean: 'Dean' };
   const typeLabels = { event: 'Event', feed: 'Feed', sponsor: 'Sponsor', booth: 'Booth', entry_permit: 'Entry Permit' };
 
-  function escapeHtml(value) {
-    return String(value ?? '').replace(/[&<>"']/g, (character) => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    })[character]);
-  }
+  function escapeHtml(value) { return window.MiuUI.escapeHtml(value); }
 
   function getActiveReviewComment(item) {
     if (item.status !== 'changes_requested') return null;

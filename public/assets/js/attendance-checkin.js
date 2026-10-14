@@ -14,16 +14,10 @@
     details.textContent = 'This attendance link is invalid. Ask the club for a current QR code.';
     return;
   }
-  const apiJson = async (url, options) => {
-    const response = await fetch(url, { cache: 'no-store', ...options });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const error = new Error(payload.message || 'Could not confirm attendance.');
-      error.status = response.status;
-      throw error;
-    }
-    return payload;
-  };
+  const apiJson = window.MiuUI.createJsonClient({
+    defaults: {"cache":"no-store"},
+    fallbackMessage: "Could not confirm attendance.", tolerateInvalidJson: true, includeStatus: true
+  });
   const scanUrl = new URL(`/api/attendance/${encodeURIComponent(token)}`, window.location.origin);
   if (qrCode) scanUrl.searchParams.set('code', qrCode);
   apiJson(scanUrl.toString()).then(async (event) => {

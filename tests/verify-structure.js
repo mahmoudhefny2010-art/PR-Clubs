@@ -16,6 +16,13 @@ const files = [...walk(publicRoot), ...walk(path.join(root, 'private'))];
 let scripts = 0, inlineScripts = 0, references = 0;
 const read = (file) => fs.readFileSync(file, 'utf8');
 const relative = (file) => path.relative(root, file);
+// Existing standalone templates intentionally omit the injected site shell.
+const standaloneTemplates = new Set([
+  'public/404.html', 'public/500.html', 'public/offline.html', 'private/error-page.html',
+  'public/dashboards/miu-events-dashboard.html', 'public/pages/event-reports.html',
+  'public/pages/miu-attendance.html', 'public/pages/my-attendance-task.html',
+  'public/pages/report-downloads.html', 'public/speaker-intake.html'
+]);
 function checkAsset(url, source) {
   if (!url.startsWith('/assets/') && !url.startsWith('/components/')) return;
   const file = path.join(publicRoot, url.split(/[?#]/)[0]);
@@ -33,10 +40,18 @@ for (const file of files) {
       if (/\bsrc\s*=/.test(match[1]) || !match[2].trim() || /application\/(?:ld\+)?json/.test(match[1])) continue;
       new vm.Script(match[2], { filename: `${relative(file)} inline script` }); inlineScripts++;
     }
-    if (!file.includes(`${path.sep}components${path.sep}`) && !/[/\\](?:404|500)\.html$/.test(file)) {
+    if (!file.includes(`${path.sep}components${path.sep}`) && !standaloneTemplates.has(relative(file).replace(/\\/g, '/'))) {
       for (const css of ['base.css', 'responsive.css', 'dark.css']) assert.ok(source.includes(`/assets/css/${css}`), `${relative(file)} missing ${css}`);
       assert.ok(source.includes('/assets/js/layout.js'), `${relative(file)} missing shared layout`);
       if (!file.endsWith(`${path.sep}attendance.html`)) assert.ok(source.includes('id="site-footer"'), `${relative(file)} missing shared footer`);
+    }
+    const dependencies = [...source.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi)]
+      .map(match => match[1].split(/[?#]/)[0]);
+    const usesShared = dependencies.some(url => url.startsWith('/assets/js/') && read(path.join(publicRoot, url)).includes('window.MiuUI.'));
+    if (usesShared) {
+      const sharedIndex = source.indexOf('/assets/js/shared.js');
+      assert.ok(sharedIndex >= 0 && sharedIndex < source.indexOf('<script') + 100, `${relative(file)} must load shared primitives before feature scripts`);
+      assert.match(source, /<script src="\/assets\/js\/shared\.js[^"\s]*"><\/script>/, `${relative(file)} shared script must be synchronous`);
     }
   }
   if (file.endsWith('.js') || file.endsWith('.css')) {

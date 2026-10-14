@@ -1,5 +1,5 @@
 ﻿(() => {
-  const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+  const escape = window.MiuUI.escapeHtml;
   window.studentFeedbackForm = (kind, id, interaction = 'evaluation', question = 'How would you rate this club?', options = []) => {
     if (!['poll', 'evaluation'].includes(interaction)) return '';
     return `<form class="student-feedback" data-feedback-kind="${escape(kind)}" data-feedback-id="${Number(id)}">

@@ -10,9 +10,7 @@
   const requestedPost = Number(new URLSearchParams(window.location.search).get('post'));
   let requestedPostFocused = false;
 
-  const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-  }[char]));
+  const escapeHtml = window.MiuUI.escapeHtml;
   const parseDate = (value) => {
     if (!value) return null;
     const date = new Date(value);

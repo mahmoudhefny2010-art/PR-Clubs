@@ -18,6 +18,18 @@ let permitSecurityApproved = false;
 function reset() { permitStatus = 'pending_security'; permitSecurityApproved = false; }
 function respond(url, method, referer, body, scenario = '') {
   const p = url.pathname;
+  if (scenario.startsWith('account-menu')) {
+    if (p === '/api/pwa/version') return [200, { version: 'account-menu-fixture' }];
+    const email = 'mahmoud2406700.long.account.name@miuegypt.edu.eg';
+    if (p === '/api/site/account-session') return [200, { authenticated: true, type: 'club', role: 'president', name: 'MUN', email,
+      dashboards: ['president', 'supervisor', 'pr', 'english', 'security', 'sso', 'dean', 'miu_events', 'software_development'].map(role => ({ role, label: role, clubName: ['president', 'supervisor'].includes(role) ? 'Model United Nations University Club' : '' })) }];
+    if (p === '/api/site/account-photo') return [200, { url: '/assets/img/pics/mun.jpg', prompt: false }];
+    if (p === '/api/notifications/config') return [200, { enabled: false }];
+    if (p === '/api/miu-attendance-task') return [200, { task: null }];
+    if (p === '/api/student/my-forms') return [200, { forms: [] }];
+    if (p === '/api/member/attendance-assignments') return [200, []];
+    if (p === '/api/student-auth/profile') return [200, { name: 'Test Student', email }];
+  }
   const role = /security-dashboard/.test(referer) ? 'security' : /english-dashboard/.test(referer) ? 'english' : /dean-dashboard|__audit\/dean-entry-permit/.test(referer) ? 'dean' : /pr-dashboard/.test(referer) ? 'pr' : /sso-dashboard/.test(referer) ? 'sso' : 'president';
   if (p === '/api/site/visitor-ping' || /\/view$/.test(p)) return [200, { ok: true }];
   if (p === '/api/site/account-session') return [200, /\/admin\/global/.test(referer) ? { authenticated: true, type: 'admin' } : { authenticated: false }];

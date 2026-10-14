@@ -1417,7 +1417,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const dayEventsClose = document.getElementById('calendarDayEventsClose');
   let selectedCalendarDay = null;
   const openCalendar = async () => {
-    calendarModal.classList.remove('hidden');
+    window.MiuUI.modals.open(calendarModal);
     selectedCalendarDay = null;
     calendarGrid.innerHTML = '<p class="calendar-month-prompt">Loading events...</p>';
     try {
@@ -1545,8 +1545,8 @@ document.addEventListener('DOMContentLoaded', () => {
     openCalendar();
     history.replaceState(null, '', `${location.pathname}${location.search}`);
   }
-  if (calendarClose) calendarClose.addEventListener('click', () => calendarModal.classList.add('hidden'));
-  if (calendarModal) calendarModal.addEventListener('click', (event) => { if (event.target === calendarModal) calendarModal.classList.add('hidden'); });
+  if (calendarClose) calendarClose.addEventListener('click', () => window.MiuUI.modals.close(calendarModal));
+  if (calendarModal) calendarModal.addEventListener('click', (event) => { if (event.target === calendarModal) window.MiuUI.modals.close(calendarModal); });
   if (dayEventsClose) dayEventsClose.addEventListener('click', closeDayEventsModal);
   if (dayEventsModal) {
     dayEventsModal.addEventListener('click', (event) => {
@@ -1558,22 +1558,14 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   window.openCalendarAt = (year, month, day) => {
-    calendarModal.classList.remove('hidden');
+    window.MiuUI.modals.open(calendarModal);
     selectedCalendarDay = Number.isInteger(day) ? day : null;
     renderCalendar(year, month);
     if (selectedCalendarDay) calendarGrid.querySelector(`[data-day="${selectedCalendarDay}"]`)?.scrollIntoView({ block: 'nearest' });
   };
 });
 
-function escapeHtml(value) {
-  return String(value ?? '').replace(/[&<>"']/g, (character) => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;',
-  })[character]);
-}
+function escapeHtml(value) { return window.MiuUI.escapeHtml(value); }
 
 function getClubStatusLabel(status) {
   return status === 'opening-soon' ? 'Opening Soon' : status.charAt(0).toUpperCase() + status.slice(1);

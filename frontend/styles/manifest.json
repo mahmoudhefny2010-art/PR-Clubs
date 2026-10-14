@@ -1,0 +1,12 @@
+{
+  "output": "public/assets/css/base.css",
+  "sources": [
+    "frontend/styles/tokens.css",
+    "frontend/styles/theme.css",
+    "frontend/styles/foundation.css",
+    "frontend/styles/navigation.css",
+    "frontend/styles/buttons.css",
+    "frontend/styles/forms.css",
+    "frontend/styles/components.css"
+  ]
+}

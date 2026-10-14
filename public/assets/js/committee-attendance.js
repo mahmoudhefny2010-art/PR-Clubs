@@ -20,12 +20,10 @@
     pending_dean: 'Waiting for Dean', approved: 'Dean approved', rejected: 'Rejected'
   };
   const approvalStages = { pr: 'pending_pr', sso: 'pending_sso', dean: 'pending_dean' };
-  const apiJson = async (url, options = {}) => {
-    const response = await fetch(url, { cache: 'no-store', ...options });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.message || 'Could not load attendance records.');
-    return payload;
-  };
+  const apiJson = window.MiuUI.createJsonClient({
+    defaults: {"cache":"no-store"},
+    fallbackMessage: "Could not load attendance records.", tolerateInvalidJson: true, includeStatus: false
+  });
   const formatDateTime = (value) => {
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short', hour12: true });

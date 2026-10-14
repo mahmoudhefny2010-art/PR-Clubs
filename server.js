@@ -1109,10 +1109,21 @@ app.post('/api/site/visitor-ping', async (req, res) => {
   }
 });
 
-async function getStudentAccountFromRequest(req, res) {
+async function getGoogleStudentAccountFromRequest(req) {
+  const staff = await getClubAccountFromRequest(req);
+  let identity = staff;
+  if (!identity && await isAdminSessionValid(req)) {
+    const admin = await loadAdminAuthState();
+    if (admin?.email === getConfiguredAdminEmail()) identity = admin;
+  }
+  if (!identity?.googleSub) return null;
+  return require('./services/university-account-session').resolveUniversityStudentProfile(StudentAccount, identity);
+}
+
+async function getStudentAccountFromRequest(req, res, allowGoogleStaff = true) {
   if (!mongoReady) return null;
   const cookie = String(req.headers.cookie || '').split(';').map((part) => part.trim()).find((part) => part.startsWith('miu_student='));
-  if (!cookie) return null;
+  if (!cookie) return allowGoogleStaff ? getGoogleStudentAccountFromRequest(req) : null;
   const parts = cookie.slice('miu_student='.length).split('.');
   if (parts.length !== 4) return null;
   const [encodedEmail, expiresText, versionText, signature] = parts;
@@ -2185,7 +2196,7 @@ app.get('/api/site/account-session', async (req, res) => {
   try {
     // A browser may have both a student login and staff logins. Keep the
     // student identity as the primary account in the profile menu.
-    const studentAccount = await getStudentAccountFromRequest(req, res);
+    const studentAccount = await getStudentAccountFromRequest(req, res, false);
     if (studentAccount) {
       const signedStaff = await getClubAccountFromRequest(req);
       const staffDashboards = signedStaff ? getStaffDashboardOptions(signedStaff) : [];
@@ -2615,6 +2626,7 @@ app.post('/api/club-auth/login', async (req, res) => {
 
 app.post('/api/club-auth/logout', (req, res) => {
   res.setHeader('Set-Cookie', [
+    `miu_student=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/;${secureCookieSuffix(req)}`,
     `miu_club=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/;${secureCookieSuffix(req)}`,
     `miu_admin=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/;${secureCookieSuffix(req)}`
   ]);
@@ -5880,6 +5892,7 @@ app.put('/api/student-auth/profile', requireStudentAuth, async (req, res) => {
 
 app.post('/api/student-auth/logout', async (req, res) => {
   const secure = secureCookieSuffix(req);
+  const clearedCookies = ['miu_student', 'miu_club', 'miu_admin'].map(name => `${name}=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/;${secure}`);
   try {
     if (!mongoReady || mongoose.connection.readyState !== 1) throw new Error('DATABASE_UNAVAILABLE');
     const account = await getStudentAccountFromRequest(req);
@@ -5891,11 +5904,11 @@ app.post('/api/student-auth/logout', async (req, res) => {
       );
       if (!result.modifiedCount) throw new Error('SESSION_REVOCATION_NOT_CONFIRMED');
     }
-    res.setHeader('Set-Cookie', `miu_student=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/;${secure}`);
+    res.setHeader('Set-Cookie', clearedCookies);
     res.status(204).end();
   } catch (error) {
     console.error('Student logout could not be verified:', error.name);
-    res.setHeader('Set-Cookie', `miu_student=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/;${secure}`);
+    res.setHeader('Set-Cookie', clearedCookies);
     res.status(503).json({ message: 'This browser was signed out, but the session could not be revoked on the server. Try again when the database is available.' });
   }
 });
@@ -6066,7 +6079,7 @@ app.post('/api/admin/login', async (req, res) => {
 });
 
 app.post('/api/admin/logout', (req, res) => {
-  res.setHeader('Set-Cookie', ['miu_admin=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/', 'miu_club=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/']);
+  res.setHeader('Set-Cookie', ['miu_admin=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/', 'miu_club=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/', 'miu_student=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/']);
   res.status(204).end();
 });
 

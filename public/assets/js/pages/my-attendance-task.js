@@ -1,10 +1,10 @@
 (() => {
   const $ = id => document.getElementById(id), message = $('usherTaskMessage'), panel = $('usherTask');
   let token = '', refreshTimer = 0, countdownTimer = 0, expiresAt = 0;
-  async function api(url, options) {
-    const response = await fetch(url, { credentials: 'same-origin', cache: 'no-store', ...options });
-    const data = await response.json().catch(() => ({})); if (!response.ok) throw new Error(data.message || 'Could not load your task.'); return data;
-  }
+  const api = window.MiuUI.createJsonClient({
+    defaults: {"credentials":"same-origin","cache":"no-store"},
+    fallbackMessage: "Could not load your task.", tolerateInvalidJson: true, includeStatus: false
+  });
   async function load() {
     try {
       const { task } = await api('/api/miu-attendance-task');

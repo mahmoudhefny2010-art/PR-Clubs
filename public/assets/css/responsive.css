@@ -612,12 +612,12 @@
   .admin-row-actions > .delete-btn { min-height: 42px; font-size: .78rem; }
 }
 
-.nav-profile-dropdown { box-sizing: border-box; width: min(280px, calc(100vw - 24px)); }
+.nav-profile-dropdown { box-sizing: border-box; width: min(320px, calc(100vw - 24px)); max-height: calc(100dvh - 100px); overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-width: thin; }
 .nav-profile-dashboard-choices { display: grid; gap: 3px; padding: 7px 0; border-bottom: 1px solid var(--border-color); }
 .nav-profile-dashboard-choices[hidden] { display: none !important; }
 .nav-profile-dashboard-label { padding: 6px 12px 2px; color: var(--text-muted); font-size: .75rem; font-weight: 750; }
 .nav-profile-dashboard-option:disabled { cursor: wait; opacity: .65; }
-.nav-profile-dashboard-choices .nav-profile-dashboard-option { display: block; min-height: 44px; padding: 8px 12px; font-size: .85rem; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nav-profile-dashboard-choices .nav-profile-dashboard-option { display: block; min-height: 40px; padding: 8px 12px; font-size: .85rem; line-height: 1.35; white-space: normal; overflow-wrap: anywhere; }
 .nav-profile-dashboard-choices .nav-profile-dashboard-option[aria-current="page"] { color: var(--primary-700); background: var(--bg-soft); }
 
 /* Size club management cards from their actual panel width, including narrow desktop columns. */
@@ -746,12 +746,12 @@
 .account-photo-prompt-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .account-photo-prompt-actions button { min-height: 44px; padding: 10px 18px; border: 1px solid var(--border-color); border-radius: 10px; font: inherit; cursor: pointer; background: var(--bg-soft); color: var(--text-main); }
 .account-photo-prompt-actions [data-photo-add] { background: var(--primary-800); color: #fff; }
-.nav-profile-account-copy { display: grid; min-width: 0; gap: 3px; }
+.nav-profile-account-copy { display: grid; flex: 1; min-width: 0; gap: 3px; }
 .nav-profile-account-copy strong { color: var(--text-main); font-size: .9rem; font-weight: 800; }
-.nav-profile-account-copy > span { overflow: hidden; color: var(--text-muted); font-size: .8rem; line-height: 1.35; text-overflow: ellipsis; }
+.nav-profile-account-copy > span { color: var(--text-muted); font-size: .8rem; line-height: 1.45; white-space: normal; overflow-wrap: anywhere; }
 .nav-profile-account-copy > span:last-child:not(:first-child) { overflow-wrap: anywhere; }
-@media (min-width: 1121px) { .nav-profile-dropdown { width: 280px; } }
-@media (min-width: 1400px) { .nav-profile-dropdown { width: 280px; } }
+@media (min-width: 1121px) { .nav-profile-dropdown { width: min(320px, calc(100vw - 24px)); } }
+@media (min-width: 1400px) { .nav-profile-dropdown { width: min(340px, calc(100vw - 24px)); } }
 @media (max-width: 520px) {
   .nav-profile-dropdown {
     position: fixed;

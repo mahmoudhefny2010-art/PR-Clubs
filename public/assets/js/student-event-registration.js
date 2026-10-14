@@ -22,7 +22,7 @@ window.mountStudentEventRegistration = async (form, feedback, endpoint) => {
     const data = await response.json();
     if (response.status === 401) {
       feedback.replaceChildren(document.createTextNode('Sign in with your university student account to register. '));
-      const link = document.createElement('a'); link.href = '/pages/applicant-login.html'; link.textContent = 'Sign in'; feedback.append(link); submit.disabled = true; return;
+      const link = document.createElement('a'); link.href = '/pages/applicant-login.html?redirect=' + encodeURIComponent(location.pathname + location.search + location.hash); link.textContent = 'Sign in'; feedback.append(link); submit.disabled = true; return;
     }
     if (!response.ok) throw new Error(data.message || 'Could not check registration.');
     feedback.textContent = data.message; submit.textContent = data.registered ? 'Already registered' : 'Register for event';

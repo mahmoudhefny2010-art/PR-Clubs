@@ -1,0 +1,29 @@
+{
+  "date": "2026-10-14",
+  "unitTests": { "passed": 160, "failed": 0 },
+  "speakerWorkflowScript": "passed",
+  "legacyEntryPermitScript": "pre-existing source-text assertion failure; unchanged server",
+  "static": { "htmlFiles": 43, "externalScripts": 60, "inlineScripts": 6, "assetReferences": 598 },
+  "preservation": { "protectedSnapshotFiles": 37, "baseCssByteIdentical": true, "movedUiBlocksStatementIdentical": 3 },
+  "browser": {
+    "scenarios": 184,
+    "standalonePages": 40,
+    "additionalInteractionStates": 6,
+    "viewports": ["1366x900", "390x844"],
+    "themes": ["light", "dark"],
+    "pixelExact": 182,
+    "withinExistingRasterTolerance": 2,
+    "domStateMatches": 184,
+    "exceptions": 0,
+    "newFixtureGaps": 0,
+    "distinctExistingFixtureGaps": 17,
+    "reportedSessionReadCountDifferences": 49,
+    "comparisonAllowances": ["existing fixture gaps", "one versus two GET /api/site/account-session reads"],
+    "batches": [
+      { "reference": "architecture-settled-before", "stage": "architecture-settled-after", "scenarios": 92, "pixelExact": 92 },
+      { "reference": "architecture-additional-before", "stage": "architecture-additional-after", "scenarios": 68, "pixelExact": 66 },
+      { "reference": "architecture-remaining-before", "stage": "architecture-remaining-after", "scenarios": 24, "pixelExact": 24 }
+    ]
+  },
+  "limits": ["Synthetic API fixtures", "External resources stubbed", "Real authentication, database writes, uploads and provider delivery not exercised"]
+}

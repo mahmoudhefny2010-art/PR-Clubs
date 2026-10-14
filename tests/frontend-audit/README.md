@@ -39,3 +39,19 @@ Google Fonts and the QR library CDN are served empty responses by the isolated h
 The capture waits for document and nested scroll positions to remain stable for eight animation frames, avoiding geometry snapshots during smooth scrolling. This changes only test capture timing.
 
 Artifacts remain local under `.frontend-audit/`; they are ignored by Git. The condensed audit, baseline manifest, relationship map, and final results are in `docs/frontend-audit/`.
+
+## Comparing a later architectural refactor
+
+The original October 9 source-preservation test remains historical evidence; subsequent authorized feature changes mean it is not a baseline for the current portal. Freeze current `public/` and `private/` sources under an ignored directory and pass `--source .frontend-audit/architecture-source` to capture that version. Use distinct stage names to retain the historical evidence.
+
+`--settled` clears per-tab navigation state, navigates away between scenarios, waits for startup jobs and the homepage typewriter, decodes completed images, and moves the pointer outside controls. Use the same procedure and scenario selection on both sides. It changes only the test environment.
+
+`--all-pages` adds current standalone public HTML pages to the historical page inventory, so newer attendance, speaker, supervisor and reporting pages can be selected too.
+
+```powershell
+node tests/frontend-audit/compare.cjs architecture-settled-after architecture-settled-before
+```
+
+The optional second stage argument chooses a reference other than `baseline`. Default comparison still fails for missing fixtures. `--allow-existing-fixture-gaps` permits only fixture gaps already recorded in the reference, reports those gaps explicitly, and continues to fail for new gaps, exceptions, unequal API calls/state, or screenshots outside the original tolerance. This demonstrates equivalence in the covered fixture environment; it does not demonstrate the missing workflows work in production.
+
+The unchanged header and push client can each request `GET /api/site/account-session`: whether the push client receives the header's session event before its own startup request is a timing race. `--allow-repeated-session-reads` reports differing counts for this one read only, requires it on both sides, and continues to compare every other request (including all writes) exactly. Strict comparison remains the default. Do not use this option for new/missing requests or other endpoints.

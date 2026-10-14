@@ -7,12 +7,10 @@
   form.dataset.initialized = 'true';
   let eventId = 0;
   const todayCairo = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(new Date());
-  async function api(url, options) {
-    const response = await fetch(url, { credentials: 'same-origin', cache: 'no-store', siteStartupNonBlocking: true, ...options });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.message || 'The request could not be completed.');
-    return data;
-  }
+  const api = window.MiuUI.createJsonClient({
+    defaults: {"credentials":"same-origin","cache":"no-store","siteStartupNonBlocking":true},
+    fallbackMessage: "The request could not be completed.", tolerateInvalidJson: true, includeStatus: false
+  });
   function refreshAssignments() {
     const rows = [...assignmentList.querySelectorAll('.miu-assignment-row')];
     rows.forEach((row, index) => {

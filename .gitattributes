@@ -1,0 +1,4 @@
+# Preserve the original CSS fragment whitespace so assembly stays byte-identical.
+frontend/styles/*.css whitespace=-blank-at-eol,-blank-at-eof
+# Third-party distribution and license are copied without editing upstream bytes.
+public/assets/vendor/* -whitespace

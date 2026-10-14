@@ -11,8 +11,11 @@ const { respond, reset: resetFixtures } = require('./fixtures.cjs');
 const root = path.resolve(__dirname, '../..');
 const stage = process.argv[2] || 'final';
 const quick = process.argv.includes('--quick');
+const settled = process.argv.includes('--settled');
 const artifacts = path.join(root, '.frontend-audit');
-const source = stage === 'baseline' || process.argv.includes('--original') ? path.join(artifacts, 'baseline') : root;
+const sourceIndex = process.argv.indexOf('--source');
+const source = sourceIndex >= 0 ? path.resolve(root, process.argv[sourceIndex + 1])
+  : stage === 'baseline' || process.argv.includes('--original') ? path.join(artifacts, 'baseline') : root;
 const output = path.join(artifacts, stage === 'baseline' ? 'browser-baseline' : `browser-${stage}`);
 const baseline = require('../../docs/frontend-audit/baseline.json');
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -89,7 +92,20 @@ const pages = baseline.files.filter((f) => f.path.endsWith('.html') && !f.path.i
   name: path.basename(f.path, '.html'),
   url: f.path.startsWith('private/') ? f.path.includes('global-admin') ? '/admin/global' : '/admin/club-credentials' : f.path === 'public/index.html' ? '/' : f.path.slice(6),
 }));
+if (process.argv.includes('--all-pages')) {
+  const walk = directory => fs.readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
+    const file = path.join(directory, entry.name);
+    return entry.isDirectory() ? walk(file) : [file];
+  });
+  for (const file of walk(path.join(source, 'public')).filter(file => file.endsWith('.html') && !file.includes(`${path.sep}components${path.sep}`))) {
+    const url = '/' + path.relative(path.join(source, 'public'), file).replace(/\\/g, '/');
+    const target = url === '/index.html' ? '/' : url;
+    if (!pages.some(page => page.url === target)) pages.push({ name: path.basename(file, '.html'), url: target });
+  }
+}
 const extras = [
+  { name: 'account-menu-visible', url: '/', action: "document.getElementById('headerStudentProfileTrigger').click()", expect: "(() => { const menu=document.getElementById('headerStudentProfileDropdown'), email=document.getElementById('headerStudentName'), options=document.querySelectorAll('#headerDashboardChoiceList button'), logout=document.getElementById('headerStudentSignoutBtn'); const r=menu.getBoundingClientRect(); if(menu.hidden || r.left<0 || r.right>innerWidth || r.bottom>innerHeight || options.length!==9 || getComputedStyle(email).whiteSpace==='nowrap' || email.scrollWidth>email.clientWidth+1)return false; menu.scrollTop=menu.scrollHeight; const end=logout.getBoundingClientRect(); const accessible=end.bottom<=r.bottom && end.top>=r.top; menu.scrollTop=0; return accessible; })()" },
+  { name: 'account-menu-student-dashboard', url: '/', action: "document.getElementById('headerStudentProfileTrigger').click(); document.getElementById('headerStudentProfileLink').click()", expect: "location.pathname==='/' && new URLSearchParams(location.search).get('myForms')==='1' && !document.getElementById('myFormsView').classList.contains('hidden')" },
   { name: 'club-dashboard', url: '/club-dashboard' },
   { name: 'club-attendance-approval-status', url: '/club-dashboard', action: "new Promise(resolve=>setTimeout(()=>{document.getElementById('openAttendanceManagerBtn').click();setTimeout(()=>{document.querySelector('.attendance-records-details summary').click();setTimeout(resolve,350)},250)},250))", expect: "document.getElementById('attendanceRecordsList').innerText.includes('SSO approved · Waiting for Dean') && document.getElementById('attendanceRecordsList').innerText.includes('Test Student')" },
   { name: 'club-entry-permit-dashboard', url: '/club-dashboard?auditEntryPermit=1', action: 'new Promise(resolve=>setTimeout(resolve,700))', expect: "document.getElementById('approvalCheckpointTrack').innerText.includes('Campus Access Request') && document.getElementById('approvalCheckpointTrack').innerText.includes('PR final review') && document.getElementById('approvalCheckpointTrack').innerText.includes('Dean view')" },
@@ -163,20 +179,30 @@ async function main() {
     const filterIndex = process.argv.indexOf('--match');
     const filter = filterIndex >= 0 ? new RegExp(process.argv[filterIndex + 1]) : null;
     for (const viewport of viewports) for (const theme of ['light', 'dark']) for (const scenario of [...pages, ...extras].filter((s) => !filter || filter.test(s.name))) {
+      if (settled) {
+        if (injection) { await client.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: injection }); injection = null; }
+        await client.send('Page.navigate', { url: 'about:blank' }); await sleep(100);
+      }
       activeScenario = scenario.name;
       resetFixtures();
       const key = `${scenario.name}-${viewport.name}-${theme}`;
       exceptions = []; serverRequests.length = 0;
       await client.send('Emulation.setDeviceMetricsOverride', { width: viewport.width, height: viewport.height, deviceScaleFactor: 1, mobile: false });
       if (injection) await client.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: injection });
-      ({ identifier: injection } = await client.send('Page.addScriptToEvaluateOnNewDocument', { source: `localStorage.clear(); localStorage.setItem('miu-site-theme',${JSON.stringify(theme)}); const AuditDate=Date; window.Date=class extends AuditDate{constructor(...args){super(...(args.length?args:['2026-10-09T08:00:00.000Z']))}static now(){return 1791532800000}}; document.addEventListener('DOMContentLoaded',()=>{const s=document.createElement('style');s.textContent='*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}';document.head.append(s)});` }));
+      ({ identifier: injection } = await client.send('Page.addScriptToEvaluateOnNewDocument', { source: `localStorage.clear(); ${settled ? 'sessionStorage.clear();' : ''} localStorage.setItem('miu-site-theme',${JSON.stringify(theme)}); const AuditDate=Date; window.Date=class extends AuditDate{constructor(...args){super(...(args.length?args:['2026-10-09T08:00:00.000Z']))}static now(){return 1791532800000}}; document.addEventListener('DOMContentLoaded',()=>{const s=document.createElement('style');s.textContent='*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}';document.head.append(s)});` }));
       await client.send('Page.navigate', { url: origin + scenario.url });
       for (let i = 0; i < 80; i++) {
         await sleep(35);
         if (await client.evaluate("document.readyState==='complete'").catch(() => false)) break;
       }
       await sleep(220);
+      if (settled) await sleep(3000); // Let startup jobs and the existing typewriter finish.
       if (scenario.action) { await client.evaluate(scenario.action); await sleep(250); }
+      if (settled) {
+        await sleep(600);
+        await client.evaluate("Promise.all([...document.images].filter(image=>image.complete).map(image=>image.decode().catch(()=>{})))");
+        await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 0, y: 0 });
+      }
       if (scenario.expect) assert.equal(await client.evaluate(scenario.expect), true, `Interaction failed: ${key}`);
       // Browser-owned validation bubbles animate outside the DOM/CSS snapshot.
       // Assert validity first, then dismiss the bubble on both original and current pages.

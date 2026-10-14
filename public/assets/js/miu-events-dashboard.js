@@ -7,7 +7,7 @@
   const formMessage = $('universityPostMessage'), submit = $('publishUniversityPostBtn');
   const imageInput = $('universityPostImage'), preview = $('universityPostPreview');
   let previewUrl = '', loadVersion = 0;
-  const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  const escapeHtml = window.MiuUI.escapeHtml;
   function showMessage(node, message, error = false) { node.textContent = message; node.classList.toggle('error', error); }
   async function request(url, options = {}) {
     const response = await fetch(url, { credentials: 'same-origin', ...options, headers: { ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...(options.headers || {}) } });

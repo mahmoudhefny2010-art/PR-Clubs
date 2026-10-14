@@ -1,0 +1,53 @@
+/* Reserve desktop scrollbar space so loading content cannot shift the page sideways. */
+html {
+  scrollbar-gutter: stable;
+  min-height: 100%;
+  background-color: var(--bg-main);
+  overscroll-behavior-y: none;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* Dark Theme Variables */
+:root[data-theme="dark"] {
+  --slate-50: #202020;
+  --slate-100: #292929;
+  --slate-200: #383838;
+  --slate-300: #414141;
+  --slate-400: #737373;
+  --slate-500: #a3a3a3;
+  --slate-600: #d1d1d1;
+  --slate-700: #383838;
+  --slate-800: #292929;
+  --slate-900: #111111;
+  --bg-main: #111111;
+  --bg-panel: #202020;
+  --bg-soft: #292929;
+  --bg-strong: #383838;
+
+  --text-main: #f8fafc;
+  --text-muted: #d1d1d1;
+  --text-light: #a3a3a3;
+
+  --border-color: #414141;
+
+  --success-bg: rgba(5, 150, 105, 0.15);
+  --warning-bg: rgba(217, 119, 6, 0.15);
+  --danger-bg: rgba(225, 29, 72, 0.15);
+  --info-bg: rgba(2, 132, 199, 0.15);
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+}
+
