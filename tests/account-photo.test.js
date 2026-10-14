@@ -14,7 +14,7 @@ function setup({ email = 'Student@miuegypt.edu.eg', sameOrigin = true, valid = t
       return { lean: async () => saved };
     }
   };
-  registerAccountPhotoRoutes({ get: (path, handler) => { routes.get = handler; }, put: (path, handler) => { routes.put = handler; } }, {
+  registerAccountPhotoRoutes({ get: (path, handler) => { routes.get = handler; }, put: (path, handler) => { routes.put = handler; }, delete: (path, handler) => { routes.delete = handler; } }, {
     model, notifyLater, getEmail: async () => email, sameOrigin: () => sameOrigin,
     databaseReady: () => ready,
     validatePhoto: async (url, publicId) => valid ? { url, publicId } : null
@@ -47,6 +47,24 @@ test('Maybe later persists without a photo and preserves an existing photo', asy
 test('photo writes reject unauthenticated, cross-origin, invalid and offline requests', async () => {
   for (const [options, expected] of [[{ email: '' }, 401], [{ sameOrigin: false }, 403], [{ valid: false }, 422], [{ ready: false }, 503]]) {
     assert.equal((await setup(options)('put', {})).code, expected);
+  }
+});
+
+test('deleting a photo clears it persistently without sending a reminder and allows replacement', async () => {
+  const emails = [];
+  const request = setup({ notifyLater: async (req, email) => { emails.push(email); } });
+  await request('put', { url: 'photo-url', publicId: 'photo-id' });
+  const empty = { url: '', publicId: '', promptDismissed: true };
+  assert.deepEqual((await request('delete')).body, empty);
+  assert.deepEqual((await request('get')).body, empty);
+  assert.deepEqual((await request('delete')).body, empty);
+  assert.deepEqual(emails, []);
+  assert.equal((await request('put', { url: 'replacement-url', publicId: 'replacement-id' })).body.url, 'replacement-url');
+});
+
+test('photo deletion rejects unauthenticated, cross-origin and offline requests', async () => {
+  for (const [options, expected] of [[{ email: '' }, 401], [{ sameOrigin: false }, 403], [{ ready: false }, 503]]) {
+    assert.equal((await setup(options)('delete')).code, expected);
   }
 });
 

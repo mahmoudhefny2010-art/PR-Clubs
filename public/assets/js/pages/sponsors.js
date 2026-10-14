@@ -94,8 +94,7 @@
     .catch(() => {
       if (!clubs.length && listEl) listEl.innerHTML = '<p class="events-empty">Could not load sponsors right now.</p>';
     });
-  window.setInterval(async () => {
-    if (document.visibilityState !== 'visible') return;
+  window.siteStartup.watch(async () => {
     try {
       const response = await fetch('/api/clubs?media=links', { cache: 'no-store' });
       if (!response.ok) return;
@@ -105,5 +104,5 @@
       window.miuPublicDataCache?.write('clubs', clubs);
       renderList();
     } catch { /* Keep the last loaded club list visible. */ }
-  }, 60_000);
+  });
 })();

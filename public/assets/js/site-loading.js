@@ -202,7 +202,8 @@
   // completes, rather than only until HTTP headers arrive.
   window.siteStartup = {
     track: (task) => trackWork(() => task),
-    afterStartup: scheduleAfterStartup
+    afterStartup: scheduleAfterStartup,
+    watch: (task) => window.miuLiveData?.watch(task)
   };
 
   window.fetch = function trackedFetch(input, init) {

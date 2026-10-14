@@ -9,7 +9,7 @@ const schema = new mongoose.Schema({
   comment: { type: String, default: '', maxlength: 1000 }
 }, { timestamps: true });
 schema.index({ kind: 1, targetKey: 1, email: 1 }, { unique: true });
-const StudentFeedback = mongoose.models.StudentFeedback || mongoose.model('StudentFeedback', schema);
+const StudentFeedback = require('../database').bindModel(mongoose.models.StudentFeedback || mongoose.model('StudentFeedback', schema));
 
 function parseInteraction(body) {
   const interaction = body.interaction || 'none';

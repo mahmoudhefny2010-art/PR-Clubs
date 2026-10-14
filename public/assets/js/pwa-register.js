@@ -48,6 +48,8 @@
         // Reload still works when a service worker update check is unavailable.
       }
     }
+    window.miuLiveData?.invalidate();
+    await clearCachedPages();
     window.location.reload();
     return true;
   }
@@ -212,7 +214,7 @@
         ]).catch(() => {});
         return;
       }
-      navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch((error) => {
+      navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' }).catch((error) => {
         console.warn('PWA service worker registration failed:', error);
       });
     }, { once: true });

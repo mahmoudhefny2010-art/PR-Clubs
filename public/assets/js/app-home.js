@@ -21,7 +21,7 @@ let clubsLoadPromise = null;
 let clubsLoadedAt = 0;
 let homepageSettingsLoadPromise = null;
 let homepageSettingsLoadedAt = 0;
-let universityContentRefreshTimer = null;
+let publicContentRefreshStarted = false;
 let universityContentRefreshId = 0;
 let universityContentLoaded = false;
 let universityContentLoadPromise = null;
@@ -337,6 +337,8 @@ async function loadClubs(force = false) {
       if (changed) {
         renderClubGrid();
         renderAdminClubList();
+        renderEventsSlideshow();
+        renderTodayEvents();
       }
     })();
   }
@@ -371,10 +373,12 @@ async function loadUniversityContentInBackground() {
       .finally(() => { universityContentLoadPromise = null; });
   }
   await universityContentLoadPromise;
-  if (!universityContentRefreshTimer) {
-    universityContentRefreshTimer = window.setInterval(() => {
-      if (document.visibilityState === 'visible') refreshUniversityContentFromDatabase();
-    }, 60_000);
+  if (!publicContentRefreshStarted) {
+    publicContentRefreshStarted = true;
+    window.siteStartup.watch(async () => {
+      await loadClubs(true);
+      await refreshUniversityContentFromDatabase();
+    });
   }
 }
 

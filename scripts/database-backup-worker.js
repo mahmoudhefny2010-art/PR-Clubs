@@ -1,4 +1,7 @@
 require('dotenv').config();
+if ((process.env.DATABASE_PROVIDER || 'mongodb') !== 'mongodb') {
+  throw new Error('This backup worker is MongoDB-only. Configure and verify SQL Server backups separately.');
+}
 
 const crypto = require('crypto');
 const fs = require('fs');

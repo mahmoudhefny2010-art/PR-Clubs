@@ -1,0 +1,7 @@
+{
+  "cases": [
+    { "name": "Public clubs", "path": "/api/clubs", "expectedStatus": 200 },
+    { "name": "Public clubs with media links", "path": "/api/clubs?media=links", "expectedStatus": 200 },
+    { "name": "University content", "path": "/api/university-content", "expectedStatus": 200 }
+  ]
+}

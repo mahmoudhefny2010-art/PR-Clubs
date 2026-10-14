@@ -118,6 +118,7 @@
       const response = await fetch('/api/university-content', { cache: 'no-store' });
       if (!response.ok) throw new Error('University updates are unavailable.');
       const latest = await response.json();
+      if (!Array.isArray(latest) || window.miuPublicDataCache?.same(universityEntries, latest)) return;
       universityEntries = Array.isArray(latest) ? latest : [];
       window.miuPublicDataCache?.write('universityContent', universityEntries);
       entries = buildEntries(loadedClubs, universityEntries);
@@ -153,9 +154,8 @@
   };
   void refreshClubs();
 
-  window.setInterval(async () => {
-    if (document.visibilityState !== 'visible') return;
+  window.siteStartup.watch(async () => {
     await refreshClubs();
     await refreshUniversityFeed();
-  }, 60_000);
+  });
 })();

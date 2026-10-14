@@ -1,4 +1,7 @@
 require('dotenv').config();
+if ((process.env.DATABASE_PROVIDER || 'mongodb') !== 'mongodb') {
+  throw new Error('This restore utility is MongoDB-only. It cannot restore SQL Server data.');
+}
 
 const fs = require('fs');
 const zlib = require('zlib');

@@ -3,7 +3,7 @@ require('dotenv').config();
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const mongoose = require('mongoose');
+const mongoose = require('../database');
 const { ClubAccount } = require('../models');
 
 const previousEmail = 'security@miu.local';
@@ -36,7 +36,7 @@ function writeLocalAccountCache(salt, passwordHash, passwordChangedAt) {
 }
 
 async function main() {
-  if (!process.env.MONGO_URI) {
+  if (mongoose.providerName === 'mongodb' && !process.env.MONGO_URI) {
     throw new Error('MONGO_URI is missing. No account data was changed.');
   }
 
@@ -57,9 +57,9 @@ async function main() {
     { new: true, projection: { email: 1, role: 1, clubId: 1, salt: 1, passwordHash: 1 } }
   ).lean();
 
-  if (!updated) throw new Error('The existing Security Office account was not found in MongoDB. No account data was changed.');
+  if (!updated) throw new Error('The existing Security Office account was not found in the database. No account data was changed.');
   if (updated.email !== newEmail || updated.role !== 'security' || updated.clubId !== 0) {
-    throw new Error('MongoDB returned an unexpected account record.');
+    throw new Error('The database returned an unexpected account record.');
   }
   if (crypto.scryptSync(password, updated.salt, 64).toString('hex') !== updated.passwordHash) {
     throw new Error('The saved password could not be verified.');
@@ -70,17 +70,17 @@ async function main() {
     writeLocalAccountCache(salt, passwordHash, passwordChangedAt);
   } catch (error) {
     cacheUpdated = false;
-    console.error(`Warning: MongoDB was updated, but the local cache was not: ${error.message}`);
+    console.error(`Warning: The database was updated, but the local cache was not: ${error.message}`);
   }
 
-  console.log('\nSecurity Office login updated and verified in MongoDB.');
+  console.log('\nSecurity Office login updated and verified in the selected database.');
   console.log(`Email: ${newEmail}`);
   console.log(`Password: ${password}`);
   console.log(`Local cache updated: ${cacheUpdated ? 'yes' : 'no'}`);
   console.log('The previous email and active sessions have been disabled.');
 }
 
-if (!process.env.MONGO_URI) {
+if (mongoose.providerName === 'mongodb' && !process.env.MONGO_URI) {
   console.error('MONGO_URI is missing. No account data was changed.');
   process.exitCode = 1;
 } else {
@@ -90,7 +90,7 @@ if (!process.env.MONGO_URI) {
     readConcern: { level: 'majority' },
     writeConcern: { w: 'majority' }
   }).then(main).catch((error) => {
-    console.error(`Could not connect to MongoDB. No account data was changed: ${error.message}`);
+    console.error('Account reset could not be confirmed in the selected database:', error.code || error.name);
     process.exitCode = 1;
   }).finally(async () => {
     if (mongoose.connection.readyState) await mongoose.disconnect();

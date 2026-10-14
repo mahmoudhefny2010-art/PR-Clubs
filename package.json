@@ -11,7 +11,18 @@
     "seed": "node seed.js",
     "test:speaker-requests": "node tests/speaker-request-workflow.js",
     "backup:watch": "node scripts/database-backup-worker.js",
-    "backup:restore": "node scripts/restore-database-backup.js"
+    "backup:restore": "node scripts/restore-database-backup.js",
+    "sql:schema:generate": "node scripts/sqlserver-schema.cjs",
+    "sql:schema:apply": "node scripts/sqlserver-migrate.cjs --schema",
+    "sql:live:schema:apply": "node scripts/sqlserver-live-schema.cjs --apply",
+    "sql:export": "node scripts/sqlserver-migrate.cjs --export",
+    "sql:dry-run": "node scripts/sqlserver-migrate.cjs --dry-run",
+    "sql:import": "node scripts/sqlserver-migrate.cjs --import",
+    "sql:validate": "node scripts/sqlserver-migrate.cjs --validate",
+    "sql:cleanup": "node scripts/sqlserver-cleanup.cjs",
+    "test:sql": "node --test tests/sqlserver*.test.js",
+    "sql:routes:verify": "node scripts/verify-provider-routes.cjs --write",
+    "sql:api:compare": "node scripts/verify-database-api-parity.cjs"
   },
   "dependencies": {
     "cloudinary": "^2.11.0",
@@ -22,6 +33,7 @@
     "express": "^4.19.2",
     "google-auth-library": "^11.2.0",
     "mongoose": "^8.6.1",
+    "mssql": "^12.0.0",
     "nodemailer": "^10.0.16"
   },
   "devDependencies": {

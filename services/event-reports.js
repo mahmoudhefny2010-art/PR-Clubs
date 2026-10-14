@@ -11,7 +11,7 @@ const schema = new mongoose.Schema({
   history: [{ action: String, actor: String, at: Date, note: String }]
 }, { timestamps: true });
 schema.index({ clubId: 1, eventKey: 1 }, { unique: true });
-const EventReport = mongoose.models.EventReport || mongoose.model('EventReport', schema);
+const EventReport = require('../database').bindModel(mongoose.models.EventReport || mongoose.model('EventReport', schema));
 function date(value) {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
     && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;

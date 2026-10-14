@@ -2,7 +2,7 @@ const express = require('express');
 const compression = require('compression');
 const { publicClubProjection, registerPublicClubMedia, publicFields } = require('./services/public-club-media');
 const cors = require('cors');
-const mongoose = require('mongoose');
+const mongoose = require('./database');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
@@ -2015,17 +2015,8 @@ async function initializeMongoData() {
     Application.find().sort({ id: 1 }).lean(),
     ClubAccount.find().sort({ clubId: 1, role: 1, committee: 1 }).lean()
   ]);
-  clubs = clubRecords.map((record, index) => ({
-    ...toApiRecord(record),
-    sortOrder: Number.isFinite(Number(record.sortOrder)) ? Number(record.sortOrder) : index + 1,
-    pinned: record.pinned === true && record.status === 'open'
-  }));
-  applications = applicationRecords;
-  clubAccounts = accountRecords.map((account) => ({
-    ...toApiRecord(account),
-    role: ['head', 'pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'miu_events', 'software_development'].includes(account.role) ? account.role : 'president',
-    committee: account.committee || ''
-  }));
+  ({ clubs, applications, clubAccounts } = require('./database/cache-snapshot').cacheSnapshot(
+    { clubRecords, applicationRecords, accountRecords }, toApiRecord));
 }
 
 function requireClubPresident(req, res, next) {
@@ -2041,6 +2032,15 @@ function accountCanReviewApplication(account, application) {
 }
 
 registerPublicClubMedia(app, { Club, requireLiveDatabase });
+require('./services/public-data-stream').registerPublicDataStream(app, {
+  database: mongoose, ready: () => mongoReady,
+  collections: {
+    [Club.collection.name]: ['clubs'],
+    [Application.collection.name]: ['clubs'],
+    [UniversityContent.collection.name]: ['universityContent'],
+    [require('./services/student-feedback').StudentFeedback.collection.name]: ['clubs', 'universityContent']
+  }
+});
 
 app.get('/api/clubs', async (req, res) => {
   try {
@@ -6651,7 +6651,7 @@ app.get('/api/admin/visitor-analytics', async (req, res) => {
 
 app.get('/api/admin/system/data-status', async (req, res) => {
   if (!mongoReady || mongoose.connection.readyState !== 1) {
-    return res.status(503).json({ message: 'MongoDB is not connected. Live database totals are unavailable.' });
+    return res.status(503).json({ message: 'The database is not connected. Live database totals are unavailable.' });
   }
 
   try {
@@ -7815,6 +7815,23 @@ app.use((error, req, res, next) => {
 
 const connectMongo = async () => {
   try {
+    if (mongoose.isSqlProvider) {
+      await mongoose.connect();
+      // SQL DDL/import/validation are explicit CLI operations. Never run the
+      // legacy Mongo startup seeding or workflow rewrites against migrated data.
+      const [clubRecords, applicationRecords, accountRecords, homepageRecord, authState] = await Promise.all([
+        Club.find().sort({ sortOrder: 1, id: 1 }).lean(), Application.find().sort({ id: 1 }).lean(),
+        ClubAccount.find().sort({ clubId: 1, role: 1, committee: 1 }).lean(),
+        SiteSetting.findOne({ key: 'homepage' }).lean(), AdminAuthState.findOne().lean()
+      ]);
+      ({ clubs, applications, clubAccounts } = require('./database/cache-snapshot').cacheSnapshot(
+        { clubRecords, applicationRecords, accountRecords }, toApiRecord));
+      if (homepageRecord) homepageSettings = { title: homepageRecord.title, subtitle: homepageRecord.subtitle };
+      adminAuthState = authState;
+      mongoReady = true;
+      console.log(`${mongoose.providerName === 'azuresql' ? 'Azure SQL' : 'SQL Server'} connected; validated data loaded.`);
+      return;
+    }
     if (!process.env.MONGO_URI) {
       console.log('MONGO_URI is not configured. Using local demo data.');
       return;
@@ -7840,6 +7857,12 @@ const connectMongo = async () => {
   } catch (error) {
     mongoReady = false;
     await mongoose.disconnect().catch(() => {});
+    if (mongoose.isSqlProvider) {
+      // Do not log the driver message: it can include host/login information.
+      console.error('SQL Server unavailable; database-dependent requests remain unavailable:', error.code || error.name);
+      console.error('SQL connection check:', require('./database/diagnostics').sqlConnectionDiagnostic(error));
+      return;
+    }
     console.error('MongoDB unavailable; using local demo data:', error.name);
     const safeMongoError = (message) => String(message || '').replace(/mongodb(?:\+srv)?:\/\/[^\s"'<>]+/gi, '<redacted MongoDB URI>');
     console.error('MongoDB connection details:', safeMongoError(error.message));
@@ -7873,7 +7896,7 @@ let lastMongoConnectAttemptAt = 0;
 const MONGO_RETRY_COOLDOWN_MS = 5000;
 function ensureReady() {
   if (mongoReady && mongoose.connection.readyState === 1) return Promise.resolve(true);
-  if (!process.env.MONGO_URI) return Promise.resolve(false);
+  if (!mongoose.isSqlProvider && !process.env.MONGO_URI) return Promise.resolve(false);
   if (connectPromise) return connectPromise;
   if (Date.now() - lastMongoConnectAttemptAt < MONGO_RETRY_COOLDOWN_MS) return Promise.resolve(false);
 

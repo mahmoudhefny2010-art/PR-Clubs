@@ -562,7 +562,7 @@ const SpeakerCvUpload = mongoose.models.SpeakerCvUpload || mongoose.model('Speak
 const SpeakerInvite = mongoose.models.SpeakerInvite || mongoose.model('SpeakerInvite', speakerInviteSchema);
 const AuditLog = mongoose.models.AuditLog || mongoose.model('AuditLog', auditLogSchema);
 
-module.exports = {
+module.exports = Object.fromEntries(Object.entries({
   SupervisorReview,
   Club,
   Application,
@@ -590,4 +590,4 @@ module.exports = {
   PasswordRecoveryRateLimit,
   NotificationDispatch,
   AdminAuthState
-};
+}).map(([name, model]) => [name, require('./database').bindModel(model)]));

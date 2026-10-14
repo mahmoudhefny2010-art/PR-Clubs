@@ -1,0 +1,998 @@
+{
+  "passed": true,
+  "providers": [
+    "mongodb",
+    "sqlserver",
+    "azuresql"
+  ],
+  "checkedAt": "2026-10-14T09:40:27.550Z",
+  "routeCount": 197,
+  "scope": "Actual Express method/path/router registration, without database connections or requests. Does not prove database contents or HTTP response parity.",
+  "routes": [
+    {
+      "method": "DELETE",
+      "prefix": "",
+      "path": "/api/admin/applications/:id"
+    },
+    {
+      "method": "DELETE",
+      "prefix": "",
+      "path": "/api/admin/club-heads/:email"
+    },
+    {
+      "method": "DELETE",
+      "prefix": "",
+      "path": "/api/admin/staff-accounts"
+    },
+    {
+      "method": "DELETE",
+      "prefix": "",
+      "path": "/api/admin/supervisors"
+    },
+    {
+      "method": "DELETE",
+      "prefix": "",
+      "path": "/api/admin/university-content/:id"
+    },
+    {
+      "method": "DELETE",
+      "prefix": "",
+      "path": "/api/applications/:id"
+    },
+    {
+      "method": "DELETE",
+      "prefix": "",
+      "path": "/api/club/content/:id"
+    },
+    {
+      "method": "DELETE",
+      "prefix": "",
+      "path": "/api/club/heads/:email"
+    },
+    {
+      "method": "DELETE",
+      "prefix": "",
+      "path": "/api/committee/requests/:id"
+    },
+    {
+      "method": "DELETE",
+      "prefix": "",
+      "path": "/api/committee/requests/:id/comment"
+    },
+    {
+      "method": "DELETE",
+      "prefix": "",
+      "path": "/api/events/:clubId/:eventIndex/registrations"
+    },
+    {
+      "method": "DELETE",
+      "prefix": "",
+      "path": "/api/miu-events/content/:id"
+    },
+    {
+      "method": "DELETE",
+      "prefix": "",
+      "path": "/api/my-forms/:id"
+    },
+    {
+      "method": "DELETE",
+      "prefix": "",
+      "path": "/api/site/account-photo"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/admin"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/admin/club-credentials"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/admin/global"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/admin/applications"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/admin/club-credentials"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/admin/club-heads"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/admin/club-members"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/admin/club-views"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/admin/clubs/:id/committee-availability"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/admin/clubs/archived"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/admin/event-analytics"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/admin/homepage"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/admin/login-settings"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/admin/session"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/admin/staff-accounts"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/admin/supervisors"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/admin/system/data-status"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/admin/university-content"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/admin/visitor-analytics"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/applications"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/attendance/:token"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/club-auth/session"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/club/:id/applications"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/club/application-form"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/club/applications"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/club/attendance-assignment-options"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/club/attendance-events"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/club/attendance-records"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/club/committee-availability"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/club/content"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/club/dashboard"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/club/event-registrations"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/club/heads"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/club/interview-form"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/club/members"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/clubs"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/clubs/:id/application-committees"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/clubs/:id/committees"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/committee/attendance-overview"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/committee/attendance-records"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/committee/attendance-reviews"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/committee/club-members"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/committee/requests"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/committee/status"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/committee/status/:id"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/dean/speaker-invites/clubs"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/dean/speaker-requests"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/events/:clubId/:eventIndex/registrations"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/feedback/access"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/feedback/results/:kind"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/member/attendance-assignments"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/miu-attendance-task"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/miu-events/content"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/my-forms/:id"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/notifications/config"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/notifications/identity"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/public-club-media/:clubId/:collection/:index/:field"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/public/speaker-invites/:token"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/pwa/version"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/site/account-photo"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/site/account-session"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/site/public-data-stream"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/speaker-requests"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/speaker-requests/:id/cv"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/speaker-requests/context"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/student-auth/google-config"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/student-auth/profile"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/student-auth/session"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/student/my-forms"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/university-content"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/university-content/:id/registrations"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/apply.html"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/assets/vendor/exceljs.min.js"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/attendance"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/club-application.html"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/club-dashboard"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/club-login"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/club.html"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/committee-dashboard.html"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/committee.html"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/dashboards/miu-events-dashboard.html"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/pages/my-attendance-task.html"
+    },
+    {
+      "method": "GET",
+      "prefix": "/^\\/api\\/ask-ai\\/?(?=\\/|$)/i",
+      "path": "/status"
+    },
+    {
+      "method": "GET",
+      "prefix": "/^\\/api\\/event-reports\\/?(?=\\/|$)/i",
+      "path": "/clubs"
+    },
+    {
+      "method": "GET",
+      "prefix": "/^\\/api\\/event-reports\\/?(?=\\/|$)/i",
+      "path": "/clubs/:clubId"
+    },
+    {
+      "method": "GET",
+      "prefix": "/^\\/api\\/report-downloads\\/?(?=\\/|$)/i",
+      "path": "/:kind.:format"
+    },
+    {
+      "method": "GET",
+      "prefix": "/^\\/api\\/report-downloads\\/?(?=\\/|$)/i",
+      "path": "/clubs"
+    },
+    {
+      "method": "GET",
+      "prefix": "/^\\/api\\/report-downloads\\/?(?=\\/|$)/i",
+      "path": "/event-sheet.csv"
+    },
+    {
+      "method": "GET",
+      "prefix": "/^\\/api\\/report-downloads\\/?(?=\\/|$)/i",
+      "path": "/event-sheet.xlsx"
+    },
+    {
+      "method": "GET",
+      "prefix": "/^\\/api\\/report-downloads\\/?(?=\\/|$)/i",
+      "path": "/events"
+    },
+    {
+      "method": "GET",
+      "prefix": "/^\\/api\\/supervisor\\/?(?=\\/|$)/i",
+      "path": "/clubs"
+    },
+    {
+      "method": "GET",
+      "prefix": "/^\\/api\\/supervisor\\/?(?=\\/|$)/i",
+      "path": "/clubs/:clubId"
+    },
+    {
+      "method": "GET",
+      "prefix": "/^\\/api\\/supervisor\\/?(?=\\/|$)/i",
+      "path": "/miu-attendance"
+    },
+    {
+      "method": "PATCH",
+      "prefix": "",
+      "path": "/api/admin/applications/:id/status"
+    },
+    {
+      "method": "PATCH",
+      "prefix": "",
+      "path": "/api/admin/club-heads/:email"
+    },
+    {
+      "method": "PATCH",
+      "prefix": "",
+      "path": "/api/admin/clubs/:id"
+    },
+    {
+      "method": "PATCH",
+      "prefix": "",
+      "path": "/api/applications/:id/status"
+    },
+    {
+      "method": "PATCH",
+      "prefix": "",
+      "path": "/api/club/content/:id/assignment"
+    },
+    {
+      "method": "PATCH",
+      "prefix": "",
+      "path": "/api/club/heads/:email"
+    },
+    {
+      "method": "PATCH",
+      "prefix": "",
+      "path": "/api/club/members/:memberId"
+    },
+    {
+      "method": "PATCH",
+      "prefix": "",
+      "path": "/api/club/status"
+    },
+    {
+      "method": "PATCH",
+      "prefix": "",
+      "path": "/api/my-forms/:id"
+    },
+    {
+      "method": "PATCH",
+      "prefix": "",
+      "path": "/api/speaker-requests/:id/resubmit"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/admin/accounts/password-reset"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/admin/accounts/password"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/admin/club-heads"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/admin/clubs"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/admin/clubs/:id/archive"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/admin/clubs/:id/restore"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/admin/login"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/admin/logout"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/admin/setup"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/admin/university-content"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/applications"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/attendance/:token"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/attendance/admin-self-checkin"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/auth/login"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/club-auth/login"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/club-auth/logout"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/club-auth/switch-dashboard"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/club/attendance-assignments"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/club/attendance-events/:clubId/:itemType/:eventRequestId/end"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/club/attendance-qr-challenge"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/club/attendance-sessions"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/club/content"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/club/content/booth"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/club/content/entry_permit"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/club/content/event"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/club/content/feed"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/club/content/sponsor"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/club/heads"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/club/members"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/club/speaker-invites"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/club/speaker-requests/:id/decision"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/clubs/:id/view"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/committee/attendance-reviews/:clubId/:itemType/:eventRequestId/approve"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/committee/requests/:id/action"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/committee/requests/:id/reopen"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/committee/requests/:id/return-to-committee"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/dean/speaker-invites"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/dean/speaker-requests/:id/decision"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/events/:clubId/:eventIndex/registrations"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/events/:clubId/:eventIndex/view"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/member/attendance-assignments/:id/accept"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/member/attendance-assignments/:id/check-in"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/member/attendance-assignments/:id/session"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/member/attendance-qr-challenge"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/miu-attendance-task/accept"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/miu-attendance-task/qr-challenge"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/miu-attendance-task/session"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/miu-events/content"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/miu/attendance-events/:eventRequestId/end"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/my-forms/access"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/password-reset/confirm"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/password-reset/request"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/public/speaker-invites/:token/submit"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/site/visitor-ping"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/speaker-requests"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/speaker-requests/cv-upload"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/student-auth/google"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/student-auth/google/link"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/student-auth/logout"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/university-content/:id/registrations"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/uploads/cloudinary-signature"
+    },
+    {
+      "method": "POST",
+      "prefix": "/^\\/api\\/ask-ai\\/?(?=\\/|$)/i",
+      "path": "/"
+    },
+    {
+      "method": "POST",
+      "prefix": "/^\\/api\\/supervisor\\/?(?=\\/|$)/i",
+      "path": "/clubs/:clubId/attendance/:itemType/:eventRequestId/decision"
+    },
+    {
+      "method": "POST",
+      "prefix": "/^\\/api\\/supervisor\\/?(?=\\/|$)/i",
+      "path": "/clubs/:clubId/decisions/:targetType/:targetId"
+    },
+    {
+      "method": "POST",
+      "prefix": "/^\\/api\\/supervisor\\/?(?=\\/|$)/i",
+      "path": "/miu-attendance/:eventRequestId/decision"
+    },
+    {
+      "method": "PUT",
+      "prefix": "",
+      "path": "/api/admin/clubs/:id/committee-availability"
+    },
+    {
+      "method": "PUT",
+      "prefix": "",
+      "path": "/api/admin/clubs/order"
+    },
+    {
+      "method": "PUT",
+      "prefix": "",
+      "path": "/api/admin/homepage"
+    },
+    {
+      "method": "PUT",
+      "prefix": "",
+      "path": "/api/admin/staff-accounts"
+    },
+    {
+      "method": "PUT",
+      "prefix": "",
+      "path": "/api/admin/supervisors"
+    },
+    {
+      "method": "PUT",
+      "prefix": "",
+      "path": "/api/club/application-form"
+    },
+    {
+      "method": "PUT",
+      "prefix": "",
+      "path": "/api/club/committee-availability"
+    },
+    {
+      "method": "PUT",
+      "prefix": "",
+      "path": "/api/club/content/:id"
+    },
+    {
+      "method": "PUT",
+      "prefix": "",
+      "path": "/api/club/interview-form"
+    },
+    {
+      "method": "PUT",
+      "prefix": "",
+      "path": "/api/feedback/:kind/:id"
+    },
+    {
+      "method": "PUT",
+      "prefix": "",
+      "path": "/api/notifications/email-preference"
+    },
+    {
+      "method": "PUT",
+      "prefix": "",
+      "path": "/api/site/account-photo"
+    },
+    {
+      "method": "PUT",
+      "prefix": "",
+      "path": "/api/student-auth/profile"
+    },
+    {
+      "method": "PUT",
+      "prefix": "/^\\/api\\/event-reports\\/?(?=\\/|$)/i",
+      "path": "/clubs/:clubId/events/:eventKey"
+    },
+    {
+      "method": "PUT",
+      "prefix": "/^\\/api\\/supervisor\\/?(?=\\/|$)/i",
+      "path": "/clubs/:clubId/reviews/:targetType/:targetId"
+    }
+  ]
+}

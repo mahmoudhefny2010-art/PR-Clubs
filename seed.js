@@ -4,6 +4,9 @@ const path = require('path');
 const mongoose = require('mongoose');
 const { Club, SiteSetting, ClubAccount } = require('./models');
 require('dotenv').config();
+if ((process.env.DATABASE_PROVIDER || 'mongodb') !== 'mongodb') {
+  throw new Error('seed.js is MongoDB-only. SQL Server data must be imported and validated using the migration tools.');
+}
 
 const defaultClubs = [
   {

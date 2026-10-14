@@ -201,6 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const studentProfileEmail = document.getElementById('headerStudentEmail');
     const studentProfileAvatar = document.getElementById('headerStudentAvatar');
     const accountPhotoButton = document.getElementById('headerAccountPhotoButton');
+    const accountPhotoDeleteButton = document.getElementById('headerAccountPhotoDeleteButton');
     const accountPhotoInput = document.getElementById('headerAccountPhotoInput');
     const accountPhotoStatus = document.getElementById('headerAccountPhotoStatus');
     let photoPrompt;
@@ -247,18 +248,43 @@ document.addEventListener('DOMContentLoaded', () => {
         eligible: () => currentHeaderSession?.authenticated && currentHeaderSession?.email === promptEmail
       });
     };
+    const accountInitial = () => Array.from(String(currentHeaderSession?.name || '').trim() || String(currentHeaderSession?.email || '').trim())[0]?.toUpperCase() || 'A';
     const renderAccountPhoto = (photo) => {
-      if (!studentProfileAvatar || !photo?.url) return;
+      if (accountPhotoDeleteButton) accountPhotoDeleteButton.hidden = !photo?.url;
+      if (!studentProfileAvatar) return;
+      studentProfileAvatar.textContent = accountInitial();
+      if (!photo?.url) return;
       const image = document.createElement('img');
       image.src = photo.url;
       image.alt = '';
+      image.addEventListener('error', () => { studentProfileAvatar.textContent = accountInitial(); }, { once: true });
       studentProfileAvatar.replaceChildren(image);
     };
     accountPhotoButton?.addEventListener('click', () => accountPhotoInput?.click());
+    accountPhotoDeleteButton?.addEventListener('click', async () => {
+      accountPhotoButton.disabled = true;
+      accountPhotoDeleteButton.disabled = true;
+      accountPhotoStatus.hidden = false;
+      accountPhotoStatus.textContent = 'Deleting photo...';
+      try {
+        const response = await fetch('/api/site/account-photo', { method: 'DELETE' });
+        const photo = await response.json();
+        if (!response.ok) throw new Error(photo?.message || 'Could not delete your photo.');
+        renderAccountPhoto(photo);
+        window.dispatchEvent(new CustomEvent('miu:account-photo-changed', { detail: photo }));
+        accountPhotoStatus.textContent = 'Photo deleted.';
+      } catch (error) {
+        accountPhotoStatus.textContent = error.message;
+      } finally {
+        accountPhotoButton.disabled = false;
+        accountPhotoDeleteButton.disabled = false;
+      }
+    });
     accountPhotoInput?.addEventListener('change', async () => {
       const file = accountPhotoInput.files[0];
       if (!file) return;
       accountPhotoButton.disabled = true;
+      if (accountPhotoDeleteButton) accountPhotoDeleteButton.disabled = true;
       accountPhotoStatus.hidden = false;
       accountPhotoStatus.textContent = 'Saving photo...';
       const promptStatus = photoPrompt?.querySelector('[data-photo-prompt-status]');
@@ -290,6 +316,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (promptStatus) promptStatus.textContent = error.message;
       } finally {
         accountPhotoButton.disabled = false;
+        if (accountPhotoDeleteButton) accountPhotoDeleteButton.disabled = false;
         accountPhotoInput.value = '';
         photoPrompt?.querySelectorAll('button').forEach(button => { button.disabled = false; });
       }
@@ -432,7 +459,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const accountIdentity = String(session.email || accountName);
             if (studentProfileName) studentProfileName.textContent = accountIdentity;
             if (studentProfileEmail) studentProfileEmail.textContent = '';
-            if (studentProfileAvatar) studentProfileAvatar.textContent = accountName.charAt(0).toUpperCase() || 'A';
+            renderAccountPhoto(null);
             window.loadAccountPhoto().then(photo => {
               if (requestId === headerAccountRequestId) {
                 renderAccountPhoto(photo);
@@ -488,6 +515,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  inject('site-header', '/components/site-header.html?v=20261014accountphoto1');
+  inject('site-header', '/components/site-header.html?v=20261014accountphoto2');
   inject('site-footer', '/components/site-footer.html');
 });

@@ -149,6 +149,7 @@
       if (!response.ok) throw new Error('University updates are unavailable.');
       const latest = await response.json();
       if (refreshId !== universityRefreshId) return;
+      if (!Array.isArray(latest) || window.miuPublicDataCache?.same(universityContent, latest)) return;
       universityContent = Array.isArray(latest) ? latest : [];
       window.miuPublicDataCache?.write('universityContent', universityContent);
     } catch {
@@ -185,10 +186,8 @@
       if (window.siteStartup?.afterStartup) window.siteStartup.afterStartup(refreshUniversityContent);
       else void refreshUniversityContent();
     });
-  window.setInterval(() => {
-    if (document.visibilityState === 'visible') void refreshClubs();
-  }, 60_000);
-  window.setInterval(() => {
-    if (document.visibilityState === 'visible') refreshUniversityContent();
-  }, 60_000);
+  window.siteStartup.watch(async () => {
+    await refreshClubs();
+    await refreshUniversityContent();
+  });
 })();

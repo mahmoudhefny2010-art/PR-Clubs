@@ -1,9 +1,12 @@
 const { spawn } = require('child_process');
 const net = require('net');
 const path = require('path');
-require('dotenv').config();
+// Read the launcher's port without copying database settings into its process
+// environment. Each server restart must load the latest .env itself.
+const localEnv = {};
+require('dotenv').config({ processEnv: localEnv });
 
-const port = Number(process.env.PORT || 1111);
+const port = Number(process.env.PORT || localEnv.PORT || 1111);
 const portProbe = net.createServer();
 
 portProbe.once('error', (error) => {
