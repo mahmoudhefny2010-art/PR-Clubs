@@ -8,9 +8,14 @@
   async function load() {
     try {
       const { task } = await api('/api/miu-attendance-task');
-      if (!task) { message.textContent = 'No MIU attendance task is currently assigned to your student account.'; return; }
+      if (!task) { panel.hidden = true; message.textContent = 'No MIU attendance task is currently assigned to your account.'; return; }
       panel.hidden = false; $('usherTaskTitle').textContent = task.eventTitle; $('usherTaskDate').textContent = task.eventDate;
       $('acceptUsherTask').hidden = task.accepted; $('openUsherQr').hidden = !task.accepted;
+      $('usherSelfCheckinForm').hidden = !task.accepted || task.attendanceAsUsher;
+      $('usherAttendanceStatus').textContent = task.attendanceAsUsher ? 'Your attendance is recorded as an Usher.' : 'Record your own attendance once as an Usher for this event.';
+      for (const [id, key] of [['usherName', 'name'], ['usherUniversityId', 'universityId'], ['usherMajor', 'major']]) {
+        if (!$(id).value) $(id).value = task.profile?.[key] || '';
+      }
       message.textContent = task.accepted ? 'Task accepted. Open the QR on the device you will use to present it.' : 'A university event team assigned this attendance task to your account.';
     } catch (error) { message.textContent = error.message; }
   }
@@ -18,6 +23,20 @@
     $('acceptUsherTask').disabled = true;
     try { const result = await api('/api/miu-attendance-task/accept', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); message.textContent = result.message; await load(); }
     catch (error) { message.textContent = error.message; $('acceptUsherTask').disabled = false; }
+  });
+  $('usherSelfCheckinForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    event.currentTarget.dataset.miuDirty = 'true';
+    const button = $('recordUsherAttendance'); button.disabled = true;
+    const feedback = $('usherSelfCheckinFeedback'); feedback.textContent = 'Recording your attendance…';
+    try {
+      const result = await api('/api/miu-attendance-task/check-in', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: $('usherName').value.trim(), universityId: $('usherUniversityId').value.trim(), major: $('usherMajor').value.trim() }) });
+      if (result.savedToDatabase !== true) throw new Error('Your attendance was not confirmed.');
+      delete $('usherSelfCheckinForm').dataset.miuDirty;
+      feedback.textContent = result.message; await load();
+    } catch (error) { feedback.textContent = error.message; }
+    finally { button.disabled = false; }
   });
   async function rotate() {
     try {

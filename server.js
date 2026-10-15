@@ -1,13 +1,17 @@
 const express = require('express');
 const compression = require('compression');
-const { publicClubProjection, registerPublicClubMedia, publicFields } = require('./services/public-club-media');
+const { publicClubProjection, registerPublicClubMedia, publicFields, sanitizePublicClub } = require('./services/public-club-media');
 const cors = require('cors');
+const httpSecurity = require('./services/http-security');
+const { validSponsorAttachment } = require('./services/attachment-validation');
 const mongoose = require('./database');
+const { readAdminSessionData } = require('./services/admin-session-read');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const nodemailer = require('nodemailer');
 const cloudinary = require('cloudinary').v2;
+const { validateFeedMedia, MAX_FEED_VIDEO_BYTES, FEED_MEDIA_FOLDER } = require('./services/feed-video');
 const { verifyGoogleStudentCredential, decideGoogleAccount, decideGoogleLink } = require('./services/google-auth');
 const { createAskAiRouter } = require('./services/ask-ai');
 const { describeVisitorDevice, createVisitorDeviceCode } = require('./services/visitor-device');
@@ -82,6 +86,7 @@ const cloudinaryCredentials = getCloudinaryCredentials();
 const cloudinaryConfigured = Boolean(cloudinaryCredentials);
 const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024;
 const cloudinaryFolders = Object.freeze({
+  feed: FEED_MEDIA_FOLDER,
   club: 'miu-clubs',
   applicant: 'miu-applicants',
   university: 'miu-university-content'
@@ -99,7 +104,10 @@ if (cloudinaryConfigured) {
 // Compress HTML, CSS, JavaScript and JSON for every route. The middleware
 // negotiates Accept-Encoding and leaves images/small responses alone.
 app.use(compression({ threshold: 1024, level: 4 }));
-app.use(cors());
+app.disable('x-powered-by');
+app.use(httpSecurity.securityHeaders);
+app.use(cors(httpSecurity.sameOriginCors));
+app.use('/api', httpSecurity.protectMutations);
 // Base64 expands binary images by roughly one third, so allow enough JSON
 // request space for an image whose decoded size is capped at 10 MiB.
 app.use(express.json({ limit: '15mb' }));
@@ -111,6 +119,12 @@ app.use('/api', (req, res, next) => {
   next();
 });
 app.use(express.urlencoded({ extended: true }));
+app.use('/api', require('./services/security-audit').auditMiddleware({
+  model: AuditLog, ready: () => mongoReady, ip: getVisitorIpAddress, adminEmail: getConfiguredAdminEmail
+}));
+app.use('/api', require('./services/public-abuse-limits').publicAbuseLimits({
+  model: PasswordRecoveryRateLimit, ready: () => mongoReady, ip: getVisitorIpAddress, secret: () => sessionSecret
+}));
 
 // Public, non-sensitive deployment marker used by installed PWAs to detect a
 // newly deployed site while they remain open.
@@ -209,16 +223,19 @@ app.post('/api/uploads/cloudinary-signature', async (req, res) => {
         }
       }
     }
-    if (purpose === 'university') {
+    if (purpose === 'feed') {
+      const account = await getClubAccountFromRequest(req);
+      if (!account || !['president', 'head'].includes(account.role)) return res.status(403).json({ message: 'Club president or assigned committee head access is required to upload feed media.' });
+    } else if (purpose === 'university') {
       const account = await getClubAccountFromRequest(req);
       if (account?.role !== 'miu_events' && !await isAdminSessionValid(req)) return res.status(401).json({ message: 'MIU Events dashboard access is required.' });
     } else if (purpose === 'club') {
       const account = await getClubAccountFromRequest(req);
-      if (!account || !['president', 'pr', 'english', 'security', 'sso', 'dean'].includes(account.role)) {
+      if (!await isAdminSessionValid(req) && (!account || !['president', 'pr', 'english', 'security', 'sso', 'dean'].includes(account.role))) {
         return res.status(403).json({ message: 'This account cannot upload club images.' });
       }
     }
-    return res.json({ ...signCloudinaryUpload(cloudinaryFolders[purpose]), maxBytes: MAX_IMAGE_UPLOAD_BYTES });
+    return res.json({ ...signCloudinaryUpload(cloudinaryFolders[purpose]), maxBytes: purpose === 'feed' && req.body.mediaType === 'video' ? MAX_FEED_VIDEO_BYTES : MAX_IMAGE_UPLOAD_BYTES });
   } catch (error) {
     console.error('Cloudinary signature generation failed:', error.name);
     return res.status(503).json({ message: 'Could not prepare the image upload. Please try again.' });
@@ -542,6 +559,9 @@ let adminCredentials = readJsonFile(adminCredentialsFile, null);
 let clubViews = readJsonFile(clubViewsFile, {});
 let eventViews = readJsonFile(eventViewsFile, {});
 let sessionSecret = process.env.ADMIN_SESSION_SECRET || adminCredentials?.sessionSecret || crypto.randomBytes(32).toString('hex');
+if (httpSecurity.production(process.env) && (!process.env.ADMIN_SESSION_SECRET || process.env.ADMIN_SESSION_SECRET.length < 32)) {
+  throw new Error('Production requires an explicit ADMIN_SESSION_SECRET of at least 32 characters. Configure it before deploying.');
+}
 let adminAuthState = null;
 
 const cleanText = (value, maxLength) => String(value || '').trim().slice(0, maxLength);
@@ -665,7 +685,7 @@ function getConfiguredAdminEmail() {
 }
 
 function matchesScryptPassword(password, salt, storedHash) {
-  if (typeof password !== 'string' || !salt || !/^[a-f0-9]{128}$/i.test(String(storedHash || ''))) return false;
+  if (typeof password !== 'string' || password.length > 200 || !salt || !/^[a-f0-9]{128}$/i.test(String(storedHash || ''))) return false;
   const expectedHash = Buffer.from(storedHash, 'hex');
   const providedHash = crypto.scryptSync(password, salt, expectedHash.length);
   return expectedHash.length === providedHash.length && crypto.timingSafeEqual(expectedHash, providedHash);
@@ -673,7 +693,7 @@ function matchesScryptPassword(password, salt, storedHash) {
 
 async function loadAdminAuthState(email = getConfiguredAdminEmail()) {
   if (mongoReady && email) {
-    adminAuthState = await AdminAuthState.findOne({ email }).lean();
+    adminAuthState = await readAdminSessionData(() => AdminAuthState.findOne({ email }).lean(), mongoose);
   }
   return adminAuthState?.email === email ? adminAuthState : null;
 }
@@ -718,7 +738,8 @@ async function isSoftwareDevelopmentSession(req) {
     const cached = clubAccounts.find(item => item.email === email && item.clubId === Number(parts[0]));
     if (cached && cached.role !== 'software_development') return false;
   }
-  const staff = await getClubAccountFromRequest(req);
+  const staff = await readAdminSessionData(() => getClubAccountFromRequest(req), mongoose);
+  if (staff?.role === 'software_development') req.securityActor = { email: staff.email, role: staff.role };
   return staff?.role === 'software_development';
 }
 
@@ -741,11 +762,13 @@ async function isAdminSessionValid(req) {
 
   const resetState = await loadAdminAuthState();
   const currentVersion = Number(resetState?.sessionVersion) || 0;
+  if (version === currentVersion) req.securityActor = { email: getConfiguredAdminEmail(), role: 'admin' };
   return version === currentVersion;
 }
 
 function setAdminSessionCookie(req, res) {
-  const secure = req.secure ? ' Secure;' : '';
+  req.securityActor = { email: getConfiguredAdminEmail(), role: 'admin' };
+  const secure = secureCookieSuffix(req);
   res.setHeader('Set-Cookie', `miu_admin=${createAdminSession()}; Max-Age=28800; HttpOnly; SameSite=Strict; Path=/;${secure}`);
 }
 
@@ -756,10 +779,18 @@ async function requireAdmin(req, res, next) {
       return res.status(503).json({ message: 'Admin password setup is required.' });
     }
     if (!await isAdminSessionValid(req)) {
+      if (req.method === 'GET' && /^\/admin(?:\/|$)/.test(req.path)) {
+        return res.set('Cache-Control', 'no-store').redirect('/admin/login?returnTo=' + encodeURIComponent(req.originalUrl));
+      }
       return res.status(401).json({ message: 'Admin login required.' });
     }
   } catch (error) {
     console.error('Admin session validation failed:', error.name);
+    if (req.method === 'GET' && /^\/admin(?:\/|$)/.test(req.path)) {
+      res.set('Cache-Control', 'no-store');
+      return sendHttpErrorPage(res, 503, 'Admin access is temporarily unavailable',
+        'We could not verify your admin session. Please try again. If this continues, check that the database service is running.');
+    }
     return res.status(503).json({ message: 'Admin access is temporarily unavailable.' });
   }
   next();
@@ -778,7 +809,7 @@ async function requireMiuEventsDashboard(req, res, next) {
 }
 
 function clubPasswordMatches(password, account) {
-  if (typeof password !== 'string') return false;
+  if (typeof password !== 'string' || password.length > 200) return false;
   if (!account?.salt || !account?.passwordHash) return false;
   const expectedHash = Buffer.from(account.passwordHash, 'hex');
   if (expectedHash.length !== 64) return false;
@@ -946,7 +977,8 @@ async function getClubAccountFromRequest(req) {
 }
 
 function setClubSessionCookie(req, res, account, assignment = null) {
-  const secure = req.secure ? ' Secure;' : '';
+  req.securityActor = { email: account.email, role: assignment?.role || account.role };
+  const secure = secureCookieSuffix(req);
   res.setHeader('Set-Cookie', `miu_club=${createClubSession(account, assignment)}; Max-Age=28800; HttpOnly; SameSite=Strict; Path=/;${secure}`);
 }
 
@@ -987,7 +1019,7 @@ function createStudentSession(account) {
 }
 
 function secureCookieSuffix(req) {
-  return req.secure || process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL) ? ' Secure;' : '';
+  return httpSecurity.secureCookie(req);
 }
 
 function setStudentSessionCookie(req, res, account) {
@@ -1761,13 +1793,7 @@ function clearGoogleNonceCookie(req, res) {
 }
 
 function isSameOriginRequest(req) {
-  const origin = req.get('origin');
-  const host = req.get('host');
-  if (!origin || !host) return false;
-  try {
-    const parsed = new URL(origin);
-    return ['http:', 'https:'].includes(parsed.protocol) && parsed.host.toLowerCase() === host.toLowerCase();
-  } catch { return false; }
+  return httpSecurity.sameOrigin(req);
 }
 
 async function verifyGoogleRequest(req, res) {
@@ -1861,8 +1887,7 @@ function toApiRecord(record) {
 }
 
 function toPublicClubRecord(record) {
-  const { memberRoster, archivedAt, ...publicRecord } = toApiRecord(record);
-  return publicRecord;
+  return sanitizePublicClub(toApiRecord(record));
 }
 
 app.use('/api/ask-ai', createAskAiRouter({
@@ -2150,7 +2175,7 @@ app.get('/api/admin/session', async (req, res) => {
     const delegatedAdmin = await isSoftwareDevelopmentSession(req);
     res.json({
       configured: hasAdminPassword() || delegatedAdmin,
-      localSetupAllowed: isLoopbackRequest(req) && !(process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD),
+      localSetupAllowed: !httpSecurity.production(process.env) && !hasAdminPassword() && process.env.ALLOW_LOCAL_ADMIN_SETUP === 'true' && isLoopbackRequest(req),
       authenticated: delegatedAdmin || (hasAdminPassword() && await isAdminSessionValid(req))
     });
   } catch (error) {
@@ -2937,13 +2962,15 @@ app.post('/api/attendance/admin-self-checkin', requireClubAuth, async (req, res)
     if (!isActivityScheduledToday(eventDate)) return res.status(409).json({ message: 'You can check in only on the event or booth date.' });
     if (await isAttendanceActivityManuallyEnded(clubId, itemType, eventRequestId)) return res.status(409).json({ message: 'Attendance has ended for this event or booth.' });
 
-    const deviceId = ensureAttendanceDeviceCookie(req, res);
-    const deviceHash = attendanceDeviceHash(deviceId);
+    const deviceHashes = attendanceDeviceHashes(req, res);
+    const deviceHash = deviceHashes[0];
     const existing = await AttendanceRecord.findOne({
       clubId, itemType, eventRequestId,
-      $or: [{ email }, { deviceHash }]
+      $or: [{ email }, { deviceHash: { $in: deviceHashes } }]
     }).select('+deviceHash email').read('primary').readConcern('majority').lean();
     if (String(existing?.email || '').trim().toLowerCase() === email) {
+      if (existing.deviceHash && !deviceHashes.includes(existing.deviceHash)) return res.status(409).json({ message: 'Your attendance for this activity is tied to another device.' });
+      await AttendanceRecord.updateOne({ _id: existing._id, email }, { $set: { eventParticipation: { role: account.role } } });
       return res.json({ savedToDatabase: true, alreadyRecorded: true, message: 'Your attendance is already recorded for this event or booth.' });
     }
     if (existing) return res.status(409).json({ message: 'Attendance has already been recorded from this device for this event or booth.' });
@@ -2960,7 +2987,10 @@ app.post('/api/attendance/admin-self-checkin', requireClubAuth, async (req, res)
     try {
       const record = await AttendanceRecord.create({
         sessionId: session._id, clubId, itemType, eventRequestId, eventTitle,
-        eventDate, eventTime, name, email, universityId, major, deviceHash, attendedAt: new Date()
+        eventDate, eventTime, name, email, universityId, major, deviceHash, attendedAt: new Date(),
+        eventParticipation: { role: account.role },
+        attendanceAudience: selected.attendanceAudience === 'all_students' ? 'all_students' : 'members',
+        ...await require('./services/attendance-participation').membershipSnapshot(email, { Club, Application })
       });
       const confirmed = await AttendanceRecord.findById(record._id).select('email clubId eventRequestId')
         .read('primary').readConcern('majority').lean();
@@ -3203,8 +3233,10 @@ app.get('/api/miu-attendance-task', requireAttendanceTaskAuth, async (req, res) 
   try {
     if (!requireLiveDatabase(res)) return;
     const session = await AttendanceSession.findOne({ sourceType: 'miu', active: true, assignedMemberEmail: req.attendanceTaskAccount.email })
-      .select('eventTitle eventDate eventTime assignedMemberAccepted assignedMemberEmail').sort({ createdAt: -1 }).lean();
-    res.json({ task: session ? { eventTitle: session.eventTitle, eventDate: session.eventDate, eventTime: session.eventTime, accepted: session.assignedMemberAccepted === true } : null });
+      .select('eventRequestId eventTitle eventDate eventTime assignedMemberAccepted assignedMemberEmail').sort({ createdAt: -1 }).lean();
+    const attendance = session ? await AttendanceRecord.findOne({ clubId: 0, itemType: 'event', eventRequestId: session.eventRequestId, email: req.attendanceTaskAccount.email }).select('eventParticipation').lean() : null;
+    res.json({ task: session ? { eventTitle: session.eventTitle, eventDate: session.eventDate, eventTime: session.eventTime, accepted: session.assignedMemberAccepted === true, attendanceRecorded: Boolean(attendance), attendanceAsUsher: attendance?.eventParticipation?.role === 'usher',
+      profile: { name: req.attendanceTaskAccount.name || '', universityId: req.attendanceTaskAccount.universityId || '', major: req.attendanceTaskAccount.major || '' } } : null });
   } catch { res.status(503).json({ message: 'Could not load your MIU attendance task.' }); }
 });
 
@@ -3253,15 +3285,26 @@ app.post('/api/miu-attendance-task/qr-challenge', requireAttendanceTaskAuth, asy
     const session = await AttendanceSession.findOne({ tokenHash: attendanceTokenHash(token), sourceType: 'miu', active: true,
       assignedMemberEmail: req.attendanceTaskAccount.email, assignedMemberAccepted: true }).select('_id clubId itemType eventRequestId eventDate assignedDeviceHash').read('primary').readConcern('majority').lean();
     if (!session || !isActivityScheduledToday(session.eventDate) || await isAttendanceActivityManuallyEnded(0, 'event', session.eventRequestId)) return res.status(410).json({ message: 'This attendance task is no longer active.' });
-    const deviceHash = attendanceDeviceHash(ensureMemberAttendanceDeviceCookie(req, res));
-    if (session.assignedDeviceHash && session.assignedDeviceHash !== deviceHash) return res.status(403).json({ message: 'This attendance task is tied to the device where you first opened its QR.' });
-    if (!session.assignedDeviceHash) {
-      const updated = await AttendanceSession.updateOne({ _id: session._id, assignedMemberEmail: req.attendanceTaskAccount.email, assignedDeviceHash: '' }, { $set: { assignedDeviceHash: deviceHash } }, { writeConcern: { w: 'majority' } });
-      if (!updated.modifiedCount) return res.status(403).json({ message: 'This attendance task has already been opened on another device.' });
-    }
+    if (!await bindUsherDevice(session, req.attendanceTaskAccount.email, req, res)) return res.status(403).json({ message: 'This attendance task is tied to the device where you first opened it.' });
     res.setHeader('Cache-Control', 'no-store'); res.json(attendanceQrChallenge(token));
   } catch { res.status(503).json({ message: 'A fresh attendance QR could not be created.' }); }
 });
+
+require('./services/attendance-participation').registerUsherSelfCheckin(app, {
+  requireAttendanceTaskAuth, requireLiveDatabase, sameOrigin: isSameOriginRequest,
+  AttendanceSession, AttendanceRecord, StudentAccount, UniversityContent, Club, Application,
+  isActivityScheduledToday, isAttendanceActivityManuallyEnded, bindUsherDevice, attendanceDeviceHashes, cleanText
+});
+
+async function bindUsherDevice(session, email, req, res) {
+  const deviceHash = attendanceDeviceHash(ensureMemberAttendanceDeviceCookie(req, res));
+  if (session.assignedDeviceHash) return session.assignedDeviceHash === deviceHash;
+  const result = await AttendanceSession.updateOne({ _id: session._id, sourceType: 'miu', active: true,
+    assignedMemberEmail: email, assignedMemberAccepted: true,
+    $or: [{ assignedDeviceHash: '' }, { assignedDeviceHash: { $exists: false } }]
+  }, { $set: { assignedDeviceHash: deviceHash } }, { writeConcern: { w: 'majority' } });
+  return result.modifiedCount === 1;
+}
 
 const ATTENDANCE_QR_PERIOD_MS = 20_000;
 const ATTENDANCE_SCAN_PROOF_TTL_MS = 3 * 60 * 1000;
@@ -3298,7 +3341,7 @@ function appendAttendanceCookie(res, cookie) {
 }
 
 function attendanceDeviceId(req) {
-  const cookie = requestCookie(req, 'miu_attendance_device');
+  const cookie = requestCookie(req, 'miu_attendance_event_device') || requestCookie(req, 'miu_attendance_device');
   const [id, signature] = cookie.split('.');
   if (!/^[A-Za-z0-9_-]{40,60}$/.test(id || '') || !/^[a-f0-9]{64}$/.test(signature || '')) return '';
   const expected = crypto.createHmac('sha256', sessionSecret).update(`attendance-device.${id}`).digest('hex');
@@ -3306,13 +3349,20 @@ function attendanceDeviceId(req) {
 }
 
 function ensureAttendanceDeviceCookie(req, res) {
+  if (req.attendanceCanonicalDeviceId) return req.attendanceCanonicalDeviceId;
   const existingId = attendanceDeviceId(req);
-  if (existingId) return existingId;
-  const id = crypto.randomBytes(32).toString('base64url');
+  if (existingId && requestCookie(req, 'miu_attendance_event_device')) return existingId;
+  const id = existingId || memberAttendanceDeviceId(req) || crypto.randomBytes(32).toString('base64url');
   const signature = crypto.createHmac('sha256', sessionSecret).update(`attendance-device.${id}`).digest('hex');
   const secure = secureCookieSuffix(req);
-  appendAttendanceCookie(res, `miu_attendance_device=${id}.${signature}; Max-Age=31536000; HttpOnly; SameSite=Strict; Path=/api/attendance/;${secure}`);
+  appendAttendanceCookie(res, `miu_attendance_event_device=${id}.${signature}; Max-Age=31536000; HttpOnly; SameSite=Strict; Path=/api/;${secure}`);
+  appendAttendanceCookie(res, `miu_attendance_device=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/api/attendance/;${secure}`);
+  req.attendanceCanonicalDeviceId = id;
   return id;
+}
+
+function attendanceDeviceHashes(req, res) {
+  return [...new Set([ensureAttendanceDeviceCookie(req, res), memberAttendanceDeviceId(req)].filter(Boolean).map(attendanceDeviceHash))];
 }
 
 function attendanceDeviceHash(id) {
@@ -3473,11 +3523,15 @@ app.post('/api/member/attendance-assignments/:id/check-in', requireStudentAuth, 
       return res.status(404).json({ message: 'The assigned event or booth is no longer available.' });
     }
     if (assignment.itemType === 'event' && selected.attendanceEnabled === false) return res.status(409).json({ message: 'This event was published without attendance tracking.' });
+    const deviceHashes = attendanceDeviceHashes(req, res);
+    const recordDeviceHash = deviceHashes[0];
     const existing = await AttendanceRecord.findOne({
       clubId: assignment.clubId, itemType: assignment.itemType, eventRequestId: assignment.eventRequestId,
-      $or: [{ email }, { deviceHash: assignedDeviceHash }]
+      $or: [{ email }, { deviceHash: { $in: deviceHashes } }]
     }).select('+deviceHash email').read('primary').readConcern('majority').lean();
     if (existing?.email === email) {
+      if (existing.deviceHash && !deviceHashes.includes(existing.deviceHash)) return res.status(409).json({ message: 'Your attendance for this activity is tied to another device.' });
+      await AttendanceRecord.updateOne({ _id: existing._id, email }, { $set: { eventParticipation: { role: 'organizer' } } });
       return res.json({ savedToDatabase: true, alreadyRecorded: true, message: 'Your attendance is already recorded for this event or booth.' });
     }
     if (existing) return res.status(409).json({ message: 'Attendance has already been recorded from this device for this event or booth.' });
@@ -3498,7 +3552,9 @@ app.post('/api/member/attendance-assignments/:id/check-in', requireStudentAuth, 
         eventTime: assignment.eventTime, name: cleanText(req.studentAccount.name || rosterMember?.name || assignment.memberName, 160),
         universityId: cleanText(req.studentAccount.universityId || acceptedApplication?.universityId, 40),
         major: cleanText(req.studentAccount.major || acceptedApplication?.major, 120),
-        email, deviceHash: assignedDeviceHash, attendedAt: new Date()
+        email, deviceHash: recordDeviceHash, attendedAt: new Date(), eventParticipation: { role: 'organizer' },
+        attendanceAudience: selected.attendanceAudience === 'all_students' ? 'all_students' : 'members',
+        ...await require('./services/attendance-participation').membershipSnapshot(email, { Club, Application })
       });
       const confirmed = await AttendanceRecord.findById(record._id).select('email clubId itemType eventRequestId')
         .read('primary').readConcern('majority').lean();
@@ -3702,24 +3758,25 @@ app.post('/api/attendance/:token', requireStudentAuth, async (req, res) => {
   // trust a name or email supplied by the browser for an attendance record.
   const name = req.studentAccount.name;
   const email = req.studentAccount.email;
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  let session;
   const note = cleanText(req.body.note, 500);
   if (!/^[A-Za-z0-9_-]{40,60}$/.test(token)) return res.status(404).json({ message: 'This attendance QR code is invalid or expired.' });
   try {
     if (!requireLiveDatabase(res)) return;
-    const session = await AttendanceSession.findOne({ tokenHash: attendanceTokenHash(token), active: true }).lean();
+    session = await AttendanceSession.findOne({ tokenHash: attendanceTokenHash(token), active: true }).lean();
     if (!session) return res.status(404).json({ message: 'This attendance QR code is invalid or expired.' });
     if (!isActivityScheduledToday(session.eventDate)) return res.status(410).json({ message: 'Attendance is closed because the event day is over.' });
     if (await isAttendanceActivityManuallyEnded(session.clubId, session.itemType || 'event', session.eventRequestId)) {
       clearAttendanceScanProofCookie(req, res);
       return res.status(410).json({ message: 'Attendance has ended for this event or booth.' });
     }
-    const normalizedEmail = String(email || '').trim().toLowerCase();
     const assignedMemberEmail = String(session.assignedMemberEmail || '').trim().toLowerCase();
     const isMiuSession = session.sourceType === 'miu';
     const isAllStudents = session.attendanceAudience === 'all_students';
     const [activityClub, acceptedApplication, memberClubs, acceptedMemberships] = await Promise.all([
       session.clubId > 0 ? Club.findOne({ id: session.clubId, archivedAt: null })
-        .select('memberRoster').read('primary').readConcern('majority').lean() : Promise.resolve(null),
+        .select('name memberRoster').read('primary').readConcern('majority').lean() : Promise.resolve(null),
       session.clubId > 0 ? Application.findOne({ clubId: session.clubId, status: 'accepted', email: normalizedEmail })
         .select('_id').read('primary').readConcern('majority').lean() : Promise.resolve(null),
       isAllStudents || isMiuSession ? Club.find({ archivedAt: null, 'memberRoster.email': normalizedEmail }).select('name memberRoster').lean() : Promise.resolve([]),
@@ -3744,13 +3801,26 @@ app.post('/api/attendance/:token', requireStudentAuth, async (req, res) => {
     if (!deviceId) return res.status(403).json({ message: 'Reopen the current QR code on this device, then try again.' });
     const itemType = session.itemType || 'event';
     const deviceHash = attendanceDeviceHash(deviceId);
+    const deviceHashes = attendanceDeviceHashes(req, res);
+    let eventParticipation = { role: 'attendee' };
+    const ownTask = isMiuSession
+      ? await AttendanceSession.findOne({ sourceType: 'miu', active: true, eventRequestId: session.eventRequestId, assignedMemberEmail: email, assignedMemberAccepted: true }).lean()
+      : await AttendanceAssignment.findOne({ clubId: session.clubId, itemType, eventRequestId: session.eventRequestId, memberEmail: email, status: 'accepted' }).lean();
+    if (ownTask) {
+      const bound = isMiuSession ? await bindUsherDevice(ownTask, email, req, res) : await bindMemberAttendanceDevice(ownTask, email, req, res);
+      if (!bound) return res.status(403).json({ message: 'Use the device assigned to your attendance task.' });
+      eventParticipation = { role: isMiuSession ? 'usher' : 'organizer' };
+    }
     const existing = await AttendanceRecord.findOne({
       clubId: session.clubId, itemType, eventRequestId: session.eventRequestId,
-      $or: [{ email }, { deviceHash }]
+      $or: [{ email }, { deviceHash: { $in: deviceHashes } }]
     }).select('+deviceHash').lean();
     if (existing) {
       clearAttendanceScanProofCookie(req, res);
-      if (existing.email === email) return res.json({ alreadyRecorded: true, message: 'You are already checked in for this event or booth.' });
+      if (existing.email === email) {
+        if (ownTask) await AttendanceRecord.updateOne({ _id: existing._id, email }, { $set: { eventParticipation } });
+        return res.json({ alreadyRecorded: true, message: 'You are already checked in for this event or booth.' });
+      }
       return res.status(409).json({ message: 'Attendance has already been recorded from this device for this event.' });
     }
     if (await isAttendanceActivityManuallyEnded(session.clubId, itemType, session.eventRequestId)) {
@@ -3764,13 +3834,15 @@ app.post('/api/attendance/:token', requireStudentAuth, async (req, res) => {
       const acceptedClubs = await Club.find({ id: { $in: [...memberClubIds] }, archivedAt: null }).select('name').lean();
       acceptedClubs.forEach((memberClub) => { if (!memberClubNames.includes(memberClub.name)) memberClubNames.push(cleanText(memberClub.name, 100)); });
     }
+    if ((isRosterMember || acceptedApplication) && activityClub?.name) memberClubNames.push(activityClub.name);
     const uniqueMemberClubNames = [...new Set(memberClubNames)];
     const attendanceRecord = new AttendanceRecord({
       universityId: cleanText(req.studentAccount.universityId, 40),
       major: cleanText(req.studentAccount.major, 120),
       attendanceAudience: isAllStudents ? 'all_students' : 'members',
-      membershipStatus: isAllStudents ? (uniqueMemberClubNames.length ? 'member' : 'non_member') : isMiuSession ? 'member' : 'unknown',
+      membershipStatus: uniqueMemberClubNames.length ? 'member' : 'non_member',
       memberClubNames: uniqueMemberClubNames,
+      eventParticipation,
       supervisorEmail: cleanText(session.assignedSupervisorEmail, 254).toLowerCase(),
       sessionId: session._id,
       clubId: session.clubId,
@@ -4073,11 +4145,11 @@ app.get('/api/member/attendance-assignments', requireStudentAuth, async (req, re
     res.setHeader('Cache-Control', 'no-store');
     if (!assignment) return res.json([]);
     const { _id, __v, activeMemberDayKey, checkInDeviceHash, ...publicAssignment } = assignment;
-    const attendanceRecorded = Boolean(await AttendanceRecord.exists({
+    const attendance = await AttendanceRecord.findOne({
       clubId: assignment.clubId, itemType: assignment.itemType,
       eventRequestId: assignment.eventRequestId, email: req.studentAccount.email
-    }));
-    res.json([{ ...publicAssignment, id: String(_id), attendanceRecorded }]);
+    }).select('eventParticipation').lean();
+    res.json([{ ...publicAssignment, id: String(_id), attendanceRecorded: Boolean(attendance), attendanceRole: attendance?.eventParticipation?.role || 'attendee' }]);
   } catch (error) {
     console.error('Member attendance tasks could not be loaded:', error.name);
     res.status(503).json({ message: 'Could not load your club attendance tasks.' });
@@ -4321,6 +4393,10 @@ app.patch('/api/club/members/:memberId', requireClubAuth, async (req, res) => {
     console.error('Database operation failed:', error.name);
     return res.status(503).json({ message: 'Could not update this member right now.' });
   }
+});
+
+require('./services/club-member-removal').registerClubMemberRemoval(app, {
+  requireClubAuth, requireClubPresident, requireLiveDatabase, mongoose, Club, Application, clubs, applications
 });
 
 async function getClubMemberDirectory() {
@@ -4628,7 +4704,7 @@ app.get('/api/committee/attendance-reviews', requireClubAuth, async (req, res) =
       const review = reviews.get(key);
       review.records.push({
         name: record.name, email: record.email, note: record.note || '', attendedAt: record.attendedAt,
-        membershipStatus: record.membershipStatus || '', memberClubNames: record.memberClubNames || []
+        membershipStatus: record.membershipStatus || '', memberClubNames: record.memberClubNames || [], eventParticipation: record.eventParticipation
       });
       (record.approvalHistory || []).filter((entry) => entry.note).forEach((entry) => {
         const note = {
@@ -4764,7 +4840,7 @@ function extractSponsorFields(body) {
     sponsorBenefits: cleanText(body.sponsorBenefits, 2000),
     sponsorDescription: cleanText(body.sponsorDescription, 2000),
     sponsorLogo: typeof body.sponsorLogo === 'string' ? body.sponsorLogo.slice(0, 4 * 1024 * 1024) : '',
-    sponsorAttachment: typeof body.sponsorAttachment === 'string' ? body.sponsorAttachment.slice(0, 4 * 1024 * 1024) : '',
+    sponsorAttachment: typeof body.sponsorAttachment === 'string' ? body.sponsorAttachment : '',
     sponsorNotes: cleanText(body.sponsorNotes, 2000)
   };
 }
@@ -5070,6 +5146,9 @@ async function resolveContentHeadAssignment(req, type, rawEmail) {
 async function createContentRequest(req, res, type) {
   try {
     if (!mongoReady) return res.status(503).json({ message: 'Content storage needs MongoDB.' });
+    let media;
+    try { media = await validateFeedMedia(type, req.body, '', { cloudinary, cloudName: cloudinaryCredentials?.cloud_name }); }
+    catch (error) { return res.status(error.status || 400).json({ message: error.message }); }
     const title = contentTitle(type, req.body);
     if (!title) {
       return res.status(400).json({ message: type === 'event' || type === 'feed'
@@ -5090,9 +5169,10 @@ async function createContentRequest(req, res, type) {
       return res.status(400).json({ message: 'Add at least one complete permit row with a valid quantity, number, and details.' });
     }
     const sponsorFields = type === 'sponsor' ? extractSponsorFields(req.body) : {};
-    const contentForImageCheck = { image: req.body.image, ...sponsorFields };
+    if (type === 'sponsor' && !validSponsorAttachment(req.body.sponsorAttachment)) return res.status(422).json({ message: 'Choose a valid PDF, DOC, DOCX, PPT or PPTX attachment up to 3 MB.' });
+    const contentForImageCheck = { image: media, ...sponsorFields };
     if (req.body.submit === true && missingRequiredPublicContentImage(type, contentForImageCheck)) {
-      return res.status(400).json({ message: type === 'sponsor' ? 'Add the company logo before submitting this sponsor request.' : 'Add an image before submitting this content.' });
+      return res.status(400).json({ message: type === 'sponsor' ? 'Add the company logo before submitting this sponsor request.' : type === 'feed' ? 'Add an image or video before submitting this post.' : 'Add an image before submitting this content.' });
     }
     const club = clubs.find((item) => item.id === req.clubAccount.clubId);
     const assignedHeadEmail = req.body.assignedHeadEmail
@@ -5117,7 +5197,7 @@ async function createContentRequest(req, res, type) {
       } : {}),
       location: type === 'booth' ? (cleanText(req.body.boothLocation, 140) || cleanText(req.body.location, 120)) : cleanText(req.body.location, 120),
       budget: cleanText(req.body.budget, 80),
-      image: typeof req.body.image === 'string' ? req.body.image.slice(0, 4 * 1024 * 1024) : '',
+      image: media.slice(0, 4 * 1024 * 1024),
       ...extractContentFields(type, req.body),
       status: req.body.submit === true ? 'pending_supervisor' : 'draft',
       clubNotice: req.body.submit === true ? `Club submitted a new ${contentSingularLabel(type)} for supervisor review.` : ''
@@ -5151,6 +5231,9 @@ app.put('/api/club/content/:id', requireClubAuth, async (req, res) => {
     }
     // The content type is fixed by the module that created the request.
     const type = record.type;
+    let media;
+    try { media = await validateFeedMedia(type, req.body, record.image, { cloudinary, cloudName: cloudinaryCredentials?.cloud_name }); }
+    catch (error) { return res.status(error.status || 400).json({ message: error.message }); }
     if (type === 'event' && req.body.submit === true
       && !['members', 'all_students'].includes(req.body.attendanceAudience ?? record.attendanceAudience)) {
       return res.status(400).json({ message: 'Choose an audience before submitting this event for review.' });
@@ -5178,13 +5261,16 @@ app.put('/api/club/content/:id', requireClubAuth, async (req, res) => {
     }
     if (req.body.location !== undefined) record.location = cleanText(req.body.location, 120);
     if (req.body.budget !== undefined) record.budget = cleanText(req.body.budget, 80);
-    if (typeof req.body.image === 'string') record.image = req.body.image.slice(0, 4 * 1024 * 1024);
+    if (typeof req.body.image === 'string') record.image = media.slice(0, 4 * 1024 * 1024);
     if (req.clubAccount.role === 'president' && req.body.assignedHeadEmail !== undefined && type !== 'entry_permit') {
       const assignedHeadEmail = await resolveContentHeadAssignment(req, type, req.body.assignedHeadEmail);
       if (assignedHeadEmail === null) return res.status(400).json({ message: 'Choose a committee head assigned to this club.' });
       record.assignedHeadEmail = assignedHeadEmail;
     }
-    if (type === 'sponsor') Object.assign(record, extractSponsorFields(req.body));
+    if (type === 'sponsor') {
+      if (req.body.sponsorAttachment !== record.sponsorAttachment && !validSponsorAttachment(req.body.sponsorAttachment)) return res.status(422).json({ message: 'Choose a valid PDF, DOC, DOCX, PPT or PPTX attachment up to 3 MB.' });
+      Object.assign(record, extractSponsorFields(req.body));
+    }
     if (type === 'entry_permit' && req.body.submit === true
       && !validEntryPermitItems(req.body.permitItems === undefined ? record.permitItems : req.body.permitItems)) {
       return res.status(400).json({ message: 'Add at least one complete permit row with a valid quantity, number, and details.' });
@@ -5198,7 +5284,7 @@ app.put('/api/club/content/:id', requireClubAuth, async (req, res) => {
       record.description = fields.permitItems.map((item) => item.details).filter(Boolean).join(' · ').slice(0, 2000);
     }
     if (req.body.submit === true && missingRequiredPublicContentImage(type, record)) {
-      return res.status(400).json({ message: type === 'sponsor' ? 'Add the company logo before submitting this sponsor request.' : 'Add an image before submitting this content.' });
+      return res.status(400).json({ message: type === 'sponsor' ? 'Add the company logo before submitting this sponsor request.' : type === 'feed' ? 'Add an image or video before submitting this post.' : 'Add an image before submitting this content.' });
     }
     if (type === 'booth') {
       Object.assign(record, extractBoothFields(req.body));
@@ -5571,13 +5657,11 @@ const loginAttempts = new Map();
 const MAX_LOGIN_FAILURES = 5;
 const LOGIN_LOCK_MS = 15 * 60 * 1000;
 
-function loginAttemptKey(req) {
-  const forwardedFor = process.env.VERCEL
-    ? String(req.headers['x-forwarded-for'] || '').split(',')[0].trim()
-    : '';
-  const sourceAddress = forwardedFor || req.ip || req.socket.remoteAddress || 'unknown';
+function loginAttemptKey(req, scope = 'account') {
+  const sourceAddress = httpSecurity.trustedClientIp(req) || 'unknown';
+  const email = scope === 'account' ? String(req.body?.email || '').trim().toLowerCase().slice(0, 254) : '';
   const hashSecret = process.env.LOGIN_ATTEMPT_SECRET || process.env.ADMIN_SESSION_SECRET || process.env.MONGO_URI || sessionSecret;
-  return crypto.createHmac('sha256', hashSecret).update(sourceAddress).digest('hex');
+  return crypto.createHmac('sha256', hashSecret).update(`${scope}|${sourceAddress}|${email}`).digest('hex');
 }
 
 async function loginLockExpiry(key) {
@@ -5596,7 +5680,7 @@ async function loginLockExpiry(key) {
   return null;
 }
 
-async function recordLoginFailure(key) {
+async function recordLoginFailure(key, threshold = MAX_LOGIN_FAILURES) {
   const now = Date.now();
   if (mongoReady) {
     const resetWindow = {
@@ -5615,7 +5699,7 @@ async function recordLoginFailure(key) {
       },
       {
         $set: {
-          lockedUntil: { $cond: [{ $gte: ['$failures', MAX_LOGIN_FAILURES] }, new Date(now + LOGIN_LOCK_MS), null] },
+          lockedUntil: { $cond: [{ $gte: ['$failures', threshold] }, new Date(now + LOGIN_LOCK_MS), null] },
           expiresAt: new Date(now + LOGIN_LOCK_MS)
         }
       }
@@ -5635,7 +5719,7 @@ async function recordLoginFailure(key) {
     entry = { windowStart: now, failures: 0 };
   }
   entry.failures += 1;
-  if (entry.failures >= MAX_LOGIN_FAILURES) {
+  if (entry.failures >= threshold) {
     entry.lockedUntil = now + LOGIN_LOCK_MS;
   }
   loginAttempts.set(key, entry);
@@ -5662,7 +5746,8 @@ function sendLoginLockResponse(res, lockedUntil) {
 
 async function checkLoginSourceLock(req, res) {
   try {
-    const lockedUntil = await loginLockExpiry(loginAttemptKey(req));
+    const expiries = await Promise.all([loginLockExpiry(loginAttemptKey(req)), loginLockExpiry(loginAttemptKey(req, 'source'))]);
+    const lockedUntil = expiries.find(Boolean);
     if (!lockedUntil) return false;
     sendLoginLockResponse(res, lockedUntil);
     return true;
@@ -5677,6 +5762,7 @@ async function countLoginSourceFailure(req, res) {
   const sourceKey = loginAttemptKey(req);
   try {
     await recordLoginFailure(sourceKey);
+    await recordLoginFailure(loginAttemptKey(req, 'source'), 100);
     return await checkLoginSourceLock(req, res);
   } catch (error) {
     console.error('Login protection unavailable:', error.name);
@@ -5987,6 +6073,9 @@ app.post('/api/auth/login', async (req, res) => {
 
 app.post('/api/admin/setup', async (req, res) => {
   const replacingConfiguredAccount = hasAdminPassword();
+  if (httpSecurity.production(process.env) || replacingConfiguredAccount || process.env.ALLOW_LOCAL_ADMIN_SETUP !== 'true') {
+    return res.status(403).json({ message: 'Administrator setup is disabled. Use authenticated account settings for an existing administrator.' });
+  }
   if (!isLoopbackRequest(req)) {
     return res.status(403).json({ message: 'Admin account setup is only allowed from this computer.' });
   }
@@ -6372,6 +6461,7 @@ app.post('/api/password-reset/confirm', limitPasswordResetRequests, async (req, 
 
 registerFeedbackRoutes(app, { Club, UniversityContent, requireStudentAuth, isAdminSessionValid, getClubAccountFromRequest, requireLiveDatabase });
 app.use('/api/admin', requireAdmin);
+require('./services/security-center').registerSecurityCenter(app, { requireAdmin, AuditLog });
 app.get('/api/admin/login-settings', (req, res) => {
   res.json({ email: getConfiguredAdminEmail() || '',
     editable: isLoopbackRequest(req) && !(process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD),
@@ -7022,27 +7112,9 @@ app.delete('/api/admin/club-heads/:email', async (req, res) => {
   }
 });
 
-app.get('/api/admin/club-credentials', (req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  // Passwords are never returned — only the account email so access can be contacted.
-  res.json(clubs.map((club) => {
-    const account = clubAccounts.find((item) => item.clubId === club.id && item.role === 'president');
-    return {
-      clubId: club.id,
-      clubName: club.name,
-      email: account?.email || ''
-    };
-  }).filter((account) => account.email));
-});
-
-app.get('/admin/club-credentials', requireAdmin, (req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  res.sendFile(path.join(__dirname, 'private', 'admin-club-credentials.html'));
-});
-
-app.get('/admin/global', requireAdmin, (req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  res.sendFile(path.join(__dirname, 'private', 'global-admin.html'));
+require('./services/admin-dashboard-pages').registerAdminDashboardPages(app, { root: __dirname, requireAdmin, Club });
+require('./services/admin-dashboard-live').registerAdminDashboardLive(app, {
+  database: mongoose, requireAdmin, sessionSecret, ready: () => mongoReady && mongoose.connection.readyState === 1
 });
 
 app.get('/dashboards/miu-events-dashboard.html', requireMiuEventsDashboard, (req, res) => {
@@ -7725,7 +7797,7 @@ app.delete('/api/applications/:id', requireClubAuth, async (req, res) => {
 app.get('/club.html', (req, res) => res.redirect(301, '/club-details.html'));
 app.get('/apply.html', (req, res) => res.redirect(301, '/club-application.html'));
 app.get('/committee.html', (req, res) => res.redirect(301, '/committee-dashboard.html'));
-app.get(['/admin', '/club-login', '/club-dashboard'], (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get(['/club-login', '/club-dashboard'], (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.get('/club-application.html', (req, res) => {
   const clubId = Number(req.query.id);
   res.redirect(302, Number.isInteger(clubId) && clubId > 0 ? `/?apply=${clubId}` : '/');

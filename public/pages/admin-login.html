@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><script src="/assets/js/shared.js?v=20261015mainadmin1"></script><script src="/assets/js/site-loading.js?v=20261011scrollrestore1"></script><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Admin sign in | MIU Clubs</title><link rel="stylesheet" href="/assets/css/base.css?v=20261015mainadmin1"><link rel="stylesheet" href="/assets/css/responsive.css"><link rel="stylesheet" href="/assets/css/dark.css"><link rel="icon" href="/assets/img/pics/pwa-icon-192.png"><script src="/assets/js/layout.js?v=20261015mainadmin1" defer></script><script src="/assets/js/pages/admin-login.js?v=20261015mainadmin1" defer></script><script src="/assets/js/pwa-register.js" defer></script></head><body><div id="site-header"></div><main class="app-container"><section id="adminLoginView" class="view active">
+          <div class="admin-login-panel">
+            <img class="club-login-miu-logo" src="/assets/img/pics/logo.svg.png" alt="MIU logo" />
+            <h2 id="adminLoginTitle">Admin access</h2>
+            <p id="adminLoginMessage">Sign in with your admin account to manage the website.</p>
+            <form id="adminLoginForm">
+              <div class="field-group">
+                <label for="adminEmailInput">Email</label>
+                <input id="adminEmailInput" name="email" type="email" autocomplete="username" maxlength="254" placeholder="e.g. name@miuegypt.edu.eg" required />
+              </div>
+              <div class="field-group">
+                <label for="adminPasswordInput">Password</label>
+                <input id="adminPasswordInput" name="password" type="password" autocomplete="current-password" placeholder="••••••••" required />
+              </div>
+              <div id="adminConfirmRow" class="field-group hidden">
+                <label for="adminConfirmInput">Confirm password</label>
+                <input id="adminConfirmInput" name="confirmPassword" type="password" autocomplete="new-password" />
+              </div>
+              <button id="adminLoginSubmit" class="primary-btn" type="submit">Unlock dashboard</button>
+            </form>
+            <div class="admin-google-signin">
+              <div class="admin-google-divider" aria-hidden="true"><span>OR</span></div>
+              <div id="adminGoogleButton" class="admin-google-button"></div>
+              <p id="adminGoogleFeedback" class="admin-feedback" aria-live="polite"></p>
+            </div>
+            <p id="adminLoginFeedback" class="admin-feedback" aria-live="polite"></p>
+            <p id="adminLoginForgotWrap"><a class="text-button" href="/pages/forgot-password.html">Forgot Password?</a></p>
+            
+            
+            <p class="login-foot">Back to homepage? <a class="login-foot-link" href="/">Click here</a></p>
+          </div>
+        </section></main><div id="site-footer"></div></body></html>

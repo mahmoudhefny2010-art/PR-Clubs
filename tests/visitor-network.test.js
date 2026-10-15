@@ -4,7 +4,8 @@ const { getVisitorIpAddress } = require('../services/visitor-network');
 const { SiteVisitorPresence } = require('../models');
 
 test('uses and validates the platform forwarded visitor IP', () => {
-  assert.equal(getVisitorIpAddress({ headers: { 'x-vercel-forwarded-for': '203.0.113.8, 10.0.0.1' }, ip: '127.0.0.1' }), '203.0.113.8');
+  assert.equal(require('../services/http-security').trustedClientIp({ headers: { 'x-vercel-forwarded-for': '203.0.113.8, 10.0.0.1' }, ip: '127.0.0.1' }, { VERCEL: '1' }), '203.0.113.8');
+  assert.equal(require('../services/http-security').trustedClientIp({ headers: { 'x-forwarded-for': '203.0.113.8' }, ip: '127.0.0.1' }, {}), '127.0.0.1');
 });
 
 test('normalizes IPv4-mapped addresses from the request socket', () => {

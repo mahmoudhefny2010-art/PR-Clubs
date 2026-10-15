@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en" class="admin-v2-shell">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <title>Admin Dashboard · MIU Clubs</title>
+  <link rel="icon" href="/assets/img/pics/pwa-icon-192.png">
+  <script src="/assets/js/shared.js?v=20261014architecture1"></script>
+  <script src="/assets/js/site-loading.js?v=20261014promptqueue1"></script>
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <link rel="stylesheet" href="/assets/css/responsive.css">
+  <link rel="stylesheet" href="/assets/css/dark.css">
+  <link rel="stylesheet" href="/assets/css/features.css?v=20261015videopopup1">
+  <!-- TOOL_STYLES -->
+  <link rel="stylesheet" href="/assets/css/pages/admin-dashboard-v2.css?v=20261015toolpolish1">
+  <script src="/assets/js/feed-media.js?v=20261015videopopup1"></script>
+  <script src="/assets/js/admin-dashboard-tools.js?v=20261015removedirectory1"></script>
+  <script src="/assets/js/admin-dashboard-data.js?v=20261015removedirectory1"></script>
+  <script src="/assets/js/theme.js" defer></script>
+  <script src="/assets/js/pwa-register.js?v=20261014localfresh1" defer></script>
+  <script src="/assets/js/layout.js?v=20261015mainadmin1" defer></script>
+  <script src="/assets/js/admin-dashboard-editors.js?v=20261015mainadmin1" defer></script>
+  <script src="/assets/js/admin-dashboard-features.js?v=20261015removedirectory1" defer></script>
+  <script src="/assets/js/admin-dashboard-layout.js?v=20261015arrange1" defer></script>
+  <script src="/assets/js/pages/admin-dashboard-v2.js?v=20261015mainadmin1" defer></script>
+  <!-- TOOL_SCRIPTS -->
+</head>
+<body class="admin-v2" data-tool="">
+  <header id="adminWorkspaceHeader" class="v2-admin-header">
+    <div class="topbar-container v2-admin-topbar">
+      <a href="/admin" class="v2-admin-logo" aria-label="MIU Admin Dashboard"><img src="/assets/img/pics/logo.svg.png" alt="Misr International University"><span>Admin Workspace<small>Website administration</small></span></a>
+      <nav class="v2-quick-nav" aria-label="Admin shortcuts"><a href="/admin">Overview</a><a href="/admin/applications">Applications</a><a href="/admin/clubs">Clubs</a><a href="/admin/reports">Reports</a></nav>
+      <form action="/admin" class="v2-header-search" role="search"><label class="v2-sr" for="adminNavSearch">Find an admin tool</label><input id="adminNavSearch" type="search" name="q" placeholder="Find a tool…" autocomplete="off"><button type="submit" aria-label="Search tools"><span data-icon="search"></span></button></form>
+      <div class="nav-right v2-header-actions"><button id="adminNavRefresh" class="v2-header-icon" type="button" aria-label="Refresh current tool" title="Refresh current tool"><span data-icon="refresh"></span></button><a href="/" class="v2-header-icon" aria-label="View public website" title="View website"><span data-icon="external"></span></a><button id="adminNavSignout" class="v2-header-icon" type="button" aria-label="Sign out" title="Sign out"><span data-icon="logout"></span></button></div>
+    </div>
+  </header>
+  <div class="v2-workspace">
+  <a class="v2-skip" href="#dashboardMain">Skip to dashboard</a>
+  <aside class="v2-sidebar" aria-label="Dashboard navigation">
+    <a class="v2-account v2-sidebar-account" href="/admin/profile"><span id="accountInitial" class="v2-avatar">A</span><span><strong>Administrator</strong><small>Website management</small></span></a>
+    <p class="v2-nav-label">WORKSPACE</p>
+    <nav class="v2-nav" id="dashboardNavigation" aria-label="Tool categories">
+      <button class="is-active" type="button" data-category="all" aria-pressed="true"><span data-icon="grid"></span>Overview</button>
+      <button type="button" data-category="staff" aria-pressed="false"><span data-icon="shield"></span>Staff &amp; access</button>
+      <button type="button" data-category="website" aria-pressed="false"><span data-icon="globe"></span>Website &amp; clubs</button>
+      <button type="button" data-category="people" aria-pressed="false"><span data-icon="users"></span>People &amp; access</button>
+      <button type="button" data-category="attendance" aria-pressed="false"><span data-icon="calendar"></span>Events &amp; attendance</button>
+      <button type="button" data-category="insights" aria-pressed="false"><span data-icon="chart"></span>Insights &amp; system</button>
+    </nav>
+    <div class="v2-sidebar-bottom">
+      <a href="/"><span data-icon="external"></span>View website</a>
+    </div>
+  </aside>
+  <main id="dashboardMain" class="v2-main">
+    <div id="overviewPage">
+    <header class="v2-topbar"><span>Workspace <span aria-hidden="true">/</span> <strong>Overview</strong></span><span id="dashboardDate"></span></header>
+    <section class="v2-heading">
+      <div><div class="v2-eyebrow">YOUR CONTROL CENTER</div><h1>Admin Dashboard</h1><p>Everything you need to manage your university clubs, in one place.</p></div>
+      <button class="v2-refresh" id="refreshDashboard" type="button"><span data-icon="refresh"></span>Refresh overview</button>
+    </section>
+    <section class="v2-summary" aria-label="Website overview" aria-busy="true" id="dashboardSummary">
+      <article><span class="v2-summary-icon blue" data-icon="clubs"></span><div><span>Active clubs</span><strong id="totalClubs">—</strong></div></article>
+      <article><span class="v2-summary-icon violet" data-icon="clipboard"></span><div><span>Applications</span><strong id="totalApplications">—</strong></div></article>
+      <article><span class="v2-summary-icon amber" data-icon="users"></span><div><span>Committee heads</span><strong id="totalHeads">—</strong></div></article>
+      <article><span class="v2-summary-icon green" data-icon="door"></span><div><span>Clubs accepting members</span><strong id="openClubs">—</strong></div></article>
+    </section>
+    <p id="overviewFeedback" class="v2-feedback" role="status" aria-live="polite"></p>
+    <section aria-labelledby="toolsHeading">
+      <div class="v2-tools-heading"><div><h2 id="toolsHeading">Management tools</h2><p id="toolsCount">Choose a tool to get started.</p></div><label class="v2-search"><span data-icon="search"></span><span class="v2-sr">Search management tools</span><input id="toolSearch" type="search" placeholder="Search tools…" autocomplete="off"></label></div>
+      <div class="v2-layout-controls"><button type="button" id="arrangeCards" class="v2-action secondary" aria-pressed="false" aria-controls="widgetGrid" disabled>Arrange cards</button><button type="button" id="resetCardOrder" class="v2-action secondary" hidden>Reset order</button></div>
+      <p id="cardOrderStatus" class="v2-panel-note" role="status" aria-live="polite" hidden></p>
+      <div class="v2-categories" id="categoryFilters" aria-label="Filter tools">
+        <button class="is-active" data-category="all" aria-pressed="true" type="button">All tools</button>
+        <button data-category="staff" aria-pressed="false" type="button">Staff &amp; access</button>
+        <button data-category="website" aria-pressed="false" type="button">Website &amp; clubs</button>
+        <button data-category="people" aria-pressed="false" type="button">People &amp; access</button>
+        <button data-category="attendance" aria-pressed="false" type="button">Events &amp; attendance</button>
+        <button data-category="insights" aria-pressed="false" type="button">Insights &amp; system</button>
+      </div>
+      <div class="v2-widget-grid" id="widgetGrid"></div>
+      <p id="emptyTools" class="v2-empty" hidden>No tools match your search. Try another name or category.</p>
+    </section>
+    </div>
+    <section id="toolPage" hidden aria-labelledby="toolTitle" class="v2-tool-page">
+      <a href="/admin" id="toolBack" class="v2-action secondary" data-history-back>← Back</a>
+      <header class="v2-tool-heading"><div><span id="toolEyebrow" class="v2-eyebrow"></span><h1 id="toolTitle"></h1></div><button type="button" id="refreshTool" class="v2-refresh">Refresh data</button></header>
+      <p id="toolFeedback" class="v2-feedback" role="status" aria-live="polite"></p>
+      <div id="pendingUpdates" class="v2-update-notice" role="status" hidden>New data is available. Your unsaved edits have been kept. <button type="button" id="applyUpdates" class="v2-action secondary">Load updates</button></div>
+      <div id="inlineConfirmation" class="v2-confirmation" hidden></div>
+      <div id="toolContent"><!-- TOOL_CONTENT --></div>
+    </section>
+  </main>
+  </div>
+  <div id="site-footer"></div>
+</body>
+</html>

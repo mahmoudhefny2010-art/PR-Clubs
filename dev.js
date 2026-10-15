@@ -21,21 +21,19 @@ portProbe.once('error', (error) => {
 
 portProbe.listen(port, () => {
   portProbe.close(() => {
-    const nodemonPath = path.join(__dirname, 'node_modules', 'nodemon', 'bin', 'nodemon.js');
     const watcher = spawn(process.execPath, [
-      nodemonPath,
-      '--exitcrash',
-      '--ignore', 'data/**',
-      '--ignore', 'public/assets/img/pics/**',
+      '--watch',
+      '--watch-preserve-output',
       'server.js'
     ], {
       cwd: __dirname,
       env: process.env,
+      windowsHide: true,
       stdio: 'inherit'
     });
 
     watcher.once('error', (error) => {
-      console.error('Could not start nodemon:', error.name);
+      console.error('Could not start development watcher:', error.name);
       process.exit(1);
     });
 

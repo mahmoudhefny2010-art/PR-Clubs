@@ -142,5 +142,6 @@ window.mountReportDownloads = function (root, kind, audienceOverride) {
   return initialize();
 };
 if (document.getElementById('downloadForm')) {
-  window.mountReportDownloads(document, new URLSearchParams(location.search).get('type') || 'reports');
+  const tool = document.body.dataset.tool;
+  window.mountReportDownloads(document, ['attendance', 'open-attendance'].includes(tool) ? 'attendance' : new URLSearchParams(location.search).get('type') || 'reports', tool === 'open-attendance' ? 'all_students' : undefined);
 }

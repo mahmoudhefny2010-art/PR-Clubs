@@ -1,13 +1,4 @@
 (() => {
-  const homepageNav = document.querySelector('.homepage-admin-sidebar');
-  const homepagePanel = homepageNav?.closest('.admin-panel');
-  if (homepagePanel && !homepagePanel.querySelector('.homepage-admin-layout')) {
-    const layout = document.createElement('div'); layout.className = 'homepage-admin-layout';
-    const content = document.createElement('div'); content.className = 'homepage-admin-content';
-    homepagePanel.querySelector('.admin-header').after(layout);
-    layout.append(homepageNav, content);
-    while (layout.nextElementSibling) content.append(layout.nextElementSibling);
-  }
   const mobile = window.matchMedia('(max-width: 760px)');
   const initialized = new WeakSet();
   const drawers = [];
@@ -34,7 +25,7 @@
     else if (!event.shiftKey && document.activeElement === items.at(-1)) { event.preventDefault(); items[0].focus(); }
   });
   function scan() {
-    document.querySelectorAll('.committee-sidebar, .president-sidebar, .student-dashboard-sidebar, .report-admin-sidebar, .homepage-admin-sidebar').forEach(sidebar => {
+    document.querySelectorAll('.committee-sidebar, .president-sidebar, .student-dashboard-sidebar, .report-admin-sidebar').forEach(sidebar => {
       if (initialized.has(sidebar)) return;
       initialized.add(sidebar);
       sidebar.classList.add('mobile-dashboard-drawer');

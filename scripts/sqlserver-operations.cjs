@@ -22,6 +22,10 @@ function ttlTargets(specs = catalog()) {
 function localProfile(expectedDatabase) {
   if (provider() !== 'sqlserver') throw new Error('Local SQL operations require the sqlserver provider.');
   const config = sqlConfig();
+  if (process.env.SQLSERVER_OPERATIONS_USER || process.env.SQLSERVER_OPERATIONS_PASSWORD) {
+    if (!process.env.SQLSERVER_OPERATIONS_USER || !process.env.SQLSERVER_OPERATIONS_PASSWORD) throw new Error('Both protected SQL operations credentials must be configured.');
+    config.user = process.env.SQLSERVER_OPERATIONS_USER; config.password = process.env.SQLSERVER_OPERATIONS_PASSWORD;
+  }
   const local = ['localhost', '127.0.0.1', '::1', require('node:os').hostname().toLowerCase()];
   if (!local.includes(config.server.toLowerCase())) throw new Error('Local SQL operations require a local SQL Server.');
   if (!expectedDatabase || config.database !== expectedDatabase) throw new Error('Scheduled database does not match the active configuration.');
@@ -58,6 +62,9 @@ async function backup(pool, database, directory) {
   const stat = await fs.stat(destination);
   const evidence = { database, file, bytes: stat.size, checksumVerified: true, verifiedAt: new Date().toISOString() };
   await fs.writeFile(destination + '.verified.json', JSON.stringify(evidence, null, 2) + '\n', { flag: 'wx' });
+  const offsite = require('../services/offsite-backup');
+  const offsiteConfig = offsite.offsiteConfiguration();
+  if (offsiteConfig) evidence.offsite = await offsite.encryptBackup({ source: destination, ...offsiteConfig });
   // Keep at least two verified backups, regardless of age. Never touch other files.
   const entries = await verifiedBackups(directory, database);
   for (const entry of entries.slice(2)) {

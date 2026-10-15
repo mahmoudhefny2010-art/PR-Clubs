@@ -2,9 +2,11 @@
   const list = document.getElementById('communityFeedList');
   const status = document.getElementById('communityFeedStatus');
   const filters = [...document.querySelectorAll('.feed-filter')];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
   let loadedClubs = window.miuPublicDataCache?.read('clubs') || [];
   let universityEntries = window.miuPublicDataCache?.read('universityContent') || [];
-  let entries = buildEntries(loadedClubs, universityEntries);
+  let entries = [];
   let universityRefreshScheduled = false;
   let activeFilter = 'all';
   const requestedPost = Number(new URLSearchParams(window.location.search).get('post'));
@@ -19,8 +21,7 @@
   const formatDate = (date) => date ? date.toLocaleString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
   }) : '';
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  entries = buildEntries(loadedClubs, universityEntries);
 
   function buildEntries(clubs, universityContent = []) {
     const clubEntries = clubs.flatMap((club) => {
@@ -75,7 +76,7 @@
       const title = String(item.title || '').trim();
       const message = String(item.text || item.description || '').trim();
       const image = item.image && item.image !== club.image
-        ? `<img class="feed-timeline-image" src="${escapeHtml(item.image)}" alt="${escapeHtml(title || 'Club post image')}" loading="lazy" decoding="async" />` : '';
+        ? window.FeedMedia.render(item.image, title || 'Club post image', 'feed-timeline-image') : '';
       const avatar = club.image ? `<img src="${escapeHtml(club.image)}" alt="" class="feed-timeline-avatar${entry.university ? ' university-brand-avatar' : ''}" loading="lazy" decoding="async" />` : '';
       const dateText = entry.publishedAt ? `<span class="feed-timeline-date">${escapeHtml(formatDate(entry.publishedAt))}</span>` : '';
       if (entry.kind === 'event') {

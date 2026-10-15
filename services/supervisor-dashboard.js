@@ -29,30 +29,33 @@ function registerSupervisorDashboard(app, deps) {
   });
   router.get('/miu-attendance', async (req, res) => {
     try {
-      const records = await AttendanceRecord.find({ clubId: 0, attendanceAudience: 'all_students', supervisorEmail: req.supervisor.email, approvalStatus: 'pending_supervisor' }).sort({ attendedAt: -1 }).lean();
+      const records = await AttendanceRecord.find({ clubId: 0, supervisorEmail: req.supervisor.email, approvalStatus: 'pending_supervisor' }).sort({ attendedAt: -1 }).lean();
       const closureMap = await attendanceClosureMapFor(records);
       const reviewable = records.filter(record => isAttendanceActivityEnded(record.eventDate) || closureMap.has(attendanceActivityKey(record)));
       const groups = new Map();
       for (const record of reviewable) {
-        const key = `${record.itemType}:${record.eventRequestId}`;
+        const audience = record.attendanceAudience === 'all_students' ? 'all_students' : 'members';
+        const key = `${record.itemType}:${record.eventRequestId}:${audience}`;
         if (!groups.has(key)) groups.set(key, { clubId: 0, clubName: 'MIU events', itemType: record.itemType, eventRequestId: record.eventRequestId,
-          eventTitle: record.eventTitle, eventDate: record.eventDate, eventTime: record.eventTime, attendanceEnded: true,
+          eventTitle: record.eventTitle, eventDate: record.eventDate, eventTime: record.eventTime, attendanceAudience: audience, attendanceEnded: true,
           attendanceEndedAt: closureMap.get(attendanceActivityKey(record))?.endedAt || null, records: [] });
         groups.get(key).records.push({ name: record.name, email: record.email, membershipStatus: record.membershipStatus,
-          memberClubNames: record.memberClubNames || [], attendedAt: record.attendedAt });
+          memberClubNames: record.memberClubNames || [], eventParticipation: record.eventParticipation, attendedAt: record.attendedAt });
       }
       res.json({ reviews: [...groups.values()] });
     } catch { res.status(503).json({ message: 'Could not load MIU attendance assigned to your supervisor account.' }); }
   });
   router.post('/miu-attendance/:eventRequestId/decision', async (req, res) => {
     if (!sameOrigin(req)) return res.status(403).json({ message: 'Reload and try again.' });
+    const attendanceAudience = req.body.attendanceAudience || 'all_students';
+    if (!['members', 'all_students'].includes(attendanceAudience)) return res.status(400).json({ message: 'Choose a valid attendance list.' });
     const eventRequestId = Number(req.params.eventRequestId), action = req.body.action;
     const comment = typeof req.body.comment === 'string' ? req.body.comment.trim().slice(0, 500) : '';
     if (!Number.isSafeInteger(eventRequestId) || eventRequestId <= 0 || !['approve', 'reject'].includes(action) || action === 'reject' && !comment) {
       return res.status(400).json({ message: 'Choose a decision and provide a reason for rejection.' });
     }
     try {
-      const filter = { clubId: 0, itemType: 'event', eventRequestId, attendanceAudience: 'all_students', supervisorEmail: req.supervisor.email, approvalStatus: 'pending_supervisor' };
+      const filter = { clubId: 0, itemType: 'event', eventRequestId, attendanceAudience, supervisorEmail: req.supervisor.email, approvalStatus: 'pending_supervisor' };
       const records = await AttendanceRecord.find(filter).select('sessionId eventDate').lean();
       if (!records.length) return res.status(409).json({ message: 'This MIU attendance list is no longer assigned to you.' });
       const closureMap = await attendanceClosureMapFor(records.map(record => ({ ...record, clubId: 0, itemType: 'event', eventRequestId })));
@@ -67,7 +70,7 @@ function registerSupervisorDashboard(app, deps) {
         role: 'supervisor', email: req.supervisor.email, action: action === 'approve' ? 'approved' : 'rejected', note: comment, createdAt: new Date()
       } } });
       if (!result.modifiedCount) return res.status(409).json({ message: 'This list was already reviewed. Refresh and try again.' });
-      try { await deps.notifyAttendance?.({ clubId: 0, itemType: 'event', eventRequestId }, status, action); } catch {}
+      try { await deps.notifyAttendance?.({ clubId: 0, itemType: 'event', eventRequestId, attendanceAudience }, status, action); } catch {}
       res.json({ status, recordsUpdated: result.modifiedCount });
     } catch { res.status(503).json({ message: 'The MIU attendance decision could not be saved.' }); }
   });
@@ -85,12 +88,15 @@ function registerSupervisorDashboard(app, deps) {
       const club = await Club.findOne({ id: clubId }).select('id name category description status events').lean();
       if (!club) return res.status(404).json({ message: 'Assigned club not found.' });
       const [requests, speakers, attendance, reviews] = await Promise.all([
-        ContentRequest.find({ clubId }).select('id clubId type title description date time location status clubNotice comments supervisorNextStage createdAt updatedAt').sort({ createdAt: -1 }).lean(),
+        ContentRequest.aggregate([{ $match: { clubId } }, { $sort: { createdAt: -1 } }, { $project: {
+          ...Object.fromEntries('id clubId type title description date time location status clubNotice comments supervisorNextStage createdAt updatedAt'.split(' ').map(key => [key, 1])),
+          image: { $cond: [{ $and: [{ $eq: ['$type', 'feed'] }, { $regexMatch: { input: { $ifNull: ['$image', ''] }, regex: '^https://res[.]cloudinary[.]com/[^/]+/video/upload/' } }] }, '$image', ''] }
+        } }]),
         SpeakerRequest.find({ clubId }).sort({ submittedAt: -1 }).lean(),
         AttendanceRecord.aggregate([{ $match: { clubId } }, { $group: {
           _id: { eventRequestId: '$eventRequestId', itemType: '$itemType', approvalStatus: '$approvalStatus', attendanceAudience: '$attendanceAudience' },
           title: { $first: '$eventTitle' }, date: { $first: '$eventDate' }, count: { $sum: 1 },
-          people: { $push: { name: '$name', email: '$email', membershipStatus: '$membershipStatus', memberClubNames: '$memberClubNames', attendedAt: '$attendedAt' } }
+          people: { $push: { name: '$name', email: '$email', membershipStatus: '$membershipStatus', memberClubNames: '$memberClubNames', eventParticipation: '$eventParticipation', attendedAt: '$attendedAt' } }
         } }]),
         Review.find({ clubId, supervisorId: req.supervisor._id }).sort({ updatedAt: -1 }).lean()
       ]);

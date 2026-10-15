@@ -24,7 +24,7 @@ function parseInteraction(body) {
   return { interaction, question, options };
 }
 
-function registerFeedbackRoutes(app, { Club, UniversityContent, requireStudentAuth, isAdminSessionValid, getClubAccountFromRequest, requireLiveDatabase }) {
+function registerFeedbackRoutes(app, { Club, UniversityContent, requireStudentAuth, isAdminSessionValid, getClubAccountFromRequest, requireLiveDatabase, feedbackModel = StudentFeedback }) {
   const safe = handler => async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     try { await handler(req, res); } catch (error) {
@@ -47,7 +47,7 @@ function registerFeedbackRoutes(app, { Club, UniversityContent, requireStudentAu
     if (!allowed.includes(await reviewer(req))) return res.status(403).json({ message: 'You cannot view these results.' });
     if (!requireLiveDatabase(res)) return;
     const targets = await (kind === 'club' ? Club : UniversityContent).find(kind === 'club' ? {} : { interaction: { $in: ['poll', 'evaluation'] } }).lean();
-    const responses = await StudentFeedback.find({ kind }).sort({ updatedAt: -1 }).lean();
+    const responses = await feedbackModel.find({ kind }).sort({ updatedAt: -1 }).lean();
     res.json(targets.map(target => {
       const rows = responses.filter(row => row.targetKey === String(target._id));
       return { id: target.id, title: target.name || target.title, question: target.question || '', interaction: target.interaction || 'evaluation', options: target.options || [], count: rows.length,
@@ -69,13 +69,13 @@ function registerFeedbackRoutes(app, { Club, UniversityContent, requireStudentAu
     if (!Number.isInteger(value) || value < (poll ? 0 : 1) || value > (poll ? target.options.length - 1 : 5)) return res.status(400).json({ message: 'Choose a valid option or a rating from 1 to 5.' });
     const comment = typeof req.body.comment === 'string' ? req.body.comment.trim() : '';
     if (comment.length > 1000) return res.status(400).json({ message: 'Keep comments within 1,000 characters.' });
-    await StudentFeedback.init();
+    await feedbackModel.init();
     const key = { kind, targetId, targetKey: String(target._id), email: req.studentAccount.email };
     try {
-      await StudentFeedback.updateOne(key, { $set: { value, comment: poll ? '' : comment } }, { upsert: true, runValidators: true, writeConcern: { w: 'majority' } });
+      await feedbackModel.updateOne(key, { $set: { value, comment: poll ? '' : comment } }, { upsert: true, runValidators: true, writeConcern: { w: 'majority' } });
     } catch (error) {
       if (error.code !== 11000) throw error;
-      await StudentFeedback.updateOne(key, { $set: { value, comment: poll ? '' : comment } }, { runValidators: true, writeConcern: { w: 'majority' } });
+      await feedbackModel.updateOne(key, { $set: { value, comment: poll ? '' : comment } }, { runValidators: true, writeConcern: { w: 'majority' } });
     }
     res.json({ message: 'Your response has been saved. Submitting again updates your response.' });
   }));

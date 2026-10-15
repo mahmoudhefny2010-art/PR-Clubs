@@ -32,7 +32,7 @@
     listMessage.textContent = posts.length ? `${posts.length} update${posts.length === 1 ? '' : 's'} published by MIU.` : 'No MIU posts published yet.';
     list.innerHTML = posts.map(post => `<article class="record"><div class="record-head"><div><h3 class="record-title">${escapeHtml(post.title)}</h3><p class="record-meta">${post.type === 'event' ? 'Event' : 'Announcement'}${post.date ? ` · ${escapeHtml(post.date)}` : ''}${post.time ? ` · ${escapeHtml(window.formatSiteTime?.(post.time) || post.time)}` : ''}${post.location ? ` · ${escapeHtml(post.location)}` : ''}</p>${post.type === 'event' ? `<p class="record-meta">${post.attendanceAudience === 'members' ? 'Current members of any MIU club' : 'All university students'}${post.registrationEnabled ? ` · ${post.attendanceEnabled ? 'Attendance will be recorded' : 'Attendance will not be recorded'}` : ''}</p>` : ''}</div><div class="record-actions"><button class="danger" type="button" data-delete-university-post="${Number(post.id)}">Delete</button></div></div><p>${escapeHtml(post.description)}</p></article>`).join('') || '<p class="empty">No university posts have been published.</p>';
     list.querySelectorAll('[data-delete-university-post]').forEach(button => button.addEventListener('click', async () => {
-      if (!window.confirm('Remove this MIU post from the public website?')) return;
+      if (!await (window.miuConfirmAction || window.confirm)('Remove this MIU post from the public website?')) return;
       button.disabled = true;
       try { await request(`/api/miu-events/content/${button.dataset.deleteUniversityPost}`, { method: 'DELETE' }); await loadPosts(); }
       catch (error) { showMessage(listMessage, error.message, true); button.disabled = false; }
@@ -68,7 +68,7 @@
       const payload = { type: $('universityPostType').value, interaction: $('universityInteraction').value, question: $('universityQuestion').value.trim(), options: $('universityOptions').value.split('\n').map(x => x.trim()).filter(Boolean), title: $('universityPostTitle').value.trim(), description: $('universityPostDescription').value.trim(), date: $('universityPostDate').value, time: $('universityPostTime').value, location: $('universityPostLocation').value.trim(), registrationEnabled, attendanceEnabled: registrationEnabled && $('universityPostAttendance').value === 'true', attendanceAudience: $('universityPostAudience').value, imageChoice };
       if (imageChoice === 'custom') { if (typeof window.uploadImageToCloudinary !== 'function') throw new Error('Image upload is not available right now.'); const uploaded = await window.uploadImageToCloudinary(file, 'university'); payload.imageUrl = uploaded.url; payload.imagePublicId = uploaded.publicId; }
       await request('/api/miu-events/content', { method: 'POST', body: JSON.stringify(payload) });
-      form.reset(); updateFields(); $('universityImageField').hidden = true; preview.src = '/assets/img/pics/logo.svg.png'; showMessage(formMessage, 'Published. The update is now visible on the public website.'); await loadPosts();
+      form.reset(); form.dataset.miuDirty = 'false'; updateFields(); $('universityImageField').hidden = true; preview.src = '/assets/img/pics/logo.svg.png'; showMessage(formMessage, 'Published. The update is now visible on the public website.'); await loadPosts();
     } catch (error) { showMessage(formMessage, error.message, true); }
     finally { submit.disabled = false; }
   });

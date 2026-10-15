@@ -28,3 +28,16 @@ test('attendance workbook includes summary, event details and review history wit
   assert.equal(workbook.getWorksheet('Event details').getCell('E2').value, 'Club workshop');
   assert.equal(workbook.getWorksheet('Review history').getCell('F2').value, 'Checked');
 });
+
+test('Excel counts organizers and ushers inside attendance totals while preserving membership', async () => {
+  const rows = [['Event', 'MIU email', 'Membership', 'Member clubs', 'Event role'],
+    ['Open Day', 'organizer@example.test', 'Member', 'Engineering', 'Organizer'],
+    ['Open Day', 'usher@example.test', 'Non-member', '', 'Usher']];
+  const workbook = new ExcelJS.Workbook(); await workbook.xlsx.load(await attendanceWorkbook(rows));
+  const summary = workbook.getWorksheet('Summary'); const counts = new Map();
+  summary.eachRow(row => counts.set(row.getCell(1).value, row.getCell(2).value));
+  assert.equal(counts.get('Exported records'), 2); assert.equal(counts.get('Organizer check-ins'), 1);
+  assert.equal(counts.get('Usher check-ins'), 1); assert.equal(counts.get('Member check-ins'), 1); assert.equal(counts.get('Non-member check-ins'), 1);
+  assert.equal(workbook.getWorksheet('Attendance').getCell('E2').value, 'Organizer');
+  assert.equal(workbook.getWorksheet('Attendance').getCell('E3').value, 'Usher');
+});

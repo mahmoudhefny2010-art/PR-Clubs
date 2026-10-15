@@ -13,7 +13,7 @@ async function harness(t, overrides = {}) {
     getAccount: async req => req.headers['x-account'] === 'none' ? null : req.headers['x-account'] === 'president' ? { role: 'president' } : account,
     databaseReady: () => true, sameOrigin: () => true,
     Club: { find: filter => { filters.push(filter); return query([{ id: 1, name: 'Assigned' }]); }, findOne: filter => { filters.push(filter); return query({ id: 1, name: 'Assigned', events: [{ title: 'Event', attendeeEmail: 'private' }] }); } },
-    ContentRequest: { find: filter => { filters.push(filter); return query([]); }, exists: async filter => { filters.push(filter); return filter.clubId === 1 && filter.id === 2; } },
+    ContentRequest: { aggregate: async pipeline => { filters.push(pipeline[0].$match); return []; }, find: filter => { filters.push(filter); return query([]); }, exists: async filter => { filters.push(filter); return filter.clubId === 1 && filter.id === 2; } },
     SpeakerRequest: { find: filter => { filters.push(filter); return query([]); }, exists: async filter => { filters.push(filter); return false; } },
     AttendanceRecord: { aggregate: async filter => { filters.push(filter[0].$match); return []; } },
     Review: { find: filter => { filters.push(filter); return query([]); }, findOneAndUpdate: async (filter, update) => { writes.push(filter); return { note: update.$set.note, updatedAt: new Date() }; } },

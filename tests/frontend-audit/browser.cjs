@@ -64,7 +64,7 @@ class CDP {
 const serverRequests = [];
 let activeScenario = '';
 const missing = new Set();
-const routes = { '/': 'public/index.html', '/admin': 'public/index.html', '/club-login': 'public/index.html', '/club-dashboard': 'public/index.html', '/__audit/club-entry-permit': 'public/index.html', '/__audit/dean-entry-permit': 'public/dashboards/dean-dashboard.html', '/attendance': 'public/attendance.html', '/admin/global': 'private/global-admin.html', '/admin/club-credentials': 'private/admin-club-credentials.html' };
+const routes = { '/': 'public/index.html', '/admin': 'private/admin-dashboard-v2.html', '/admin/login': 'public/pages/admin-login.html', '/club-login': 'public/index.html', '/club-dashboard': 'public/index.html', '/__audit/club-entry-permit': 'public/index.html', '/__audit/dean-entry-permit': 'public/dashboards/dean-dashboard.html', '/attendance': 'public/attendance.html' };
 const types = { '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript', '.png': 'image/png', '.jpg': 'image/jpeg' };
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://127.0.0.1');
@@ -88,9 +88,9 @@ const server = http.createServer(async (req, res) => {
   res.end(fs.readFileSync(full));
 });
 
-const pages = baseline.files.filter((f) => f.path.endsWith('.html') && !f.path.includes('/components/')).map((f) => ({
+const pages = baseline.files.filter((f) => f.path.endsWith('.html') && !f.path.includes('/components/') && !f.path.startsWith('private/') && fs.existsSync(path.join(source,f.path))).map((f) => ({
   name: path.basename(f.path, '.html'),
-  url: f.path.startsWith('private/') ? f.path.includes('global-admin') ? '/admin/global' : '/admin/club-credentials' : f.path === 'public/index.html' ? '/' : f.path.slice(6),
+  url: f.path === 'public/index.html' ? '/' : f.path.slice(6),
 }));
 if (process.argv.includes('--all-pages')) {
   const walk = directory => fs.readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
@@ -115,12 +115,7 @@ const extras = [
   { name: 'attendance-valid-link', url: `/attendance?token=${'a'.repeat(44)}` },
   { name: 'calendar-open', url: '/', action: "window.openCalendarAt(2026,9,9); if(document.querySelector('.calendar-modal').classList.contains('hidden')) throw Error('Calendar not open')" },
   { name: 'club-details', url: '/', action: "document.querySelector('[data-action=\"view-club\"]').click()" },
-  { name: 'admin-analysis', url: '/admin/global', action: "[...document.querySelectorAll('.tab-btn')].find(b=>b.textContent.trim()==='Analysis').click()" },
-  { name: 'admin-anonymous-device-code', url: '/admin/global', expect: "document.getElementById('activePeopleList').innerText.includes('Device DEV-3A91BC72') && document.getElementById('activePeopleList').innerText.includes('iPhone') && document.getElementById('activePeopleList').innerText.includes('Safari') && document.getElementById('activePeopleList').innerText.includes('203.0.113.42')" },
-  { name: 'admin-university-publisher', url: '/admin/global', action: "[...document.querySelectorAll('.tab-btn')].find(b=>b.dataset.tab==='university').click();if(!document.getElementById('universityEventFields').hidden)throw Error('Announcement form should hide event-only fields');document.querySelector('input[name=imageChoice][value=custom]').click();if(document.getElementById('universityImageField').hidden)throw Error('Custom image picker did not open');document.querySelector('input[name=imageChoice][value=logo]').click();document.getElementById('universityPostType').value='event';document.getElementById('universityPostType').dispatchEvent(new Event('change',{bubbles:true}))", expect: "document.getElementById('tab-university').classList.contains('active') && !document.getElementById('universityEventFields').hidden && document.querySelector('#universityPostRecords').innerText.includes('MIU community update')" },
-  { name: 'admin-university-save-confirmed', url: '/admin/global', action: "[...document.querySelectorAll('.tab-btn')].find(b=>b.dataset.tab==='university').click();document.getElementById('universityPostTitle').value='Confirmed MIU announcement';document.getElementById('universityPostDescription').value='This post is confirmed by the database.';document.getElementById('universityPostForm').requestSubmit()", expect: "document.getElementById('universityPostMessage').textContent.includes('Published.')" },
-  { name: 'admin-university-save-failure', url: '/admin/global', action: "[...document.querySelectorAll('.tab-btn')].find(b=>b.dataset.tab==='university').click();document.getElementById('universityPostTitle').value='Unconfirmed MIU announcement';document.getElementById('universityPostDescription').value='This must not claim success.';document.getElementById('universityPostForm').requestSubmit()", expect: "document.getElementById('universityPostMessage').textContent.includes('Database write could not be confirmed.') && !document.getElementById('universityPostMessage').textContent.includes('Published.')" },
-  { name: 'university-feed', url: '/pages/feed.html', expect: "document.getElementById('communityFeedList').innerText.includes('MIU community update') && document.getElementById('communityFeedList').innerText.includes('University welcome event')" },
+            { name: 'university-feed', url: '/pages/feed.html', expect: "document.getElementById('communityFeedList').innerText.includes('MIU community update') && document.getElementById('communityFeedList').innerText.includes('University welcome event')" },
   { name: 'university-event-details', url: '/pages/event.html?university=702', expect: "document.getElementById('eventPageTitle').textContent==='University welcome event' && document.getElementById('regForm').hidden" },
   { name: 'university-event-calendar', url: '/', action: "window.openCalendarAt(2026,9,20)", expect: "document.getElementById('calendarGrid').innerText.includes('University welcome event')" },
   ...['pr', 'english', 'dean'].map((role) => ({ name: `${role}-request-details`, url: `/dashboards/${role}-dashboard.html`, action: "document.querySelector('#requestsList .view-details').click()", expect: "document.getElementById('requestDialog').open" })),

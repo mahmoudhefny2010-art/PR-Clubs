@@ -1,13 +1,4 @@
 .dashboard-drawer-toggle, .dashboard-drawer-close, .dashboard-drawer-heading, .dashboard-drawer-overlay { display: none; }
-.homepage-admin-layout { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 24px; align-items: start; }
-.homepage-admin-content { min-width: 0; }
-.admin-panel .homepage-admin-sidebar { position: sticky; top: 90px; display: flex; flex-direction: column; flex-wrap: nowrap; gap: 1px; max-height: calc(100dvh - 110px); overflow-y: auto; padding: 14px 12px; margin: 0; border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-soft); }
-.admin-panel .homepage-admin-sidebar > :is(a, button) { display: flex; align-items: center; justify-content: flex-start; box-sizing: border-box; width: 100%; min-height: 44px; margin: 0; padding: 10px 12px; border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--text-main); box-shadow: none; font-size: .9rem; line-height: 1.4; text-align: left; white-space: normal; }
-.admin-panel .homepage-admin-sidebar > :is(a, button):hover { background: var(--bg-soft); color: var(--primary-700); }
-.admin-panel .homepage-admin-sidebar > :is(a, button) { font: inherit; font-size: .9rem; font-weight: 650; line-height: 1.4; text-decoration: none; cursor: pointer; }
-:root[data-theme="dark"] body .admin-panel .homepage-admin-sidebar > :is(a, button) { background-color: transparent !important; color: var(--text-main) !important; border-color: transparent !important; }
-.homepage-admin-sidebar { scrollbar-width: none !important; }
-.homepage-admin-sidebar::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
 @media (max-width: 760px) {
   .dashboard-drawer-toggle { display: inline-flex; align-items: center; gap: 8px; justify-self: start; min-height: 44px; margin: 0 0 12px; }
   .dashboard-drawer-toggle:has(+ .hidden), .dashboard-drawer-toggle:has(+ [hidden]) { display: none; }
@@ -30,10 +21,10 @@
   .mobile-dashboard-drawer > .dashboard-drawer-heading,
   #adminTabs.mobile-dashboard-drawer > .dashboard-drawer-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 0 0 12px; margin-bottom: 8px; border-bottom: 1px solid var(--border-color); font-size: 16px; }
   .mobile-dashboard-drawer .dashboard-drawer-close { display: grid; place-items: center; width: 40px; height: 40px; min-height: 40px; padding: 0; margin: 0; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-soft); color: var(--text-main); font: inherit; font-size: 24px; line-height: 1; box-shadow: none; cursor: pointer; }
-  #adminTabs.mobile-dashboard-drawer > :is(button, a), .admin-panel .homepage-admin-sidebar > :is(button, a) { min-height: 44px; padding: 10px 12px; font-size: 14px; line-height: 1.4; box-shadow: none; }
+  #adminTabs.mobile-dashboard-drawer > :is(button, a){ min-height: 44px; padding: 10px 12px; font-size: 14px; line-height: 1.4; box-shadow: none; }
   #adminTabs.mobile-dashboard-drawer > :is(.active, .is-active) { box-shadow: inset 3px 0 var(--primary-700); }
   .mobile-dashboard-drawer > h2 { display: none !important; }
-  .committee-dashboard-layout, .president-dashboard-layout, .student-dashboard-layout, .report-admin-layout, .homepage-admin-layout { grid-template-columns: minmax(0, 1fr) !important; }
+  .committee-dashboard-layout, .president-dashboard-layout, .student-dashboard-layout, .report-admin-layout{ grid-template-columns: minmax(0, 1fr) !important; }
 }
 @media (prefers-reduced-motion: reduce) { .mobile-dashboard-drawer { transition: none !important; } }
 
@@ -58,8 +49,7 @@
     text-align: left !important;
   }
   .mobile-dashboard-drawer > :is(a, button):not(.dashboard-drawer-close),
-  #adminTabs.mobile-dashboard-drawer > :is(a, button):not(.dashboard-drawer-close),
-  .admin-panel .homepage-admin-sidebar.mobile-dashboard-drawer > :is(a, button) {
+  #adminTabs.mobile-dashboard-drawer > :is(a, button):not(.dashboard-drawer-close){
     justify-content: flex-start !important;
     min-width: 0 !important;
     min-height: 44px;
@@ -77,8 +67,7 @@
   }
   .mobile-dashboard-drawer > :is(a, button):not(.dashboard-drawer-close):hover,
   .mobile-dashboard-drawer > :is(a, button).is-active:not(.dashboard-drawer-close),
-  #adminTabs.mobile-dashboard-drawer > :is(a, button).is-active:not(.dashboard-drawer-close),
-  .admin-panel .homepage-admin-sidebar.mobile-dashboard-drawer > :is(a, button):hover {
+  #adminTabs.mobile-dashboard-drawer > :is(a, button).is-active:not(.dashboard-drawer-close){
     border-color: var(--border-color) !important;
     background: var(--bg-soft) !important;
     color: var(--primary-700) !important;
@@ -99,7 +88,6 @@
   body .committee-dashboard-layout .committee-sidebar.mobile-dashboard-drawer,
   body .president-dashboard-layout .president-sidebar.mobile-dashboard-drawer,
   body .student-dashboard-layout .student-dashboard-sidebar.mobile-dashboard-drawer,
-  body .admin-panel .homepage-admin-sidebar.mobile-dashboard-drawer,
   body #adminTabs.mobile-dashboard-drawer,
   body .mobile-dashboard-drawer {
     position: fixed !important;
@@ -140,7 +128,6 @@
   body .committee-dashboard-layout .committee-sidebar.mobile-dashboard-drawer.drawer-open,
   body .president-dashboard-layout .president-sidebar.mobile-dashboard-drawer.drawer-open,
   body .student-dashboard-layout .student-dashboard-sidebar.mobile-dashboard-drawer.drawer-open,
-  body .admin-panel .homepage-admin-sidebar.mobile-dashboard-drawer.drawer-open,
   body #adminTabs.mobile-dashboard-drawer.drawer-open,
   body .mobile-dashboard-drawer.drawer-open { transform: translateX(0); visibility: visible; }
   body .mobile-dashboard-drawer > .dashboard-drawer-heading {
@@ -239,7 +226,6 @@
   body .president-dashboard-layout .president-sidebar.mobile-dashboard-drawer > :is(a, button):not(.dashboard-drawer-close),
   body .student-dashboard-layout .student-dashboard-sidebar.mobile-dashboard-drawer .student-dashboard-nav-item,
   body .student-dashboard-layout .student-dashboard-sidebar.mobile-dashboard-drawer > .student-dashboard-explore,
-  body .admin-panel .homepage-admin-sidebar.mobile-dashboard-drawer > :is(a, button),
   body #adminTabs.mobile-dashboard-drawer > :is(a, button):not(.dashboard-drawer-close) {
     display: flex !important;
     flex: 0 0 auto !important;
@@ -280,16 +266,6 @@
     background: var(--primary-50, #fff1f2) !important;
     background: color-mix(in srgb, var(--primary-50, #fff1f2) 78%, var(--bg-panel)) !important;
     color: var(--primary-800, #991b1b) !important;
-  }
-  :root[data-theme="dark"] body .admin-panel .homepage-admin-sidebar.mobile-dashboard-drawer > :is(a, button) {
-    border-color: var(--border-color) !important;
-    background: var(--bg-panel) !important;
-    color: var(--text-muted) !important;
-  }
-  :root[data-theme="dark"] body .admin-panel .homepage-admin-sidebar.mobile-dashboard-drawer > :is(a, button).is-active {
-    border-color: rgba(185, 28, 28, .28) !important;
-    background: rgba(185, 28, 28, .13) !important;
-    color: #ff9299 !important;
   }
   body .mobile-dashboard-drawer .sidebar-unread-badge,
   body .mobile-dashboard-drawer .student-nav-count { margin: 0; }

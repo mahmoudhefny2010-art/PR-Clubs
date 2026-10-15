@@ -130,59 +130,8 @@
   }
 }
 
-/* Keep homepage-admin controls uniform and wrap them instead of clipping. */
-#adminView > .admin-panel > .admin-header {
-  align-items: flex-start;
-  flex-direction: column;
-}
-
-#adminView .admin-session-actions {
-  display: grid;
-  flex: 1 1 100%;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
-  align-items: stretch;
-  width: 100%;
-}
-
-#adminView .admin-session-actions > :is(a, button) {
-  box-sizing: border-box;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  min-width: 0;
-  min-height: 50px;
-  margin: 0;
-  padding: 10px 12px;
-  line-height: 1.2;
-  text-align: center;
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-
 /* Keep admin controls evenly sized and wrapped on narrow screens. */
 @media (max-width: 760px) {
-  .admin-session-actions {
-    box-sizing: border-box;
-    display: grid;
-    flex: 1 1 100%;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 165px), 1fr));
-    align-items: stretch;
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
-    overflow: visible;
-    padding: 0;
-    gap: 8px;
-  }
-  .admin-session-actions > :is(a, button) {
-    box-sizing: border-box;
-    width: 100%;
-    min-width: 0;
-    min-height: 44px;
-    padding: 10px 9px;
-    white-space: normal;
-  }
 }
 
 @keyframes slideDown {
@@ -258,25 +207,6 @@
     justify-content: flex-start;
   }
 
-  .admin-editor-form {
-    padding: 22px 0 0;
-    border-top: 1px solid var(--border-color);
-    border-left: 0;
-  }
-
-  .admin-club-row {
-    grid-template-columns: 44px minmax(0, 1fr);
-  }
-
-  .admin-club-row > img {
-    width: 44px;
-    height: 44px;
-  }
-
-  .admin-row-actions {
-    grid-column: 2;
-  }
-
   .committee-top,
   .application-row {
     align-items: flex-start;
@@ -310,10 +240,6 @@
   }
 
   .stats-summary {
-    grid-template-columns: 1fr;
-  }
-
-  .admin-form-grid {
     grid-template-columns: 1fr;
   }
 
@@ -584,32 +510,6 @@
 }
 
 @media (max-width: 640px) {
-  .admin-club-row {
-    box-sizing: border-box;
-    grid-template-columns: 44px minmax(0, 1fr);
-    gap: 10px 12px;
-    min-width: 0;
-    padding: 12px;
-  }
-  .admin-club-info { min-width: 0; overflow-wrap: anywhere; }
-  .admin-row-actions {
-    grid-column: 1 / -1;
-    display: grid;
-    grid-template-columns: 36px 36px minmax(60px, 1fr) minmax(72px, 1.1fr);
-    gap: 6px;
-    width: 100%;
-    min-width: 0;
-  }
-  .admin-row-actions > :is(button, a) {
-    box-sizing: border-box;
-    width: 100%;
-    min-width: 0;
-    padding-inline: 5px;
-    white-space: nowrap;
-  }
-  .admin-row-actions > .order-btn { height: 38px; }
-  .admin-row-actions > .secondary-btn,
-  .admin-row-actions > .delete-btn { min-height: 42px; font-size: .78rem; }
 }
 
 .nav-profile-dropdown { box-sizing: border-box; width: min(320px, calc(100vw - 24px)); max-height: calc(100dvh - 100px); overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-width: thin; }
@@ -623,39 +523,6 @@
 /* Size club management cards from their actual panel width, including narrow desktop columns. */
 #adminClubList { min-width: 0; container-type: inline-size; }
 @container (max-width: 460px) {
-  #adminClubList .admin-club-row {
-    box-sizing: border-box;
-    grid-template-columns: 44px minmax(0, 1fr);
-    gap: 10px 12px;
-    min-width: 0;
-    padding: 12px;
-  }
-  #adminClubList .admin-club-row > img { width: 44px; height: 44px; }
-  #adminClubList .admin-club-info { min-width: 0; overflow-wrap: anywhere; }
-  #adminClubList .admin-row-actions {
-    grid-column: 1 / -1;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    width: 100%;
-    min-width: 0;
-  }
-  #adminClubList .admin-row-actions > .order-btn {
-    box-sizing: border-box;
-    flex: 0 0 36px;
-    width: 36px;
-    height: 38px;
-    padding: 0;
-  }
-  #adminClubList .admin-row-actions > :is(.secondary-btn, .delete-btn) {
-    box-sizing: border-box;
-    flex: 1 1 78px;
-    min-width: 0;
-    min-height: 42px;
-    padding-inline: 7px;
-    font-size: .8rem;
-    white-space: nowrap;
-  }
 }
 
 /* Shared touch-friendly button sizing and wrapping across mobile pages. */

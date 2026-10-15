@@ -98,7 +98,9 @@
         note.textContent = person.note ? `Note: ${person.note}` : 'No note';
         const checkin = document.createElement('small');
         checkin.textContent = `Checked in: ${htmlDate(person.attendedAt)}`;
-        row.append(identity, email, ...(person.membershipStatus ? [membership] : []), note, checkin);
+        const eventRole = document.createElement('small');
+        eventRole.textContent = window.MiuUI.attendanceEventRoleLabel(person);
+        row.append(identity, email, eventRole, ...(person.membershipStatus ? [membership] : []), note, checkin);
         people.append(row);
       });
       const sheet = document.createElement('details');

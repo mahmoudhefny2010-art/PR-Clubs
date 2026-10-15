@@ -165,7 +165,7 @@ test('all requested dashboards can download per-event sheets while club ownershi
 
 test('each requested dashboard loads the shared native panel and controls', () => {
   const fs = require('node:fs'), path = require('node:path');
-  for (const file of ['public/index.html', 'public/dashboards/pr-dashboard.html', 'public/dashboards/sso-dashboard.html', 'public/dashboards/dean-dashboard.html', 'public/dashboards/supervisor-dashboard.html', 'private/global-admin.html']) {
+  for (const file of ['public/index.html', 'public/dashboards/pr-dashboard.html', 'public/dashboards/sso-dashboard.html', 'public/dashboards/dean-dashboard.html', 'public/dashboards/supervisor-dashboard.html']) {
     const html = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
     assert.equal((html.match(/src="\/assets\/js\/report-dashboard-panels.js/g) || []).length, 1, file);
     assert.equal((html.match(/src="\/assets\/js\/pages\/report-downloads.js/g) || []).length, 1, file);
@@ -287,4 +287,19 @@ test('open-event attendance stays in its own per-event sheet and labels membersh
   assert.equal(sheet.status, 200); assert.match(sheet.text, /Club member/); assert.match(sheet.text, /Member/);
   assert.match(sheet.text, /Engineering/); assert.match(sheet.text, /Non-member/); assert.doesNotMatch(sheet.text, /Member lane only/);
   assert.ok(filters.some(filter => filter.attendanceAudience === 'all_students'));
+});
+
+test('organizer and usher event roles export separately from membership and member club names', async t => {
+  const records = [
+    { clubId: 1, itemType: 'event', eventRequestId: 10, eventTitle: 'Opening', eventDate: '2026-01-01', name: 'Organizer Member', email: 'organizer@example.test', membershipStatus: 'member', memberClubNames: ['Engineering'], eventParticipation: { role: 'organizer' } },
+    { clubId: 1, itemType: 'event', eventRequestId: 10, eventTitle: 'Opening', eventDate: '2026-01-01', name: 'Usher Guest', email: 'usher@example.test', membershipStatus: 'non_member', memberClubNames: [], eventParticipation: { role: 'usher' } }
+  ];
+  const { request } = await harness(t, { AttendanceRecord: { find: () => q(records) }, StudentAccount: { find: () => q([]) } });
+  const perEvent = await request('/event-sheet.csv?clubId=1&period=all&eventKey=request:10&sheet=verified', 'president');
+  assert.equal(perEvent.status, 200); assert.match(perEvent.text, /"Event role"/);
+  assert.match(perEvent.text, /"Attendance category"/);
+  assert.match(perEvent.text, /"Organizer"\r?\n/); assert.match(perEvent.text, /"Usher"\r?\n|"Usher"$/);
+  assert.match(perEvent.text, /"Member","Engineering","Organizer"/); assert.match(perEvent.text, /"Non-member","","Usher"/);
+  const annual = await request('/attendance.csv?clubId=1&year=2026', 'president');
+  assert.equal(annual.status, 200); assert.match(annual.text, /"Member","Engineering","Organizer"/); assert.match(annual.text, /"Non-member","","Usher"/);
 });

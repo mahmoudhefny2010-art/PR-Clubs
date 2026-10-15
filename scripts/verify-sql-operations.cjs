@@ -43,8 +43,11 @@ async function browserChecks(origin, accounts, password, directory) {
       if (r.exceptionDetails) throw new Error('Browser evaluation failed'); return r.result.value;
     };
     const wait = async (expression, label) => {
-      for (let i = 0; i < 100; i++) { if (await evaluate(expression)) return; await sleep(100); }
-      throw new Error('Browser wait failed: ' + label);
+      for (let i = 0; i < 300; i++) { if (await evaluate(expression)) return; await sleep(100); }
+      const detail = await evaluate("JSON.stringify({page:location.pathname, loginFeedback:document.getElementById('loginFeedback')?.textContent, feedback:document.getElementById('usherSelfCheckinFeedback')?.textContent, status:document.getElementById('usherAttendanceStatus')?.textContent, invalid:[...document.querySelectorAll('#usherSelfCheckinForm input')].filter(e=>!e.validity.valid).map(e=>({id:e.id,message:e.validationMessage}))})");
+      const screenshot = await send('Page.captureScreenshot', { format: 'png' });
+      await fs.writeFile(path.join(directory, 'browser-failure.png'), Buffer.from(screenshot.data, 'base64'));
+      throw new Error('Browser wait failed: ' + label + ' ' + detail);
     };
     await send('Page.enable'); await send('Network.enable');
     // Block external resources; QA never needs Google, push or external assets.
@@ -54,10 +57,19 @@ async function browserChecks(origin, accounts, password, directory) {
       await send('Network.clearBrowserCookies');
       await send('Page.navigate', { url: origin + '/pages/applicant-login.html?redirect=/' });
       await wait("document.readyState === 'complete' && Boolean(document.getElementById('studentLoginForm')) && typeof studentReturnTarget === 'function'", 'login form scripts');
-      await evaluate(`document.getElementById('uniId').value=${JSON.stringify(account.email)}; document.getElementById('uniPassword').value=${JSON.stringify(password)}; document.getElementById('studentLoginForm').requestSubmit(); true;`);
+      await evaluate(`document.getElementById('uniId').value=${JSON.stringify(account.email)}; document.getElementById('uniPassword').value=${JSON.stringify(password)}; for(const id of ['uniId','uniPassword']) document.getElementById(id).dispatchEvent(new Event('input',{bubbles:true})); document.getElementById('studentLoginForm').requestSubmit(); true;`);
       await wait("!location.pathname.includes('applicant-login')", account.role + ' redirect');
-      const sessionPath = account.role === 'admin' ? '/api/admin/session' : account.role === 'student' ? '/api/student-auth/session' : '/api/club-auth/session';
+      const sessionPath = account.role === 'admin' ? '/api/admin/session' : ['student', 'usher'].includes(account.role) ? '/api/student-auth/session' : '/api/club-auth/session';
       assert.equal(await evaluate(`fetch(${JSON.stringify(sessionPath)}).then(async r => r.status===200 && (await r.json()).authenticated===true)`), true, account.role + ' browser session');
+      if (account.role === 'usher') {
+        await send('Page.navigate', { url: origin + '/pages/my-attendance-task.html' });
+        await wait("document.readyState === 'complete' && document.getElementById('usherTask')?.hidden === false", 'usher assigned task');
+        await evaluate("document.getElementById('acceptUsherTask').click(); true;");
+        await wait("document.getElementById('usherSelfCheckinForm')?.hidden === false", 'accepted usher self attendance form');
+        await evaluate("document.getElementById('usherSelfCheckinForm').requestSubmit(); true;");
+        await wait("document.getElementById('usherSelfCheckinForm')?.hidden === true && document.getElementById('usherAttendanceStatus').textContent.includes('recorded as an Usher')", 'usher self attendance saved');
+        console.log('PASS: browser usher task acceptance and self attendance');
+      }
       const screenshot = await send('Page.captureScreenshot', { format: 'png' });
       await fs.writeFile(path.join(directory, 'browser-' + account.role + '.png'), Buffer.from(screenshot.data, 'base64'));
       results.push({ role: account.role, loginForm: true, session: true, redirect: await evaluate('location.pathname') });
@@ -68,6 +80,9 @@ async function browserChecks(origin, accounts, password, directory) {
 }
 
 async function main(directory) {
+  const attendanceQa = process.argv.includes('--attendance');
+  const attendanceFocus = attendanceQa && process.argv.includes('--attendance-focus');
+  if (attendanceQa) process.env.SQLSERVER_REQUEST_TIMEOUT_MS = '90000';
   const source = process.env.SQLSERVER_DATABASE, config = localProfile(source);
   const backupDirectory = await fs.realpath(directory);
   const entries = await verifiedBackups(backupDirectory, source);
@@ -97,24 +112,59 @@ async function main(directory) {
     created = true;
     console.log('PASS: native backup restored to an isolated database');
     process.env.SQLSERVER_DATABASE = target;
+    // Isolated QA databases are created by the protected operations account.
+    process.env.SQLSERVER_USER = config.user;
+    process.env.SQLSERVER_PASSWORD = config.password;
     process.env.SQLSERVER_MIGRATION_TARGET_DATABASE = target;
     process.env.NODE_ENV = 'test';
     pool = await new sql.ConnectionPool({ ...config, database: target }).connect();
-    await pool.request().query('DBCC CHECKDB WITH PHYSICAL_ONLY, NO_INFOMSGS;');
-    report.restoreChecksumAndPhysicalCheck = true;
-    console.log('PASS: restored database physical integrity');
+    if (!attendanceFocus) await pool.request().query('DBCC CHECKDB WITH PHYSICAL_ONLY, NO_INFOMSGS;');
+    report.restoreChecksumAndPhysicalCheck = !attendanceFocus;
+    report.restoredWithChecksum = true;
+    console.log(attendanceFocus ? 'PASS: focused attendance QA uses a checksum-validated restore' : 'PASS: restored database physical integrity');
+    report.stage = 'seed isolated accounts';
     const { catalog } = require('../database/catalog');
     const models = Object.fromEntries(catalog().map(spec => [spec.name, require('../database/models').bindModel(spec.model)]));
     const runtime = require('../database/runtime'); await runtime.connect();
     const password = 'Qa-' + crypto.randomBytes(24).toString('hex');
     const hash = await require('../services/account-passwords').hashAccountPassword(password);
     const club = await models.Club.findOne({ archivedAt: null }).lean(); assert.ok(club);
-    const roles = ['president', 'head', 'pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'miu_events', 'software_development'];
+    const roles = attendanceFocus ? ['head', 'pr', 'sso', 'dean', 'supervisor'] : ['president', 'head', 'pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'miu_events', 'software_development'];
     const accounts = roles.map(role => ({ role, email: `qa-${role}-${suffix}@example.test` }));
     for (const account of accounts) await models.ClubAccount.create({ ...account, ...hash, clubId: ['president', 'head'].includes(account.role) ? club.id : 0, committee: 'QA ' + suffix, assignedClubIds: account.role === 'supervisor' ? [club.id] : [] });
     const student = { role: 'student', email: `qa-student-${suffix}@example.test` };
-    await models.StudentAccount.create({ email: student.email, name: 'QA Student', ...hash });
+    await models.StudentAccount.create({ email: student.email, name: 'QA Student', universityId: '00012', major: 'Engineering', ...hash });
     const admin = { role: 'admin', email: `qa-admin-${suffix}@example.test` };
+    const fixtureSecret = crypto.randomBytes(32).toString('hex');
+    let participation;
+    if (attendanceQa) {
+      report.stage = 'seed isolated attendance fixtures';
+      const parts = new Intl.DateTimeFormat('en', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+      const dateParts = Object.fromEntries(parts.map(part => [part.type, part.value]));
+      const today = `${dateParts.year}-${dateParts.month}-${dateParts.day}`;
+      const last = await models.UniversityContent.findOne().sort({ id: -1 }).lean();
+      const eventId = Number(last?.id || 0) + 1;
+      await models.UniversityContent.create({ id: eventId, type: 'event', title: 'QA Usher Event', description: 'Isolated attendance QA', date: today, time: '12:00', attendanceAudience: 'all_students', attendanceEnabled: true });
+      const memberEventId = eventId + 1;
+      await models.UniversityContent.create({ id: memberEventId, type: 'event', title: 'QA Members Usher Event', description: 'Isolated members attendance QA', date: today, time: '12:00', attendanceAudience: 'members', attendanceEnabled: true });
+      const organizer = { role: 'student', email: `qa-organizer-${suffix}@example.test` };
+      const browserUsher = { role: 'usher', email: `qa-browser-usher-${suffix}@example.test` };
+      for (const account of [organizer, browserUsher]) await models.StudentAccount.create({ email: account.email, name: 'QA ' + account.role, universityId: '00013', major: 'Engineering', ...hash });
+      for (const email of [student.email, accounts.find(a => a.role === 'head').email, browserUsher.email]) {
+        const id = new (require('mongoose').Types.ObjectId)();
+        const token = crypto.createHmac('sha256', fixtureSecret).update(`miu-attendance-usher:${String(id)}:${email}`).digest('base64url');
+        await models.AttendanceSession.create({ _id: id, clubId: 0, sourceType: 'miu', itemType: 'event', eventRequestId: email === browserUsher.email ? memberEventId : eventId, eventTitle: email === browserUsher.email ? 'QA Members Usher Event' : 'QA Usher Event', eventDate: today, eventTime: '12:00', attendanceAudience: email === browserUsher.email ? 'members' : 'all_students', tokenHash: crypto.createHash('sha256').update(token).digest('hex'), createdBy: admin.email, assignedMemberEmail: email, assignedSupervisorEmail: accounts.find(a => a.role === 'supervisor').email });
+      }
+      const clubEventId = eventId + 100000;
+      await models.Club.updateOne({ id: club.id }, { $push: {
+        events: { requestId: clubEventId, title: 'QA Organizer Event', date: today, time: '12:00', attendanceEnabled: true, attendanceAudience: 'members' },
+        memberRoster: { id: 'qa-member-' + suffix, name: 'QA Organizer', email: organizer.email, committee: 'QA', position: 'Member', memberType: 'new' }
+      } });
+      const assignment = await models.AttendanceAssignment.create({ clubId: club.id, clubName: club.name, itemType: 'event', eventRequestId: clubEventId, eventTitle: 'QA Organizer Event', eventDate: today, eventTime: '12:00', memberEmail: organizer.email, memberName: 'QA Organizer', committee: 'QA', assignedBy: admin.email });
+      participation = { eventId, memberEventId, organizer, browserUsher, assignmentId: String(assignment._id), clubEventId, clubId: club.id };
+    }
+    console.log('PASS: isolated accounts and attendance fixtures ready');
+    if (!attendanceFocus) {
     const ttlRecords = [];
     for (const targetSpec of ttlTargets()) {
       for (const expired of [true, false]) {
@@ -137,31 +187,39 @@ async function main(directory) {
     assert.deepEqual(await Promise.all(['Club', 'ClubAccount', 'StudentAccount', 'UniversityContent'].map(name => models[name].countDocuments())), before);
     report.cleanup = { expiredFixturesDeleted: 6, unexpiredFixturesRetained: 6, accountAndContentCountsUnchanged: true };
     console.log('PASS: TTL cleanup removes expired fixtures and retains live data');
+    }
+    report.stage = 'launch isolated application';
     await runtime.disconnect();
-    const env = { ...process.env, LOCAL_DATA_DIRECTORY: path.join(reportDirectory, 'data'), ADMIN_EMAIL: admin.email, ADMIN_PASSWORD: password, ADMIN_SESSION_SECRET: crypto.randomBytes(32).toString('hex'), MONGO_URI: '', VERCEL: '', VERCEL_URL: '', SQLSERVER_INTEGRATION_TESTS: 'false' };
+    const env = { ...process.env, LOCAL_DATA_DIRECTORY: path.join(reportDirectory, 'data'), ADMIN_EMAIL: admin.email, ADMIN_PASSWORD: password, ADMIN_SESSION_SECRET: fixtureSecret, MONGO_URI: '', VERCEL: '', VERCEL_URL: '', SQLSERVER_INTEGRATION_TESTS: 'false', SQLSERVER_REQUEST_TIMEOUT_MS: '90000' };
     for (const key of Object.keys(env)) if (/(SMTP|MAIL|ONESIGNAL|CLOUDINARY|GOOGLE)/i.test(key) && !['ADMIN_EMAIL'].includes(key)) env[key] = '';
     child = fork(path.join(__dirname, 'provider-staging-server.cjs'), [], { env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe', 'ipc'] });
-    child.stdout.resume(); child.stderr.resume();
+    child.stdout.resume();
+    child.stderr.on('data', chunk => {
+      for (const line of chunk.toString().split(/\r?\n/)) if (/^Usher attendance failed: [A-Za-z_]+$/.test(line)) console.log(line);
+    });
     const origin = await new Promise((resolve, reject) => {
       const timeout = setTimeout(() => reject(new Error('QA application startup timeout')), 60000);
       child.once('error', error => { clearTimeout(timeout); reject(error); });
       child.once('exit', () => { clearTimeout(timeout); reject(new Error('QA application exited before startup')); });
       child.on('message', message => { if (message.type === 'ready') { clearTimeout(timeout); resolve('http://127.0.0.1:' + message.port); } if (message.type === 'failed') { clearTimeout(timeout); reject(new Error('QA application initialization failed')); } });
     });
+    report.stage = 'HTTP attendance verification';
     const call = async (name, method, endpoint, expected, body, cookie = '') => {
-      const response = await fetch(origin + endpoint, { method, headers: { 'Content-Type': 'application/json', Origin: origin, Cookie: cookie }, body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(30000), redirect: 'manual' });
+      const response = await fetch(origin + endpoint, { method, headers: { 'Content-Type': 'application/json', Origin: origin, Cookie: cookie }, body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(90000), redirect: 'manual' });
       const text = await response.text(); let data; try { data = JSON.parse(text); } catch {}
+      if (response.status !== expected) report.failedCase = { name, method, endpoint, status: response.status, expected };
       assert.equal(response.status, expected, name + ': ' + method + ' ' + endpoint);
       report.cases.push({ name, method, endpoint, status: response.status });
       console.log('PASS:', name);
       const cookies = response.headers.getSetCookie().map(c => c.split(';')[0]).filter(c => !c.endsWith('=')).join('; ');
-      return { data, cookie: cookies };
+      return { data, text, cookie: cookies };
     };
+    const sessions = {};
+    if (!attendanceFocus) {
     await call('Guest admin guard', 'GET', '/api/admin/homepage', 401);
     await call('Guest club guard', 'GET', '/api/club/dashboard', 401);
     await call('Guest student guard', 'GET', '/api/student-auth/profile', 401);
     await call('Wrong password', 'POST', '/api/auth/login', 401, { email: student.email, password: 'wrong-password' });
-    const sessions = {};
     for (const account of [admin, ...accounts, student]) {
       const session = await call(account.role + ' login', 'POST', '/api/auth/login', 200, { email: account.email, password });
       assert.equal(session.data.role, account.role); assert.ok(session.cookie); sessions[account.role] = session.cookie;
@@ -194,8 +252,72 @@ async function main(directory) {
     await call('Student profile update', 'PUT', '/api/student-auth/profile', 200, { name: 'QA Edited', universityId: '00012', major: 'QA', age: '20' }, sessions.student);
     await call('Student logout', 'POST', '/api/student-auth/logout', 204, {}, sessions.student);
     await call('Revoked student cookie denied', 'GET', '/api/student-auth/profile', 401, undefined, sessions.student);
-    report.browser = await browserChecks(origin, [admin, ...accounts, student], password, reportDirectory);
+    } else {
+      for (const account of [admin, student, ...accounts.filter(a => ['head', 'supervisor', 'pr', 'sso', 'dean'].includes(a.role))]) {
+        sessions[account.role] = (await call(account.role + ' focused QA sign-in', 'POST', '/api/auth/login', 200, { email: account.email, password })).cookie;
+      }
+    }
+    if (participation) {
+      const merge = (...strings) => [...new Map(strings.join('; ').split('; ').filter(Boolean).map(cookie => [cookie.split('=')[0], cookie])).values()].join('; ');
+      const login = await call('Usher sign-in after logout', 'POST', '/api/auth/login', 200, { email: student.email, password });
+      let usherCookie = login.cookie;
+      await call('Usher cannot self-check-in before task acceptance', 'POST', '/api/miu-attendance-task/check-in', 403, {}, usherCookie);
+      await call('Usher accepts assigned event', 'POST', '/api/miu-attendance-task/accept', 200, {}, usherCookie);
+      const recorded = await call('Usher records own attendance', 'POST', '/api/miu-attendance-task/check-in', 201, { email: 'forged@example.test', name: 'Forged identity', eventParticipation: { role: 'admin' }, clubId: 999 }, usherCookie);
+      usherCookie = merge(usherCookie, recorded.cookie);
+      await call('Usher repeat does not duplicate attendance', 'POST', '/api/miu-attendance-task/check-in', 200, {}, usherCookie);
+      await call('Usher cannot switch devices', 'POST', '/api/miu-attendance-task/check-in', 403, {}, login.cookie);
+      const status = await call('Usher status survives page reload', 'GET', '/api/miu-attendance-task', 200, undefined, usherCookie);
+      assert.equal(status.data.task.attendanceAsUsher, true);
+      const qr = await call('Usher QR remains available after self-check-in', 'POST', '/api/miu-attendance-task/session', 200, {}, usherCookie);
+      await call('Usher presents rotating QR on same device', 'POST', '/api/miu-attendance-task/qr-challenge', 200, { token: qr.data.token }, usherCookie);
+      // A real staff login clears the student/admin cookies; preserve only the
+      // device cookies when simulating another signed-in user in the same browser.
+      const shared = merge(usherCookie.split('; ').filter(cookie => !cookie.startsWith('miu_student=') && !cookie.startsWith('miu_admin=')).join('; '), sessions.head);
+      await call('Second usher accepts their own task', 'POST', '/api/miu-attendance-task/accept', 200, {}, shared);
+      await call('Same device cannot record a different usher', 'POST', '/api/miu-attendance-task/check-in', 409, { name: 'QA Head', universityId: '0010', major: 'QA' }, shared);
+      const organizer = await call('Organizer signs in', 'POST', '/api/auth/login', 200, { email: participation.organizer.email, password });
+      await call('Organizer accepts club task', 'POST', '/api/member/attendance-assignments/' + participation.assignmentId + '/accept', 200, {}, organizer.cookie);
+      const own = await call('Organizer records own club attendance', 'POST', '/api/member/attendance-assignments/' + participation.assignmentId + '/check-in', 201, {}, organizer.cookie);
+      const ownCookie = merge(organizer.cookie, own.cookie);
+      await call('Organizer repeats without duplicate', 'POST', '/api/member/attendance-assignments/' + participation.assignmentId + '/check-in', 200, {}, ownCookie);
+      await call('Organizer cannot switch devices', 'POST', '/api/member/attendance-assignments/' + participation.assignmentId + '/check-in', 403, {}, organizer.cookie);
+      const snapshot = (await pool.request().input('usher', sql.NVarChar, student.email).input('organizer', sql.NVarChar, participation.organizer.email)
+        .query('SELECT [_payload] FROM [dbo].[AttendanceRecord] WHERE [email] IN (@usher,@organizer);')).recordset.map(row => JSON.parse(row._payload));
+      assert.equal(snapshot.length, 2);
+      assert.equal(snapshot.find(row => row.email === student.email).eventParticipation.role, 'usher');
+      assert.equal(snapshot.find(row => row.email === student.email).membershipStatus, 'non_member');
+      assert.equal(snapshot.find(row => row.email === student.email).approvalStatus, 'pending_supervisor');
+      assert.equal(snapshot.find(row => row.email === participation.organizer.email).eventParticipation.role, 'organizer');
+      assert.equal(snapshot.find(row => row.email === participation.organizer.email).membershipStatus, 'member');
+      const exportPath = '/api/report-downloads/event-sheet.xlsx?clubId=0&period=all&eventKey=request:' + participation.eventId + '&sheet=verified&audience=all_students';
+      const exported = await fetch(origin + exportPath, { headers: { Cookie: sessions.admin }, signal: AbortSignal.timeout(30000) });
+      assert.equal(exported.status, 200);
+      const workbook = new (require('exceljs').Workbook)(); await workbook.xlsx.load(Buffer.from(await exported.arrayBuffer()));
+      const sheet = workbook.getWorksheet('Attendance'); const headings = sheet.getRow(1).values;
+      assert.equal(sheet.rowCount, 2); assert.equal(sheet.getRow(2).getCell(headings.indexOf('Event role')).value, 'Usher');
+      assert.equal(sheet.getRow(2).getCell(headings.indexOf('Membership')).value, 'Non-member');
+      report.cases.push({ name: 'Actual SQL attendance Excel role and membership', status: 200 });
+      report.eventParticipation = { usher: true, organizer: true, oneEmailOneDevice: true, sameReviewWorkflow: true, excel: true };
+    }
+    report.stage = 'browser attendance verification';
+    report.browser = await browserChecks(origin, attendanceFocus ? [participation.browserUsher] : [admin, ...accounts, student, ...(participation ? [participation.browserUsher] : [])], password, reportDirectory);
+    if (participation) {
+      report.stage = 'full attendance review chain';
+      for (const [eventId, attendanceAudience] of [[participation.eventId, 'all_students'], [participation.memberEventId, 'members']]) {
+        await call('End ' + attendanceAudience + ' MIU event', 'POST', '/api/miu/attendance-events/' + eventId + '/end', 200, {}, sessions.pr);
+        const reviews = await call('Supervisor sees ' + attendanceAudience + ' ushers', 'GET', '/api/supervisor/miu-attendance', 200, undefined, sessions.supervisor);
+        const review = reviews.data.reviews.find(r => r.eventRequestId === eventId && r.attendanceAudience === attendanceAudience);
+        assert.ok(review?.records.some(r => r.eventParticipation?.role === 'usher'));
+        await call('Supervisor approves ' + attendanceAudience + ' usher attendance', 'POST', '/api/supervisor/miu-attendance/' + eventId + '/decision', 200, { action: 'approve', attendanceAudience }, sessions.supervisor);
+        for (const role of ['pr', 'sso', 'dean']) await call(role + ' approves ' + attendanceAudience + ' usher attendance', 'POST', '/api/committee/attendance-reviews/0/event/' + eventId + '/approve?audience=' + attendanceAudience, 200, { action: 'approve' }, sessions[role]);
+      }
+      const approved = (await pool.request().input('id', sql.BigInt, participation.memberEventId).query('SELECT [approvalStatus] FROM [dbo].[AttendanceRecord] WHERE [clubId]=0 AND [eventRequestId]=@id;')).recordset;
+      assert.ok(approved.length && approved.every(r => r.approvalStatus === 'approved'));
+      report.eventParticipation.fullReviewChainBothAudiences = true;
+    }
     report.passed = true;
+    report.stage = 'complete';
   } finally {
     if (child) { child.send?.({ type: 'stop' }); await Promise.race([new Promise(resolve => child.once('exit', resolve)), sleep(10000)]); if (child.exitCode === null) child.kill(); }
     await require('../database/runtime').disconnect().catch(() => {});

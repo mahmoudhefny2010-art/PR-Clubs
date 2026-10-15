@@ -59,7 +59,7 @@ for (const file of files) {
   }
 }
 const homepage = read(path.join(publicRoot, 'index.html'));
-const orderedScripts = ['app-home.js', 'app-admin.js', 'app-dashboard.js'];
+const orderedScripts = ['app-home.js', 'app-forms.js', 'app-dashboard.js'];
 const positions = orderedScripts.map((name) => homepage.indexOf(`/assets/js/${name}`));
 assert.ok(positions.every((pos, i) => pos >= 0 && (!i || pos > positions[i - 1])), 'Homepage shared globals must load in the original order');
 new vm.Script(orderedScripts.map((file) => read(path.join(publicRoot, 'assets/js', file))).join('\n'), { filename: 'homepage-shared-scope.js' });

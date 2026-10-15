@@ -43,7 +43,7 @@ function fixture() {
     Application: { aggregate: () => chain([]) },
     require: () => ({ StudentFeedback: { aggregate: () => chain([]) } }),
     publicFields: '', publicClubProjection: () => ({}), sendRevalidatedPublicJson: (req, res, records) => res.json(records),
-    toApiRecord: value => value,
+    toApiRecord: value => value, sanitizePublicClub: require('../services/public-club-media').sanitizePublicClub,
     cleanText: (value, limit) => String(value || '').trim().slice(0, limit), positiveNumber: value => Math.max(0, Number(value) || 0),
     normalizeApplicationFields: value => value || [],
     cloudinaryFolders: { club: 'clubs' }, readCloudinaryAsset: async url => ({ url, publicId: 'test-only' }),

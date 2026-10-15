@@ -10,3 +10,7 @@ scripts/
 *.pptx
 dev.js
 seed.js
+data/
+ses_*.json
+*.bak
+*.bak.enc

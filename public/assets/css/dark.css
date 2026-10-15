@@ -89,8 +89,7 @@
   .content-card, .module-card, .module-nav a, #adminDataStatusSections > *,
   .committee-head-manager, .committee-head-row, .committee-head-edit-form,
   .application-form-builder, .application-question-editor, .interview-section-editor,
-  .interview-question-editor, .modal-interview-section, .admin-club-section,
-  .admin-club-row, .admin-editor-form, .admin-data-status-card,
+  .interview-question-editor, .modal-interview-section,
   .approval-checkpoint-request, .approval-checkpoint-more-row, .calendar-panel,
   .calendar-detail, .calendar-day, .event-tile, .post-tile, .post-detail,
   .event-timeline-content, .feed-timeline-content, .event-page-content,
@@ -231,8 +230,8 @@
 :root[data-theme="dark"] body :is(.event-timeline-marker, .feed-timeline-marker) { background-color: var(--bg-panel) !important; box-shadow: 0 0 0 4px var(--bg-panel); }
 :root[data-theme="dark"] body :is(table, th, td) { border-color: var(--border-color) !important; }
 :root[data-theme="dark"] body th { color: var(--text-muted) !important; }
-:root[data-theme="dark"] body :is(.dashboard-sync-grid span, .admin-data-status-database) { border-color: var(--success-border) !important; background: var(--success-bg) !important; color: #9aefbe !important; }
-:root[data-theme="dark"] body :is(.dashboard-sync-grid span[data-sync-state="error"], .admin-data-status-failure) { border-color: var(--danger-border) !important; background: var(--danger-bg) !important; color: #ffabb1 !important; }
+:root[data-theme="dark"] body :is(.dashboard-sync-grid span) { border-color: var(--success-border) !important; background: var(--success-bg) !important; color: #9aefbe !important; }
+:root[data-theme="dark"] body :is(.dashboard-sync-grid span[data-sync-state="error"]) { border-color: var(--danger-border) !important; background: var(--danger-bg) !important; color: #ffabb1 !important; }
 :root[data-theme="dark"] body .dashboard-sync-grid span[data-sync-state="loading"] { border-color: var(--warning-border) !important; background: var(--warning-bg) !important; color: #ffd279 !important; }
 
 /* Review and permit cards are shared by PR, Dean, English, and Security dashboards.
@@ -314,7 +313,7 @@
 :root[data-theme="dark"] body:has(.error-card) :is(.back-action, .retry-action) { background: var(--bg-soft) !important; color: var(--text-main) !important; border-color: var(--border-color) !important; }
 
 /* Dialogs and overlays. */
-:root[data-theme="dark"] body :is(dialog, .modal, .modal-card, .request-dialog-inner, .approval-checkpoint-more-inner, .admin-data-status-dialog, .committee-availability-dialog, .attendance-review-dialog) {
+:root[data-theme="dark"] body :is(dialog, .modal, .modal-card, .request-dialog-inner, .approval-checkpoint-more-inner, .committee-availability-dialog, .attendance-review-dialog) {
   background-color: var(--bg-panel) !important;
   color: var(--text-main) !important;
   border-color: var(--border-color) !important;

@@ -98,12 +98,6 @@
   text-transform: uppercase;
 }
 
-.admin-session-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
 .admin-settings-form {
   margin-bottom: 28px;
   padding: 20px;
@@ -121,20 +115,6 @@
   align-items: start;
 }
 
-.admin-club-section {
-  padding: 20px;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  background: var(--bg-panel);
-}
-
-.admin-editor-form {
-  padding: 22px;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  background: var(--bg-panel);
-}
-
 .admin-section-heading {
   display: flex;
   align-items: center;
@@ -146,12 +126,6 @@
 .admin-section-heading h3 { margin: 0; font-size: 1.05rem; }
 
 .admin-count { color: var(--text-muted); font-size: .9rem; font-weight: 600; }
-
-.admin-form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0 16px;
-}
 
 .admin-field-full { grid-column: 1 / -1; }
 
@@ -325,40 +299,6 @@
 
 .my-forms-panel .form-row, .committee-card .form-row { grid-template-columns: 1fr; }
 
-.admin-club-row {
-  display: grid;
-  grid-template-columns: 64px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 16px;
-  padding: 14px 16px;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  background: var(--bg-panel);
-  margin-bottom: 12px;
-}
-
-.admin-club-info {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.admin-club-info strong {
-  font-size: 1rem;
-}
-
-.admin-club-info span {
-  color: var(--text-muted);
-  font-size: .85rem;
-}
-
-.admin-row-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .order-btn {
   width: 34px;
   height: 34px;
@@ -374,15 +314,6 @@
 }
 
 .order-btn:disabled { opacity: .4; cursor: not-allowed; }
-
-.admin-club-row > img {
-  display: block;
-  width: 64px;
-  height: 64px;
-  object-fit: contain;
-  border-radius: 50%;
-  background: #fff;
-}
 
 .applicant-photo-preview-frame {
   position: relative;
@@ -761,7 +692,9 @@
 .member-roster-card strong { display: block; }
 .member-roster-card p { margin: 4px 0 0; color: var(--text-muted); }
 .member-type-pill { flex: 0 0 auto; padding: 6px 10px; border-radius: var(--radius-full); background: var(--primary-50); color: var(--primary-800); font-size: .76rem; font-weight: 800; }
-.member-roster-actions { display: flex; align-items: center; gap: 8px; }
+.member-roster-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.member-removal-confirmation { width: 100%; display: grid; gap: 12px; }
+.member-removal-confirmation .member-role-edit-actions { flex-wrap: wrap; }
 .member-role-edit-btn { padding: 7px 12px; white-space: nowrap; }
 .member-role-edit-form { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(160px, .7fr) auto; align-items: end; gap: 12px; width: 100%; }
 .member-role-edit-form label { display: grid; gap: 5px; color: var(--text-muted); font-size: .86rem; font-weight: 700; }

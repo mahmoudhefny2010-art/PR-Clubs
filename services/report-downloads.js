@@ -126,7 +126,7 @@ function registerReportDownloads(app, deps) {
           : { attendanceAudience: { $in: ['members', null] } };
         const records = await AttendanceRecord.find({ clubId: event.clubId, eventRequestId: event.attendanceId, ...audienceFilter,
           ...(event.itemType === 'booth' ? { itemType: 'booth' } : { $or: [{ itemType: 'event' }, { itemType: { $exists: false } }] }) })
-          .select('name email universityId major itemType eventRequestId eventTitle eventDate attendedAt approvalStatus approvalHistory note attendanceAudience membershipStatus memberClubNames').lean();
+          .select('name email universityId major itemType eventRequestId eventTitle eventDate attendedAt approvalStatus approvalHistory note attendanceAudience membershipStatus memberClubNames eventParticipation').lean();
         people = records.filter(r => r.eventRequestId === event.attendanceId && (r.itemType || 'event') === event.itemType && (event.attendanceId > 0 || r.eventTitle === event.title && r.eventDate === event.date));
       }
       if (!people.length) return res.status(404).json({ message: sheet === 'registered'
@@ -135,14 +135,15 @@ function registerReportDownloads(app, deps) {
       const emails = [...new Set(people.map(p => String(p.email || '').trim().toLowerCase()).filter(Boolean))];
       const students = emails.length ? await StudentAccount.find({ email: { $in: emails } }).select('name email universityId major').lean() : [];
       const profiles = new Map(students.map(s => [s.email.toLowerCase(), s]));
-      const rows = [['Club', 'Event', 'Event date', 'From time', 'To time', 'Type', 'Full name', 'MIU ID', 'MIU email', 'Major', 'Membership', 'Member clubs', 'Sheet type', 'Checked in at', 'Approval status']];
+      const rows = [['Club', 'Event', 'Event date', 'From time', 'To time', 'Type', 'Full name', 'MIU ID', 'MIU email', 'Major', 'Membership', 'Member clubs', 'Event role', 'Sheet type', 'Checked in at', 'Approval status', 'Attendance category']];
       people.sort((a, b) => String(a.name).localeCompare(String(b.name)));
       for (const person of people) {
         const profile = profiles.get(String(person.email || '').trim().toLowerCase());
-        rows.push([event.clubName, event.title, event.date, event.startTime, event.endTime, event.itemType, profile?.name || person.name, person.universityId || profile?.universityId || '', person.email, person.major || profile?.major || '', audience === 'all_students' ? (person.membershipStatus === 'member' ? 'Member' : 'Non-member') : '', audience === 'all_students' ? (person.memberClubNames || []).join('; ') : '', sheet === 'registered' ? 'Registered (not proof of attendance)' : 'Verified check-in', person.attendedAt ? new Date(person.attendedAt).toISOString() : '', person.approvalStatus || '']);
+        const membership = person.membershipStatus === 'member' ? 'Member' : person.membershipStatus === 'non_member' ? 'Non-member' : '';
+        rows.push([event.clubName, event.title, event.date, event.startTime, event.endTime, event.itemType, profile?.name || person.name, person.universityId || profile?.universityId || '', person.email, person.major || profile?.major || '', membership, (person.memberClubNames || []).join('; '), sheet === 'registered' ? '' : require('./attendance-participation').eventRoleLabel(person), sheet === 'registered' ? 'Registered (not proof of attendance)' : 'Verified check-in', person.attendedAt ? new Date(person.attendedAt).toISOString() : '', person.approvalStatus || '', sheet === 'registered' ? '' : require('./attendance-participation').attendanceCategory(person)]);
       }
       if (req.path.endsWith('.xlsx')) {
-        const buffer = await require('./attendance-workbook').attendanceWorkbook(rows, { event, sheet, people, period: range });
+        const buffer = await require('./attendance-workbook').attendanceWorkbook(rows, { event, sheet, people, period: range, attendanceAudience: audience });
         const filenamePrefix = audience === 'all_students' ? 'open-event-attendance' : `${sheet}-club-attendance`;
         res.setHeader('Content-Disposition', `attachment; filename="${filenamePrefix}-${event.clubId}-${event.key.replace(/[^a-zA-Z0-9-]/g, '-')}.xlsx"`);
         return res.type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet').send(Buffer.from(buffer));
@@ -171,12 +172,12 @@ function registerReportDownloads(app, deps) {
       if (kind === 'attendance') {
         const records = await AttendanceRecord.find({ clubId: { $in: ids }, eventDate: { $gte: range.start, $lte: range.end },
           $or: [{ attendanceAudience: 'members' }, { attendanceAudience: { $exists: false } }] })
-          .select('clubId itemType eventRequestId eventTitle eventDate eventTime name email universityId major attendedAt approvalStatus').lean();
+          .select('clubId itemType eventRequestId eventTitle eventDate eventTime name email universityId major attendedAt approvalStatus membershipStatus memberClubNames eventParticipation').lean();
         const attendance = records.filter(r => period(r.eventDate, r.eventDate));
         const emails = [...new Set(attendance.map(r => String(r.email || '').trim().toLowerCase()).filter(Boolean))];
         const students = emails.length ? await StudentAccount.find({ email: { $in: emails } }).select('email name universityId major').lean() : [];
         const profiles = new Map(students.map(s => [s.email.toLowerCase(), s]));
-        rows = [['Club', 'Event', 'Event date', 'From time', 'To time', 'Type', 'Full name', 'MIU ID', 'MIU email', 'Major', 'Checked in at', 'Approval status', 'Profile data status']];
+        rows = [['Club', 'Event', 'Event date', 'From time', 'To time', 'Type', 'Full name', 'MIU ID', 'MIU email', 'Major', 'Checked in at', 'Approval status', 'Profile data status', 'Membership', 'Member clubs', 'Event role', 'Attendance category']];
         attendance.sort((a, b) => String(a.eventDate).localeCompare(String(b.eventDate)) || String(a.eventTitle).localeCompare(String(b.eventTitle)) || String(a.name).localeCompare(String(b.name)));
         for (const record of attendance) {
           const profile = profiles.get(String(record.email || '').trim().toLowerCase());
@@ -190,7 +191,9 @@ function registerReportDownloads(app, deps) {
             activity?.startTime || activity?.time || activity?.boothOpenTime || record.eventTime || '', activity?.endTime || activity?.boothCloseTime || '', type,
             profile?.name || record.name, record.universityId || profile?.universityId || '', record.email, record.major || profile?.major || '',
             record.attendedAt ? new Date(record.attendedAt).toISOString() : '', record.approvalStatus,
-            (record.universityId || profile?.universityId) && (record.major || profile?.major) ? 'Available (attendance record or student profile)' : 'Missing ID or major in student profile']);
+            (record.universityId || profile?.universityId) && (record.major || profile?.major) ? 'Available (attendance record or student profile)' : 'Missing ID or major in student profile',
+            record.membershipStatus === 'member' ? 'Member' : record.membershipStatus === 'non_member' ? 'Non-member' : '',
+            (record.memberClubNames || []).join('; '), require('./attendance-participation').eventRoleLabel(record), require('./attendance-participation').attendanceCategory(record)]);
         }
       } else {
         const [reports, registrations, attendance] = await Promise.all([

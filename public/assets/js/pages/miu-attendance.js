@@ -90,7 +90,7 @@
     finally { start.disabled = false; }
   });
   $('miuAttendanceEnd').addEventListener('click', async () => {
-    if (!eventId || !confirm('End check-in for this MIU event and close all assigned usher QR sessions?')) return;
+    if (!eventId || !await (window.miuConfirmAction || window.confirm)('End check-in for this MIU event and close all assigned usher QR sessions?')) return;
     $('miuAttendanceEnd').disabled = true;
     try {
       await api(`/api/miu/attendance-events/${encodeURIComponent(eventId)}/end`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });

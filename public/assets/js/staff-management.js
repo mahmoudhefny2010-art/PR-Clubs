@@ -4,8 +4,6 @@
   const emailRoleStatus = document.getElementById('staffEmailRoleStatus');
   const rowsHost = document.getElementById('staffRoleAssignments');
   const addRoleButton = document.getElementById('staffAddRoleBtn');
-  const password = document.getElementById('staffPassword');
-  const confirmPassword = document.getElementById('staffConfirmPassword');
   const feedback = document.getElementById('staffFeedback');
   const accounts = document.getElementById('staffAccounts');
   const search = document.getElementById('staffSearch');
@@ -136,7 +134,6 @@
   }
 
   function edit(account) {
-    password.value = ''; confirmPassword.value = ''; confirmPassword.required = false;
     email.value = account.email;
     updateEmailRoleStatus();
     rowsHost.replaceChildren();
@@ -231,7 +228,7 @@
       const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'text-button staff-delete-account'; remove.textContent = 'Delete account';
       remove.setAttribute('aria-label', `Delete staff roles for ${account.email}`);
       remove.onclick = async () => {
-        if (!window.confirm(`Delete all dashboard roles for ${account.email}? This removes this account's staff dashboard access.`)) return;
+        if (!await (window.miuConfirmAction || window.confirm)(`Delete all dashboard roles for ${account.email}? This removes this account's staff dashboard access.`)) return;
         remove.disabled = true;
         try {
           const result = await api({ method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: account.email }) });
@@ -239,7 +236,6 @@
           data.accounts = data.accounts.filter(item => item.email.toLowerCase() !== account.email.toLowerCase());
           if (email.value.trim().toLowerCase() === account.email.toLowerCase()) {
             form.reset(); rowsHost.replaceChildren(); makeAssignmentRow(); refreshRows();
-            confirmPassword.required = false;
           }
           render(); updateEmailRoleStatus();
           feedback.classList.remove('is-error'); feedback.textContent = result.message;
@@ -281,7 +277,6 @@
 
   addRoleButton.addEventListener('click', () => { makeAssignmentRow(); refreshRows(); rowsHost.lastElementChild.querySelector('select').focus(); });
   email.addEventListener('input', () => { updateEmailRoleStatus(); refreshEmailRoleStatus(); });
-  password.addEventListener('input', () => { confirmPassword.required = Boolean(password.value); });
   let directoryLookupRevision = 0;
   let directoryLookupTimer;
   search.addEventListener('input', () => {
@@ -317,16 +312,13 @@
     const invalidField = form.querySelector(':invalid');
     if (invalidField) {
       const message = invalidField === email ? 'Enter a valid MIU Google email.'
-        : invalidField === password ? 'Use a password with at least 12 characters.'
-          : invalidField === confirmPassword ? 'Confirm the new password (at least 12 characters).'
-            : invalidField.matches('select') ? 'Choose a dashboard role for every assignment.'
+        : invalidField.matches('select') ? 'Choose a dashboard role for every assignment.'
               : 'Complete the highlighted field.';
       feedback.textContent = message;
       feedback.classList.add('is-error');
       invalidField.focus();
       return;
     }
-    if (password.value !== confirmPassword.value) { feedback.textContent = 'The passwords do not match.'; feedback.classList.add('is-error'); confirmPassword.focus(); return; }
     const assignments = [...rowsHost.querySelectorAll('.staff-role-assignment')].map(row => {
       const role = row.querySelector('select').value;
       const assignedClubIds = [...row.querySelectorAll('.staff-role-clubs input:checked')].map(input => Number(input.value));
@@ -351,16 +343,16 @@
     roleFilter.value = '';
     let savedResult;
     try {
-      savedResult = await api({ method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email.value, assignments, password: password.value, confirmPassword: confirmPassword.value }) });
+      savedResult = await api({ method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email.value, assignments }) });
       if (savedResult.savedToDatabase !== true) throw new Error('The database did not confirm this save. Your changes were not reported as saved.');
     } catch (error) {
       feedback.textContent = error.message;
       feedback.classList.add('is-error');
       button.disabled = false;
-      password.value = ''; confirmPassword.value = ''; confirmPassword.required = false;
       return;
     }
     const savedAccount = { ...savedResult, email: savedResult.email || email.value.trim().toLowerCase() };
+    form.dataset.miuDirty = 'false';
     data.accounts = data.accounts.filter(account => account.email.toLowerCase() !== savedAccount.email.toLowerCase());
     data.accounts.push(savedAccount);
     data.accounts.sort((left, right) => left.email.localeCompare(right.email));
@@ -371,7 +363,6 @@
     render();
     accounts.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     updateEmailRoleStatus();
-    password.value = ''; confirmPassword.value = ''; confirmPassword.required = false;
     feedback.textContent = savedResult.message || 'Dashboard roles were saved and verified in the database.';
     button.disabled = false;
     try {

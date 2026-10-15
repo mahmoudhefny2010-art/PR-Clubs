@@ -61,7 +61,7 @@ const ContentStudio = (() => {
     return `
     <article class="content-card">
       ${image
-        ? `<img src="${escapeHtml(image)}" alt="" loading="lazy" decoding="async" />`
+        ? window.FeedMedia.render(image, item.title, 'content-card-media')
         : `<div class="content-card-type" aria-hidden="true">${escapeHtml(label)}</div>`}
       <div class="content-card-body">
         <strong>${escapeHtml(item.title)}</strong>
@@ -191,7 +191,7 @@ const ContentStudio = (() => {
         contentList.querySelectorAll('[data-submit]').forEach((btn) => btn.addEventListener('click', () => submitExisting(Number(btn.dataset.submit))));
         contentList.querySelectorAll('[data-assign-content]').forEach((select) => select.addEventListener('change', () => assignContent(Number(select.dataset.assignContent), select)));
       } catch (error) {
-        contentList.innerHTML = `<p>${error.message}</p>`;
+        contentList.textContent = error.message;
       }
     }
 
@@ -279,10 +279,21 @@ const ContentStudio = (() => {
       formFeedback.textContent = '';
     }
 
+    let saving = false;
     async function saveContent(submit) {
+      if (saving) return;
+      saving = true;
+      const controls = [...contentForm.querySelectorAll('button')];
+      controls.forEach(button => { button.disabled = true; });
+      try { await performSaveContent(submit); }
+      finally { saving = false; controls.forEach(button => { button.disabled = false; }); }
+    }
+    async function performSaveContent(submit) {
       formFeedback.textContent = '';
       if (window.validateDataEntryForm && !window.validateDataEntryForm(contentForm)) return;
-      const payload = { ...(collect ? collect() : {}), submit };
+      let payload;
+      try { payload = { ...(collect ? await collect() : {}), submit }; }
+      catch (error) { formFeedback.textContent = error.message || 'Could not upload this media. Try again.'; return; }
       if (assignedHeadSelect) payload.assignedHeadEmail = assignedHeadSelect.value;
       if (submit && type === 'event' && !['members', 'all_students'].includes(payload.attendanceAudience)) {
         formFeedback.textContent = 'Choose whether this event is for club members or all university students.';
@@ -290,7 +301,7 @@ const ContentStudio = (() => {
         return;
       }
       if (submit && (type === 'event' || type === 'feed') && !String(payload.image || '').trim()) {
-        formFeedback.textContent = 'Add an image before submitting this content for review.';
+        formFeedback.textContent = type === 'feed' ? 'Add an image or video before submitting this post for review.' : 'Add an image before submitting this content for review.';
         document.getElementById('imageInput')?.focus();
         return;
       }

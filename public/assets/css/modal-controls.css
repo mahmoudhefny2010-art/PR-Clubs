@@ -53,7 +53,7 @@ body :is(
 /* Let the surrounding title rows scroll normally; the close button has its own rail. */
 :is(.calendar-panel > .calendar-head, .member-dialog-inner > .member-dialog-header,
     .member-directory-inner > .member-directory-header, .approval-checkpoint-more-header,
-    #reviewModal .modal-header, .admin-data-status-header, .attendance-review-panel > header,
+    #reviewModal .modal-header, .attendance-review-panel > header,
     .review-history-head, .club-feedback-dialog-heading) {
   position: static !important;
   top: auto !important;

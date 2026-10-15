@@ -150,6 +150,16 @@ function formatStatus(status) {
 
 function openAttachmentPreview(src, altText) {
   if (!attachmentPreviewDialog || !attachmentPreviewImage || !src) return;
+  attachmentPreviewDialog.querySelector('[data-video-attachment]')?.remove();
+  attachmentPreviewImage.hidden = window.FeedMedia.isVideo(src);
+  if (window.FeedMedia.isVideo(src)) {
+    const container = document.createElement('div');
+    container.dataset.videoAttachment = 'true';
+    container.innerHTML = window.FeedMedia.render(src, altText, 'feed-attachment-media');
+    attachmentPreviewImage.after(container);
+    attachmentPreviewDialog.showModal();
+    return;
+  }
   attachmentPreviewImage.src = src;
   attachmentPreviewImage.alt = altText || 'Request attachment';
   attachmentPreviewDialog.showModal();
@@ -237,7 +247,7 @@ function openDetails(item, context = 'pending') {
   if (requestDetailImageWrap && requestDetailImage) {
     requestDetailImageWrap.hidden = !requestImage;
     requestDetailImage.alt = `${item.clubName || 'Club'} ${item.image || item.sponsorLogo ? 'request image' : 'logo'}`;
-    if (requestImage) requestDetailImage.src = requestImage;
+    if (requestImage) requestDetailImage.src = window.FeedMedia.poster(requestImage);
   }
   addDetail('Club', item.clubName);
   addDetail('Type', contentTypeLabel(item.type));
@@ -333,7 +343,7 @@ function openDetails(item, context = 'pending') {
     logo.className = 'detail-attachment';
     attachment.append(logoLink, logo);
   }
-  if (item.type === 'sponsor' && item.sponsorAttachment) {
+  if (item.type === 'sponsor' && item.sponsorAttachment && /^(?:https:\/\/|data:application\/(?:pdf|msword|vnd\.ms-powerpoint|vnd\.openxmlformats-officedocument\.(?:wordprocessingml\.document|presentationml\.presentation));base64,)/i.test(item.sponsorAttachment)) {
     hasAttachments = true;
     const agreement = document.createElement('a');
     agreement.href = item.sponsorAttachment;
@@ -530,7 +540,7 @@ async function loadRequests(sharedResponse = null, invalidateStatus = true) {
         || (['entry_permit', 'booth'].includes(item.type) ? item.clubImage : '');
       if (requestImage) {
         const image = document.createElement('img');
-        image.src = requestImage;
+        image.src = window.FeedMedia.poster(requestImage);
         image.alt = `${item.clubName || 'Club'} ${item.image || item.sponsorLogo ? 'request image' : 'logo'}`;
         image.loading = 'lazy';
         image.decoding = 'async';
@@ -766,7 +776,7 @@ async function loadStatusOverview(itemsSnapshot = null) {
       if (!rowImage) row.classList.add('no-image');
       if (rowImage) {
         const image = document.createElement('img');
-        image.src = rowImage;
+        image.src = window.FeedMedia.poster(rowImage);
         image.alt = '';
         image.loading = 'lazy';
         image.decoding = 'async';
@@ -1178,6 +1188,7 @@ async function act(item, action, fromDialog = false, source = 'queue') {
   attachmentPreviewDialog?.addEventListener('click', (event) => {
     if (event.target === attachmentPreviewDialog) attachmentPreviewDialog.close();
   });
+  attachmentPreviewDialog?.addEventListener('close', () => attachmentPreviewDialog.querySelectorAll('video').forEach(video => { video.pause(); video.removeAttribute('src'); video.load(); }));
 requestDialog.querySelectorAll('[data-dialog-action]').forEach((button) => button.addEventListener('click', () => {
   if (activeRequest) act(activeRequest, button.dataset.dialogAction, true);
 }));

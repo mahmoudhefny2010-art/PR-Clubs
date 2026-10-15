@@ -368,6 +368,15 @@ async function loadClubMembers(force = false) {
       editButton.textContent = 'Edit role';
       editButton.addEventListener('click', () => showMemberRoleEditor(card, member));
       actions.append(editButton);
+      if (state.clubAccount?.role === 'president') {
+        const removeButton = document.createElement('button');
+        removeButton.type = 'button';
+        removeButton.className = 'delete-btn member-role-edit-btn';
+        removeButton.textContent = 'Remove member';
+        removeButton.setAttribute('aria-label', `Remove ${member.name} from this club`);
+        removeButton.addEventListener('click', () => showMemberRemovalConfirmation(card, member));
+        actions.append(removeButton);
+      }
       card.append(details, actions);
       list.append(card);
     });
@@ -385,6 +394,53 @@ async function loadClubMembers(force = false) {
     list.append(message);
   }
   clubMembersRequestPending = false;
+}
+
+function showMemberRemovalConfirmation(card, member) {
+  const form = document.createElement('form');
+  form.className = 'member-removal-confirmation';
+  const message = document.createElement('p');
+  message.textContent = `Remove ${member.name} from this club? Their account and history will be kept. Any accepted application for this club will be marked rejected to end membership.`;
+  const actions = document.createElement('div');
+  actions.className = 'member-role-edit-actions';
+  const confirm = document.createElement('button');
+  confirm.type = 'submit';
+  confirm.className = 'delete-btn';
+  confirm.textContent = 'Confirm removal';
+  const cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.className = 'secondary-btn';
+  cancel.textContent = 'Cancel';
+  const original = [...card.childNodes];
+  cancel.addEventListener('click', () => {
+    card.replaceChildren(...original);
+    card.querySelector('.delete-btn')?.focus();
+  });
+  const feedback = document.createElement('p');
+  feedback.className = 'member-role-edit-error';
+  feedback.setAttribute('role', 'alert');
+  actions.append(confirm, cancel);
+  form.append(message, actions, feedback);
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (confirm.disabled) return;
+    confirm.disabled = cancel.disabled = true;
+    feedback.textContent = '';
+    confirm.textContent = 'Removing…';
+    try {
+      const response = await fetch(`/api/club/members/${encodeURIComponent(member.id)}`, { method: 'DELETE' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Could not remove this member.');
+      clubMembersLoadedAt = 0;
+      await loadClubMembers(true);
+    } catch (error) {
+      feedback.textContent = error.message;
+      confirm.textContent = 'Confirm removal';
+      confirm.disabled = cancel.disabled = false;
+    }
+  });
+  card.replaceChildren(form);
+  cancel.focus();
 }
 
 function showMemberRoleEditor(card, member) {
@@ -766,43 +822,6 @@ document.getElementById('presidentClubStatusForm').addEventListener('submit', as
   }
 });
 
-document.getElementById('adminLoginForm').addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const setupRequired = event.currentTarget.dataset.setup === 'true';
-  const email = document.getElementById('adminEmailInput').value.trim();
-  const password = document.getElementById('adminPasswordInput').value;
-  const payload = { email, password };
-  if (setupRequired) payload.confirmPassword = document.getElementById('adminConfirmInput').value;
-
-  try {
-    const response = await fetch(setupRequired ? '/api/admin/setup' : '/api/admin/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.message || 'Admin login failed.');
-    if (setupRequired && result.savedToDatabase !== true) {
-      throw new Error('The database did not confirm the new admin account. It was not accepted as saved.');
-    }
-
-    resetClubEditor();
-    setAdminFeedback('');
-    showView('admin');
-    await Promise.all([loadClubs(true), loadHomepageSettings(true)]);
-    if (window.siteStartup?.afterStartup) {
-      window.siteStartup.afterStartup(() => loadArchivedClubs().catch((error) => {
-        const list = document.getElementById('archivedClubList');
-        if (list) list.textContent = error.message || 'Archived clubs could not be loaded. Use refresh to try again.';
-      }));
-    } else {
-      void loadArchivedClubs().catch(() => {});
-    }
-  } catch (error) {
-    setAdminLoginFeedback(error.message, true);
-  }
-});
-
 document.getElementById('clubLoginForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   const feedback = document.getElementById('clubLoginFeedback');
@@ -865,130 +884,6 @@ document.getElementById('createCommitteeHeadForm').addEventListener('submit', as
   }
 });
 
-document.getElementById('adminBackBtn').addEventListener('click', returnToPreviousAppView);
-
-document.getElementById('adminLogoutBtn')?.addEventListener('click', async () => {
-  await fetch('/api/admin/logout', { method: 'POST' });
-  await window.refreshHeaderAccountState?.();
-  showView('home');
-});
-
-document.getElementById('adminLoginBackBtn').addEventListener('click', returnToPreviousAppView);
-
-document.addEventListener('keydown', (event) => {
-  if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'a') {
-    event.preventDefault();
-    openAdminAccess();
-  }
-});
-
-document.getElementById('homepageSettingsForm').addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const payload = {
-    title: document.getElementById('homeTitleInput').value.trim(),
-    subtitle: document.getElementById('homeSubtitleInput').value.trim(),
-  };
-
-  try {
-    const response = await fetch('/api/admin/homepage', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.message || 'Could not save homepage text.');
-
-    homePageTitle.textContent = result.title;
-    homePageSubtitle.textContent = result.subtitle;
-    homepageSettingsLoadedAt = Date.now();
-    setAdminFeedback('Homepage text saved.');
-  } catch (error) {
-    setAdminFeedback(error.message, true);
-  }
-});
-
-clubEditorForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const clubId = Number(document.getElementById('clubEditorId').value);
-  const currentClub = state.clubs.find((club) => club.id === clubId);
-  const imageFile = clubImageInput.files[0];
-  const payload = {
-    name: document.getElementById('clubNameInput').value.trim(),
-    committee: document.getElementById('clubCommitteeInput').value.trim(),
-    category: document.getElementById('clubCategoryInput').value.trim(),
-    status: document.getElementById('clubStatusInput').value,
-    tagline: document.getElementById('clubTaglineInput').value.trim(),
-    description: document.getElementById('clubDescriptionInput').value.trim(),
-    requirements: document.getElementById('clubRequirementsInput').value.trim(),
-    applicationIntro: applicationFormIntroInput.value.trim(),
-    applicationFields: state.editingApplicationFields,
-    seats: Number(document.getElementById('clubSeatsInput').value),
-    members: Number(document.getElementById('clubMembersInput').value),
-    applicants: Number(document.getElementById('clubApplicantsInput').value),
-    imageFit: document.getElementById('clubImageFitInput').value,
-    pinned: clubPinnedInput.checked,
-  };
-  if (!clubId) {
-    payload.clubLoginEmail = document.getElementById('clubLoginEmailInput').value.trim();
-    payload.clubInitialPassword = document.getElementById('clubInitialPasswordInput').value;
-  }
-
-  const invalidQuestion = state.editingApplicationFields.find((field) => (
-    !field.label.trim() || (field.type === 'select' && field.options.length < 2)
-  ));
-  if (invalidQuestion) {
-    setAdminFeedback('Every question needs a label; choice questions need at least two options.', true);
-    return;
-  }
-
-  try {
-    if (imageFile) {
-      if (!['image/png', 'image/jpeg', 'image/webp'].includes(imageFile.type) || imageFile.size > 10 * 1024 * 1024) {
-        throw new Error('Choose a PNG, JPG, or WebP image up to 10 MB.');
-      }
-      const uploadedImage = await window.uploadImageToCloudinary(imageFile, 'club');
-      payload.imageUrl = uploadedImage.url;
-      payload.imagePublicId = uploadedImage.publicId;
-    } else if (!currentClub?.image) {
-      throw new Error('Choose a photo or logo for this club card.');
-    }
-
-    const endpoint = clubId ? `/api/admin/clubs/${clubId}` : '/api/admin/clubs';
-    const response = await fetch(endpoint, {
-      method: clubId ? 'PATCH' : 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const result = response.status === 204 ? null : await response.json();
-    if (!response.ok) throw new Error(result?.message || 'Could not save this club card.');
-
-    resetClubEditor();
-    await loadClubs(true);
-    setAdminFeedback(clubId ? 'Club card updated.' : 'Club card added.');
-  } catch (error) {
-    setAdminFeedback(error.message, true);
-  }
-});
-
-document.getElementById('cancelClubEditBtn').addEventListener('click', resetClubEditor);
-
-clubImageInput.addEventListener('change', () => {
-  const file = clubImageInput.files[0];
-  if (!file) return;
-  if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 10 * 1024 * 1024) {
-    clubImageInput.value = '';
-    setAdminFeedback('Choose a PNG, JPG, or WebP image up to 10 MB.', true);
-    return;
-  }
-
-  if (clubImagePreview.dataset.objectUrl) URL.revokeObjectURL(clubImagePreview.dataset.objectUrl);
-  const imageUrl = URL.createObjectURL(file);
-  clubImagePreview.dataset.objectUrl = imageUrl;
-  clubImagePreview.src = imageUrl;
-  clubImagePreview.classList.remove('hidden');
-  setAdminFeedback('');
-});
-
 document.getElementById('modalPhoto').addEventListener('change', (event) => {
   const input = event.currentTarget;
   const file = input.files[0];
@@ -1043,7 +938,7 @@ function returnToPreviousAppView() {
 }
 function showView(viewName) {
   const current = Object.entries(views).find(([, view]) => view.classList.contains('active'))?.[0];
-  if (!returningToAppView && current && current !== viewName && !['authLoading', 'signIn', 'adminLogin', 'clubLogin'].includes(current)) appViewBackStack.push(current);
+  if (!returningToAppView && current && current !== viewName && !['authLoading', 'signIn', 'clubLogin'].includes(current)) appViewBackStack.push(current);
   Object.entries(views).forEach(([key, view]) => {
     view.classList.toggle('active', key === viewName);
   });
@@ -1084,10 +979,6 @@ async function restoreLastAppView() {
     showView('myForms');
     return true;
   }
-  if (['admin', 'adminLogin'].includes(savedView.viewName)) {
-    await openAdminAccess();
-    return true;
-  }
   if (['clubLogin', 'head'].includes(savedView.viewName)) {
     await openClubPortal();
     return true;
@@ -1101,11 +992,6 @@ async function restoreLastAppView() {
 
 async function init() {
   const pathname = window.location.pathname;
-  if (pathname === '/admin') {
-    showView('authLoading');
-    await openAdminAccess();
-    return;
-  }
   if (pathname === '/club-login' || pathname === '/club-dashboard') {
     showView('authLoading');
     await openClubPortal();
@@ -1181,3 +1067,5 @@ const pageStartup = init().catch(() => {
   document.documentElement.classList.remove('auth-route-pending');
 });
 window.siteStartup?.track(pageStartup);
+
+document.addEventListener("keydown", event => { if(event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "a") { event.preventDefault(); location.assign("/admin"); } });

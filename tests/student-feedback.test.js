@@ -28,7 +28,7 @@ test('feedback permissions, validation, privacy and response updates', async () 
     if (existing) Object.assign(existing, update.$set);
     else rows.push({ ...key, ...update.$set });
   };
-  registerFeedbackRoutes(app, {
+  registerFeedbackRoutes(app, { feedbackModel: Feedback,
     Club: { find: () => query([target]), findOne: ({ id }) => query(id === 1 ? target : null) },
     UniversityContent: { find: () => query([poll]), findOne: ({ id }) => query(id === 1 ? poll : null) },
     requireStudentAuth: (req, res, next) => { if (req.role !== 'student') return res.status(401).json({}); req.studentAccount = { email: 'student@miuegypt.edu.eg' }; return next(); },

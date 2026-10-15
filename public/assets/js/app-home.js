@@ -4,7 +4,6 @@ const state = {
   applications: [],
   selectedClub: null,
   selectedApplication: null,
-  editingApplicationFields: [],
   presidentApplicationFields: [],
   interviewSections: [],
   pendingInterviewPhoto: '',
@@ -59,9 +58,7 @@ const views = {
   home: document.getElementById('homeView'),
   signIn: document.getElementById('signInView'),
   myForms: document.getElementById('myFormsView'),
-  adminLogin: document.getElementById('adminLoginView'),
   clubLogin: document.getElementById('clubLoginView'),
-  admin: document.getElementById('adminView'),
   club: document.getElementById('clubView'),
   application: document.getElementById('applicationView'),
   head: document.getElementById('headDashboardView'),
@@ -98,14 +95,6 @@ const fullClubsStat = document.getElementById('fullClubsStat');
 const openingSoonClubsStat = document.getElementById('openingSoonClubsStat');
 const homePageTitle = document.getElementById('homePageTitle');
 const homePageSubtitle = document.getElementById('homePageSubtitle');
-const adminClubList = document.getElementById('adminClubList');
-const adminClubCount = document.getElementById('adminClubCount');
-const adminFeedback = document.getElementById('adminFeedback');
-const clubEditorForm = document.getElementById('clubEditorForm');
-const clubImageInput = document.getElementById('clubImageInput');
-const clubImagePreview = document.getElementById('clubImagePreview');
-const clubStatusInput = document.getElementById('clubStatusInput');
-const clubPinnedInput = document.getElementById('clubPinnedInput');
 const applicationFormIntro = document.getElementById('applicationFormIntro');
 const applicationCustomFields = document.getElementById('applicationCustomFields');
 const applicationFeedback = document.getElementById('applicationFeedback');
@@ -113,8 +102,6 @@ const applicationClubLogo = document.getElementById('applicationClubLogo');
 const applicantPhotoInput = document.getElementById('applicantPhotoInput');
 const applicantPhotoPreview = document.getElementById('applicantPhotoPreview');
 const applicantPhotoPlaceholder = document.getElementById('applicantPhotoPlaceholder');
-const applicationFieldEditorList = document.getElementById('applicationFieldEditorList');
-const applicationFormIntroInput = document.getElementById('clubApplicationIntroInput');
 
 const reviewModal = document.getElementById('reviewModal');
 const closeModalBtn = document.getElementById('closeModalBtn');
@@ -311,7 +298,6 @@ async function removeMyForm(item) {
 async function loadClubs(force = false) {
   if (!force && clubsLoaded && Date.now() - clubsLoadedAt < 30_000) {
     renderClubGrid();
-    renderAdminClubList();
     return;
   }
   if (!clubsLoaded) {
@@ -320,7 +306,6 @@ async function loadClubs(force = false) {
       state.clubs = cachedClubs;
       clubsLoaded = true;
       renderClubGrid();
-      renderAdminClubList();
     }
   }
   if (!clubsLoadPromise) {
@@ -336,7 +321,6 @@ async function loadClubs(force = false) {
       clubsLoadedAt = Date.now();
       if (changed) {
         renderClubGrid();
-        renderAdminClubList();
         renderEventsSlideshow();
         renderTodayEvents();
       }
@@ -391,8 +375,6 @@ async function loadHomepageSettings(force = false) {
       const settings = await response.json();
       homePageTitle.textContent = settings.title;
       homePageSubtitle.textContent = settings.subtitle;
-      document.getElementById('homeTitleInput').value = settings.title;
-      document.getElementById('homeSubtitleInput').value = settings.subtitle;
       homepageSettingsLoadedAt = Date.now();
     })();
   }
@@ -1247,6 +1229,9 @@ function getAllFeeds() {
 function renderTodayEvents() {
   const strip = document.getElementById('todayEvents');
   if (!strip) return;
+  const previousScroll = strip.querySelector('.today-events-viewport')?.scrollLeft || 0;
+  strip.todayEventsCleanup?.();
+  strip.todayEventsObserver?.disconnect();
   const start = startOfLocalDay(new Date());
   const end = new Date(start);
   end.setDate(end.getDate() + 1);
@@ -1259,15 +1244,109 @@ function renderTodayEvents() {
     strip.classList.add('hidden');
     return;
   }
-  strip.innerHTML = `<span class="today-events-label">Happening today</span>${events.map((event) => {
+  strip.innerHTML = `<span class="today-events-label" id="todayEventsLabel">Happening today</span><div class="today-events-viewport" tabindex="0" role="region" aria-labelledby="todayEventsLabel" aria-roledescription="carousel">${events.map((event) => {
     return `
       <a class="today-event-chip" href="/pages/event.html?club=${event.clubId}&event=${event.eventIndex}" data-club="${event.clubId}" data-idx="${event.eventIndex}">
         <span class="today-event-badge">Today · New</span>
         <img class="${event.university && (event.image || '/assets/img/pics/logo.svg.png') === '/assets/img/pics/logo.svg.png' ? 'university-brand-image' : ''}" src="${escapeHtml(event.image || event.clubImage)}" alt="" loading="lazy" decoding="async" />
         <span class="today-event-title">${escapeHtml(event.title || 'Event')}</span>
       </a>`;
-  }).join('')}`;
+  }).join('')}</div><div class="today-events-controls"><button class="today-events-arrow" type="button" data-today-direction="-1" aria-label="Previous events" aria-controls="todayEventsTrack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><button class="today-events-arrow" type="button" data-today-direction="1" aria-label="Next events" aria-controls="todayEventsTrack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m10 6 6 6-6 6"/></svg></button></div>`;
   strip.classList.remove('hidden');
+  const viewport = strip.querySelector('.today-events-viewport');
+  viewport.id = 'todayEventsTrack';
+  viewport.scrollLeft = previousScroll;
+  const arrows = strip.querySelectorAll('[data-today-direction]');
+  const chips = [...viewport.querySelectorAll('.today-event-chip')];
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const controller = new AbortController();
+  let autoplayPaused = strip.dataset.autoplayPaused === 'true', interacting = false;
+  const pause = document.createElement('button');
+  pause.type = 'button';
+  pause.className = 'today-events-arrow today-events-pause';
+  pause.setAttribute('aria-controls', viewport.id);
+  strip.querySelector('.today-events-controls').prepend(pause);
+  const syncPause = () => {
+    pause.setAttribute('aria-label', autoplayPaused ? 'Play event timeline' : 'Pause event timeline');
+    pause.setAttribute('aria-pressed', String(autoplayPaused));
+    pause.innerHTML = autoplayPaused ? '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m9 5 11 7-11 7z"/></svg>' : '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5h4v14H7zm6 0h4v14h-4z"/></svg>';
+    pause.hidden = chips.length < 2 || reducedMotion.matches;
+  };
+  const stops = () => {
+    const end = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+    const left = viewport.getBoundingClientRect().left;
+    return [...new Set([0, ...chips.map(chip => Math.round(Math.min(end, Math.max(0, chip.getBoundingClientRect().left - left + viewport.scrollLeft - 2)))), end])].sort((a, b) => a - b);
+  };
+  const syncArrows = () => {
+    const end = viewport.scrollWidth - viewport.clientWidth;
+    arrows[0].disabled = viewport.scrollLeft <= 2;
+    arrows[1].disabled = viewport.scrollLeft >= end - 2;
+    const left = viewport.getBoundingClientRect().left;
+    const current = chips.find(chip => chip.getBoundingClientRect().left >= left - 3) || chips[chips.length - 1];
+    chips.forEach(chip => chip.classList.toggle('is-current', chip === current));
+  };
+  const move = (direction, loop = false) => {
+    const positions = stops();
+    const next = direction > 0 ? positions.find(left => left > viewport.scrollLeft + 3) : positions.findLast(left => left < viewport.scrollLeft - 3);
+    viewport.scrollTo({ left: next ?? (loop ? 0 : viewport.scrollLeft), behavior: reducedMotion.matches ? 'instant' : 'smooth' });
+  };
+  pause.addEventListener('click', () => {
+    autoplayPaused = !autoplayPaused;
+    strip.dataset.autoplayPaused = String(autoplayPaused);
+    syncPause();
+  });
+  strip.addEventListener('pointerenter', () => { interacting = true; }, { signal: controller.signal });
+  strip.addEventListener('pointerleave', () => { interacting = false; }, { signal: controller.signal });
+  strip.addEventListener('pointerdown', () => { interacting = true; }, { signal: controller.signal });
+  strip.addEventListener('pointerup', event => { if (event.pointerType !== 'mouse') interacting = false; }, { signal: controller.signal });
+  strip.addEventListener('pointercancel', () => { interacting = false; }, { signal: controller.signal });
+  const timer = setInterval(() => {
+    if (!document.hidden && !autoplayPaused && !interacting && !reducedMotion.matches && !strip.contains(document.activeElement) && viewport.scrollWidth > viewport.clientWidth + 2) move(1, true);
+  }, 2000);
+  strip.todayEventsCleanup = () => { clearInterval(timer); controller.abort(); };
+  reducedMotion.addEventListener('change', syncPause, { signal: controller.signal });
+  syncPause();
+  arrows.forEach(button => button.addEventListener('click', () => move(Number(button.dataset.todayDirection))));
+  viewport.addEventListener('scroll', syncArrows, { passive: true });
+  viewport.addEventListener('keydown', event => {
+    if (event.target !== viewport || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    if (event.key === 'Home' || event.key === 'End') viewport.scrollTo({ left: event.key === 'Home' ? 0 : viewport.scrollWidth, behavior: 'instant' });
+    else move(event.key === 'ArrowLeft' ? -1 : 1);
+  });
+  let drag = null, suppressClickUntil = 0;
+  viewport.addEventListener('pointerdown', event => {
+    if (event.pointerType !== 'mouse' || event.button !== 0) return;
+    drag = { id: event.pointerId, x: event.clientX, left: viewport.scrollLeft, active: false };
+  });
+  viewport.addEventListener('pointermove', event => {
+    if (!drag || drag.id !== event.pointerId) return;
+    const delta = event.clientX - drag.x;
+    if (!drag.active && Math.abs(delta) < 8) return;
+    drag.active = true;
+    viewport.classList.add('is-dragging');
+    if (!viewport.hasPointerCapture(event.pointerId)) viewport.setPointerCapture(event.pointerId);
+    event.preventDefault();
+    viewport.scrollLeft = drag.left - delta;
+  });
+  const stopDrag = () => {
+    if (drag?.active) suppressClickUntil = Date.now() + 400;
+    drag = null;
+    viewport.classList.remove('is-dragging');
+  };
+  viewport.addEventListener('pointerup', stopDrag);
+  viewport.addEventListener('pointercancel', stopDrag);
+  viewport.addEventListener('lostpointercapture', stopDrag);
+  viewport.addEventListener('pointerleave', () => { if (!drag?.active) drag = null; });
+  viewport.addEventListener('dragstart', event => event.preventDefault());
+  viewport.addEventListener('click', event => {
+    if (Date.now() < suppressClickUntil) { event.preventDefault(); event.stopImmediatePropagation(); }
+  }, true);
+  if (typeof ResizeObserver === 'function') {
+    strip.todayEventsObserver = new ResizeObserver(syncArrows);
+    strip.todayEventsObserver.observe(viewport);
+  }
+  syncArrows();
   strip.querySelectorAll('.today-event-chip').forEach((chip) => chip.addEventListener('click', (clickEvent) => {
     const event = events.find((item) => Number(item.clubId) === Number(chip.dataset.club) && item.eventIndex === Number(chip.dataset.idx));
     if (event && typeof window.openEventModal === 'function') {
@@ -1598,15 +1677,3 @@ function clubsShareOrderGroup(left, right) {
   return getClubStatusPriority(left.status) === getClubStatusPriority(right.status)
     && Boolean(left.pinned) === Boolean(right.pinned);
 }
-
-function setAdminFeedback(message, isError = false) {
-  adminFeedback.textContent = message;
-  adminFeedback.classList.toggle('is-error', isError);
-}
-
-function setAdminLoginFeedback(message, isError = false) {
-  const feedback = document.getElementById('adminLoginFeedback');
-  feedback.textContent = message;
-  feedback.classList.toggle('is-error', isError);
-}
-

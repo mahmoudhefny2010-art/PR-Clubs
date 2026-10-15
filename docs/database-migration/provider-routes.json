@@ -5,8 +5,8 @@
     "sqlserver",
     "azuresql"
   ],
-  "checkedAt": "2026-10-14T09:40:27.550Z",
-  "routeCount": 197,
+  "checkedAt": "2026-10-15T15:06:17.226Z",
+  "routeCount": 233,
   "scope": "Actual Express method/path/router registration, without database connections or requests. Does not prove database contents or HTTP response parity.",
   "routes": [
     {
@@ -87,12 +87,162 @@
     {
       "method": "GET",
       "prefix": "",
+      "path": "/admin/account-passwords"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/admin/admin-settings"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/admin/analytics"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/admin/application-forms"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/admin/applications"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/admin/archives"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/admin/attendance"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/admin/club-accounts"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/admin/club-analytics"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
       "path": "/admin/club-credentials"
     },
     {
       "method": "GET",
       "prefix": "",
+      "path": "/admin/club-feedback"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/admin/club-order"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/admin/clubs"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/admin/committees"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/admin/dashboard-v2/:tool?"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/admin/data"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/admin/event-analytics"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
       "path": "/admin/global"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/admin/heads"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/admin/homepage"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/admin/login"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/admin/members"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/admin/miu-attendance"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/admin/open-attendance"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/admin/profile"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/admin/publishing"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/admin/recovery"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/admin/reports"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/admin/staff"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/admin/supervisors"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/admin/university-feedback"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/admin/website-content"
     },
     {
       "method": "GET",
@@ -132,6 +282,26 @@
     {
       "method": "GET",
       "prefix": "",
+      "path": "/api/admin/dashboard-clubs/:id"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/admin/dashboard-content-clubs"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/admin/dashboard-state"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/admin/dashboard-stream"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
       "path": "/api/admin/event-analytics"
     },
     {
@@ -143,6 +313,11 @@
       "method": "GET",
       "prefix": "",
       "path": "/api/admin/login-settings"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
+      "path": "/api/admin/security/audit"
     },
     {
       "method": "GET",
@@ -818,6 +993,11 @@
       "method": "POST",
       "prefix": "",
       "path": "/api/miu-attendance-task/accept"
+    },
+    {
+      "method": "POST",
+      "prefix": "",
+      "path": "/api/miu-attendance-task/check-in"
     },
     {
       "method": "POST",

@@ -366,7 +366,7 @@ document.addEventListener('DOMContentLoaded', () => {
             sso: { label: 'SSO Dashboard', href: '/dashboards/sso-dashboard.html' },
             supervisor: { label: 'Supervisor Dashboard', href: '/dashboards/supervisor-dashboard.html' },
             dean: { label: 'Dean Dashboard', href: '/dashboards/dean-dashboard.html' },
-            software_development: { label: 'Software Development Dashboard', href: '/admin' },
+            software_development: { label: 'Admin Dashboard', href: '/admin' },
             miu_events: { label: 'MIU Events Dashboard', href: '/dashboards/miu-events-dashboard.html' },
             student: { label: 'My Dashboard', href: '/?myForms=1' }
           };

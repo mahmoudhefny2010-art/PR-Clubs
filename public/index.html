@@ -2,29 +2,30 @@
 <html lang="en">
   <head>
       <link rel="manifest" href="/manifest.webmanifest">
-    <script src="/assets/js/shared.js?v=20261014architecture1"></script>
+    <script src="/assets/js/shared.js?v=20261015mainadmin1"></script>
   <script src="/assets/js/install-welcome.js?v=20261014promptqueue1" defer></script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script src="/assets/js/site-loading.js?v=20261014promptqueue1"></script>
     <script src="/assets/js/public-live-data.js?v=20261014events1"></script>
-    <script>if(['/admin','/club-login','/club-dashboard'].includes(location.pathname))document.documentElement.classList.add('auth-route-pending');</script>
+    <script>if(['/club-login','/club-dashboard'].includes(location.pathname))document.documentElement.classList.add('auth-route-pending');</script>
     <title>Club Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" /></noscript>
-    <link rel="stylesheet" href="/assets/css/base.css?v=20261014approvaltrack1" />
-    <link rel="stylesheet" href="/assets/css/responsive.css?v=20261014accountphotoprompt2" />
-    <link rel="stylesheet" href="/assets/css/dark.css?v=20261014permitcards2" />
-    <link rel="stylesheet" href="/assets/css/features.css?v=20261014permititemlayout1" />
+    <link rel="stylesheet" href="/assets/css/base.css?v=20261015memberremove1" />
+    <link rel="stylesheet" href="/assets/css/responsive.css?v=20261015mainadmin1" />
+    <link rel="stylesheet" href="/assets/css/dark.css?v=20261015mainadmin1" />
+    <link rel="stylesheet" href="/assets/css/features.css?v=20261015mainadmin1" />
     <link rel="stylesheet" href="/assets/css/event-modal.css?v=20261013attendancebadge1" />
     <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/pics/pwa-icon-192.png?v=20261013favicon1">
     <link rel="stylesheet" href="/assets/css/pages/home.css?v=20261013compactlogin1" />
     <link rel="stylesheet" href="/assets/css/pages/speaker-requests.css?v=20261014mobilefit1" />
       <script defer src="/assets/js/pwa-register.js?v=20261014localfresh1"></script>
-    <link rel="stylesheet" href="/assets/css/modal-controls.css?v=20261014pairedappactions1">
+    <link rel="stylesheet" href="/assets/css/modal-controls.css?v=20261015mainadmin1">
   <link rel="stylesheet" href="/assets/css/pages/event-reports.css?v=20261014mobileoptions1">
+  <script src="/assets/js/feed-media.js?v=20261015videopopup1"></script>
 </head>
   <body>
     <div class="page-shell">
@@ -142,38 +143,7 @@
           </div>
         </section>
 
-        <section id="adminLoginView" class="view">
-          <div class="admin-login-panel">
-            <img class="club-login-miu-logo" src="/assets/img/pics/logo.svg.png" alt="MIU logo" />
-            <h2 id="adminLoginTitle">Admin access</h2>
-            <p id="adminLoginMessage">Sign in with your admin account to manage the homepage.</p>
-            <form id="adminLoginForm">
-              <div class="field-group">
-                <label for="adminEmailInput">Email</label>
-                <input id="adminEmailInput" name="email" type="email" autocomplete="username" maxlength="254" placeholder="e.g. name@miuegypt.edu.eg" required />
-              </div>
-              <div class="field-group">
-                <label for="adminPasswordInput">Password</label>
-                <input id="adminPasswordInput" name="password" type="password" autocomplete="current-password" placeholder="••••••••" required />
-              </div>
-              <div id="adminConfirmRow" class="field-group hidden">
-                <label for="adminConfirmInput">Confirm password</label>
-                <input id="adminConfirmInput" name="confirmPassword" type="password" autocomplete="new-password" />
-              </div>
-              <button id="adminLoginSubmit" class="primary-btn" type="submit">Unlock dashboard</button>
-            </form>
-            <div class="admin-google-signin">
-              <div class="admin-google-divider" aria-hidden="true"><span>OR</span></div>
-              <div id="adminGoogleButton" class="admin-google-button"></div>
-              <p id="adminGoogleFeedback" class="admin-feedback" aria-live="polite"></p>
-            </div>
-            <p id="adminLoginFeedback" class="admin-feedback" aria-live="polite"></p>
-            <p id="adminLoginForgotWrap"><a class="text-button" href="/pages/forgot-password.html">Forgot Password?</a></p>
-            <button id="adminResetAccessBtn" class="text-button" type="button" hidden>Set a new admin email and password</button>
-            <button id="adminResetBackBtn" class="text-button" type="button" hidden>Back to admin sign in</button>
-            <p class="login-foot">Back to homepage? <button id="adminLoginBackBtn" class="login-foot-link" type="button">Click here</button></p>
-          </div>
-        </section>
+
 
         <section id="clubLoginView" class="view">
           <div class="club-login-panel">
@@ -198,161 +168,7 @@
           </div>
         </section>
 
-        <section id="adminView" class="view">
-          <div class="admin-panel">
-            <header class="admin-header">
-              <div>
-                <span class="admin-eyebrow">HOMEPAGE MANAGEMENT</span>
-                <h2>Admin dashboard</h2>
-              </div>
-              <div class="admin-session-actions homepage-admin-sidebar" role="navigation" aria-label="Admin dashboard navigation">
-                <button class="secondary-btn" id="openAdminDataStatusBtn" type="button">Site data &amp; sync</button>
-                <a class="secondary-btn" href="/admin/global">All-club access</a>
-                <button class="secondary-btn" type="button" data-open-member-directory="admin">View club members</button>
-                <button class="secondary-btn" id="openArchivedClubsBtn" type="button">Archived clubs</button>
-                <a class="secondary-btn" href="/dashboards/supervisor-management.html">Manage club supervisors</a>
-                <a class="secondary-btn" href="/dashboards/staff-management.html">Staff accounts &amp; roles</a>
-                <a class="secondary-btn" href="/?explore=clubs">Home</a>
-                <button class="secondary-btn" id="adminBackBtn" type="button">Back</button>
-              </div>
-            </header>
 
-            <form id="homepageSettingsForm" class="admin-settings-form">
-              <h3>Homepage text</h3>
-              <div class="form-row">
-                <div class="field-group">
-                  <label for="homeTitleInput">Page title</label>
-                  <input id="homeTitleInput" name="title" type="text" maxlength="100" required />
-                </div>
-                <div class="field-group">
-                  <label for="homeSubtitleInput">Short introduction</label>
-                  <input id="homeSubtitleInput" name="subtitle" type="text" maxlength="240" required />
-                </div>
-              </div>
-              <button class="primary-btn" type="submit">Save homepage text</button>
-            </form>
-
-            <div class="admin-grid">
-              <section class="admin-club-section" aria-labelledby="adminClubHeading">
-                <div class="admin-section-heading">
-                  <h3 id="adminClubHeading">Club cards</h3>
-                  <span id="adminClubCount" class="admin-count"></span>
-                </div>
-                <div id="adminClubList" class="admin-club-list"></div>
-              </section>
-
-              <form id="clubEditorForm" class="admin-editor-form">
-                <div class="admin-section-heading">
-                  <h3 id="clubEditorHeading">Add a club card</h3>
-                  <button class="text-button hidden" id="cancelClubEditBtn" type="button">Cancel edit</button>
-                </div>
-                <input id="clubEditorId" name="id" type="hidden" />
-
-                <div class="admin-form-grid">
-                  <div class="field-group">
-                    <label for="clubNameInput">Club name</label>
-                    <input id="clubNameInput" name="name" type="text" maxlength="80" required />
-                  </div>
-                  <div class="field-group">
-                    <label for="clubCommitteeInput">Committee name</label>
-                    <input id="clubCommitteeInput" name="committee" type="text" maxlength="100" required />
-                  </div>
-                  <div class="field-group">
-                    <label for="clubCategoryInput">Category</label>
-                    <input id="clubCategoryInput" name="category" type="text" maxlength="80" required />
-                  </div>
-                  <div class="field-group">
-                    <label for="clubStatusInput">Card status</label>
-                    <select id="clubStatusInput" name="status" required>
-                      <option value="open">Open</option>
-                      <option value="opening-soon">Opening Soon</option>
-                      <option value="full">Full</option>
-                      <option value="closed">Closed</option>
-                    </select>
-                  </div>
-                  <div class="field-group admin-field-full">
-                    <label class="admin-checkbox-field" for="clubPinnedInput">
-                      <input id="clubPinnedInput" name="pinned" type="checkbox" />
-                      <span>Pin this Open club above the other Open clubs</span>
-                    </label>
-                  </div>
-                  <div class="field-group admin-field-full">
-                    <label for="clubTaglineInput">Short card text</label>
-                    <input id="clubTaglineInput" name="tagline" type="text" maxlength="140" required />
-                  </div>
-                  <div class="field-group admin-field-full">
-                    <label for="clubDescriptionInput">Full description shown on View</label>
-                    <textarea id="clubDescriptionInput" name="description" maxlength="1200" required></textarea>
-                  </div>
-                  <div class="field-group admin-field-full">
-                    <label for="clubRequirementsInput">Requirements</label>
-                    <textarea id="clubRequirementsInput" name="requirements" maxlength="600" required></textarea>
-                  </div>
-                  <section id="clubLoginCredentialsFields" class="application-form-builder admin-field-full" aria-labelledby="clubLoginCredentialsHeading">
-                    <div class="admin-section-heading">
-                      <div>
-                        <h3 id="clubLoginCredentialsHeading">Club Login Credentials</h3>
-                        <p class="admin-form-hint">Create the initial sign-in for this club’s dashboard.</p>
-                      </div>
-                    </div>
-                    <div class="form-row">
-                      <div class="field-group">
-                        <label for="clubLoginEmailInput">Club Login Email</label>
-                        <input id="clubLoginEmailInput" name="clubLoginEmail" type="email" autocomplete="username" maxlength="254" />
-                      </div>
-                      <div class="field-group">
-                        <label for="clubInitialPasswordInput">Initial Password</label>
-                        <input id="clubInitialPasswordInput" name="clubInitialPassword" type="password" autocomplete="new-password" minlength="12" maxlength="200" />
-                        <small>Use 12 to 200 characters. This password is stored as a secure hash.</small>
-                      </div>
-                    </div>
-                  </section>
-                  <div class="field-group admin-field-full">
-                    <label for="clubApplicationIntroInput">Application form introduction</label>
-                    <input id="clubApplicationIntroInput" name="applicationIntro" type="text" maxlength="240" placeholder="Intro shown on this club's Apply page" />
-                  </div>
-                  <section class="application-form-builder admin-field-full" aria-labelledby="applicationFieldsHeading">
-                    <div class="admin-section-heading">
-                      <div>
-                        <h3 id="applicationFieldsHeading">Club-specific form questions</h3>
-                        <p id="applicationFieldsClubName" class="admin-form-hint">Select a club with Edit to manage its questions.</p>
-                      </div>
-                      <button id="addApplicationFieldBtn" class="secondary-btn" type="button" disabled>Add question</button>
-                    </div>
-                    <div id="applicationFieldEditorList" class="application-field-editor-list"></div>
-                  </section>
-                  <div class="field-group">
-                    <label for="clubSeatsInput">Seats</label>
-                    <input id="clubSeatsInput" name="seats" type="number" min="0" step="1" required />
-                  </div>
-                  <div class="field-group">
-                    <label for="clubMembersInput">Members</label>
-                    <input id="clubMembersInput" name="members" type="number" min="0" step="1" required />
-                  </div>
-                  <div class="field-group">
-                    <label for="clubApplicantsInput">Applicants</label>
-                    <input id="clubApplicantsInput" name="applicants" type="number" min="0" step="1" required />
-                  </div>
-                  <div class="field-group">
-                    <label for="clubImageFitInput">Logo display</label>
-                    <select id="clubImageFitInput" name="imageFit">
-                      <option value="contain">Show full logo</option>
-                      <option value="cover">Fill the circle</option>
-                    </select>
-                  </div>
-                  <div class="field-group admin-field-full">
-                    <label for="clubImageInput">Club photo or logo</label>
-                    <input id="clubImageInput" name="image" type="file" accept="image/png,image/jpeg,image/webp" />
-                    <img id="clubImagePreview" class="admin-image-preview hidden" alt="Selected club image preview" />
-                  </div>
-                </div>
-
-                <button class="submit-btn" id="saveClubBtn" type="submit">Add club card</button>
-              </form>
-            </div>
-            <p id="adminFeedback" class="admin-feedback" aria-live="polite"></p>
-          </div>
-        </section>
 
         <section id="clubView" class="view">
           <div id="clubDetail" class="club-detail-card"></div>
@@ -908,24 +724,7 @@
         </div>
       </dialog>
 
-      <dialog id="adminDataStatusDialog" class="admin-data-status-dialog" aria-labelledby="adminDataStatusTitle">
-        <div class="admin-data-status-inner">
-          <header class="admin-data-status-header">
-            <div>
-              <span class="admin-eyebrow">ADMINISTRATOR</span>
-              <h2 id="adminDataStatusTitle">Site data &amp; sync</h2>
-              <p>Read-only totals from the live database and the site data routes.</p>
-            </div>
-            <button class="calendar-close-btn" id="closeAdminDataStatusBtn" type="button" aria-label="Close site data status">&times;</button>
-          </header>
-          <div class="admin-data-status-actions">
-            <p id="adminDataStatusMessage" class="admin-data-status-message" aria-live="polite">Open the report to check the latest database data.</p>
-            <button id="refreshAdminDataStatusBtn" class="secondary-btn" type="button">Refresh report</button>
-          </div>
-          <div id="adminDataStatusDatabase" class="admin-data-status-database" hidden></div>
-          <div id="adminDataStatusSections" class="admin-data-status-sections"></div>
-        </div>
-      </dialog>
+
 
       <div class="calendar-modal hidden" id="calendarModal">
         <div class="calendar-panel">
@@ -947,16 +746,7 @@
         </section>
       </div>
 
-      <div class="event-modal hidden" id="archivedClubsModal" role="dialog" aria-modal="true" aria-labelledby="archivedClubHeading">
-        <article class="event-modal-panel" style="grid-template-columns: 1fr;">
-          <button id="archivedClubsModalClose" class="calendar-close-btn event-modal-close" type="button" aria-label="Close archived clubs">&times;</button>
-          <div class="event-modal-copy">
-            <h2 id="archivedClubHeading">Archived clubs</h2>
-            <span id="archivedClubCount" class="admin-count"></span>
-            <div id="archivedClubList" class="admin-club-list" aria-labelledby="archivedClubHeading"></div>
-          </div>
-        </article>
-      </div>
+
 
       <div class="event-modal hidden" id="eventModal" role="dialog" aria-modal="true" aria-labelledby="eventModalTitle">
         <article class="event-modal-panel">
@@ -1062,17 +852,17 @@
 
     <script src="/assets/js/event-modal.js?v=20261013audience1" defer></script>
     <script src="/assets/js/committee-sidebar.js?v=20261013lighter1" defer></script>
-    <script src="/assets/js/member-dashboard.js?v=20261013stagedload3" defer></script>
-    <script src="/assets/js/app-home.js?v=20261014approvaltrack1" defer></script>
+    <script src="/assets/js/member-dashboard.js?v=20261014eventroles1" defer></script>
+    <script src="/assets/js/app-home.js?v=20261015mainadmin1" defer></script>
     <script src="/assets/js/cloudinary-upload.js?v=2" defer></script>
     <script src="/assets/js/student-feedback.js?v=20261013stagedload3" defer></script>
-    <script src="/assets/js/app-admin.js?v=20261014accountphotoprompt2" defer></script>
-    <script src="/assets/js/app-dashboard.js?v=20261013stagedload4" defer></script>
-    <script src="/assets/js/admin-data-status.js?v=2" defer></script>
-    <script src="/assets/js/attendance-dashboard.js?v=20261013audience1" defer></script>
+    <script src="/assets/js/event-info-popup.js?v=20261015eventinfo1" defer></script>
+    <script src="/assets/js/app-forms.js?v=20261015eventinfo1" defer></script>
+    <script src="/assets/js/app-dashboard.js?v=20261015memberremove1" defer></script>
+    <script src="/assets/js/attendance-dashboard.js?v=20261014eventroles1" defer></script>
     <script src="/assets/js/entry-permit-dashboard.js?v=20261014permitmobilecards1" defer></script>
     <script src="/assets/js/member-directory.js?v=20261013stagedload3" defer></script>
-    <script src="/assets/js/layout.js?v=20261014promptqueue1" defer></script>
+    <script src="/assets/js/layout.js?v=20261015mainadmin1" defer></script>
     <script src="/assets/js/theme.js?v=20261009c" defer></script>
     <script src="/assets/js/pages/report-downloads.js?v=20261014progressive1" defer></script>
   <script src="/assets/js/report-dashboard-panels.js?v=20261014progressive1" defer></script>

@@ -7,7 +7,7 @@ test('delegated administrator requires a live verified modern staff session and 
   const source = fs.readFileSync(require.resolve('../server'), 'utf8');
   const method = source.slice(source.indexOf('async function isSoftwareDevelopmentSession(req) {'), source.indexOf('function setAdminSessionCookie'));
   let account = { role: 'software_development' };
-  const context = { mongoReady: true, Buffer, clubAccounts: [], getClubAccountFromRequest: async () => account };
+  const context = { mongoReady: true, Buffer, clubAccounts: [], mongoose: { isSqlProvider: false }, readAdminSessionData: require('../services/admin-session-read').readAdminSessionData, getClubAccountFromRequest: async () => account };
   vm.createContext(context); vm.runInContext(method, context);
   const request = { headers: { cookie: 'miu_club=0.email.expiry.1.signature' } };
   assert.equal(await context.isAdminSessionValid(request), true);

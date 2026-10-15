@@ -91,7 +91,6 @@ function respond(url, method, referer, body, scenario = '') {
   if (p === '/api/club/application-form') return [200, { intro: 'Apply to our club.', fields: [] }];
   if (p === '/api/club/interview-form') return [200, { sections: [], fields: [] }];
   if (/\/(?:applications|club-heads|heads|archived)$/.test(p)) return [200, []];
-  if (p === '/api/admin/club-credentials') return [200, []];
   if (p === '/api/admin/club-views') return [200, { totalViews: 4, clubs: [{ clubId: 1, views: 4 }] }];
   if (p === '/api/admin/event-analytics') return [200, { totals: { views: 4, registrations: 2, checkins: 1 }, events: [{ ...event, clubName: 'MUN', clubId: 1, views: 4, registrations: 2, checkins: 1 }] }];
   if (p === '/api/admin/visitor-analytics') return [200, {

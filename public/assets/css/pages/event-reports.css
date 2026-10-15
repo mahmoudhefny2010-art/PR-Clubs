@@ -94,3 +94,5 @@ body.miu-attendance-page .footer-container { width: min(100%, 1240px); }
   overflow-wrap: anywhere;
 }
 .miu-attendance-event-details[hidden] { display: none !important; }
+#usherSelfCheckinForm { display: grid; gap: .75rem; max-width: 36rem; margin-block: 1rem; }
+#usherSelfCheckinForm[hidden] { display: none; }

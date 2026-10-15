@@ -408,6 +408,9 @@ attendanceAssignmentSchema.index({ activeMemberDayKey: 1 }, {
 });
 
 const attendanceRecordSchema = new mongoose.Schema({
+  eventParticipation: {
+    role: { type: String, enum: ['attendee', 'organizer', 'usher', 'president', 'head'] }
+  },
   universityId: { type: String, default: '', trim: true, maxlength: 40 },
   major: { type: String, default: '', trim: true, maxlength: 120 },
   attendanceAudience: { type: String, enum: ['members', 'all_students'], default: 'members', index: true },

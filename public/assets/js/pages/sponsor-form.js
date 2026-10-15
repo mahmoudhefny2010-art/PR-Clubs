@@ -9,6 +9,7 @@
       });
       attachmentInput.addEventListener('change', async (event) => {
         const file = event.target.files[0];
+        if (file && file.size > 3 * 1024 * 1024) { attachmentInput.value = ''; document.getElementById('formFeedback').textContent = 'Choose an attachment up to 3 MB.'; return; }
         if (file) currentAttachment = await ContentStudio.fileToDataUrl(file);
       });
 

@@ -8,3 +8,8 @@ data/club-logins.generated.json
 
 # Local frontend audit snapshots, browser profiles, and screenshots.
 .frontend-audit/
+
+# Private conversation exports and database backups.
+ses_*.json
+*.bak
+*.bak.enc

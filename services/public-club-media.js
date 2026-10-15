@@ -1,8 +1,17 @@
 // Replace embedded media in public listing responses inside MongoDB, before
 // large base64 values cross the database connection. Stored data is unchanged.
 const collections = new Set(['events', 'posts', 'sponsors', 'booths']);
-const fields = new Set(['image', 'sponsorLogo', 'sponsorAttachment']);
-const publicFields = 'id sortOrder name committee category tagline image imagePublicId imageFit status applicationCycleStartedAt pinned seats members committeeAvailability description requirements applicationIntro applicationFields interviewForms events posts sponsors booths memberRoster.email';
+const fields = new Set(['image', 'sponsorLogo']);
+const publicFields = 'id sortOrder name committee category tagline image imagePublicId imageFit status applicationCycleStartedAt pinned seats members committeeAvailability description requirements applicationIntro applicationFields events posts sponsors booths memberRoster.email';
+const publicContentFields = 'requestId contentType title date time location budget description image createdAt publishedAt registrationEnabled attendanceEnabled attendanceAudience author text type category kind sponsorName sponsorCompany sponsorType sponsorBenefits sponsorDescription sponsorLogo boothName boothPurpose boothDescription boothLocation boothSize boothEquipment boothSetupDate boothOpenDate boothCloseDate interaction question options'.split(' ');
+function sanitizePublicClub(record) {
+  const { memberRoster, archivedAt, interviewForms, ...result } = record;
+  for (const collection of collections) if (Array.isArray(result[collection])) result[collection] = result[collection].map(item => {
+    if (!item || typeof item !== 'object') return item;
+    return Object.fromEntries(publicContentFields.filter(key => Object.hasOwn(item, key)).map(key => [key, item[key]]));
+  });
+  return result;
+}
 
 function publicClubProjection() {
   const projection = Object.fromEntries(publicFields.split(' ').map((field) => [field, 1]));
@@ -22,7 +31,7 @@ function publicClubProjection() {
       input: { $range: [0, { $size: { $ifNull: [`$${collection}`, []] } }] }, as: 'mediaIndex',
       in: { $let: { vars: { item: { $arrayElemAt: [`$${collection}`, '$$mediaIndex'] } },
         in: { $cond: [{ $eq: [{ $type: '$$item' }, 'object'] },
-          { $mergeObjects: ['$$item', replacements] }, '$$item'] } } }
+          { ...Object.fromEntries(publicContentFields.map(key => [key, `$$item.${key}`])), ...replacements }, '$$item'] } } }
     } }, `$${collection}`] };
   }
   return projection;
@@ -73,4 +82,4 @@ function registerPublicClubMedia(app, { Club, requireLiveDatabase }) {
   });
 }
 
-module.exports = { publicClubProjection, registerPublicClubMedia, publicFields };
+module.exports = { publicClubProjection, registerPublicClubMedia, publicFields, sanitizePublicClub };

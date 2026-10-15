@@ -121,6 +121,7 @@ test('real club submission handlers gate all modules and re-enter supervisor rev
   const source = fs.readFileSync(require.resolve('../server'), 'utf8');
   let record; let handler;
   const context = {
+    validateFeedMedia: require('../services/feed-video').validateFeedMedia, cloudinary: {}, cloudinaryCredentials: null, validSponsorAttachment: require('../services/attachment-validation').validSponsorAttachment,
     console, mongoReady: true, clubs: [{ id: 1, name: 'Test club' }],
     cleanText: value => String(value || '').trim(), contentTitle: (type, body) => body.title || '',
     contentSingularLabel: type => type, contentRequiresTitle: () => true,

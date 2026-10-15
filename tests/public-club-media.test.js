@@ -32,8 +32,8 @@ test('public media preserves bytes, restricts fields, excludes archived/version-
   assert.equal(pipelines[0][0].$match.archivedAt, null);
   assert.equal(pipelines[0][0].$match.id, 1);
   const pdf = await fetch(base + 'sponsors/0/sponsorAttachment?v=1234');
-  assert.equal(pdf.headers.get('content-disposition'), 'attachment; filename="attachment.pdf"');
-  assert.deepEqual(Buffer.from(await pdf.arrayBuffer()), bytes);
+  assert.equal(pdf.status, 400, 'Private sponsor attachments cannot be fetched publicly');
+
   for (const suffix of ['memberRoster/0/email?v=1234', 'events/0/private?v=1234', 'events/-1/image?v=1234', 'events/0/image?v=bad']) {
     assert.equal((await fetch(base + suffix)).status, 400);
   }

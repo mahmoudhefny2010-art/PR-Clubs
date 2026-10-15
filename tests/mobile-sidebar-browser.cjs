@@ -11,24 +11,19 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   const browser = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find(fs.existsSync);
   assert.ok(browser, 'Chrome or Edge is required');
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'miu-sidebar-check-'));
-  const admin = fs.readFileSync(path.join(root, 'private/global-admin.html'), 'utf8');
-  const styles = admin.match(/<style>([\s\S]*?)<\/style>/)?.[1] || '';
+  const styles = ''; // Reports use shared styles, independently of administration.
   const names = ['Overview', 'Club Heads', 'Clubs', 'Analysis', 'MIU Posts', 'Student feedback', 'MIU polls & evaluations', 'Applications', 'Event reports', 'Attendance sheets per event'];
-  let fixture = `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/assets/css/base.css"><style>${styles}</style><link rel="stylesheet" href="/assets/css/pages/event-reports.css"><link rel="stylesheet" href="/assets/css/mobile-sidebars.css"><main class="app-container"><div class="report-admin-layout"><div id="adminTabs" class="tab-bar report-admin-sidebar">${names.map((n, i) => `<button class="tab-btn ${i ? '' : 'active'}">${n}</button>`).join('')}</div><section>Dashboard content</section></div></main><script src="/assets/js/mobile-sidebars.js"></script>`;
-  if (process.argv.includes('--homepage')) fixture = fixture
-    .replace('<div class="report-admin-layout"><div id=', '<div class="admin-panel"><header class="admin-header"><h2>Admin dashboard</h2><div id=')
-    .replace('tab-bar report-admin-sidebar', 'admin-session-actions homepage-admin-sidebar')
-    .replace('</div><section>Dashboard content', '</div></header><section>Dashboard content');
+  let fixture = `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/assets/css/base.css"><style>${styles}</style><link rel="stylesheet" href="/assets/css/pages/event-reports.css"><link rel="stylesheet" href="/assets/css/mobile-sidebars.css"><main class="app-container"><div class="report-admin-layout"><div id="reportNavigation" class="tab-bar report-admin-sidebar">${names.map((n, i) => `<button class="tab-btn ${i ? '' : 'active'}">${n}</button>`).join('')}</div><section>Dashboard content</section></div></main><script src="/assets/js/mobile-sidebars.js"></script>`;
   if (process.argv.includes('--events')) fixture = fs.readFileSync(path.join(root, 'public/pages/report-downloads.html'), 'utf8').replace(/<script[\s\S]*?<\/script>/g, '').replace('</body>', '<script>history.replaceState(null,"","?type=attendance")</script><script src="/assets/js/pages/report-downloads.js"></script></body>');
   if (process.argv.includes('--registration')) fixture = '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/assets/css/base.css"><form id="regForm"><div class="field-group"><input required></div><button type="submit">Register</button></form><p id="regFeedback"></p><script type="module">import "/assets/js/student-event-registration.js";window.mountStudentEventRegistration(document.getElementById("regForm"),document.getElementById("regFeedback"),"/api/events/1/0/registrations");</script>';
   if (process.argv.includes('--audience')) {
     const eventPage = fs.readFileSync(path.join(root, 'public/pages/event-form.html'), 'utf8');
     const eventForm = eventPage.match(/<form id="contentForm"[\s\S]*?<\/form>/)?.[0] || '';
-    const globalAdmin = fs.readFileSync(path.join(root, 'private/global-admin.html'), 'utf8');
-    const adminStyles = globalAdmin.match(/<style>([\s\S]*?)<\/style>/)?.[1] || '';
-    const universityPublisher = globalAdmin.match(/<div class="university-publisher">([\s\S]*?)<\/div>\s*<h3 class="analysis-title">/)?.[1] || '';
+    const publisherPage = fs.readFileSync(path.join(root, 'public/dashboards/miu-events-dashboard.html'), 'utf8');
+    const adminStyles = fs.readFileSync(path.join(root, 'public/assets/css/pages/miu-events-dashboard.css'), 'utf8');
+    const universityPublisher = require('../services/admin-dashboard-pages').element(publisherPage, 'form', 'universityPostForm');
     const visiblePublisher = universityPublisher.replace('id="universityEventFields" hidden', 'id="universityEventFields"').replace('id="universityAudienceField" for=', 'id="universityAudienceField" for=');
-    fixture = `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/assets/css/base.css"><link rel="stylesheet" href="/assets/css/pages/content-form.css"><style>${adminStyles}</style><main class="app-container"><section class="committee-card"><h2>Club event</h2><div class="content-layout"><div class="panel">${eventForm}</div></div></section><section class="committee-card"><h2>MIU event</h2><div class="university-publisher">${visiblePublisher}</div></section></main>`;
+    fixture = `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/assets/css/base.css"><link rel="stylesheet" href="/assets/css/pages/content-form.css"><style>${adminStyles}</style><body class="miu-events-dashboard-page"><main class="app-container"><section class="committee-card"><h2>Club event</h2><div class="content-layout"><div class="panel">${eventForm}</div></div></section><section class="committee-card"><h2>MIU event</h2><div class="university-publisher">${visiblePublisher}</div></section></main>`;
   }
   let registered = false;
   const server = http.createServer((req, res) => {
@@ -96,12 +91,12 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     }
     for (let i = 0; i < 50 && !await evaluate('!!document.querySelector(".dashboard-drawer-toggle")'); i++) await sleep(100);
     await evaluate('document.querySelector(".dashboard-drawer-toggle").click()'); await sleep(300);
-    const dimensions = await evaluate(`(() => { const d=document.getElementById('adminTabs'), b=d.querySelector('.dashboard-drawer-close'), r=d.getBoundingClientRect(); return {left:r.left,width:r.width,height:r.height,visible:getComputedStyle(d).visibility,close:b.textContent,closeWidth:b.getBoundingClientRect().width,overflow:document.documentElement.scrollWidth>innerWidth}; })()`);
+    const dimensions = await evaluate(`(() => { const d=document.getElementById('reportNavigation'), b=d.querySelector('.dashboard-drawer-close'), r=d.getBoundingClientRect(); return {left:r.left,width:r.width,height:r.height,visible:getComputedStyle(d).visibility,close:b.textContent,closeWidth:b.getBoundingClientRect().width,overflow:document.documentElement.scrollWidth>innerWidth}; })()`);
     assert.equal(dimensions.left, 0); assert.ok(dimensions.width <= 288); assert.equal(dimensions.visible, 'visible'); assert.equal(dimensions.close, '×'); assert.equal(dimensions.closeWidth, 40); assert.equal(dimensions.overflow, false);
     await evaluate('document.querySelector(".dashboard-drawer-overlay").click()');
     assert.equal(await evaluate('document.querySelector(".dashboard-drawer-toggle").getAttribute("aria-expanded")'), 'false');
     await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }); await sleep(100);
-    assert.equal(await evaluate('document.getElementById("adminTabs").inert'), false);
+    assert.equal(await evaluate('document.getElementById("reportNavigation").inert'), false);
     console.log('PASS: 390px drawer fits, opens, closes, has a 40px close control, and restores desktop navigation.');
   } finally { socket?.close(); child.kill(); server.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

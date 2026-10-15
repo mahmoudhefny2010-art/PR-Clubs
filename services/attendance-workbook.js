@@ -9,7 +9,7 @@ async function attendanceWorkbook(rows, details = {}) {
   const index = name => headings.indexOf(name);
   const value = (row, name) => index(name) < 0 ? '' : row[index(name)];
   const registered = details.sheet === 'registered';
-  const openAudience = index('Membership') >= 0;
+  const openAudience = (details.attendanceAudience || details.event?.attendanceAudience) === 'all_students';
   const knownEmails = new Set(records.map(row => String(value(row, 'MIU email') || '').trim().toLowerCase()).filter(Boolean));
   const summary = [ ['Metric', 'Value', 'Details'],
     ['Export type', registered ? 'Registered attendees' : openAudience ? 'Open event verified check-ins' : 'Verified check-ins', registered ? 'Registration does not prove attendance.' : 'Recorded check-ins; administrative approval is tracked separately.'],
@@ -25,6 +25,9 @@ async function attendanceWorkbook(rows, details = {}) {
     summary.push(['Non-member check-ins', records.filter(row => value(row, 'Membership') === 'Non-member').length, 'No active club membership was found at check-in time.']);
   }
   const statuses = new Map();
+  if (index('Event role') >= 0 && !registered) {
+    for (const role of ['Organizer', 'Usher', 'President', 'Head']) summary.push([role + ' check-ins', records.filter(row => value(row, 'Event role') === role).length, 'Included in the attendance total; event role is separate from club membership.']);
+  }
   for (const row of records) { const status = value(row, 'Approval status'); if (status) statuses.set(status, (statuses.get(status) || 0) + 1); }
   for (const [status, count] of statuses) summary.push(['Approval: ' + status.replace(/_/g, ' '), count, 'Administrative review status, not a separate attendance count.']);
   formatSheet(workbook, summary, 'Summary');

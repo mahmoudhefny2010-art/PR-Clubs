@@ -31,9 +31,12 @@
   });
   window.MiuUI = Object.freeze({
     escapeHtml, createJsonClient, button, modals,
+    attendanceEventRoleLabel(record) {
+      return ({ organizer: 'Organizer', usher: 'Usher', president: 'President', head: 'Head' })[record?.eventParticipation?.role] || 'Attendee';
+    },
     initModalControls() {
       const closeButtonSelector = 'button[aria-label*="close" i], button[aria-label*="exit" i], button[title*="close" i], button[class*="close" i], button[id*="close" i], .club-detail-close, .calendar-close-btn, .close-btn, .request-dialog-close, .club-review-notice-close, .club-feedback-dialog-close, .attachment-preview-close';
-      const closeRailTargetSelector = '.request-dialog-inner, .calendar-panel, .modal-card, .event-modal-panel, .member-directory-inner, .member-dialog-inner, .status-overview-inner, .review-history-inner, .approval-checkpoint-more-inner, .attachment-preview-panel, .club-feedback-dialog, .club-review-notice-content, .attendance-review-panel, .admin-data-status-dialog, .committee-attendance-inner, .committee-availability-dialog, .attendance-review-dialog, .committee-sidebar, .president-sidebar, .student-dashboard-sidebar, .report-admin-sidebar, .homepage-admin-sidebar, #adminTabs';
+      const closeRailTargetSelector = '.request-dialog-inner, .calendar-panel, .modal-card, .event-modal-panel, .member-directory-inner, .member-dialog-inner, .status-overview-inner, .review-history-inner, .approval-checkpoint-more-inner, .attachment-preview-panel, .club-feedback-dialog, .club-review-notice-content, .attendance-review-panel, .committee-attendance-inner, .committee-availability-dialog, .attendance-review-dialog, .committee-sidebar, .president-sidebar, .student-dashboard-sidebar, .report-admin-sidebar';
       const moveCloseButtonToRail = (button) => {
         if (!(button instanceof HTMLElement) || button.closest('.modal-close-rail, .request-dialog-close-rail')) return;
         if (button.closest('.committee-inline-panel')) return;

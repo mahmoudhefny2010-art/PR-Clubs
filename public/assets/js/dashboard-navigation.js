@@ -1,9 +1,11 @@
 (() => {
+  // The new admin tools use actual pages and browser history, not hidden panels.
+  if (location.pathname === '/admin' || location.pathname.startsWith('/admin/')) return;
   const key = 'miu:dashboard-navigation:' + location.pathname;
   let saved = { current: null, stack: [] };
   try { saved = JSON.parse(sessionStorage.getItem(key)) || saved; } catch {}
   if (!Array.isArray(saved.stack)) saved.stack = [];
-  const sidebar = '.committee-sidebar, .president-sidebar, .student-dashboard-sidebar, .report-admin-sidebar, .homepage-admin-sidebar';
+  const sidebar = '.committee-sidebar, .president-sidebar, .student-dashboard-sidebar, .report-admin-sidebar';
   const attributes = ['data-report-mode', 'data-dashboard-panel', 'data-dashboard-section', 'data-panel', 'data-tab', 'data-student-section'];
   const descriptor = element => {
     if (!element || element.matches('.dashboard-drawer-close, .dashboard-drawer-toggle')) return null;

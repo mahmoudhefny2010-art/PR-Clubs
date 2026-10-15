@@ -53,7 +53,7 @@
       meta.textContent = [assignment.clubName, kind, assignment.eventDate, assignment.eventTime].filter(Boolean).join(' · ');
       const committee = document.createElement('p');
       committee.className = 'member-assignment-meta';
-      committee.textContent = `${assignment.committee} · Assigned by ${assignment.assignedBy}`;
+        committee.textContent = `Organizer · ${assignment.committee} · Assigned by ${assignment.assignedBy}`;
       content.append(title, meta, committee);
       const status = document.createElement('span');
       const isToday = String(assignment.eventDate || '').slice(0, 10) === todayInCairo();
@@ -67,8 +67,8 @@
       if (assignment.status === 'assigned') {
         actions.append(button('Accept request', 'primary-btn', () => acceptAssignment(assignment.id)));
       } else if (!isPast && isToday) {
-        if (!assignment.attendanceRecorded) {
-          actions.append(button('Record my attendance', 'primary-btn', () => checkInAssignment(assignment, card)));
+        if (!assignment.attendanceRecorded || assignment.attendanceRole !== 'organizer') {
+          actions.append(button('Record my organizer attendance', 'primary-btn', () => checkInAssignment(assignment, card)));
         }
         actions.append(button('Open attendance QR', 'secondary-btn', () => openQr(assignment, card)));
       } else if (!isPast) {
