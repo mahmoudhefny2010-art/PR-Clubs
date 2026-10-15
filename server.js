@@ -486,7 +486,8 @@ const defaultClubs = [
 ];
 
 const dataDirectory = process.env.LOCAL_DATA_DIRECTORY
-  ? path.resolve(process.env.LOCAL_DATA_DIRECTORY) : path.join(__dirname, 'data');
+  ? path.resolve(process.env.LOCAL_DATA_DIRECTORY)
+  : process.env.VERCEL ? path.join(require('node:os').tmpdir(), 'miu-clubs-data') : path.join(__dirname, 'data');
 const clubsFile = path.join(dataDirectory, 'clubs.json');
 const homepageFile = path.join(dataDirectory, 'homepage.json');
 const adminCredentialsFile = path.join(dataDirectory, 'admin.json');
@@ -496,7 +497,7 @@ const eventViewsFile = path.join(dataDirectory, 'event-views.json');
 const picsDirectory = path.join(__dirname, 'public', 'assets', 'img', 'pics');
 
 fs.mkdirSync(dataDirectory, { recursive: true });
-fs.mkdirSync(picsDirectory, { recursive: true });
+if (!process.env.VERCEL) fs.mkdirSync(picsDirectory, { recursive: true });
 
 function readJsonFile(filePath, fallback) {
   try {
