@@ -1,12 +1,12 @@
 const STAFF_ROUTES = {
   software_development: '/admin',
   miu_events: '/dashboards/miu-events-dashboard.html',
-  president: '/club-dashboard', head: '/club-dashboard', supervisor: '/dashboards/supervisor-dashboard.html',
+  president: '/club-dashboard', vice_president: '/club-dashboard', head: '/club-dashboard', supervisor: '/dashboards/supervisor-dashboard.html',
   pr: '/dashboards/pr-dashboard.html', english: '/dashboards/english-dashboard.html',
   security: '/dashboards/security-dashboard.html', sso: '/dashboards/sso-dashboard.html', dean: '/dashboards/dean-dashboard.html'
 };
 
-const STAFF_ROLE_LABELS = { president: 'Club president', head: 'Committee head', supervisor: 'Club supervisor',
+const STAFF_ROLE_LABELS = { president: 'Club president', vice_president: 'Club vice president', head: 'Committee head', supervisor: 'Club supervisor',
   pr: 'PR', english: 'English Department', security: 'Security Office', sso: 'SSO', dean: 'Dean',
   software_development: 'Software Development team', miu_events: 'MIU Events' };
 

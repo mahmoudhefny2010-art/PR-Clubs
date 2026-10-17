@@ -83,13 +83,13 @@
     const legend = document.createElement('legend'); legend.textContent = 'Assigned clubs'; clubs.append(legend);
     const initialClubIds = assignment.role === 'supervisor'
       ? assignment.assignedClubIds || []
-      : ['president', 'head'].includes(assignment.role) && assignment.clubId ? [assignment.clubId] : [];
+      : ['president', 'vice_president', 'head'].includes(assignment.role) && assignment.clubId ? [assignment.clubId] : [];
     for (const club of data.clubs) {
       const label = document.createElement('label'); label.className = 'supervisor-assignment';
       const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.value = club.id;
       checkbox.checked = initialClubIds.includes(Number(club.id));
       checkbox.addEventListener('change', () => {
-        if (['president', 'head'].includes(role.value) && checkbox.checked) {
+        if (['president', 'vice_president', 'head'].includes(role.value) && checkbox.checked) {
           clubs.querySelectorAll('input').forEach(item => { if (item !== checkbox) item.checked = false; });
         }
       });
@@ -117,7 +117,7 @@
         if (!occupied.has(value) || value === currentRole) role.append(new Option(label, value));
       });
       role.value = currentRole;
-      const scoped = ['president', 'head', 'supervisor'].includes(currentRole);
+      const scoped = ['president', 'vice_president', 'head', 'supervisor'].includes(currentRole);
       row.querySelector('.staff-role-clubs').hidden = !scoped;
       const committeeLabel = row.querySelector('.staff-role-committee');
       committeeLabel.hidden = currentRole !== 'head';
@@ -145,7 +145,7 @@
 
   function assignmentSummary(item) {
     const ids = item.role === 'supervisor' ? item.assignedClubIds || []
-      : ['president', 'head'].includes(item.role) && item.clubId ? [item.clubId] : [];
+      : ['president', 'vice_president', 'head'].includes(item.role) && item.clubId ? [item.clubId] : [];
     const clubNames = ids.map(id => data.clubs.find(club => club.id === Number(id))?.name || `Club #${id}`);
     return [data.roles[item.role] || item.role, item.committee, ...clubNames].filter(Boolean).join(' · ');
   }
@@ -326,10 +326,10 @@
     });
     for (const item of assignments) {
       if (!item.role) { feedback.textContent = 'Choose a dashboard role for every assignment.'; feedback.classList.add('is-error'); rowsHost.querySelector('select:invalid')?.focus(); return; }
-      if (['president', 'head', 'supervisor'].includes(item.role) && !item.assignedClubIds.length) {
+      if (['president', 'vice_president', 'head', 'supervisor'].includes(item.role) && !item.assignedClubIds.length) {
         feedback.textContent = `Select at least one club for ${data.roles[item.role]}.`; feedback.classList.add('is-error'); rowsHost.querySelectorAll('.staff-role-assignment')[assignments.indexOf(item)]?.querySelector('.staff-role-clubs input')?.focus(); return;
       }
-      if (['president', 'head'].includes(item.role) && item.assignedClubIds.length !== 1) {
+      if (['president', 'vice_president', 'head'].includes(item.role) && item.assignedClubIds.length !== 1) {
         feedback.textContent = `Select exactly one club for ${data.roles[item.role]}.`; feedback.classList.add('is-error'); return;
       }
       if (item.role === 'head' && !item.committee) { feedback.textContent = 'Enter the committee for the committee head role.'; feedback.classList.add('is-error'); rowsHost.querySelectorAll('.staff-role-assignment')[assignments.indexOf(item)]?.querySelector('.staff-role-committee input')?.focus(); return; }

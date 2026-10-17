@@ -5,7 +5,7 @@ const fields = new Set(['image', 'sponsorLogo']);
 const publicFields = 'id sortOrder name committee category tagline image imagePublicId imageFit status applicationCycleStartedAt pinned seats members committeeAvailability description requirements applicationIntro applicationFields events posts sponsors booths memberRoster.email';
 const publicContentFields = 'requestId contentType title date time location budget description image createdAt publishedAt registrationEnabled attendanceEnabled attendanceAudience author text type category kind sponsorName sponsorCompany sponsorType sponsorBenefits sponsorDescription sponsorLogo boothName boothPurpose boothDescription boothLocation boothSize boothEquipment boothSetupDate boothOpenDate boothCloseDate interaction question options'.split(' ');
 function sanitizePublicClub(record) {
-  const { memberRoster, archivedAt, interviewForms, ...result } = record;
+  const { memberRoster, archivedAt, interviewForms, questionHistory, ...result } = record;
   for (const collection of collections) if (Array.isArray(result[collection])) result[collection] = result[collection].map(item => {
     if (!item || typeof item !== 'object') return item;
     return Object.fromEntries(publicContentFields.filter(key => Object.hasOwn(item, key)).map(key => [key, item[key]]));

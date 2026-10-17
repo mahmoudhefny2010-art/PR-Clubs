@@ -8,7 +8,7 @@ const base = { email: 'staff@miuegypt.edu.eg', role: 'supervisor', assignedClubI
 
 test('all staff roles validate their own club/committee scope and reject privileged role injection', () => {
   for (const role of Object.keys(STAFF_ROUTES)) {
-    const scoped = ['president', 'head', 'supervisor'].includes(role);
+    const scoped = ['president', 'vice_president', 'head', 'supervisor'].includes(role);
     const result = validateStaffAssignment({ ...base, role, assignedClubIds: scoped ? [1] : [], committee: 'IT' });
     assert.equal(result.error, undefined);
     assert.equal(result.value.clubId, scoped ? 1 : 0);
@@ -17,6 +17,8 @@ test('all staff roles validate their own club/committee scope and reject privile
   assert.ok(validateStaffAssignment({ ...base, assignedClubIds: [] }).error);
   assert.ok(validateStaffAssignment({ ...base, role: 'head', committee: '' }).error);
   assert.ok(validateStaffAssignment({ ...base, role: 'president', assignedClubIds: [1, 2] }).error);
+  assert.ok(validateStaffAssignment({ ...base, role: 'vice_president', assignedClubIds: [] }).error);
+  assert.ok(validateStaffAssignment({ ...base, role: 'vice_president', assignedClubIds: [1, 2] }).error);
   assert.ok(validateStaffAssignment({ ...base, role: 'dean' }).error);
   assert.ok(validateStaffAssignment({ ...base, email: 'outside@example.com' }).error);
   assert.ok(validateStaffAssignment({ ...base, assignedClubIds: ['1'] }).error);

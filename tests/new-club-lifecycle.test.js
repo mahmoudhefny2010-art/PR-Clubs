@@ -61,7 +61,7 @@ function fixture() {
   evaluate('function toPublicClubRecord(', "app.use('/api/ask-ai'");
   evaluate("app.post('/api/admin/clubs',", "app.put('/api/admin/clubs/order'");
   evaluate("app.get('/api/clubs',", "app.get('/api/university-content'");
-  evaluate("app.post('/api/club-auth/login',", "app.post('/api/club-auth/logout'");
+  evaluate("app.post('/api/auth/login',", "app.post('/api/admin/setup'");
   evaluate("app.get('/api/club/dashboard',", '// Public event registration');
   const payload = { name: 'Brand New Club', committee: 'New Committee', category: 'Science', tagline: 'New activities',
     description: 'Student club description', requirements: 'Interest in science', status: 'open', seats: 30,
@@ -91,12 +91,12 @@ test('new club receives a president account and appears in both public API varia
     assert.equal(homepage.code, 200);
     assert.ok(homepage.body.some(club => club.id === 51 && club.name === state.payload.name));
   }
-  const login = await state.call('POST', '/api/club-auth/login', { body: { email: state.payload.clubLoginEmail, password: state.payload.clubInitialPassword } });
-  assert.equal(login.code, 200); assert.equal(login.body.club.id, 51); assert.equal(login.body.club.role, 'president');
+  const login = await state.call('POST', '/api/auth/login', { body: { email: state.payload.clubLoginEmail, password: state.payload.clubInitialPassword } });
+  assert.equal(login.code, 200); assert.equal(login.body.redirect, '/club-dashboard'); assert.equal(login.body.role, 'president');
   assert.equal(login.headers['Set-Cookie'], 'test-session');
   const dashboard = await state.call('GET', '/api/club/dashboard', { clubAccount: state.dbAccounts[0] });
   assert.equal(dashboard.body.id, 51); assert.equal(dashboard.body.role, 'president');
-  const wrongPassword = await state.call('POST', '/api/club-auth/login', { body: { email: state.payload.clubLoginEmail, password: 'wrong-password' } });
+  const wrongPassword = await state.call('POST', '/api/auth/login', { body: { email: state.payload.clubLoginEmail, password: 'wrong-password' } });
   assert.equal(wrongPassword.code, 401);
 });
 test('account write failure rolls back club creation and does not update the public cache', async () => {

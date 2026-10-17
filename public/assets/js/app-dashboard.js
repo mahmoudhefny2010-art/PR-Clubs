@@ -48,7 +48,7 @@ function renderHeadDashboard() {
     const matchesStatus = statusFilter === 'all'
       || (statusFilter === 'pending' && app.status === 'pending' && !app.interviewed)
       || (statusFilter === 'processing' && app.status === 'pending' && app.interviewed)
-      || (['accepted', 'rejected'].includes(statusFilter) && app.status === statusFilter);
+      || (['accepted', 'rejected', 'removed'].includes(statusFilter) && app.status === statusFilter);
     return matchesSearch && matchesCommittee && matchesStatus;
   });
   const resultsCount = document.getElementById('applicantResultsCount');
@@ -104,7 +104,7 @@ async function deleteApplication(appId) {
   await loadApplications();
 }
 
-function openReviewModal(appId) {
+async function openReviewModal(appId) {
   const app = state.applications.find((item) => item.id === appId);
   if (!app) return;
 
@@ -135,7 +135,25 @@ function openReviewModal(appId) {
   `).join('');
   modalCustomAnswers.classList.toggle('hidden', answers.length === 0);
 
-  renderInterviewReviewQuestions(app);
+  const reviewButton = document.getElementById('saveReviewBtn');
+  reviewButton.disabled = true;
+  state.reviewInterviewSections = [];
+  document.getElementById('modalInterviewQuestions').replaceChildren();
+  document.getElementById('modalInterviewFeedback').textContent = 'Loading interview questions...';
+  reviewModal.classList.remove('hidden');
+  try {
+    const response = await fetch('/api/club/interview-form', { cache: 'no-store' });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Could not load interview questions.');
+    if (state.selectedApplication?.id !== appId) return;
+    state.reviewInterviewSections = result.sections || [];
+    renderInterviewReviewQuestions(app);
+    document.getElementById('modalInterviewFeedback').textContent = '';
+    reviewButton.disabled = false;
+  } catch (error) {
+    document.getElementById('modalInterviewFeedback').textContent = error.message + ' Close and reopen this interview to retry.';
+    return;
+  }
 
   reviewModal.querySelector('.modal-card').scrollTop = 0;
   reviewModal.classList.remove('hidden');
@@ -149,12 +167,8 @@ function renderInterviewReviewQuestions(app) {
   const container = document.getElementById('modalInterviewQuestions');
   const evaluation = (app.interviewEvaluations || []).find((item) => item.scope === getInterviewScope());
   const previousAnswers = new Map((evaluation?.answers || []).map((answer) => [answer.key, answer.value]));
-  if (!state.interviewSections.length) {
-    container.replaceChildren();
-    container.classList.add('hidden');
-    return;
-  }
-  container.innerHTML = state.interviewSections.map((section) => `
+
+  container.innerHTML = (state.reviewInterviewSections || []).map((section) => `
     <section class="modal-interview-section">
       <h4>${escapeHtml(section.title)}</h4>
       <div class="form-row modal-interview-question-grid">
@@ -177,12 +191,19 @@ function renderInterviewReviewQuestions(app) {
       </div>
     </section>
   `).join('');
-  container.classList.remove('hidden');
+  const saved = evaluation?.answers || [];
+  const history = evaluation?.history || [];
+  if (saved.length || history.length) {
+    const answersHtml = answers => answers.map(answer => '<div class="review-answer"><strong>' + escapeHtml(answer.label) + '</strong><p>' + escapeHtml(answer.value || 'No answer') + '</p></div>').join('');
+    container.innerHTML += '<details class="modal-interview-section"><summary>Previously saved interview answers</summary>' + answersHtml(saved)
+      + history.map((entry, index) => '<details><summary>Earlier save ' + (index + 1) + '</summary>' + answersHtml(entry.answers || []) + '</details>').join('') + '</details>';
+  }
+  container.classList.toggle('hidden', !container.innerHTML.trim());
 }
 
 function collectInterviewReviewAnswers() {
   const answers = [];
-  for (const section of state.interviewSections) {
+  for (const section of (state.reviewInterviewSections || [])) {
     for (const question of section.questions) {
       const input = document.querySelector(`#modalInterviewQuestions [data-interview-answer="${CSS.escape(question.key)}"]`);
       const value = input?.value.trim() || '';
@@ -400,7 +421,7 @@ function showMemberRemovalConfirmation(card, member) {
   const form = document.createElement('form');
   form.className = 'member-removal-confirmation';
   const message = document.createElement('p');
-  message.textContent = `Remove ${member.name} from this club? Their account and history will be kept. Any accepted application for this club will be marked rejected to end membership.`;
+  message.textContent = `Remove ${member.name} from this club? Their account and history will be kept. Their membership will be marked removed.`;
   const actions = document.createElement('div');
   actions.className = 'member-role-edit-actions';
   const confirm = document.createElement('button');
@@ -779,7 +800,7 @@ document.getElementById('logoutBtn')?.addEventListener('click', async () => {
   await window.refreshHeaderAccountState?.();
   state.clubAccount = null;
   state.applications = [];
-  showView('clubLogin');
+  window.location.replace('/pages/applicant-login.html?redirect=%2Fclub-dashboard');
 });
 
 document.getElementById('backHomeBtn').addEventListener('click', returnToPreviousAppView);
@@ -819,41 +840,6 @@ document.getElementById('presidentClubStatusForm').addEventListener('submit', as
     feedback.classList.add('is-error');
   } finally {
     saveButton.disabled = false;
-  }
-});
-
-document.getElementById('clubLoginForm').addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const feedback = document.getElementById('clubLoginFeedback');
-  const submitButton = document.getElementById('clubLoginSubmit');
-  const originalLabel = submitButton.textContent;
-  submitButton.disabled = true;
-  submitButton.textContent = 'Signing in…';
-  feedback.textContent = '';
-  feedback.classList.remove('is-error');
-
-  try {
-    const response = await fetch('/api/club-auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: document.getElementById('clubLoginEmail').value.trim(),
-        password: document.getElementById('clubLoginPassword').value,
-      }),
-    });
-    if (!response.headers.get('content-type')?.includes('application/json')) {
-      throw new Error('The login API was not reached. Open the portal through the app server at http://localhost:1111/club-login, not a static preview or Live Server link.');
-    }
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.message || 'Club login failed.');
-    if (!result.authenticated || !result.club) throw new Error('Login succeeded, but the dashboard account could not be loaded.');
-    await openClubPortal(result);
-  } catch (error) {
-    feedback.textContent = error.message;
-    feedback.classList.add('is-error');
-  } finally {
-    submitButton.disabled = false;
-    submitButton.textContent = originalLabel;
   }
 });
 
@@ -938,7 +924,7 @@ function returnToPreviousAppView() {
 }
 function showView(viewName) {
   const current = Object.entries(views).find(([, view]) => view.classList.contains('active'))?.[0];
-  if (!returningToAppView && current && current !== viewName && !['authLoading', 'signIn', 'clubLogin'].includes(current)) appViewBackStack.push(current);
+  if (!returningToAppView && current && current !== viewName && !['authLoading', 'signIn'].includes(current)) appViewBackStack.push(current);
   Object.entries(views).forEach(([key, view]) => {
     view.classList.toggle('active', key === viewName);
   });
@@ -979,7 +965,7 @@ async function restoreLastAppView() {
     showView('myForms');
     return true;
   }
-  if (['clubLogin', 'head'].includes(savedView.viewName)) {
+  if (savedView.viewName === 'head') {
     await openClubPortal();
     return true;
   }
@@ -1053,17 +1039,36 @@ const pageStartup = init().catch(() => {
   // A failed initial API must show an error, not an empty directory or an
   // indefinite loading screen. Reload retries the real data requests.
   const panel = document.createElement('section');
-  panel.className = 'hero-panel';
+  panel.className = 'page-load-error';
   panel.setAttribute('role', 'alert');
+  panel.setAttribute('aria-labelledby', 'pageLoadErrorTitle');
+  const icon = document.createElement('div');
+  icon.className = 'page-load-error-icon';
+  icon.setAttribute('aria-hidden', 'true');
+  icon.innerHTML = '<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 35h-3a9 9 0 0 1-1-18 12 12 0 0 1 23-3 10.5 10.5 0 0 1 2 20.8"/><circle cx="25" cy="32" r="9"/><path d="M25 27v5m0 4h.01"/></svg>';
+  const eyebrow = document.createElement('p');
+  eyebrow.className = 'page-load-error-eyebrow';
+  eyebrow.textContent = 'TEMPORARILY UNAVAILABLE';
+  const title = document.createElement('h1');
+  title.id = 'pageLoadErrorTitle';
+  title.textContent = 'Let\u2019s try that again';
   const message = document.createElement('p');
-  message.textContent = 'The page data could not be loaded. Please check your connection and try again.';
+  message.className = 'page-load-error-message';
+  message.textContent = 'We couldn\u2019t load the page right now. Please try again in a moment.';
   const retry = document.createElement('button');
   retry.type = 'button';
   retry.className = 'primary-btn';
   retry.textContent = 'Try again';
-  retry.addEventListener('click', () => window.location.reload());
-  panel.append(message, retry);
-  document.querySelector('main').replaceChildren(panel);
+  retry.addEventListener('click', () => {
+    retry.disabled = true;
+    retry.textContent = 'Retrying...';
+    window.location.reload();
+  });
+  panel.append(icon, eyebrow, title, message, retry);
+  const wrapper = document.createElement('div');
+  wrapper.className = 'page-load-error-wrap';
+  wrapper.append(panel);
+  document.querySelector('main').replaceChildren(wrapper);
   document.documentElement.classList.remove('auth-route-pending');
 });
 window.siteStartup?.track(pageStartup);

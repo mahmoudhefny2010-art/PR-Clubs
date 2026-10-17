@@ -70,5 +70,42 @@ module.exports = async ({ cdp, origin, fixtures, requests, until, screenshot }) 
   await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape' });
   assert.equal(await cdp.evaluate('document.body.style.overflow'), 'clip', 'Previous scroll style is restored');
   await cdp.evaluate("document.body.style.overflow=''");
+  club.posts = [
+    { title: 'Older feed', createdAt: '2026-10-01', text: 'Older feed details' },
+    { title: 'Newer feed', createdAt: '2026-10-10', text: 'Full feed text\nSecond line <img src=x onerror=alert(1)>', description: 'Additional description', author: 'Fixture author' }
+  ];
+  club.sponsors = [{ title: 'Sponsor info', description: 'Original sponsor inline description', sponsorName: 'Sponsor name', sponsorCompany: 'Company name', sponsorType: 'Financial', sponsorAmount: '5000 EGP', sponsorBenefits: 'Full benefits\nSecond benefit', sponsorDescription: 'Full sponsor description' }];
+  club.booths = [{ title: 'Booth info', description: 'Original booth inline description', boothName: 'Welcome booth', boothPurpose: 'Welcome students', boothDescription: 'Complete booth description', boothLocation: 'Main courtyard', boothSize: '3 x 4', boothEquipment: 'Table and chairs', boothSetupDate: '2026-10-20', boothOpenDate: '2026-10-21', boothCloseDate: '2026-10-22' }];
+  await cdp.evaluate("window.miuLiveData.invalidate(['clubs']);loadClubs(true)");
+  await until("state.clubs.find(c=>c.id===1)?.posts?.length===2");
+  await cdp.evaluate('openClubDetail(1)');
+  assert.equal(await cdp.evaluate("document.querySelectorAll('#clubDetail .event-tile-desc').length"), 0, 'No section retains inline details');
+  assert.equal(await cdp.evaluate("document.querySelector('#clubDetail [data-content-section=posts]').dataset.contentIndex"), '1', 'Feed sort preserves identity');
+  for (const [section, title, expected] of [
+    ['posts', 'Newer feed', [club.posts[1].text, 'Additional description', 'Fixture author']],
+    ['sponsors', 'Sponsor info', Object.values(club.sponsors[0])],
+    ['booths', 'Booth info', Object.values(club.booths[0])]
+  ]) {
+    await cdp.evaluate(`document.querySelector('#clubDetail [data-content-section=${section}]').click()`);
+    assert.equal(await cdp.evaluate("document.getElementById('eventCardInfoTitle').textContent"), title);
+    const content = await cdp.evaluate("document.querySelector('#eventCardInfoModal .event-modal-copy').textContent");
+    for (const value of expected) assert.ok(content.includes(value), `${section} retains ${value}`);
+    assert.equal(await cdp.evaluate("document.querySelectorAll('#eventCardInfoModal .event-modal-copy img').length"), 0);
+    await screenshot(`club-info-${section}`);
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape' });
+    assert.equal(await cdp.evaluate('document.activeElement.dataset.contentSection'), section);
+  }
+  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 320, height: 700, deviceScaleFactor: 1, mobile: true });
+  await cdp.evaluate("document.documentElement.dataset.theme='dark';document.querySelector('#clubDetail [data-content-section=booths]').click()");
+  assert.equal(await cdp.evaluate("(()=>{const r=document.querySelector('#eventCardInfoModal .event-modal-panel').getBoundingClientRect();return r.left>=0&&r.right<=innerWidth+1&&r.top>=0&&r.bottom<=innerHeight+1})()"), true);
+  await screenshot('club-info-booth-mobile');
+  await cdp.evaluate("document.getElementById('eventCardInfoModal').click();delete document.documentElement.dataset.theme");
+  await cdp.evaluate("window.openClubContentInfoPopup({title:'Video feed',text:'Video description',image:'https://res.cloudinary.com/demo/video/upload/fixture.mp4'},'feed',state.clubs[0],document.querySelector('#clubDetail [data-content-section=posts]'))");
+  assert.equal(await cdp.evaluate("(()=>{const v=document.querySelector('#eventCardInfoModal video');return !!v&&v.controls&&v.preload==='none'&&!v.autoplay})()"), true, 'Feed video uses native controls without autoplay');
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab' });
+  assert.equal(await cdp.evaluate('document.activeElement.tagName'), 'VIDEO', 'Video controls are keyboard accessible inside the focus trap');
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape' });
+  assert.equal(await cdp.evaluate("document.querySelectorAll('#eventCardInfoModal').length"), 0);
+  console.log('PASS: Feed, Sponsor and Booth reuse Event Info; full descriptions/metadata, sorted identity, safe text, focus restoration, mobile layout and video controls.');
   console.log('PASS: Event Info uses shared popup styling; sorted identities, safe text, X/overlay/Escape, focus/scroll restoration, optional images, long content and 320–1440px layouts. No new API requests.');
 };

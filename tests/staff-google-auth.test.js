@@ -74,6 +74,28 @@ test('Google sign-in endpoint verifies the credential before assigning the store
   await handler({ body: { credential: 'unverified', role: 'dean' } }, res);
   assert.equal(status, 401); assert.equal(staffCookie, null);
 });
+test('Google sign-in retries database readiness and fails closed while it is still unavailable', async () => {
+  const source = fs.readFileSync(require.resolve('../server'), 'utf8');
+  const start = source.indexOf("app.post('/api/student-auth/google',");
+  const end = source.indexOf("app.post('/api/student-auth/google/link'", start);
+  for (const recovers of [true, false]) {
+    let handler, attempts = 0, credentialChecks = 0;
+    const context = {
+      app: { post: (_path, callback) => { handler = callback; } },
+      isSameOriginRequest: () => true, checkLoginSourceLock: async () => false, mongoReady: false,
+      ensureReady: async () => { attempts++; context.mongoReady = recovers; },
+      verifyGoogleRequest: async () => { credentialChecks++; throw new Error('GOOGLE_ACCOUNT_NOT_ALLOWED'); },
+      countLoginSourceFailure: async () => false, console: { error() {} }
+    };
+    vm.createContext(context); vm.runInContext(source.slice(start, end), context);
+    const response = { code: 200, setHeader() {}, status(code) { this.code = code; return this; }, json(body) { this.body = body; } };
+    await handler({ body: {} }, response);
+    assert.equal(attempts, 1);
+    assert.equal(credentialChecks, recovers ? 1 : 0);
+    assert.equal(response.code, recovers ? 401 : 503);
+  }
+});
+
 test('MIU supervisors can be assigned without a portal password; existing passwords cannot be silently replaced', async t => {
   let account = null; let saved;
   const app = express(); app.use(express.json());

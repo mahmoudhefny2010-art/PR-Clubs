@@ -189,12 +189,37 @@ async function screenshot(name) {
   await cdp.evaluate("document.getElementById('adminEmailInput').value='admin@example.test'; document.getElementById('adminPasswordInput').value='wrong-password'; document.getElementById('adminLoginForm').requestSubmit()");
   await until("document.getElementById('adminLoginFeedback').textContent==='Fixture login rejected.'");
   assert.equal(await cdp.evaluate('location.pathname'), '/admin/login', 'Failed login stays on login screen');
+  await until("!document.documentElement.classList.contains('site-startup-pending') && !!document.querySelector('#site-header header')");
+  for (const [width, height] of [[1440, 900], [1366, 650], [375, 812]]) {
+    await cdp.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 760 });
+    assert.equal(await cdp.evaluate("document.querySelector('#adminLoginView .login-wrap').getBoundingClientRect().width<=440"), true, 'Admin login uses the student login card width');
+    assert.equal(await cdp.evaluate('document.documentElement.scrollWidth<=innerWidth'), true, 'Login fits narrow screens');
+    assert.equal(await cdp.evaluate("getComputedStyle(document.getElementById('adminLoginSubmit')).width===getComputedStyle(document.getElementById('adminLoginForm')).width"), true, 'Sign-in button fills the form');
+    await screenshot(`admin-login-${width}-${height}`);
+  }
+  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1100, deviceScaleFactor: 1, mobile: false });
   await cdp.evaluate("document.getElementById('adminPasswordInput').value='Fixture-password-123'; document.getElementById('adminLoginForm').requestSubmit()");
   await until("location.pathname==='/admin'");
   await until(`document.querySelectorAll('.v2-widget').length===${toolIds.length} && document.getElementById('totalClubs').textContent==='2'`);
   assert.equal(await cdp.evaluate("getComputedStyle(document.getElementById('widgetGrid')).gridTemplateColumns.split(' ').length"), 4);
   assert.equal(await cdp.evaluate("document.querySelector('.v2-main').getBoundingClientRect().left >= document.querySelector('.v2-sidebar').getBoundingClientRect().right"), true, 'Sidebar stays next to content on desktop');
   assert.equal(await cdp.evaluate("document.getElementById('openClubs').textContent"), '1');
+  for (const theme of ['light', 'dark']) {
+    await cdp.evaluate(`document.documentElement.dataset.theme='${theme}'`);
+    for (const width of [320, 375]) {
+      await cdp.send('Emulation.setDeviceMetricsOverride', { width, height: 812, deviceScaleFactor: 1, mobile: true });
+      assert.equal(await cdp.evaluate(`(() => {
+        const brand=document.querySelector('.v2-admin-logo').getBoundingClientRect();
+        const actions=document.querySelector('.v2-header-actions').getBoundingClientRect();
+        const search=document.querySelector('.v2-header-search').getBoundingClientRect();
+        const title=document.querySelector('.v2-admin-logo > span');
+        return brand.bottom<=actions.top && actions.right<=innerWidth && search.right<=actions.left && title.scrollWidth<=title.clientWidth && document.documentElement.scrollWidth<=innerWidth;
+      })()`), true, `Admin header fits two rows at ${width}px in ${theme} mode`);
+      await screenshot(`admin-header-${theme}-${width}`);
+    }
+  }
+  await cdp.evaluate("document.documentElement.dataset.theme='light'");
+  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1100, deviceScaleFactor: 1, mobile: false });
   if (process.argv.includes('--appearance-only')) {
     await require('./admin-tool-appearance-checks.cjs')({ cdp, origin, toolIds, until, screenshot });
     assert.deepEqual(cdp.events.filter(event => event.method === 'Runtime.exceptionThrown'), [], 'No browser script errors');

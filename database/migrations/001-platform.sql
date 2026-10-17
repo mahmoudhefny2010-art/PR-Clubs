@@ -111,7 +111,7 @@ CREATE TABLE [dbo].[ClubAccount] (
   [_version] BIGINT NOT NULL DEFAULT 0,
   CONSTRAINT [PK_ClubAccount] PRIMARY KEY ([_id]),
   [_has_googleSub] BIT NOT NULL,
-  CHECK ([role] IS NULL OR [role] IN (N'president', N'head', N'pr', N'english', N'security', N'sso', N'dean', N'supervisor', N'miu_events', N'software_development')),
+  CHECK ([role] IS NULL OR [role] IN (N'president', N'vice_president', N'head', N'pr', N'english', N'security', N'sso', N'dean', N'supervisor', N'miu_events', N'software_development')),
   CHECK ([_id] IS NULL OR (LEN([_id]) = 24 AND [_id] NOT LIKE '%[^0-9a-f]%'))
 );
 CREATE UNIQUE NONCLUSTERED INDEX [IX_ClubAccount_0_b9890c] ON [dbo].[ClubAccount] ([googleSub] ASC) WHERE ([_has_googleSub] = 1);
@@ -254,7 +254,7 @@ CREATE TABLE [dbo].[Application] (
   CHECK ([memberType] IS NULL OR [memberType] IN (N'new', N'senior')),
   CHECK ([rating] IS NULL OR [rating] >= 0),
   CHECK ([rating] IS NULL OR [rating] <= 5),
-  CHECK ([status] IS NULL OR [status] IN (N'pending', N'accepted', N'rejected')),
+  CHECK ([status] IS NULL OR [status] IN (N'pending', N'accepted', N'rejected', N'removed')),
   CHECK ([_id] IS NULL OR (LEN([_id]) = 24 AND [_id] NOT LIKE '%[^0-9a-f]%'))
 );
 CREATE UNIQUE NONCLUSTERED INDEX [IX_Application_0_037c92] ON [dbo].[Application] ([id] ASC);

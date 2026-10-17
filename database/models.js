@@ -70,7 +70,12 @@ function materialize(spec, row, query) {
   if (!row) return null;
   const data = values.projection(row.data, query.options.selection, spec.model.schema);
   if (query.options.lean) return data;
-  const doc = spec.model.hydrate(data, selectionMap(query.options.selection));
+  const selected = selectionMap(query.options.selection);
+  const selection = selected ? { ...selected } : selected;
+  // Inclusive Mongo projections retain _id unless explicitly excluded. Mongoose
+  // hydrate needs that inclusion stated explicitly or subsequent save loses its key.
+  if (selection && Object.values(selection).some(flag => flag === 1) && selection._id === undefined && data._id !== undefined) selection._id = 1;
+  const doc = spec.model.hydrate(data, selection);
   return attach(spec, doc, row.version, query.sessionValue);
 }
 function scalarValue(column, value) {

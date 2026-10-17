@@ -17,8 +17,10 @@ test('delegated administrator requires a live verified modern staff session and 
   assert.equal(await context.isAdminSessionValid(request), false);
   account = { role: 'software_development' };
   context.mongoReady = false;
-  assert.equal(await context.isAdminSessionValid(request), false);
-  context.mongoReady = true;
+  context.ensureReady = async () => {};
+  await assert.rejects(context.isAdminSessionValid(request), { code: 'DATABASE_UNAVAILABLE' });
+  context.ensureReady = async () => { context.mongoReady = true; };
+  assert.equal(await context.isAdminSessionValid(request), true);
   assert.equal(await context.isAdminSessionValid({ headers: { cookie: 'miu_club=0.expiry.signature' } }), false);
 });
 

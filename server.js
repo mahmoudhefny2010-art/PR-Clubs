@@ -523,7 +523,7 @@ let clubs = readJsonFile(clubsFile, defaultClubs).map((club, index) => ({
 }));
 let clubAccounts = readJsonFile(clubAccountsFile, []).map((account) => ({
   ...account,
-  role: ['head', 'pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'miu_events', 'software_development'].includes(account.role) ? account.role : 'president',
+  role: ['vice_president', 'head', 'pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'miu_events', 'software_development'].includes(account.role) ? account.role : 'president',
   committee: typeof account.committee === 'string' ? account.committee : ''
 }));
 
@@ -575,7 +575,11 @@ function normalizeApplicationFields(fields) {
   if (!Array.isArray(fields)) return [];
 
   const usedKeys = new Set();
-  return fields.slice(0, 12).flatMap((field, index) => {
+  const scopeCounts = new Map();
+  return fields.flatMap((field, index) => {
+    const committee = cleanText(field.committee, 100);
+    const scope = committee.toLowerCase();
+    if ((scopeCounts.get(scope) || 0) >= 12) return [];
     const label = cleanText(field.label, 100);
     let key = String(field.key || `question_${index + 1}`).toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 40);
     if (!label) return [];
@@ -589,7 +593,8 @@ function normalizeApplicationFields(fields) {
       : [];
     if (type === 'select' && options.length < 2) return [];
 
-    return [{ key, label, type, required: field.required === true, options }];
+    scopeCounts.set(scope, (scopeCounts.get(scope) || 0) + 1);
+    return [{ key, label, type, required: field.required === true, options, committee }];
   });
 }
 
@@ -616,7 +621,7 @@ async function makeClub(payload, existing, id) {
     description: cleanText(payload.description, 1200),
     requirements: cleanText(payload.requirements, 600),
     applicationIntro: cleanText(payload.applicationIntro, 240),
-    applicationFields: normalizeApplicationFields(payload.applicationFields ?? existing?.applicationFields)
+    applicationFields: payload.applicationFields === undefined ? (existing?.applicationFields || []) : normalizeApplicationFields(payload.applicationFields)
   };
 
   if (!club.name || !club.committee || !club.category || !club.tagline || !club.description || !club.requirements) {
@@ -693,6 +698,10 @@ function matchesScryptPassword(password, salt, storedHash) {
 }
 
 async function loadAdminAuthState(email = getConfiguredAdminEmail()) {
+  if (email && !mongoReady) {
+    await ensureReady();
+    if (!mongoReady) throw Object.assign(new Error('Session storage is temporarily unavailable.'), { code: 'DATABASE_UNAVAILABLE' });
+  }
   if (mongoReady && email) {
     adminAuthState = await readAdminSessionData(() => AdminAuthState.findOne({ email }).lean(), mongoose);
   }
@@ -720,7 +729,7 @@ function emailMatches(email) {
 }
 
 function createAdminSession() {
-  const expiresAt = Date.now() + 8 * 60 * 60 * 1000;
+  const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
   const version = Number(adminAuthState?.sessionVersion) || 0;
   const payload = `${expiresAt}.${version}`;
   const signature = crypto.createHmac('sha256', sessionSecret).update(payload).digest('hex');
@@ -729,7 +738,11 @@ function createAdminSession() {
 
 async function isSoftwareDevelopmentSession(req) {
   const staffCookie = String(req.headers.cookie || '').split(';').map(value => value.trim()).find(value => value.startsWith('miu_club='));
-  if (!mongoReady || !staffCookie) return false;
+  if (!staffCookie) return false;
+  if (!mongoReady) {
+    await ensureReady();
+    if (!mongoReady) throw Object.assign(new Error('Session storage is temporarily unavailable.'), { code: 'DATABASE_UNAVAILABLE' });
+  }
   const parts = staffCookie.slice('miu_club='.length).split('.');
   if (![5, 6].includes(parts.length)) return false;
   if (parts.length === 6 && parts[2] !== 'software_development') return false;
@@ -770,7 +783,7 @@ async function isAdminSessionValid(req) {
 function setAdminSessionCookie(req, res) {
   req.securityActor = { email: getConfiguredAdminEmail(), role: 'admin' };
   const secure = secureCookieSuffix(req);
-  res.setHeader('Set-Cookie', `miu_admin=${createAdminSession()}; Max-Age=28800; HttpOnly; SameSite=Strict; Path=/;${secure}`);
+  res.setHeader('Set-Cookie', `miu_admin=${createAdminSession()}; Max-Age=604800; HttpOnly; SameSite=Strict; Path=/;${secure}`);
 }
 
 async function requireAdmin(req, res, next) {
@@ -819,7 +832,7 @@ function clubPasswordMatches(password, account) {
 }
 
 function createClubSession(account, assignment = null) {
-  const expiresAt = Date.now() + 8 * 60 * 60 * 1000;
+  const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
   const encodedEmail = Buffer.from(account.email).toString('base64url');
   const version = Number(account.sessionVersion) || 0;
   if (assignment) {
@@ -830,33 +843,6 @@ function createClubSession(account, assignment = null) {
   const payload = `${account.clubId}.${encodedEmail}.${expiresAt}.${version}`;
   const signature = crypto.createHmac('sha256', sessionSecret).update(payload).digest('hex');
   return `${payload}.${signature}`;
-}
-
-function normalizeInterviewSections(sections) {
-  if (!Array.isArray(sections)) return [];
-  const usedKeys = new Set();
-  return sections.slice(0, 10).flatMap((section, sectionIndex) => {
-    const title = cleanText(section?.title, 80);
-    if (!title) return [];
-    const questions = (Array.isArray(section.questions) ? section.questions : []).slice(0, 12).flatMap((question, questionIndex) => {
-      const label = cleanText(question?.label, 100);
-      if (!label) return [];
-      let key = String(question.key || `question_${sectionIndex + 1}_${questionIndex + 1}`)
-        .toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 40);
-      if (!key || usedKeys.has(key)) key = `question_${sectionIndex + 1}_${questionIndex + 1}`;
-      while (usedKeys.has(key)) key = `${key}_${questionIndex + 1}`;
-      usedKeys.add(key);
-      const type = ['text', 'textarea', 'select'].includes(question.type) ? question.type : 'text';
-      const options = type === 'select' && Array.isArray(question.options)
-        ? [...new Set(question.options.map((option) => cleanText(option, 100)).filter(Boolean))].slice(0, 20)
-        : [];
-      if (type === 'select' && options.length < 2) return [];
-      return [{ key, label, type, required: question.required === true, options }];
-    });
-    let key = String(section.key || `section_${sectionIndex + 1}`).toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 40);
-    if (!key || key === 'section') key = `section_${sectionIndex + 1}`;
-    return [{ key, title, questions }];
-  });
 }
 
 function getInterviewFormScope(account) {
@@ -945,6 +931,10 @@ async function getClubAccountFromRequest(req) {
 
   const expectedSignature = crypto.createHmac('sha256', sessionSecret).update(payload).digest('hex');
   if (!crypto.timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expectedSignature, 'hex'))) return null;
+  if (!mongoReady) {
+    await ensureReady();
+    if (!mongoReady) throw Object.assign(new Error('Session storage is temporarily unavailable.'), { code: 'DATABASE_UNAVAILABLE' });
+  }
   if (!account && mongoReady && [5, 6].includes(cookieParts.length)) {
     const email = Buffer.from(cookieParts[1], 'base64url').toString('utf8').toLowerCase();
     account = await ClubAccount.findOne(cookieParts.length === 6 ? { email } : { clubId: Number(clubIdText), email }).lean();
@@ -980,7 +970,7 @@ async function getClubAccountFromRequest(req) {
 function setClubSessionCookie(req, res, account, assignment = null) {
   req.securityActor = { email: account.email, role: assignment?.role || account.role };
   const secure = secureCookieSuffix(req);
-  res.setHeader('Set-Cookie', `miu_club=${createClubSession(account, assignment)}; Max-Age=28800; HttpOnly; SameSite=Strict; Path=/;${secure}`);
+  res.setHeader('Set-Cookie', `miu_club=${createClubSession(account, assignment)}; Max-Age=604800; HttpOnly; SameSite=Strict; Path=/;${secure}`);
 }
 
 function getStaffDashboardOptions(account) {
@@ -992,7 +982,7 @@ function getStaffDashboardOptions(account) {
     label: STAFF_ROLE_LABELS[assignment.role] || assignment.role,
     href: STAFF_ROUTES[assignment.role],
     clubName: (assignment.role === 'supervisor' ? assignment.assignedClubIds
-      : ['president', 'head'].includes(assignment.role) ? [assignment.clubId] : [])
+      : ['president', 'vice_president', 'head'].includes(assignment.role) ? [assignment.clubId] : [])
       .map(id => clubs.find(club => Number(club.id) === Number(id))?.name).filter(Boolean).join(', ')
   }));
 }
@@ -1080,7 +1070,7 @@ async function identifySiteVisitor(req) {
     const clubAccount = await getClubAccountFromRequest(req);
     if (clubAccount) {
       const club = clubs.find((item) => Number(item.id) === Number(clubAccount.clubId));
-    const roleLabels = { president: 'Club president', head: 'Committee head', pr: 'PR', english: 'English', security: 'Security Office', sso: 'SSO', dean: 'Dean', miu_events: 'MIU Events' };
+    const roleLabels = { president: 'Club president', vice_president: 'Club vice president', head: 'Committee head', pr: 'PR', english: 'English', security: 'Security Office', sso: 'SSO', dean: 'Dean', miu_events: 'MIU Events' };
       const role = roleLabels[clubAccount.role] || 'Club account';
       return {
         accountType: 'club', accountEmail: clubAccount.email,
@@ -2002,7 +1992,7 @@ async function initializeMongoData() {
     await ClubAccount.bulkWrite(clubAccounts.map(({ clubId, email, salt, passwordHash, role, committee, assignedClubIds }) => ({
       updateOne: {
         filter: { email },
-        update: { $setOnInsert: { clubId, email, salt, passwordHash, role: ['head', 'pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'miu_events', 'software_development'].includes(role) ? role : 'president', committee: committee || '', assignedClubIds: assignedClubIds || [] } },
+        update: { $setOnInsert: { clubId, email, salt, passwordHash, role: ['vice_president', 'head', 'pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'miu_events', 'software_development'].includes(role) ? role : 'president', committee: committee || '', assignedClubIds: assignedClubIds || [] } },
         upsert: true
       }
     })));
@@ -2054,7 +2044,7 @@ function requireClubPresident(req, res, next) {
 }
 
 function accountCanReviewApplication(account, application) {
-  return application.clubId === account.clubId
+  return ['president', 'vice_president', 'head'].includes(account.role) && application.clubId === account.clubId
     && (account.role !== 'head' || application.committee === account.committee);
 }
 
@@ -2609,46 +2599,6 @@ app.post('/api/club-auth/switch-dashboard', async (req, res) => {
     console.error('Dashboard switch failed:', error.name);
     return res.status(503).json({ message: 'Dashboard access is temporarily unavailable.' });
   }
-});
-
-app.post('/api/club-auth/login', async (req, res) => {
-  if (await checkLoginSourceLock(req, res)) return;
-  if (!mongoReady) return res.status(503).json({ message: 'Sign-in storage is temporarily unavailable. Please try again.' });
-
-  const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
-  let account;
-  try {
-    account = await ClubAccount.findOne({ email }).read('primary').readConcern('majority').lean();
-  } catch (error) {
-    console.error('Club login failed:', error.name);
-    return res.status(503).json({ message: 'Club login is temporarily unavailable.' });
-  }
-  if (!account || !clubPasswordMatches(req.body.password, account)) {
-    if (await countLoginSourceFailure(req, res)) return;
-    return res.status(401).json({ message: 'Incorrect club email or password.' });
-  }
-
-  if (!await clearLoginSourceFailures(req, res)) return;
-  await recordSuccessfulSignIn('club', account.email);
-  setClubSessionCookie(req, res, account);
-  res.append('Set-Cookie', `miu_admin=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/;${secureCookieSuffix(req)}`);
-  res.append('Set-Cookie', `miu_student=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/;${secureCookieSuffix(req)}`);
-  const committeeRoles = ['pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'miu_events', 'software_development'];
-  const dashboardName = account.role === 'miu_events' ? 'MIU Events' : account.role === 'software_development' ? 'Software Development team' : account.role.toUpperCase();
-  const club = committeeRoles.includes(account.role)
-    ? { id: 0, name: dashboardName, image: '/assets/img/pics/logo.svg.png', role: account.role, committee: '' }
-    : clubs.find((item) => item.id === account.clubId);
-  res.json({
-    authenticated: true,
-    club: club ? {
-      id: club.id,
-      name: club.name,
-      image: club.image,
-      status: club.status,
-      role: account.role,
-      committee: account.committee || club.committee || ''
-    } : null
-  });
 });
 
 app.post('/api/club-auth/logout', (req, res) => {
@@ -3914,6 +3864,7 @@ app.get('/api/clubs/:id/committees', (req, res) => {
 
 function getManagedCommittees(clubId) {
   return [...new Set(clubAccounts
+    .flatMap(account => account.roleAssignments?.length ? account.roleAssignments : [account])
     .filter((account) => account.clubId === clubId && account.role === 'head' && account.committee)
     .map((account) => account.committee))].sort((left, right) => left.localeCompare(right));
 }
@@ -4455,74 +4406,8 @@ app.post('/api/club/members', requireClubAuth, requireClubPresident, async (req,
   }
 });
 
-app.get('/api/club/application-form', requireClubAuth, requireClubPresident, (req, res) => {
-  const club = clubs.find((item) => item.id === req.clubAccount.clubId);
-  if (!club) return res.status(404).json({ message: 'Club not found.' });
-  res.json({
-    applicationIntro: club.applicationIntro || '',
-    applicationFields: club.applicationFields || []
-  });
-});
-
-app.put('/api/club/application-form', requireClubAuth, requireClubPresident, async (req, res) => {
-  const club = clubs.find((item) => item.id === req.clubAccount.clubId);
-  if (!club) return res.status(404).json({ message: 'Club not found.' });
-
-  const applicationIntro = cleanText(req.body.applicationIntro, 500);
-  const applicationFields = normalizeApplicationFields(req.body.applicationFields);
-  try {
-    if (!requireLiveDatabase(res)) return;
-    const savedClub = await Club.findOneAndUpdate(
-      { id: req.clubAccount.clubId },
-      { $set: { applicationIntro, applicationFields } },
-      { new: true, runValidators: true }
-    ).lean();
-    if (!savedClub) return res.status(404).json({ message: 'Club not found.' });
-    club.applicationIntro = applicationIntro;
-    club.applicationFields = applicationFields;
-    res.json({ applicationIntro, applicationFields });
-  } catch (error) {
-    console.error('Database operation failed:', error.name);
-    res.status(503).json({ message: 'Could not save the application form right now.' });
-  }
-});
-
-app.get('/api/club/interview-form', requireClubAuth, async (req, res) => {
-  try {
-    if (!requireLiveDatabase(res)) return;
-    const club = await Club.findOne({ id: req.clubAccount.clubId }).select('interviewForms')
-      .read('primary').readConcern('majority').lean();
-    if (!club) return res.status(404).json({ message: 'Club not found.' });
-    const scope = getInterviewFormScope(req.clubAccount);
-    res.json({ scope, sections: getInterviewFormSections(club.interviewForms, scope) });
-  } catch (error) {
-    console.error('Database operation failed:', error.name);
-    res.status(503).json({ message: 'Could not load interview questions right now.' });
-  }
-});
-
-app.put('/api/club/interview-form', requireClubAuth, async (req, res) => {
-  const scope = getInterviewFormScope(req.clubAccount);
-  const sections = normalizeInterviewSections(req.body.sections);
-  try {
-    if (!requireLiveDatabase(res)) return;
-    const club = await Club.findOne({ id: req.clubAccount.clubId }).select('interviewForms').lean();
-    if (!club) return res.status(404).json({ message: 'Club not found.' });
-    const interviewForms = (club.interviewForms || []).filter((item) => item.scope !== scope);
-    interviewForms.push({ scope, sections });
-    const savedClub = await Club.findOneAndUpdate(
-      { id: req.clubAccount.clubId },
-      { $set: { interviewForms } },
-      { new: true, runValidators: true }
-    ).lean();
-    if (!savedClub) return res.status(404).json({ message: 'Club not found.' });
-    const cachedClub = clubs.find((item) => item.id === req.clubAccount.clubId);
-    if (cachedClub) cachedClub.interviewForms = interviewForms;
-    res.json({ scope, sections });
-  } catch (error) {
-    console.error('Database operation failed:', error.name);
-    res.status(503).json({ message: 'Could not save interview questions right now.' });
-  }
+require('./services/club-questions').registerClubQuestions(app, {
+  Club, ClubAccount, requireClubAuth, requireLiveDatabase, getInterviewFormScope, getInterviewFormSections, clubs
 });
 
 app.post('/api/club/heads', requireClubAuth, requireClubPresident, async (req, res) => {
@@ -5797,7 +5682,8 @@ app.post('/api/student-auth/google', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   if (!isSameOriginRequest(req)) return res.status(403).json({ message: 'Google sign-in request was blocked. Reload this page and try again.' });
   if (await checkLoginSourceLock(req, res)) return;
-  if (!mongoReady) return res.status(503).json({ message: 'Google sign-in requires the database.' });
+  if (!mongoReady) await ensureReady();
+  if (!mongoReady) return res.status(503).json({ message: 'Sign-in is temporarily unavailable because the database could not be reached. Please try again shortly.' });
   try {
     const identity = await verifyGoogleRequest(req, res);
     if (identity.email === getConfiguredAdminEmail()) {
@@ -6041,6 +5927,7 @@ app.post('/api/auth/login', async (req, res) => {
       miu_events: '/dashboards/miu-events-dashboard.html',
       supervisor: '/dashboards/supervisor-dashboard.html',
       president: '/club-dashboard',
+      vice_president: '/club-dashboard',
       head: '/club-dashboard',
       pr: '/dashboards/pr-dashboard.html',
       english: '/dashboards/english-dashboard.html',
@@ -7407,8 +7294,7 @@ app.post('/api/applications', async (req, res) => {
     return res.status(409).json({ message: 'Applications are not open for this club.' });
   }
   const committee = cleanText(payload.committee, 100);
-  if (!committee || !clubAccounts.some((account) => account.clubId === clubId
-    && account.role === 'head' && account.committee === committee)) {
+  if (!committee || !getManagedCommittees(clubId).includes(committee)) {
     return res.status(409).json({ message: 'This committee is not accepting applications yet.' });
   }
   const committeeStatus = getCommitteeApplicationStatus(selectedClub, committee);
@@ -7429,7 +7315,7 @@ app.post('/api/applications', async (req, res) => {
         { email: String(signedInStudent.email || '').trim().toLowerCase() }
       );
     }
-    const existingApplication = await Application.findOne({ clubId, $or: duplicateIdentityFilters })
+    const existingApplication = await Application.findOne({ clubId, status: { $ne: 'removed' }, $or: duplicateIdentityFilters })
       .select('id').read('primary').readConcern('majority').lean();
     if (existingApplication) {
       return res.status(409).json({ message: 'You have already submitted an application to this club. Check My Forms for its status.' });
@@ -7444,19 +7330,11 @@ app.post('/api/applications', async (req, res) => {
     return res.status(400).json({ message: 'A PNG, JPG, or WebP applicant photo is required.' });
   }
 
-  const submittedAnswers = Array.isArray(payload.answers) ? payload.answers : [];
-  const answers = [];
-  for (const field of selectedClub.applicationFields || []) {
-    const submitted = submittedAnswers.find((answer) => answer.key === field.key);
-    const value = cleanText(submitted?.value, 2000);
-    if (field.required && !value) {
-      return res.status(400).json({ message: `${field.label} is required.` });
-    }
-    if (field.type === 'select' && value && !field.options.includes(value)) {
-      return res.status(400).json({ message: `Choose a valid option for ${field.label}.` });
-    }
-    answers.push({ key: field.key, label: field.label, value });
-  }
+  let answers;
+  try {
+    const { applicationQuestions, validateAnswers } = require('./services/club-questions');
+    answers = validateAnswers(applicationQuestions(selectedClub, committee), payload.answers ?? []);
+  } catch (error) { return res.status(400).json({ message: error.message }); }
 
   const newApplication = {
     id: Date.now(),
@@ -7505,6 +7383,14 @@ app.post('/api/applications', async (req, res) => {
         || savedProfile.major !== profile.major || savedProfile.phone !== profile.phone || savedProfile.age !== profile.age) {
         return res.status(503).json({ message: 'Your profile could not be verified as saved. Your application was not submitted.' });
       }
+    }
+    // Historical removals retain the application, but no longer reserve its
+    // unique account/club key. Also covers removals made before key release.
+    if (newApplication.studentClubKey) {
+      await Application.updateMany(
+        { studentClubKey: newApplication.studentClubKey, status: 'removed' },
+        { $unset: { studentClubKey: 1 } }
+      );
     }
     await Application.create(newApplication);
     applications.unshift(newApplication);
@@ -7609,8 +7495,7 @@ app.patch('/api/my-forms/:id', limitMyFormAccessAttempts, async (req, res) => {
   }
   if (req.body.committee !== undefined) {
     const committee = cleanText(req.body.committee, 100);
-    if (!committee || !clubAccounts.some((account) => account.clubId === application.clubId
-      && account.role === 'head' && account.committee === committee)) {
+    if (!committee || !getManagedCommittees(application.clubId).includes(committee)) {
       return res.status(409).json({ message: 'This committee is not accepting applications anymore.' });
     }
     const committeeStatus = getCommitteeApplicationStatus(selectedClub, committee);
@@ -7622,18 +7507,13 @@ app.patch('/api/my-forms/:id', limitMyFormAccessAttempts, async (req, res) => {
     updates.committee = committee;
   }
   if (req.body.answers !== undefined) {
-    if (!Array.isArray(req.body.answers)) return res.status(400).json({ message: 'Check your form answers.' });
-    const submittedAnswers = req.body.answers;
-    updates.answers = [];
-    for (const field of selectedClub?.applicationFields || []) {
-      const submitted = submittedAnswers.find((answer) => answer.key === field.key);
-      const value = cleanText(submitted?.value, 2000);
-      if (field.required && !value) return res.status(400).json({ message: `${field.label} is required.` });
-      if (field.type === 'select' && value && !field.options.includes(value)) {
-        return res.status(400).json({ message: `Choose a valid option for ${field.label}.` });
-      }
-      updates.answers.push({ key: field.key, label: field.label, value });
-    }
+    try {
+      const { applicationQuestions, validateAnswers } = require('./services/club-questions');
+      const active = validateAnswers(applicationQuestions(selectedClub, updates.committee ?? application.committee), req.body.answers);
+      const keys = new Set(active.map(answer => answer.key));
+      updates.answers = [...active, ...(application.answers || []).filter(answer => !keys.has(answer.key))];
+      updates.answerHistory = [...(application.answerHistory || []), { savedAt: new Date(), answers: application.answers || [] }];
+    } catch (error) { return res.status(400).json({ message: error.message }); }
   }
   if (req.body.photo !== undefined) {
     const applicantPhoto = await getApplicantPhoto(req.body);
@@ -7733,22 +7613,15 @@ app.patch('/api/applications/:id/status', requireClubAuth, async (req, res) => {
       const scope = getInterviewFormScope(req.clubAccount);
       const questions = getInterviewFormSections(club?.interviewForms, scope)
         .flatMap((section) => section.questions || []);
-      const submittedAnswers = new Map(req.body.interviewAnswers.map((answer) => [String(answer.key), answer.value]));
-      const interviewAnswers = questions.map((question) => ({
-        key: question.key,
-        label: question.label,
-        value: cleanText(submittedAnswers.get(question.key), 2000)
-      }));
-      const missingRequired = questions.find((question) => question.required
-        && !interviewAnswers.find((answer) => answer.key === question.key)?.value);
-      if (missingRequired) {
-        return res.status(400).json({ message: `Answer “${missingRequired.label}” before saving.` });
-      }
+      let interviewAnswers;
+      try { interviewAnswers = require('./services/club-questions').validateAnswers(questions, req.body.interviewAnswers); }
+      catch (error) { return res.status(400).json({ message: error.message }); }
       const priorEvaluation = (app.interviewEvaluations || []).find((entry) => entry.scope === scope);
       const activeKeys = new Set(questions.map((question) => question.key));
       const archivedAnswers = (priorEvaluation?.answers || []).filter((answer) => !activeKeys.has(answer.key));
       const evaluations = (app.interviewEvaluations || []).filter((entry) => entry.scope !== scope);
-      evaluations.push({ scope, answers: [...interviewAnswers, ...archivedAnswers] });
+      evaluations.push({ scope, answers: [...interviewAnswers, ...archivedAnswers],
+        history: [...(priorEvaluation?.history || []), ...(priorEvaluation ? [{ savedAt: new Date(), answers: priorEvaluation.answers || [] }] : [])] });
       updates.interviewEvaluations = evaluations;
     }
     if (notes !== undefined || rating !== undefined || Array.isArray(req.body.interviewAnswers)
@@ -7798,7 +7671,8 @@ app.delete('/api/applications/:id', requireClubAuth, async (req, res) => {
 app.get('/club.html', (req, res) => res.redirect(301, '/club-details.html'));
 app.get('/apply.html', (req, res) => res.redirect(301, '/club-application.html'));
 app.get('/committee.html', (req, res) => res.redirect(301, '/committee-dashboard.html'));
-app.get(['/club-login', '/club-dashboard'], (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/club-login', (req, res) => res.set('Cache-Control', 'no-store').redirect(303, '/pages/applicant-login.html?redirect=%2Fclub-dashboard'));
+app.get('/club-dashboard', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.get('/club-application.html', (req, res) => {
   const clubId = Number(req.query.id);
   res.redirect(302, Number.isInteger(clubId) && clubId > 0 ? `/?apply=${clubId}` : '/');

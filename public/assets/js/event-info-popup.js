@@ -7,7 +7,7 @@
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
   }
-  window.openEventInfoPopup = (event, trigger = document.activeElement) => {
+  window.openEventInfoPopup = (event, trigger = document.activeElement, type = 'event') => {
     if (!event) return;
     active?.close(false);
     const controller = new AbortController();
@@ -22,7 +22,9 @@
     panel.className = 'event-modal-panel';
     panel.tabIndex = -1;
     const closeButton = window.MiuUI.button('\u00d7', 'calendar-close-btn event-modal-close', () => close());
-    closeButton.setAttribute('aria-label', 'Close event information');
+    closeButton.style.color = 'var(--text-main)';
+    const label = ({ event: 'Event', feed: 'Feed', sponsor: 'Sponsor', booth: 'Booth' })[type] || 'Item';
+    closeButton.setAttribute('aria-label', `Close ${label.toLowerCase()} information`);
     const copy = document.createElement('div');
     copy.className = 'event-modal-copy';
     const append = (tag, className, content) => {
@@ -34,7 +36,7 @@
       return element;
     };
     append('span', 'event-modal-club', text(event.clubName));
-    const heading = append('h2', '', text(event.title) || 'Event');
+    const heading = append('h2', '', text(event.title) || text(event.boothName) || text(event.sponsorName) || label);
     heading.id = 'eventCardInfoTitle';
     const formatTime = value => text(value) ? window.formatSiteTime ? window.formatSiteTime(value) : text(value) : '';
     const time = [formatTime(event.time), formatTime(event.endTime)].filter(Boolean).join(' – ');
@@ -43,7 +45,24 @@
     if (description) {
       description.id = 'eventCardInfoDescription';
       description.style.overflowWrap = 'anywhere';
+      description.style.whiteSpace = 'pre-wrap';
       modal.setAttribute('aria-describedby', description.id);
+    }
+    if (text(event.text) && text(event.description) && text(event.text) !== text(event.description)) {
+      const extra = append('p', 'event-modal-description', text(event.description));
+      extra.style.whiteSpace = 'pre-wrap';
+      extra.style.overflowWrap = 'anywhere';
+    }
+    const detailFields = {
+      feed: [['author', 'Author']],
+      sponsor: [['sponsorName', 'Sponsor'], ['sponsorCompany', 'Company'], ['sponsorType', 'Sponsorship type'], ['sponsorAmount', 'Amount'], ['sponsorBenefits', 'Benefits'], ['sponsorDescription', 'Sponsor description']],
+      booth: [['boothName', 'Booth'], ['boothPurpose', 'Purpose'], ['boothDescription', 'Booth description'], ['boothLocation', 'Booth location'], ['boothSize', 'Size'], ['boothEquipment', 'Equipment'], ['boothSetupDate', 'Setup date'], ['boothOpenDate', 'Opening date'], ['boothCloseDate', 'Closing date']]
+    };
+    for (const [key, title] of detailFields[type] || []) {
+      if (!text(event[key])) continue;
+      const detail = append('p', 'event-modal-description', `${title}: ${text(event[key])}`);
+      detail.style.whiteSpace = 'pre-wrap';
+      detail.style.overflowWrap = 'anywhere';
     }
     if (text(event.budget)) append('p', 'event-modal-meta', 'Budget: ' + text(event.budget));
     if (typeof event.registrationEnabled === 'boolean') append('p', 'event-modal-meta', 'Student registration: ' + (event.registrationEnabled ? 'Enabled' : 'Not enabled'));
@@ -54,7 +73,7 @@
     closeRail.style.gridColumn = '1 / -1';
     closeRail.append(closeButton);
     panel.append(closeRail);
-    const source = text(event.image) || text(event.clubImage);
+    const source = type === 'sponsor' ? text(event.sponsorLogo) : type === 'booth' ? '' : text(event.image) || text(event.clubImage);
     let imageUrl;
     try {
       const url = new URL(source, location.origin);
@@ -65,9 +84,16 @@
       panel.style.gridTemplateColumns = 'minmax(0, 1fr)';
     };
     if (imageUrl) {
-      const image = document.createElement('img');
+      const video = type === 'feed' && window.FeedMedia?.isVideo(imageUrl);
+      const image = document.createElement(video ? 'video' : 'img');
       image.className = 'event-modal-image';
-      image.alt = text(event.title) || 'Event image';
+      if (video) {
+        image.controls = true;
+        image.playsInline = true;
+        image.preload = 'none';
+        image.poster = window.FeedMedia.poster(imageUrl);
+        image.setAttribute('aria-label', text(event.title) || 'Feed video');
+      } else image.alt = text(event.title) || `${label} image`;
       image.addEventListener('error', omitImage, { signal });
       image.src = imageUrl;
       panel.append(image);
@@ -84,6 +110,7 @@
     function close(restoreFocus = true) {
       if (closed) return;
       closed = true;
+      panel.querySelectorAll('video').forEach(video => { video.pause(); video.removeAttribute('src'); video.load(); });
       controller.abort();
       window.MiuUI.modals.close(modal);
       modal.remove();
@@ -98,7 +125,7 @@
     document.addEventListener('keydown', key => {
       if (key.key === 'Escape') { key.preventDefault(); key.stopPropagation(); close(); return; }
       if (key.key !== 'Tab') return;
-      const focusable = [...panel.querySelectorAll('button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])')].filter(element => element.getClientRects().length);
+      const focusable = [...panel.querySelectorAll('button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), video[controls], [tabindex]:not([tabindex="-1"])')].filter(element => element.getClientRects().length);
       const first = focusable[0] || panel, last = focusable.at(-1) || panel;
       if (key.shiftKey && (document.activeElement === first || !panel.contains(document.activeElement))) { key.preventDefault(); last.focus(); }
       else if (!key.shiftKey && (document.activeElement === last || !panel.contains(document.activeElement))) { key.preventDefault(); first.focus(); }
@@ -106,5 +133,8 @@
     window.addEventListener('pagehide', () => close(false), { once: true, signal });
     window.MiuUI.modals.open(modal);
     closeButton.focus({ preventScroll: true });
+  };
+  window.openClubContentInfoPopup = (item, type, club, trigger) => {
+    window.openEventInfoPopup({ ...item, clubName: club.name, clubImage: club.image }, trigger, type);
   };
 })();

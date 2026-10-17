@@ -229,6 +229,30 @@ test('a migration connection cannot bypass later runtime readiness or missing no
   assert.equal(runtime.connection.readyState, 1);
   assert.equal(closed, 2);
 });
+test('projected SQL documents retain their implicit identity and can save with optimistic version checks', async t => {
+  const originalRequest = runtime.request, originalTransaction = runtime.transaction;
+  const clubSpec = spec('Club');
+  const data = new clubSpec.model({ id: 77, name: 'Fixture club', committee: 'IT', category: 'Test', tagline: 'Test', status: 'closed', image: '/fixture.png', description: 'Keep description', requirements: 'Keep requirements', members: 1 }).toObject();
+  let writes = 0, expectedVersion;
+  runtime.transaction = async (_session, callback) => callback({});
+  runtime.request = () => ({ input(name, _type, value) { if (name === 'expectedVersion') expectedVersion = value; return this; }, async query(text) {
+    if (text.startsWith('SELECT')) return { recordset: [{ _payload: mongoose.mongo.BSON.EJSON.stringify(data), _version: 6 }] };
+    writes++; return { rowsAffected: [1] };
+  } });
+  t.after(() => { runtime.request = originalRequest; runtime.transaction = originalTransaction; });
+  const projection = { id: 1, members: 1, memberRoster: 1 };
+  const club = await new Query(clubSpec, 'findOne', { id: 77 }).select(projection);
+  assert.equal(String(club._id), String(data._id));
+  assert.equal(projection._id, undefined, 'Do not modify caller-owned projections');
+  club.members = 0;
+  await club.save();
+  assert.equal(writes, 1);
+  assert.equal(expectedVersion, 6);
+  assert.equal(club.$locals.sqlVersion, 7);
+  const excluded = await new Query(clubSpec, 'findOne', { id: 77 }).select('id members -_id');
+  assert.equal(excluded._id, undefined, 'Explicit identity exclusions remain supported');
+});
+
 test('optimistic write conflicts roll back and cannot return a confirmed updated account', async t => {
   const originalRequest = runtime.request, originalTransaction = runtime.transaction;
   const statements = [], calls = [];

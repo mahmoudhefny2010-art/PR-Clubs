@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 const applicationFieldSchema = new mongoose.Schema({
+  committee: { type: String, default: '', maxlength: 100 },
   key: { type: String, required: true },
   label: { type: String, required: true, trim: true },
   type: { type: String, enum: ['text', 'textarea', 'select'], default: 'text' },
@@ -40,6 +41,7 @@ const clubSchema = new mongoose.Schema({
   seats: { type: Number, min: 0, default: 0 },
   members: { type: Number, min: 0, default: 0 },
   memberRoster: { type: [clubMemberSchema], default: [] },
+  removedMembers: { type: [mongoose.Schema.Types.Mixed], default: [] },
   committeeAvailability: { type: [committeeAvailabilitySchema], default: [] },
   applicants: { type: Number, min: 0, default: 0 },
   description: { type: String, required: true },
@@ -47,6 +49,7 @@ const clubSchema = new mongoose.Schema({
   applicationIntro: { type: String, trim: true, default: '' },
   applicationFields: { type: [applicationFieldSchema], default: [] },
   interviewForms: { type: [mongoose.Schema.Types.Mixed], default: [] },
+  questionHistory: { type: [mongoose.Schema.Types.Mixed], default: [] },
   events: { type: [mongoose.Schema.Types.Mixed], default: [] },
   posts: { type: [mongoose.Schema.Types.Mixed], default: [] },
   sponsors: { type: [mongoose.Schema.Types.Mixed], default: [] },
@@ -76,10 +79,11 @@ const applicationSchema = new mongoose.Schema({
   rating: { type: Number, min: 0, max: 5, default: 0 },
   interviewed: { type: Boolean, default: false },
   interviewEvaluations: { type: [mongoose.Schema.Types.Mixed], default: [] },
-  status: { type: String, enum: ['pending', 'accepted', 'rejected'], default: 'pending' },
+  status: { type: String, enum: ['pending', 'accepted', 'rejected', 'removed'], default: 'pending' },
   photo: { type: String, default: '' },
   photoPublicId: { type: String, default: '' },
   managementTokenHash: { type: String, default: '' },
+  answerHistory: { type: [mongoose.Schema.Types.Mixed], default: [] },
   answers: { type: mongoose.Schema.Types.Mixed, default: () => [] }
 }, { timestamps: true });
 applicationSchema.index({ studentClubKey: 1 }, { unique: true, sparse: true });
@@ -138,7 +142,7 @@ const siteVisitorPresenceSchema = new mongoose.Schema({
 }, { versionKey: false });
 
 const clubRoleAssignmentSchema = new mongoose.Schema({
-  role: { type: String, enum: ['president', 'head', 'pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'miu_events', 'software_development'], required: true },
+  role: { type: String, enum: ['president', 'vice_president', 'head', 'pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'miu_events', 'software_development'], required: true },
   clubId: { type: Number, required: true, default: 0 },
   assignedClubIds: { type: [Number], default: [] },
   committee: { type: String, default: '' }
@@ -153,7 +157,7 @@ const clubAccountSchema = new mongoose.Schema({
   sessionVersion: { type: Number, default: 0 },
   passwordChangedAt: { type: Date, default: null },
   lastLoginAt: { type: Date, default: null },
-  role: { type: String, enum: ['president', 'head', 'pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'miu_events', 'software_development'], default: 'president' },
+  role: { type: String, enum: ['president', 'vice_president', 'head', 'pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'miu_events', 'software_development'], default: 'president' },
   roleAssignments: { type: [clubRoleAssignmentSchema], default: [] },
   assignedClubIds: { type: [Number], default: [] },
   committee: { type: String, default: '' }

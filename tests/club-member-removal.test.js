@@ -28,7 +28,7 @@ function harness({ roster = [], accepted = [], count = roster.length, failSave =
       const value = filter.id === dbClub.id ? { ...structuredClone(dbClub), async save(options) {
         assert.equal(options.session, session);
         if (failSave) throw new Error('SAVE_FAILED');
-        dbClub = { id: this.id, members: this.members, memberRoster: this.memberRoster };
+        dbClub = { id: this.id, members: this.members, memberRoster: this.memberRoster, removedMembers: this.removedMembers };
       } } : null;
       return query(value);
     } },
@@ -36,7 +36,10 @@ function harness({ roster = [], accepted = [], count = roster.length, failSave =
       find: filter => query(dbApplications.filter(a => a.clubId === filter.clubId && a.status === filter.status)),
       async updateMany(filter, update, options) {
         assert.equal(options.session, session);
-        for (const a of dbApplications) if (a.clubId === filter.clubId && a.status === filter.status && filter.id.$in.includes(a.id)) Object.assign(a, update.$set);
+        for (const a of dbApplications) if (a.clubId === filter.clubId && a.status === filter.status && filter.id.$in.includes(a.id)) {
+          Object.assign(a, update.$set);
+          for (const key of Object.keys(update.$unset || {})) delete a[key];
+        }
       }
     }
   });
@@ -55,6 +58,8 @@ test('removes a manual member, updates count and cache, and does not remove othe
   const s = h.snapshot();
   assert.deepEqual(s.dbClub.memberRoster, [{ id: 'two' }]);
   assert.equal(s.dbClub.members, 22);
+  assert.equal(s.dbClub.removedMembers[0].status, 'removed');
+  assert.equal(s.dbClub.removedMembers[0].id, 'one');
   assert.deepEqual(s.clubs[0], s.dbClub);
   assert.equal(s.ended, true);
   assert.equal((await h.remove('one')).statusCode, 404);
@@ -63,7 +68,7 @@ test('removes a manual member, updates count and cache, and does not remove othe
 
 test('removes both membership sources and duplicate accepted applications without deleting history or touching another club', async () => {
   const h = harness({ roster: [{ id: 'manual', email: 'Same@miuegypt.edu.eg' }], count: 1, accepted: [
-    { id: 10, clubId: 1, email: 'same@miuegypt.edu.eg', status: 'accepted', notes: 'Keep interview notes' },
+    { id: 10, clubId: 1, email: 'same@miuegypt.edu.eg', status: 'accepted', studentClubKey: 'student:1', notes: 'Keep interview notes' },
     { id: 11, clubId: 1, email: 'same@miuegypt.edu.eg', status: 'accepted' },
     { id: 12, clubId: 2, email: 'same@miuegypt.edu.eg', status: 'accepted' }
   ] });
@@ -71,15 +76,29 @@ test('removes both membership sources and duplicate accepted applications withou
   const s = h.snapshot();
   assert.equal(s.dbClub.memberRoster.length, 0);
   assert.equal(s.dbClub.members, 0);
-  assert.deepEqual(s.dbApplications.map(a => a.status), ['rejected', 'rejected', 'accepted']);
+  assert.deepEqual(s.dbApplications.map(a => a.status), ['removed', 'removed', 'accepted']);
   assert.equal(s.dbApplications[0].notes, 'Keep interview notes');
-  assert.deepEqual(s.applications.map(a => a.status), ['rejected', 'rejected', 'accepted']);
+  assert.equal(s.dbApplications[0].studentClubKey, undefined);
+  assert.equal(s.applications[0].studentClubKey, undefined);
+  assert.equal(s.dbClub.removedMembers[0].status, 'removed');
+  assert.deepEqual(s.dbClub.removedMembers[0].applicationIds, [10, 11]);
+  assert.deepEqual(s.applications.map(a => a.status), ['removed', 'removed', 'accepted']);
 });
 
 test('manual removal also revokes a matching accepted membership', async () => {
   const h = harness({ roster: [{ id: 'manual', email: 'one@miuegypt.edu.eg' }], accepted: [{ id: 5, clubId: 1, email: 'one@miuegypt.edu.eg', status: 'accepted' }] });
   assert.equal((await h.remove('manual')).statusCode, 200);
-  assert.equal(h.snapshot().dbApplications[0].status, 'rejected');
+  assert.equal(h.snapshot().dbApplications[0].status, 'removed');
+});
+
+test('removal does not reclassify genuinely rejected or pending applications', async () => {
+  const h = harness({ count: 1, accepted: [
+    { id: 1, clubId: 1, email: 'member@example.test', status: 'accepted' },
+    { id: 2, clubId: 1, email: 'rejected@example.test', status: 'rejected' },
+    { id: 3, clubId: 1, email: 'pending@example.test', status: 'pending' }
+  ] });
+  assert.equal((await h.remove('application-1')).statusCode, 200);
+  assert.deepEqual(h.snapshot().dbApplications.map(item => item.status), ['removed', 'rejected', 'pending']);
 });
 
 test('requires president authentication and rejects cross-club or malformed member identities', async () => {

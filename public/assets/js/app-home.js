@@ -58,7 +58,6 @@ const views = {
   home: document.getElementById('homeView'),
   signIn: document.getElementById('signInView'),
   myForms: document.getElementById('myFormsView'),
-  clubLogin: document.getElementById('clubLoginView'),
   club: document.getElementById('clubView'),
   application: document.getElementById('applicationView'),
   head: document.getElementById('headDashboardView'),
@@ -204,7 +203,7 @@ function renderMyForms() {
     const info = document.createElement('p');
     info.textContent = `${club?.name || 'Club'} · ${app.committee || 'Committee'}`;
     const statusKey = app.status === 'pending' && app.interviewed ? 'processing' : (app.status || 'pending');
-    const statusLabels = { pending: 'Pending', processing: 'Processing', accepted: 'Accepted', rejected: 'Rejected' };
+    const statusLabels = { pending: 'Pending', processing: 'Processing', accepted: 'Accepted', rejected: 'Rejected', removed: 'Removed' };
     const status = document.createElement('span');
     status.className = `badge ${statusKey}`;
     status.textContent = statusLabels[statusKey] || 'Pending';
@@ -250,7 +249,7 @@ async function startEditingMyForm(item) {
   if (currentCommitteeOption) {
     currentCommitteeOption.disabled = false;
     applicationCommitteeInput.disabled = false;
-    applicationForm.querySelector('[type="submit"]').disabled = false;
+    applicationForm.querySelector('[type="submit"]').disabled = state.applicationQuestionsReady === false;
   }
   const nameParts = String(app.studentName || '').trim().split(/\s+/);
   applicationForm.elements.namedItem('firstName').value = nameParts.shift() || '';
@@ -262,6 +261,7 @@ async function startEditingMyForm(item) {
     const input = applicationForm.elements.namedItem(field);
     if (input) input.value = value || '';
   }
+  renderApplicationFields(state.selectedClub);
   const answers = new Map((Array.isArray(app.answers) ? app.answers : []).map((answer) => [answer.key, answer.value]));
   for (const field of state.selectedClub?.applicationFields || []) {
     const input = applicationForm.elements.namedItem(`club-answer-${field.key}`);
@@ -835,13 +835,14 @@ async function openClubPortal(initialSession = null) {
     let session = initialSession;
     if (!session) {
       const sessionResponse = await fetch('/api/club-auth/session');
+      if (!sessionResponse.ok) throw new Error('Club access is temporarily unavailable. Please try again.');
       session = await sessionResponse.json();
     }
     if (!session.authenticated) {
       document.documentElement.classList.remove('auth-route-pending');
       state.clubAccount = null;
       state.applications = [];
-      showView('clubLogin');
+      window.location.replace('/pages/applicant-login.html?redirect=%2Fclub-dashboard');
       return;
     }
 
@@ -870,6 +871,8 @@ async function openClubPortal(initialSession = null) {
       ? 'PRESIDENT DASHBOARD - ALL COMMITTEES'
       : `${club.committee} - HEAD DASHBOARD`;
     const isPresident = club.role === 'president';
+    const canManageQuestions = ['president', 'vice_president', 'head'].includes(club.role);
+    if (club.role === 'vice_president') document.getElementById('clubDashboardRoleLabel').textContent = 'VICE PRESIDENT DASHBOARD';
     document.getElementById('presidentClubStatusPanel')?.classList.toggle('hidden', !isPresident);
     const presidentStatusSelect = document.getElementById('presidentClubStatusSelect');
     if (presidentStatusSelect) presidentStatusSelect.value = ['open', 'opening-soon', 'full', 'closed'].includes(club.status) ? club.status : 'open';
@@ -887,8 +890,8 @@ async function openClubPortal(initialSession = null) {
     const canManageAttendanceTools = isPresident || isItCommitteeHead;
     const canViewAttendanceHistory = isPresident || club.role === 'head';
     presidentHeadManager.classList.toggle('hidden', club.role !== 'president');
-    presidentFormManager.classList.toggle('hidden', club.role !== 'president');
-    const canViewClubOperations = ['president', 'head'].includes(club.role);
+    presidentFormManager.classList.toggle('hidden', !canManageQuestions);
+    const canViewClubOperations = canManageQuestions;
     presidentSidebar.classList.toggle('hidden', !canViewClubOperations);
     presidentDashboardLayout.classList.toggle('is-president', canViewClubOperations);
     presidentSidebar.querySelectorAll('[data-president-only]').forEach((item) => item.classList.toggle('hidden', !isPresident));
@@ -929,17 +932,17 @@ async function openClubPortal(initialSession = null) {
     } else {
       setPresidentDashboardSection('presidentOverviewPanel');
     }
-    document.getElementById('interviewFormHeading').textContent = club.role === 'president'
+    document.getElementById('interviewFormHeading').textContent = club.role !== 'head'
       ? 'Club interview questions'
       : `${club.committee} interview questions`;
-    document.getElementById('interviewFormDescription').textContent = club.role === 'president'
+    document.getElementById('interviewFormDescription').textContent = club.role !== 'head'
       ? 'These questions are used when you review applicants in your club dashboard.'
       : 'These questions are used when you review applicants assigned to your committee.';
     showView('head');
     document.documentElement.classList.remove('auth-route-pending');
     const dashboardLoads = club.role === 'president'
       ? [loadApplications()]
-      : [loadApplications(), loadInterviewForm()];
+      : [loadApplications(), loadInterviewForm(), loadPresidentApplicationForm()];
     if (club.role === 'president') {
       // Paint the overview first; prepare its nested management sections in
       // ordered background stages so they are ready before the user opens them.
@@ -966,16 +969,21 @@ async function openClubPortal(initialSession = null) {
         }
       });
     } else {
-      window.siteStartup?.afterStartup?.(() => loadClubMembers());
+      if (club.role === 'head') window.siteStartup?.afterStartup?.(() => loadClubMembers());
     }
     await Promise.all(dashboardLoads);
     if (club.role === 'president') startApprovalCheckpointLiveUpdates();
   } catch (error) {
     document.documentElement.classList.remove('auth-route-pending');
-    const feedback = document.getElementById('clubLoginFeedback');
-    feedback.textContent = error.message;
-    feedback.classList.add('is-error');
-    showView('clubLogin');
+    const feedback = document.createElement('p');
+    feedback.textContent = error.message || 'Could not load your club dashboard. Please try again.';
+    const retry = document.createElement('button');
+    retry.type = 'button';
+    retry.className = 'secondary-btn';
+    retry.textContent = 'Try again';
+    retry.addEventListener('click', () => openClubPortal());
+    views.authLoading.replaceChildren(feedback, retry);
+    showView('authLoading');
   }
 }
 

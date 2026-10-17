@@ -1,11 +1,14 @@
 
-      .login-wrap { max-width: 440px; margin: clamp(12px, 3vh, 26px) auto; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: var(--radius-xl); padding: 26px 28px; box-shadow: var(--shadow-xl); }
-      .login-wrap img { display: block; width: 88px; height: 88px; object-fit: contain; border-radius: 50%; margin: 0 auto 5px; }
+      .login-wrap { box-sizing: border-box; width: 100%; max-width: 380px; margin: 14px auto; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: var(--radius-xl); padding: 20px 24px; box-shadow: var(--shadow-xl); color-scheme: light; }
+      :root[data-theme="dark"] .login-wrap { color-scheme: dark; }
+      :root[data-theme="dark"] .login-wrap > img { background: #fff; border-radius: 10px; padding: 8px 12px; }
+      .login-wrap > img { display: block; width: 150px; height: 76px; object-fit: contain; border-radius: 0; margin: 0 auto 10px; }
       .login-wrap h1 { text-align: center; font-size: 1.5rem; margin: 0 0 6px; font-weight: 800; }
-      .login-wrap p.sub { text-align: center; color: var(--text-muted); margin: 0 0 15px; font-size: .9rem; }
-      .login-wrap .field-group { margin-bottom: 12px; }
+      .login-wrap p.sub { text-align: center; color: var(--text-muted); margin: 0 0 12px; font-size: .9rem; }
+      .login-wrap .field-group { margin-bottom: 10px; }
       .login-wrap .field-group label { margin-bottom: 5px; }
-      .login-wrap .field-group input { min-height: 44px; padding: 10px 14px; }
+      .login-wrap .field-group input { min-height: 44px; padding: 10px 14px; background: var(--bg-panel); color: var(--text-main); }
+      .login-wrap .field-group input:autofill { -webkit-text-fill-color: var(--text-main); box-shadow: 0 0 0 1000px var(--bg-panel) inset; }
       .login-divider { display: flex; align-items: center; gap: 12px; margin: 14px 0; color: var(--text-light); font-size: .8rem; font-weight: 700; }
       .login-divider::before, .login-divider::after { content: ''; flex: 1; height: 1px; background: var(--border-color); }
       #googleLoginArea, #googleLoginButton { box-sizing: border-box; width: 100%; min-width: 0; }
@@ -20,7 +23,7 @@
       .login-foot a { color: var(--primary-700); font-weight: 700; text-decoration: none; }
       @media (max-height: 800px) {
         .login-wrap { margin: 10px auto; padding: 18px 24px; }
-        .login-wrap img { width: 68px; height: 68px; margin-bottom: 3px; }
+        .login-wrap > img { width: 150px; height: 76px; margin-bottom: 6px; }
         .login-wrap p.sub { margin-bottom: 10px; }
         .login-wrap .field-group { margin-bottom: 8px; }
         .login-divider { margin: 10px 0; }
@@ -28,6 +31,6 @@
       }
       @media (max-height: 680px) {
         .login-wrap { margin: 5px auto; padding: 13px 20px; }
-        .login-wrap img { width: 50px; height: 50px; }
+        .login-wrap > img { width: 140px; height: 68px; }
         .login-wrap h1 { font-size: 1.3rem; }
       }

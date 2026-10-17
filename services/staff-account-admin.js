@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const { passwordInputError, hashAccountPassword, verifyAccountPasswordSaved } = require('./account-passwords');
 const { STAFF_ROUTES, STAFF_ROLE_LABELS, staffRoleAssignments } = require('./staff-google-auth');
 const ROLE_LABELS = STAFF_ROLE_LABELS;
-const CLUB_ROLES = new Set(['president', 'head', 'supervisor']);
+const CLUB_ROLES = new Set(['president', 'vice_president', 'head', 'supervisor']);
 
 function validateStaffAssignment(body) {
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
@@ -14,7 +14,7 @@ function validateStaffAssignment(body) {
   if (!Array.isArray(ids) || ids.length > 200 || ids.some(id => !Number.isSafeInteger(id) || id <= 0)
     || new Set(ids).size !== ids.length) return { error: 'Choose valid, unique clubs.' };
   if (CLUB_ROLES.has(role) && !ids.length) return { error: 'Select at least one club for this role.' };
-  if (['president', 'head'].includes(role) && ids.length !== 1) return { error: 'Select exactly one club for a president or committee head.' };
+  if (['president', 'vice_president', 'head'].includes(role) && ids.length !== 1) return { error: 'Select exactly one club for a president or committee head.' };
   if (!CLUB_ROLES.has(role) && ids.length) return { error: 'Committee dashboard roles do not use club assignments.' };
   if (role === 'head' && (!committee || committee.length > 100)) return { error: 'Enter the committee this head will manage (up to 100 characters).' };
   return { value: { email, role, clubId: ids[0] || 0, assignedClubIds: role === 'supervisor' ? ids : [], committee: role === 'head' ? committee : '' } };
@@ -33,7 +33,7 @@ function validateStaffAssignments(body) {
   }
   if (new Set(assignments.map(item => item.role)).size !== assignments.length) return { error: 'Choose each dashboard role only once.' };
   const assignedClubIds = assignments.flatMap(item => item.role === 'supervisor'
-    ? item.assignedClubIds : ['president', 'head'].includes(item.role) ? [item.clubId] : []);
+    ? item.assignedClubIds : ['president', 'vice_president', 'head'].includes(item.role) ? [item.clubId] : []);
   if (new Set(assignedClubIds).size > 200) return { error: 'Choose no more than 200 clubs across dashboard assignments.' };
   const primary = assignments[0];
   return { value: { email, role: primary.role, clubId: primary.clubId, assignedClubIds: primary.assignedClubIds,
@@ -59,7 +59,7 @@ async function countOtherSoftwareDevelopmentAccounts(ClubAccount, email) {
 function registerStaffAccountAdmin(app, { ClubAccount, Club, databaseReady, sameOrigin, refreshAccount, removeAccount = () => {}, isAdminEmail = () => false }) {
   const publicAccount = account => ({ email: account.email, role: account.role, clubId: account.clubId,
     committee: account.committee || '', assignedClubIds: account.role === 'supervisor' ? account.assignedClubIds || []
-      : ['president', 'head'].includes(account.role) ? [account.clubId] : [], assignments: staffRoleAssignments(account),
+      : ['president', 'vice_president', 'head'].includes(account.role) ? [account.clubId] : [], assignments: staffRoleAssignments(account),
     isGlobalAdmin: staffRoleAssignments(account).some(item => item.role === 'software_development'),
     updatedAt: account.updatedAt || null });
   app.get('/api/admin/staff-accounts', async (req, res) => {
@@ -97,7 +97,7 @@ function registerStaffAccountAdmin(app, { ClubAccount, Club, databaseReady, same
     let writeAcknowledged = false;
     try {
       const ids = [...new Set(value.roleAssignments.flatMap(item => item.role === 'supervisor'
-        ? item.assignedClubIds : ['president', 'head'].includes(item.role) ? [item.clubId] : []))];
+        ? item.assignedClubIds : ['president', 'vice_president', 'head'].includes(item.role) ? [item.clubId] : []))];
       if (ids.length && await Club.countDocuments({ id: { $in: ids }, archivedAt: null }) !== ids.length) {
         return res.status(400).json({ message: 'Select existing, active clubs.' });
       }

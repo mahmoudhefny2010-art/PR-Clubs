@@ -9,7 +9,7 @@ function cacheSnapshot({ clubRecords, applicationRecords, accountRecords }, toAp
     applications: applicationRecords,
     clubAccounts: accountRecords.map(account => ({
       ...toApiRecord(account),
-      role: ['head', 'pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'miu_events', 'software_development'].includes(account.role) ? account.role : 'president',
+      role: ['vice_president', 'head', 'pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'miu_events', 'software_development'].includes(account.role) ? account.role : 'president',
       committee: account.committee || ''
     }))
   };

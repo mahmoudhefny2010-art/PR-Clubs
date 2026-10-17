@@ -1,13 +1,56 @@
+document.getElementById('reloadApplicationQuestionsBtn').addEventListener('click', () => loadPresidentApplicationForm().catch(() => {}));
+document.getElementById('reloadInterviewQuestionsBtn').addEventListener('click', () => loadInterviewForm().catch(() => {}));
+function questionEditorScope(kind) {
+  return document.getElementById(kind === 'application' ? 'applicationQuestionScope' : 'interviewQuestionScope');
+}
+function updateQuestionScope(kind, result) {
+  const select = questionEditorScope(kind);
+  select.replaceChildren();
+  if (state.clubAccount?.role !== 'head') select.add(new Option(kind === 'application' ? 'Whole club' : 'Club interviews', ''));
+  for (const committee of result.committees || []) select.add(new Option(committee, committee));
+  select.value = result.committee || '';
+  select.disabled = state.clubAccount?.role === 'head';
+  if (kind === 'application') document.getElementById('presidentApplicationIntro').closest('.field-group').classList.toggle('hidden', Boolean(result.committee));
+}
+for (const kind of ['application', 'interview']) {
+  questionEditorScope(kind)?.addEventListener('change', () => {
+    const load = kind === 'application' ? loadPresidentApplicationForm : loadInterviewForm;
+    load().catch(() => {});
+  });
+}
+function validateQuestionEditor(questions) {
+  const keys = new Set();
+  for (const question of questions) {
+    if (!question.label?.trim() || question.label.trim().length > 100) return 'Each question needs text up to 100 characters.';
+    if (!['text', 'textarea', 'select'].includes(question.type) || typeof question.required !== 'boolean') return 'Check the question type and required setting.';
+    if (keys.has(question.key)) return 'Each question must have a unique identifier.';
+    keys.add(question.key);
+    if (question.type === 'select' && (question.options.length < 2 || question.options.length > 20 || new Set(question.options).size !== question.options.length || question.options.some(o => !o.trim() || o.length > 100))) return 'Choice questions need 2-20 unique options, up to 100 characters each.';
+  }
+  return '';
+}
 async function loadPresidentApplicationForm() {
-  const response = await fetch('/api/club/application-form');
+  const feedback = document.getElementById('presidentFormFeedback');
+  const button = document.getElementById('savePresidentApplicationFormBtn');
+  button.disabled = true;
+  feedback.textContent = 'Loading questions...';
+  try {
+  const scope = state.clubAccount?.role === 'head' ? state.clubAccount.committee : questionEditorScope('application').value;
+  const response = await fetch('/api/club/application-form?committee=' + encodeURIComponent(scope || ''), { cache: 'no-store' });
   const result = await response.json();
   if (!response.ok) throw new Error(result.message || 'Could not load your application form.');
+  updateQuestionScope('application', result);
+  state.applicationQuestionVersion = result.version;
   document.getElementById('presidentApplicationIntro').value = result.applicationIntro || '';
   state.presidentApplicationFields = (result.applicationFields || []).map((field) => ({
     ...field,
     options: Array.isArray(field.options) ? [...field.options] : []
   }));
   renderPresidentApplicationFields();
+  feedback.textContent = '';
+  feedback.classList.remove('is-error');
+  button.disabled = false;
+  } catch (error) { feedback.textContent = error.message; feedback.classList.add('is-error'); throw error; }
 }
 
 function renderPresidentApplicationFields() {
@@ -66,9 +109,16 @@ function updatePresidentApplicationField(event) {
 }
 
 async function loadInterviewForm() {
-  const response = await fetch('/api/club/interview-form');
+  const button = document.getElementById('saveInterviewFormBtn');
+  button.disabled = true;
+  setInterviewFeedback('Loading questions...');
+  try {
+  const scope = state.clubAccount?.role === 'head' ? state.clubAccount.committee : questionEditorScope('interview').value;
+  const response = await fetch('/api/club/interview-form?committee=' + encodeURIComponent(scope || ''), { cache: 'no-store' });
   const result = await response.json();
   if (!response.ok) throw new Error(result.message || 'Could not load interview questions.');
+  updateQuestionScope('interview', result);
+  state.interviewQuestionVersion = result.version;
   state.interviewSections = (result.sections || []).map((section) => ({
     ...section,
     questions: (section.questions || []).map((question) => ({
@@ -77,6 +127,9 @@ async function loadInterviewForm() {
     }))
   }));
   renderInterviewSections();
+  setInterviewFeedback('');
+  button.disabled = false;
+  } catch (error) { setInterviewFeedback(error.message, true); throw error; }
 }
 
 function renderInterviewSections() {
@@ -140,7 +193,7 @@ function renderInterviewSections() {
         state.interviewSections.splice(sectionIndex, 1);
       } else if (button.dataset.interviewAction === 'add-question') {
         if (section.questions.length >= 12) return setInterviewFeedback('A section can have up to 12 questions.', true);
-        section.questions.push({ key: `question_${Date.now()}`, label: 'New question', type: 'text', required: false, options: [] });
+        section.questions.push({ key: `q_${crypto.randomUUID().replaceAll('-', '')}`, label: 'New question', type: 'text', required: false, options: [] });
       } else if (button.dataset.interviewAction === 'remove-question') {
         section.questions.splice(Number(button.closest('[data-question-index]').dataset.questionIndex), 1);
       }
@@ -173,11 +226,14 @@ function setInterviewFeedback(message, isError = false) {
 
 document.getElementById('addInterviewSectionBtn').addEventListener('click', () => {
   if (state.interviewSections.length >= 10) return setInterviewFeedback('An interview form can have up to 10 sections.', true);
-  state.interviewSections.push({ key: `section_${Date.now()}`, title: 'New section', questions: [] });
+  state.interviewSections.push({ key: `s_${crypto.randomUUID().replaceAll('-', '')}`, title: 'New section', questions: [] });
   renderInterviewSections();
 });
 
 document.getElementById('saveInterviewFormBtn').addEventListener('click', async () => {
+  if (document.getElementById('saveInterviewFormBtn').disabled) return;
+  const validation = validateQuestionEditor(state.interviewSections.flatMap(s => s.questions));
+  if (validation) return setInterviewFeedback(validation, true);
   for (const section of state.interviewSections) {
     if (!section.title.trim()) return setInterviewFeedback('Every section needs a name.', true);
     for (const question of section.questions) {
@@ -194,10 +250,11 @@ document.getElementById('saveInterviewFormBtn').addEventListener('click', async 
     const response = await fetch('/api/club/interview-form', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sections: state.interviewSections })
+      body: JSON.stringify({ sections: state.interviewSections, committee: questionEditorScope('interview').value, version: state.interviewQuestionVersion })
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Could not save interview questions.');
+    state.interviewQuestionVersion = result.version;
     state.interviewSections = result.sections;
     renderInterviewSections();
     setInterviewFeedback('Interview form saved.');
@@ -214,7 +271,7 @@ document.getElementById('addPresidentApplicationFieldBtn').addEventListener('cli
     document.getElementById('presidentFormFeedback').classList.add('is-error');
     return;
   }
-  state.presidentApplicationFields.push({ key: `question_${Date.now()}`, label: 'New question', type: 'text', required: false, options: [] });
+  state.presidentApplicationFields.push({ key: `q_${crypto.randomUUID().replaceAll('-', '')}`, label: 'New question', type: 'text', required: false, options: [] });
   renderPresidentApplicationFields();
   document.querySelector('#presidentApplicationFieldList article:last-child [data-president-property="label"]')?.focus();
 });
@@ -223,6 +280,9 @@ document.getElementById('presidentFormEditor').addEventListener('submit', async 
   event.preventDefault();
   const feedback = document.getElementById('presidentFormFeedback');
   const button = document.getElementById('savePresidentApplicationFormBtn');
+  if (button.disabled) return;
+  const validation = validateQuestionEditor(state.presidentApplicationFields);
+  if (validation) { feedback.textContent = validation; feedback.classList.add('is-error'); return; }
   const invalidChoice = state.presidentApplicationFields.find((field) => field.type === 'select'
     && new Set(field.options.map((option) => option.trim()).filter(Boolean)).size < 2);
   if (invalidChoice) {
@@ -239,16 +299,18 @@ document.getElementById('presidentFormEditor').addEventListener('submit', async 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         applicationIntro: document.getElementById('presidentApplicationIntro').value,
+        committee: questionEditorScope('application').value, version: state.applicationQuestionVersion,
         applicationFields: state.presidentApplicationFields
       })
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Could not save your application form.');
+    state.applicationQuestionVersion = result.version;
     state.presidentApplicationFields = result.applicationFields;
     const club = state.clubs.find((item) => item.id === state.clubAccount.id);
     if (club) {
       club.applicationIntro = result.applicationIntro;
-      club.applicationFields = result.applicationFields;
+      club.applicationFields = [...(club.applicationFields || []).filter(f => (f.committee || '') !== (result.committee || '')), ...result.applicationFields];
     }
     feedback.textContent = 'Application form saved. New applicants will see these changes.';
   } catch (error) {
@@ -321,7 +383,6 @@ function renderClubContentSections(club) {
     const cards = sorted.map((item, index) => {
       const image = clubContentImage(item, section.type, club);
       const meta = clubContentMeta(item, section.type);
-      const description = item.text || item.description || '';
       const imageBlock = image
         ? window.FeedMedia.render(image, item.title || section.label, 'club-image')
         : `<div class="club-image club-image-placeholder" aria-hidden="true">${escapeHtml(section.label)}</div>`;
@@ -336,9 +397,8 @@ function renderClubContentSections(club) {
             </div>
             <div class="club-tagline">${escapeHtml(meta)}</div>
             <div class="club-actions">
-              <button class="event-info-btn" type="button" data-info="${escapeHtml(section.key)}-${index}"${section.type === 'event' ? ` data-event-index="${club.events.indexOf(item)}" aria-haspopup="dialog"` : ''}>Info</button>
+              <button class="event-info-btn" type="button" data-info="${escapeHtml(section.key)}-${index}" data-content-section="${escapeHtml(section.key)}" data-content-index="${club[section.key].indexOf(item)}" aria-haspopup="dialog"${section.type === 'event' ? ` data-event-index="${club.events.indexOf(item)}"` : ''}>Info</button>
             </div>
-            ${section.type === 'event' ? '' : `<p class="event-tile-desc" id="${escapeHtml(section.key)}-desc-${index}" hidden>${escapeHtml(description)}</p>`}
           </div>
         </article>`;
     }).join('');
@@ -425,23 +485,25 @@ function openClubDetail(clubId) {
 
   clubDetail.querySelectorAll('.event-info-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
-      const [kind, rawIndex] = btn.dataset.info.split('-');
-      if (kind === 'events') {
-        const event = club.events[Number(btn.dataset.eventIndex)];
-        if (event) window.openEventInfoPopup({ ...event, clubName: club.name, clubImage: club.image }, btn);
-        return;
-      }
-      const target = clubDetail.querySelector(`#${kind}-desc-${rawIndex}`);
-      if (target) target.hidden = !target.hidden;
+      const section = CLUB_CONTENT_SECTIONS.find(section => section.key === btn.dataset.contentSection);
+      const item = section && club[section.key]?.[Number(btn.dataset.contentIndex)];
+      if (item) window.openClubContentInfoPopup(item, section.type, club, btn);
     });
   });
 
   showView('club');
 }
 
+let applicationSubmissionPending = false;
+let applicationFormVersion = 0;
+let applicationAutoCloseTimer;
+document.getElementById('applicationBackHomeBtn').addEventListener('click', () => clearTimeout(applicationAutoCloseTimer));
+
 async function openApplicationForm(clubId, allowClosedClub = false) {
   const club = state.clubs.find((item) => item.id === clubId);
   if (!club || (!allowClosedClub && club.status !== 'open')) return;
+  applicationFormVersion++;
+  clearTimeout(applicationAutoCloseTimer);
 
   const activeView = Object.keys(views).find((name) => views[name]?.classList.contains('active'));
   if (activeView && activeView !== 'application') state.applicationReturnView = activeView;
@@ -454,6 +516,7 @@ async function openApplicationForm(clubId, allowClosedClub = false) {
   applicantPhotoInput.required = true;
   applicationForm.querySelector('.applicant-photo-field small').textContent = 'PNG, JPG, or WebP. Maximum size: 10 MB.';
   applicationForm.querySelector('[type="submit"]').textContent = 'Submit Application';
+  applicationForm.querySelector('[type="submit"]').disabled = applicationSubmissionPending;
   applicationFeedback.textContent = '';
   applicationFeedback.classList.remove('is-error');
   applicationTitle.textContent = `Join ${club.name}`;
@@ -461,10 +524,11 @@ async function openApplicationForm(clubId, allowClosedClub = false) {
   applicationClubLogo.alt = `${club.name} logo`;
   applicationClubLogo.classList.toggle('application-club-logo-contain', club.imageFit === 'contain');
   applicationFormIntro.textContent = club.applicationIntro || `Complete your details and answer ${club.name}'s questions.`;
-  renderApplicationFields(club);
+  state.applicationQuestionsReady = false;
+  renderApplicationFields({ applicationFields: [] });
   showView('application');
   const [profile, , accountPhoto] = await Promise.all([
-    loadStudentProfile(), loadApplicationCommittees(clubId),
+    loadStudentProfile(), loadApplicationCommittees(clubId).then(() => loadPublicApplicationQuestions(clubId)),
     window.loadAccountPhoto?.().catch(() => null)
   ]);
   if (state.selectedClub?.id !== clubId || state.editingMyForm) return;
@@ -595,8 +659,47 @@ applicantPhotoInput.addEventListener('change', () => {
   applicationFeedback.classList.remove('is-error');
 });
 
+let publicQuestionRequest = 0;
+async function loadPublicApplicationQuestions(clubId) {
+  const request = ++publicQuestionRequest, version = applicationFormVersion;
+  const values = new Map([...applicationCustomFields.querySelectorAll('input, textarea, select')].map(input => [input.name, input.value]));
+  const button = applicationForm.querySelector('[type="submit"]');
+  button.disabled = true;
+  state.applicationQuestionsReady = false;
+  applicationFeedback.textContent = 'Loading application questions...';
+  try {
+    const response = await fetch('/api/clubs/' + clubId + '/application-form', { cache: 'no-store' });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Could not load application questions.');
+    if (request !== publicQuestionRequest || version !== applicationFormVersion || state.selectedClub?.id !== clubId) return;
+    Object.assign(state.selectedClub, result);
+    applicationFormIntro.textContent = result.applicationIntro || 'Complete your details and answer the questions below.';
+    renderApplicationFields(state.selectedClub);
+    for (const [name, value] of values) {
+      const input = applicationForm.elements.namedItem(name);
+      if (input) input.value = value;
+    }
+    state.applicationQuestionsReady = true;
+    button.disabled = applicationSubmissionPending || applicationCommitteeInput.disabled || ![...applicationCommitteeInput.options].some(option => option.value && !option.disabled);
+    applicationFeedback.textContent = '';
+    applicationFeedback.classList.remove('is-error');
+  } catch (error) {
+    if (request !== publicQuestionRequest || version !== applicationFormVersion) return;
+    applicationFeedback.textContent = error.message + ' ';
+    applicationFeedback.classList.add('is-error');
+    const retry = document.createElement('button');
+    retry.type = 'button'; retry.className = 'secondary-btn'; retry.textContent = 'Retry loading questions';
+    retry.addEventListener('click', () => loadPublicApplicationQuestions(clubId));
+    applicationFeedback.append(retry);
+  }
+}
+applicationCommitteeInput.addEventListener('change', () => {
+  if (state.selectedClub) loadPublicApplicationQuestions(state.selectedClub.id);
+});
+
 function renderApplicationFields(club) {
-  const fields = club.applicationFields || [];
+  const fields = (club.applicationFields || []).filter(field => !field.committee || field.committee.toLowerCase() === String(applicationCommitteeInput.value || '').toLowerCase());
+  state.activeApplicationFields = fields;
   applicationCustomFields.classList.toggle('hidden', fields.length === 0);
   applicationCustomFields.innerHTML = fields.map((field) => {
     const fieldName = `club-answer-${field.key}`;
@@ -614,8 +717,8 @@ function renderApplicationFields(club) {
     }
 
     const input = field.type === 'textarea'
-      ? `<textarea id="${escapeHtml(fieldName)}" name="${escapeHtml(fieldName)}" rows="4" ${required}></textarea>`
-      : `<input id="${escapeHtml(fieldName)}" name="${escapeHtml(fieldName)}" type="text" ${required} />`;
+      ? `<textarea id="${escapeHtml(fieldName)}" name="${escapeHtml(fieldName)}" rows="4" maxlength="2000" ${required}></textarea>`
+      : `<input id="${escapeHtml(fieldName)}" name="${escapeHtml(fieldName)}" type="text" maxlength="2000" ${required} />`;
     return `
       <div class="field-group">
         <label for="${escapeHtml(fieldName)}">${escapeHtml(field.label)}${field.required ? ' *' : ''}</label>
@@ -627,6 +730,12 @@ function renderApplicationFields(club) {
 
 applicationForm.addEventListener('submit', async (event) => {
   event.preventDefault();
+  const submitButton = applicationForm.querySelector('[type="submit"]');
+  if (applicationSubmissionPending || submitButton?.disabled || state.applicationQuestionsReady === false) return;
+  const formVersion = applicationFormVersion;
+  const editing = state.editingMyForm;
+  const clubName = state.selectedClub.name;
+  let closingAfterSuccess = false;
 
   const formData = new FormData(applicationForm);
   const applicantPhoto = applicantPhotoInput.files[0];
@@ -641,7 +750,7 @@ applicationForm.addEventListener('submit', async (event) => {
     return;
   }
 
-  const submitButton = applicationForm.querySelector('[type="submit"]');
+  applicationSubmissionPending = true;
   const submitButtonText = submitButton?.textContent || '';
   if (submitButton) {
     submitButton.disabled = true;
@@ -662,7 +771,7 @@ applicationForm.addEventListener('submit', async (event) => {
     age: formData.get('age') || '20',
     motivation: formData.get('motivation') || 'Interested in joining this committee.',
     notes: formData.get('notes') || '',
-    answers: (state.selectedClub?.applicationFields || []).map((field) => ({
+    answers: (state.activeApplicationFields || state.selectedClub?.applicationFields || []).map((field) => ({
       key: field.key,
       value: formData.get(`club-answer-${field.key}`) || '',
     })),
@@ -683,7 +792,6 @@ applicationForm.addEventListener('submit', async (event) => {
       payload.photoPublicId = state.defaultApplicantPhoto.publicId;
     }
     if (!state.editingMyForm && !payload.photo) throw new Error('Upload your photo before submitting.');
-    const editing = state.editingMyForm;
     const response = await fetch(editing ? `/api/my-forms/${encodeURIComponent(editing.id)}` : '/api/applications', {
       method: editing ? 'PATCH' : 'POST',
       headers: { 'Content-Type': 'application/json', ...(editing?.token ? { Authorization: `Bearer ${editing.token}` } : {}) },
@@ -692,10 +800,13 @@ applicationForm.addEventListener('submit', async (event) => {
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || (editing ? 'Could not save your changes.' : 'Could not submit the application.'));
 
-    if (!editing && (!result.application?.id || typeof result.managementToken !== 'string')) {
+    if (!editing && (response.status !== 201 || !result.application?.id || Number(result.application.clubId) !== Number(payload.clubId)
+      || typeof result.managementToken !== 'string' || !result.managementToken.trim())) {
       throw new Error('The server accepted the form but could not link it to My Forms. Check with the club before submitting again to avoid a duplicate application.');
     }
 
+    if (!editing) rememberMyForm(result.application.id, result.managementToken);
+    if (formVersion !== applicationFormVersion || !views.application.classList.contains('active')) return;
     if (editing) {
       editing.application = result;
       state.myForms = state.myForms.map((item) => item.id === editing.id ? { ...item, application: result } : item);
@@ -711,17 +822,25 @@ applicationForm.addEventListener('submit', async (event) => {
     } else {
       applicationForm.reset();
       clearApplicantPhotoPreview();
-      rememberMyForm(result.application.id, result.managementToken);
-      applicationFeedback.textContent = `Your application to ${state.selectedClub.name} was submitted.`;
+      applicationFeedback.textContent = `Your application to ${clubName} was submitted.`;
+      closingAfterSuccess = true;
+      applicationAutoCloseTimer = setTimeout(() => {
+        if (formVersion === applicationFormVersion && views.application.classList.contains('active')) {
+          document.getElementById('applicationBackHomeBtn').click();
+        }
+      }, 1200);
     }
     applicationFeedback.classList.remove('is-error');
   } catch (error) {
-    applicationFeedback.textContent = error.message;
-    applicationFeedback.classList.add('is-error');
+    if (formVersion === applicationFormVersion) {
+      applicationFeedback.textContent = error.message;
+      applicationFeedback.classList.add('is-error');
+    }
   } finally {
+    applicationSubmissionPending = false;
     if (submitButton) {
-      submitButton.disabled = false;
-      submitButton.textContent = submitButtonText;
+      submitButton.disabled = closingAfterSuccess && formVersion === applicationFormVersion;
+      if (formVersion === applicationFormVersion) submitButton.textContent = submitButtonText;
     }
   }
 });

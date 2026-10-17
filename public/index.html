@@ -14,7 +14,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" /></noscript>
-    <link rel="stylesheet" href="/assets/css/base.css?v=20261015memberremove1" />
+    <link rel="stylesheet" href="/assets/css/base.css?v=20261017loaderror1" />
     <link rel="stylesheet" href="/assets/css/responsive.css?v=20261015mainadmin1" />
     <link rel="stylesheet" href="/assets/css/dark.css?v=20261015mainadmin1" />
     <link rel="stylesheet" href="/assets/css/features.css?v=20261015mainadmin1" />
@@ -145,28 +145,7 @@
 
 
 
-        <section id="clubLoginView" class="view">
-          <div class="club-login-panel">
-            <img class="club-login-miu-logo" src="/assets/img/pics/logo.svg.png" alt="MIU logo" />
-            <span class="admin-eyebrow">MIU CLUB PORTAL</span>
-            <h2>Club dashboard login</h2>
-            <p>Presidents manage committee heads. Committee heads review applications assigned to their committee.</p>
-            <form id="clubLoginForm">
-              <div class="field-group">
-                <label for="clubLoginEmail">Club email</label>
-                <input id="clubLoginEmail" name="email" type="email" autocomplete="username" required />
-              </div>
-              <div class="field-group">
-                <label for="clubLoginPassword">Password</label>
-                <input id="clubLoginPassword" name="password" type="password" autocomplete="current-password" required />
-              </div>
-              <button class="primary-btn" id="clubLoginSubmit" type="submit">Sign in</button>
-            </form>
-            <a class="text-button" href="/pages/forgot-password.html">Forgot Password?</a>
-            <p id="clubLoginFeedback" class="admin-feedback" aria-live="polite"></p>
-            <a class="text-button" href="/">Back to clubs</a>
-          </div>
-        </section>
+
 
 
 
@@ -380,7 +359,7 @@
                 <a href="#presidentClubStatusPanel" data-dashboard-section="presidentClubStatusPanel" data-president-only>Club status</a>
                 <a href="#presidentHeadManager" data-dashboard-section="presidentHeadManager" data-unread-section="committeeHeads" data-president-only>Committee heads <span class="sidebar-unread-badge" data-unread-badge="committeeHeads" hidden></span></a>
                 <span class="president-sidebar-group-title">Applications</span>
-                <a href="#presidentFormManager" data-dashboard-section="presidentFormManager" data-president-only>Application form</a>
+                <a href="#presidentFormManager" data-dashboard-section="presidentFormManager">Application form</a>
                 <a href="#interviewFormManager" data-dashboard-section="interviewFormManager">Interview questions</a>
                 <a href="#presidentApplicantsPanel" data-dashboard-section="presidentApplicantsPanel" data-unread-section="applicants">Applicants <span class="sidebar-unread-badge" data-unread-badge="applicants" hidden></span></a>
                 <span class="president-sidebar-group-title">Club operations</span>
@@ -451,6 +430,7 @@
                 </div>
               </div>
               <p>Changes here appear on your club’s application page. Add, edit, or remove questions, then save.</p>
+              <div class="field-group"><label for="applicationQuestionScope">Questions for</label><select id="applicationQuestionScope"><option value="">Whole club</option></select></div>
               <form id="presidentFormEditor" class="president-form-editor">
                 <div class="field-group">
                   <label for="presidentApplicationIntro">Form introduction</label>
@@ -463,6 +443,7 @@
                 <p class="admin-form-hint">Up to 12 questions. Choose short text, long text, or a list of options.</p>
                 <div id="presidentApplicationFieldList" class="application-field-editor-list"></div>
                 <div class="president-form-actions">
+                  <button id="reloadApplicationQuestionsBtn" class="secondary-btn" type="button">Reload questions</button>
                   <button id="savePresidentApplicationFormBtn" class="primary-btn" type="submit">Save application form</button>
                   <p id="presidentFormFeedback" class="admin-feedback" aria-live="polite"></p>
                 </div>
@@ -478,8 +459,10 @@
                 <button id="addInterviewSectionBtn" class="secondary-btn" type="button">Add section</button>
               </div>
               <p id="interviewFormDescription">Organize your interview into sections and add the questions you need.</p>
+              <div class="field-group"><label for="interviewQuestionScope">Questions for</label><select id="interviewQuestionScope"><option value="">Club interviews</option></select></div>
               <div id="interviewSectionList" class="interview-section-list"></div>
               <div class="president-form-actions">
+                <button id="reloadInterviewQuestionsBtn" class="secondary-btn" type="button">Reload questions</button>
                 <button id="saveInterviewFormBtn" class="primary-btn" type="button">Save interview form</button>
                 <p id="interviewFormFeedback" class="admin-feedback" aria-live="polite"></p>
               </div>
@@ -579,6 +562,7 @@
                     <option value="processing">Interviewed · pending</option>
                     <option value="accepted">Accepted</option>
                     <option value="rejected">Rejected</option>
+                    <option value="removed">Removed</option>
                   </select>
                 </label>
                 <label>Committee
@@ -853,12 +837,12 @@
     <script src="/assets/js/event-modal.js?v=20261013audience1" defer></script>
     <script src="/assets/js/committee-sidebar.js?v=20261013lighter1" defer></script>
     <script src="/assets/js/member-dashboard.js?v=20261014eventroles1" defer></script>
-    <script src="/assets/js/app-home.js?v=20261015mainadmin1" defer></script>
+    <script src="/assets/js/app-home.js?v=20261017questions1" defer></script>
     <script src="/assets/js/cloudinary-upload.js?v=2" defer></script>
     <script src="/assets/js/student-feedback.js?v=20261013stagedload3" defer></script>
-    <script src="/assets/js/event-info-popup.js?v=20261015eventinfo1" defer></script>
-    <script src="/assets/js/app-forms.js?v=20261015eventinfo1" defer></script>
-    <script src="/assets/js/app-dashboard.js?v=20261015memberremove1" defer></script>
+    <script src="/assets/js/event-info-popup.js?v=20261017clubinfo1" defer></script>
+    <script src="/assets/js/app-forms.js?v=20261017clubinfo1" defer></script>
+    <script src="/assets/js/app-dashboard.js?v=20261017loaderror1" defer></script>
     <script src="/assets/js/attendance-dashboard.js?v=20261014eventroles1" defer></script>
     <script src="/assets/js/entry-permit-dashboard.js?v=20261014permitmobilecards1" defer></script>
     <script src="/assets/js/member-directory.js?v=20261013stagedload3" defer></script>

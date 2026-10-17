@@ -5,7 +5,7 @@
     "sqlserver",
     "azuresql"
   ],
-  "checkedAt": "2026-10-15T15:06:17.226Z",
+  "checkedAt": "2026-10-16T14:58:27.070Z",
   "routeCount": 233,
   "scope": "Actual Express method/path/router registration, without database connections or requests. Does not prove database contents or HTTP response parity.",
   "routes": [
@@ -48,6 +48,11 @@
       "method": "DELETE",
       "prefix": "",
       "path": "/api/club/heads/:email"
+    },
+    {
+      "method": "DELETE",
+      "prefix": "",
+      "path": "/api/club/members/:memberId"
     },
     {
       "method": "DELETE",
@@ -162,6 +167,11 @@
     {
       "method": "GET",
       "prefix": "",
+      "path": "/admin/dashboard-v2/club-accounts"
+    },
+    {
+      "method": "GET",
+      "prefix": "",
       "path": "/admin/data"
     },
     {
@@ -248,11 +258,6 @@
       "method": "GET",
       "prefix": "",
       "path": "/api/admin/applications"
-    },
-    {
-      "method": "GET",
-      "prefix": "",
-      "path": "/api/admin/club-credentials"
     },
     {
       "method": "GET",
@@ -838,11 +843,6 @@
       "method": "POST",
       "prefix": "",
       "path": "/api/auth/login"
-    },
-    {
-      "method": "POST",
-      "prefix": "",
-      "path": "/api/club-auth/login"
     },
     {
       "method": "POST",

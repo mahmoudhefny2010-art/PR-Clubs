@@ -1,0 +1,21 @@
+/* The same compact card and height breakpoints as the student sign-in page. */
+.admin-signin { box-sizing: border-box; width: 100%; color-scheme: light; }
+.login-wrap.admin-signin { max-width: 380px; padding: 20px 24px; margin-block: 14px; }
+.login-wrap.admin-signin > .club-login-miu-logo { width: 150px; height: 76px; border-radius: 0; margin: 0 auto 10px; }
+.login-wrap.admin-signin .field-group { margin-bottom: 10px; }
+.login-wrap.admin-signin .sub { margin-bottom: 12px; }
+.login-wrap.admin-signin .login-divider { margin-block: 10px; }
+.login-wrap.admin-signin .login-foot { margin-top: 8px; }
+@media (max-height: 680px) {
+  .login-wrap.admin-signin { padding: 16px 20px; margin-block: 8px; }
+  .login-wrap.admin-signin > .club-login-miu-logo { width: 140px; height: 68px; margin-bottom: 6px; }
+}
+:root[data-theme="dark"] .admin-signin { color-scheme: dark; }
+:root[data-theme="dark"] .login-wrap.admin-signin > .club-login-miu-logo { background: #fff; border-radius: 10px; padding: 8px 12px; }
+.admin-signin #adminLoginSubmit { width: 100%; }
+.admin-signin .field-group input { background: var(--bg-panel); color: var(--text-main); }
+.admin-signin .admin-feedback { font-size: .86rem; overflow-wrap: anywhere; }
+.admin-signin .admin-feedback:empty { display: none; }
+.admin-signin #adminLoginForgotWrap { text-align: right; margin: 10px 0; font-size: .86rem; }
+.admin-signin #adminGoogleButton { width: 100%; min-width: 0; max-width: 400px; margin-inline: auto; overflow: hidden; }
+.admin-signin #adminGoogleButton > div, .admin-signin #adminGoogleButton iframe { box-sizing: border-box; width: 100% !important; max-width: 100% !important; }
