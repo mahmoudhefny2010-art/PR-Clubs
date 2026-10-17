@@ -9,11 +9,6 @@
     return Number.isNaN(d.getTime()) ? null : d;
   };
 
-  const legacyParams = new URLSearchParams(window.location.search);
-  if (legacyParams.has('club') && legacyParams.has('event')) {
-    window.location.replace(`/pages/event.html?club=${encodeURIComponent(legacyParams.get('club'))}&event=${encodeURIComponent(legacyParams.get('event'))}`);
-  }
-
   const escapeHtml = window.MiuUI.escapeHtml;
 
   let clubs = window.miuPublicDataCache?.read('clubs') || [];
@@ -78,10 +73,10 @@
       listEl.innerHTML = '<p class="events-empty">No upcoming events right now.</p>';
       return;
     }
-    listEl.innerHTML = events.map((event) => {
+    listEl.innerHTML = events.map((event, index) => {
       const label = dayLabel(event.date);
       return `
-      <a class="event-timeline-item" href="${event.university ? `/pages/event.html?university=${encodeURIComponent(event.universityContentId)}` : `/pages/event.html?club=${encodeURIComponent(event.clubId)}&event=${encodeURIComponent(event.eventIndex)}`}">
+      <button type="button" class="event-timeline-item sponsor-timeline-item" data-event-open="${index}" aria-haspopup="dialog">
         <span class="event-timeline-marker" aria-hidden="true"></span>
         <span class="event-timeline-content">
           <span class="event-timeline-header">
@@ -102,8 +97,11 @@
             <span class="event-timeline-link">View event details →</span>
           </span>
         </span>
-      </a>`;
+      </button>`;
     }).join('');
+    listEl.querySelectorAll('[data-event-open]').forEach(button => button.addEventListener('click', () => {
+      window.openEventModal(events[Number(button.dataset.eventOpen)]);
+    }));
   }
 
   function renderFeedTimeline() {

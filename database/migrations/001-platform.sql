@@ -135,7 +135,7 @@ CREATE TABLE [dbo].[SpeakerInvite] (
   [_payload] NVARCHAR(MAX) NOT NULL CHECK (ISJSON([_payload]) = 1),
   [_version] BIGINT NOT NULL DEFAULT 0,
   CONSTRAINT [PK_SpeakerInvite] PRIMARY KEY ([_id]),
-  CHECK ([createdByRole] IS NULL OR [createdByRole] IN (N'president', N'head', N'dean')),
+  CHECK ([createdByRole] IS NULL OR [createdByRole] IN (N'president', N'head', N'dean', N'supervisor')),
   CHECK ([_id] IS NULL OR (LEN([_id]) = 24 AND [_id] NOT LIKE '%[^0-9a-f]%'))
 );
 CREATE NONCLUSTERED INDEX [IX_SpeakerInvite_0_8ee33f] ON [dbo].[SpeakerInvite] ([clubId] ASC);

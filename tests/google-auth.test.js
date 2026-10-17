@@ -39,6 +39,19 @@ test('invalid Google credentials, wrong nonce, unverified email and non-MIU iden
   await rejects({ ...baseClaims, sub: '' });
 });
 
+test('Google verification identifies safe failure categories for actionable sign-in feedback', async () => {
+  const verify = claims => verifyGoogleStudentCredential({
+    credential: 'signed-google-token', expectedNonce: 'nonce-value', clientId: 'web-client-id', client: verifierFor(claims)
+  });
+  await assert.rejects(verify({ ...baseClaims, nonce: 'old-nonce' }), error => error.message === 'GOOGLE_ACCOUNT_NOT_ALLOWED' && error.reason === 'nonce_mismatch');
+  await assert.rejects(verify({ ...baseClaims, hd: 'gmail.com', email: 'student@gmail.com' }), error => error.reason === 'miu_domain_mismatch');
+  await assert.rejects(verify({ ...baseClaims, email_verified: false }), error => error.reason === 'email_unverified');
+  await assert.rejects(verifyGoogleStudentCredential({
+    credential: 'signed-google-token', expectedNonce: 'nonce-value', clientId: 'web-client-id',
+    client: { verifyIdToken: async () => { throw new Error('audience mismatch'); } }
+  }), error => error.message === 'GOOGLE_CREDENTIAL_INVALID' && error.reason === 'token_rejected');
+});
+
 test('existing Google subjects sign in while matching existing emails require an explicit link', () => {
   const linked = { email: 'student@miuegypt.edu.eg', googleSub: 'google-subject-123' };
   assert.deepEqual(decideGoogleAccount({ accountBySubject: linked, accountByEmail: null }), { action: 'sign_in', account: linked });

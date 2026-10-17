@@ -42,10 +42,8 @@
           }
           const sessionResponse = await fetch('/api/student-auth/session', { cache: 'no-store' });
           const linkExistingAccount = sessionResponse.ok;
-          if (linkExistingAccount) {
-            hint.textContent = 'Link your signed-in student account to your verified MIU Google account.';
-            hint.hidden = false;
-          }
+          if (linkExistingAccount) hint.hidden = true;
+          const studentSession = linkExistingAccount ? await sessionResponse.json() : null;
           const script = document.createElement('script');
           script.src = 'https://accounts.google.com/gsi/client';
           script.async = true;
@@ -54,37 +52,6 @@
               fallbackButton.hidden = false;
               return;
             }
-            window.google.accounts.id.initialize({
-              client_id: config.clientId,
-              nonce: config.nonce,
-              hd: 'miuegypt.edu.eg',
-              error_callback: () => {
-                const feedback = document.getElementById('googleLoginFeedback');
-                feedback.textContent = 'Google sign-in was closed or could not be opened. You can try again or use your email and password.';
-                feedback.classList.add('is-error');
-              },
-              callback: async (credentialResponse) => {
-                const feedback = document.getElementById('googleLoginFeedback');
-                feedback.classList.remove('is-error');
-                if (!credentialResponse?.credential) {
-                  feedback.textContent = 'Google did not return a sign-in credential. Try again or use your email and password.';
-                  feedback.classList.add('is-error');
-                  return;
-                }
-                feedback.textContent = 'Checking your MIU Google account...';
-                try {
-                  const endpoint = linkExistingAccount ? '/api/student-auth/google/link' : '/api/student-auth/google';
-                  const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ credential: credentialResponse.credential }) });
-                  const result = await response.json();
-                  if (!response.ok) throw new Error(result.message || 'Google sign-in failed.');
-                  if (linkExistingAccount) {
-                    feedback.textContent = 'Your Google account is now linked. You can use either sign-in method.';
-                    return;
-                  }
-                  window.location.replace(result.role === 'student' ? studentReturnTarget() : (result.redirect || '/'));
-                } catch (error) { feedback.textContent = error.message; feedback.classList.add('is-error'); }
-              }
-            });
             const buttonHost = document.getElementById('googleLoginButton');
             let renderedWidth = 0;
             const renderGoogleButton = () => {
@@ -96,8 +63,56 @@
               buttonHost.replaceChildren();
               window.google.accounts.id.renderButton(buttonHost, { theme: 'outline', size: 'large', text: linkExistingAccount ? 'continue_with' : 'signin_with', shape: 'rectangular', width });
             };
-            area.classList.remove('hidden');
-            renderGoogleButton();
+            const initializeGoogle = (googleConfig) => {
+              renderedWidth = 0;
+              window.google.accounts.id.initialize({
+                client_id: googleConfig.clientId,
+                nonce: googleConfig.nonce,
+                hd: 'miuegypt.edu.eg',
+                ...(studentSession?.email ? { login_hint: studentSession.email } : {}),
+                error_callback: () => {
+                  const feedback = document.getElementById('googleLoginFeedback');
+                  feedback.textContent = 'Google sign-in was closed or could not be opened. You can try again or use your email and password.';
+                  feedback.classList.add('is-error');
+                },
+                callback: async (credentialResponse) => {
+                  const feedback = document.getElementById('googleLoginFeedback');
+                  feedback.classList.remove('is-error');
+                  if (!credentialResponse?.credential) {
+                    feedback.textContent = 'Google did not return a sign-in credential. Try again or use your email and password.';
+                    feedback.classList.add('is-error');
+                    return;
+                  }
+                  feedback.textContent = 'Checking your MIU Google account...';
+                  try {
+                    const endpoint = linkExistingAccount ? '/api/student-auth/google/link' : '/api/student-auth/google';
+                    const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ credential: credentialResponse.credential }) });
+                    const result = await response.json();
+                    if (!response.ok) throw new Error(result.message || 'Google sign-in failed.');
+                    if (linkExistingAccount) {
+                      window.location.replace(studentReturnTarget());
+                      return;
+                    }
+                    window.location.replace(result.role === 'student' ? studentReturnTarget() : (result.redirect || '/'));
+                  } catch (error) {
+                    feedback.textContent = error.message;
+                    feedback.classList.add('is-error');
+                    try {
+                      const refreshedResponse = await fetch('/api/student-auth/google-config', { cache: 'no-store' });
+                      const refreshedConfig = await refreshedResponse.json();
+                      if (!refreshedResponse.ok || !refreshedConfig.enabled) throw new Error('Google could not prepare another sign-in check. Reload this page to try again.');
+                      initializeGoogle(refreshedConfig);
+                    } catch (refreshError) {
+                      feedback.textContent = `${error.message} ${refreshError.message}`;
+                    }
+                  }
+                }
+              });
+              area.classList.remove('hidden');
+              buttonHost.replaceChildren();
+              renderGoogleButton();
+            };
+            initializeGoogle(config);
             if ('ResizeObserver' in window) new ResizeObserver(renderGoogleButton).observe(buttonHost);
           };
           script.onerror = () => { fallbackButton.hidden = false; area.classList.remove('hidden'); };

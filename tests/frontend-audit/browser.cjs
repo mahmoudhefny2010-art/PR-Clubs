@@ -69,11 +69,14 @@ const types = { '.html': 'text/html', '.css': 'text/css', '.js': 'application/ja
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://127.0.0.1');
   if (url.pathname === '/favicon.ico') { res.writeHead(204); res.end(); return; }
+  if (url.pathname === '/api/site/public-data-stream') { res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store' }); res.write('event: ready\\ndata: {}\\n\\n'); return; }
   if (url.pathname.startsWith('/api/')) {
     const chunks = []; for await (const chunk of req) chunks.push(chunk);
     const text = Buffer.concat(chunks).toString(); let body;
     try { body = text ? JSON.parse(text) : undefined; } catch { body = text; }
     serverRequests.push({ method: req.method, url: url.pathname + url.search, body });
+    if (activeScenario === 'my-forms-initial-loading' && url.pathname === '/api/clubs') await sleep(650);
+    if (activeScenario === 'club-dashboard-initial-loading' && url.pathname === '/api/club-auth/session') await sleep(650);
     const [status, data] = respond(url, req.method, req.headers.referer || '', body, activeScenario);
     if (status === 404) missing.add(`${req.method} ${url.pathname}`);
     res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
@@ -104,8 +107,17 @@ if (process.argv.includes('--all-pages')) {
   }
 }
 const extras = [
-  { name: 'account-menu-visible', url: '/', action: "document.getElementById('headerStudentProfileTrigger').click()", expect: "(() => { const menu=document.getElementById('headerStudentProfileDropdown'), email=document.getElementById('headerStudentName'), options=document.querySelectorAll('#headerDashboardChoiceList button'), logout=document.getElementById('headerStudentSignoutBtn'); const r=menu.getBoundingClientRect(); if(menu.hidden || r.left<0 || r.right>innerWidth || r.bottom>innerHeight || options.length!==9 || getComputedStyle(email).whiteSpace==='nowrap' || email.scrollWidth>email.clientWidth+1)return false; menu.scrollTop=menu.scrollHeight; const end=logout.getBoundingClientRect(); const accessible=end.bottom<=r.bottom && end.top>=r.top; menu.scrollTop=0; return accessible; })()" },
+  { name: 'account-menu-visible', url: '/', action: "document.getElementById('headerStudentProfileTrigger').click()", expect: "(() => { const menu=document.getElementById('headerStudentProfileDropdown'), email=document.getElementById('headerStudentName'), options=document.querySelectorAll('#headerDashboardChoiceList button'), logout=document.getElementById('headerStudentSignoutBtn'); const r=menu.getBoundingClientRect(); if(menu.hidden || r.left<0 || r.right>innerWidth || r.bottom>innerHeight || options.length!==11 || getComputedStyle(email).whiteSpace==='nowrap' || email.scrollWidth>email.clientWidth+1)return false; menu.scrollTop=menu.scrollHeight; const end=logout.getBoundingClientRect(); const accessible=end.bottom<=r.bottom && end.top>=r.top; menu.scrollTop=0; return accessible; })()" },
   { name: 'account-menu-student-dashboard', url: '/', action: "document.getElementById('headerStudentProfileTrigger').click(); document.getElementById('headerStudentProfileLink').click()", expect: "location.pathname==='/' && new URLSearchParams(location.search).get('myForms')==='1' && !document.getElementById('myFormsView').classList.contains('hidden')" },
+  ...Object.entries({ admin: '/admin', software_development: '/admin', president: '/club-dashboard', vice_president: '/club-dashboard', head: '/club-dashboard', supervisor: '/dashboards/supervisor-dashboard.html', pr: '/dashboards/pr-dashboard.html', english: '/dashboards/english-dashboard.html', security: '/dashboards/security-dashboard.html', sso: '/dashboards/sso-dashboard.html', dean: '/dashboards/dean-dashboard.html', miu_events: '/dashboards/miu-events-dashboard.html' }).map(([role, href]) => ({
+    name: `account-menu-role-${role}`, url: '/', action: "document.getElementById('headerStudentProfileTrigger').click()",
+    expect: `document.getElementById('headerStudentProfileLink').getAttribute('href')===${JSON.stringify(href)}`
+  })),
+  { name: 'account-menu-president-back-forward', url: '/', action: "document.getElementById('headerStudentProfileTrigger').click(); document.getElementById('headerStudentProfileLink').click()", expect: "location.pathname==='/club-dashboard'", backForward: true },
+  { name: 'account-menu-role-expired', url: '/', action: "document.getElementById('headerStudentProfileTrigger').click()", expect: "document.getElementById('headerStudentProfileMenu').hidden && document.getElementById('headerAuthBtn').getAttribute('href')==='/pages/applicant-login.html'" },
+  { name: 'my-forms-initial-loading', url: '/?myForms=1', expect: "document.documentElement.classList.contains('auth-route-pending') && getComputedStyle(document.getElementById('homeView')).display==='none' && getComputedStyle(document.getElementById('authLoadingView')).display==='grid'" },
+  { name: 'club-dashboard-initial-loading', url: '/club-dashboard', expect: "document.documentElement.classList.contains('auth-route-pending') && getComputedStyle(document.getElementById('homeView')).display==='none' && getComputedStyle(document.getElementById('authLoadingView')).display==='grid'" },
+  { name: 'club-dashboard-expired-session', url: '/club-dashboard', action: "new Promise((resolve,reject)=>{const started=Date.now();const timer=setInterval(()=>{if(location.pathname==='/pages/applicant-login.html'){clearInterval(timer);resolve()}else if(Date.now()-started>3000){clearInterval(timer);reject(Error('Expired session did not reach sign-in'))}},25)})", expect: "location.pathname==='/pages/applicant-login.html'" },
   { name: 'club-dashboard', url: '/club-dashboard' },
   { name: 'club-attendance-approval-status', url: '/club-dashboard', action: "new Promise(resolve=>setTimeout(()=>{document.getElementById('openAttendanceManagerBtn').click();setTimeout(()=>{document.querySelector('.attendance-records-details summary').click();setTimeout(resolve,350)},250)},250))", expect: "document.getElementById('attendanceRecordsList').innerText.includes('SSO approved · Waiting for Dean') && document.getElementById('attendanceRecordsList').innerText.includes('Test Student')" },
   { name: 'club-entry-permit-dashboard', url: '/club-dashboard?auditEntryPermit=1', action: 'new Promise(resolve=>setTimeout(resolve,700))', expect: "document.getElementById('approvalCheckpointTrack').innerText.includes('Campus Access Request') && document.getElementById('approvalCheckpointTrack').innerText.includes('PR final review') && document.getElementById('approvalCheckpointTrack').innerText.includes('Dean view')" },
@@ -199,6 +211,14 @@ async function main() {
         await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 0, y: 0 });
       }
       if (scenario.expect) assert.equal(await client.evaluate(scenario.expect), true, `Interaction failed: ${key}`);
+      if (scenario.backForward) {
+        await client.evaluate('history.back()');
+        for (let i = 0; i < 40 && await client.evaluate("location.pathname!=='/'").catch(() => true); i++) await sleep(50);
+        assert.equal(await client.evaluate('location.pathname'), '/', 'Back returns from the account dashboard to the prior page');
+        await client.evaluate('history.forward()');
+        for (let i = 0; i < 40 && await client.evaluate("location.pathname!=='/club-dashboard'").catch(() => true); i++) await sleep(50);
+        assert.equal(await client.evaluate('location.pathname'), '/club-dashboard', 'Forward restores the selected account dashboard');
+      }
       // Browser-owned validation bubbles animate outside the DOM/CSS snapshot.
       // Assert validity first, then dismiss the bubble on both original and current pages.
       if (scenario.dismissNativeValidation) {

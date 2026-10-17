@@ -33,14 +33,14 @@
   }
   async function loadInviteClubs() {
     const clubs = await api('/api/dean/speaker-invites/clubs');
-    inviteClub.replaceChildren(new Option('Choose a club', ''));
+    inviteClub.replaceChildren(new Option('Choose MIU or a club', ''));
     for (const club of clubs) inviteClub.add(new Option(club.name, String(club.id)));
     invitePanel.hidden = false;
   }
   async function createInvite(rotate = false) {
     const clubId = Number(inviteClub.value);
-    if (!Number.isSafeInteger(clubId) || clubId <= 0) {
-      inviteFeedback('Choose a hosting club first.', true);
+    if (inviteClub.value === '' || !Number.isSafeInteger(clubId) || clubId < 0) {
+      inviteFeedback('Choose MIU or a hosting club first.', true);
       inviteClub.focus();
       return;
     }

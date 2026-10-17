@@ -1,0 +1,25 @@
+<div class="event-modal hidden" id="eventModal" role="dialog" aria-modal="true" aria-labelledby="eventModalTitle">
+        <article class="event-modal-panel">
+          <button id="eventModalClose" class="calendar-close-btn event-modal-close" type="button" aria-label="Close event">&times;</button>
+          <img id="eventModalImage" class="event-modal-image" src="" alt="" />
+          <div class="event-modal-copy">
+            <span id="eventModalClub" class="event-modal-club"></span>
+            <h2 id="eventModalTitle"></h2>
+            <p id="eventModalMeta" class="event-modal-meta"></p>
+            <p id="eventModalAttendance" class="event-attendance-status" hidden></p>
+            <p id="eventModalDescription" class="event-modal-description"></p>
+            <form id="eventModalForm">
+              <div class="field-group">
+                <label for="eventModalName">Your Name</label>
+                <input id="eventModalName" placeholder="Full name" required />
+              </div>
+              <div class="field-group">
+                <label for="eventModalEmail">University Email</label>
+                <input id="eventModalEmail" type="email" placeholder="example@miuegypt.edu.eg" required />
+              </div>
+              <button class="primary-btn" type="submit">Register for event</button>
+            </form>
+            <p id="eventModalFeedback" class="admin-feedback" aria-live="polite"></p>
+          </div>
+        </article>
+      </div>

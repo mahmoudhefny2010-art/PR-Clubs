@@ -11,14 +11,12 @@ function requesterKey(identity, clubId) {
 }
 
 function resolveSpeakerHosting(identity, payload = {}) {
-  if (identity?.type === 'club') {
-    const clubId = Number(identity.clubId);
-    return Number.isSafeInteger(clubId) && clubId > 0 ? { hostingType: 'club', clubId } : null;
-  }
-  if (identity?.type !== 'student') return null;
-  if (payload.hostingType === 'miu') return { hostingType: 'miu', clubId: 0 };
-  const clubId = Number(payload.clubId);
-  return Number.isSafeInteger(clubId) && clubId > 0 ? { hostingType: 'club', clubId } : null;
+  if (identity?.type !== 'club') return null;
+  const clubId = Number(identity.clubId);
+  if (!Number.isSafeInteger(clubId) || clubId <= 0
+    || payload.hostingType !== undefined && payload.hostingType !== 'club'
+    || payload.clubId !== undefined && Number(payload.clubId) !== clubId) return null;
+  return { hostingType: 'club', clubId };
 }
 
 function validateSpeakerPayload(payload = {}) {

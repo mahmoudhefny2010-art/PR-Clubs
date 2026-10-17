@@ -15,16 +15,24 @@ body.modal-open { overflow: hidden; }
 .event-modal-panel {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);
-  gap: 28px;
-  width: min(980px, 100%);
-  max-height: min(760px, 90vh);
+  grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
+  align-items: start;
+  gap: 20px 24px;
+  width: min(920px, 100%);
+  max-height: min(760px, calc(100dvh - 40px));
+  box-sizing: border-box;
   overflow: auto;
-  padding: 32px;
+  padding: 24px;
   border-radius: 20px;
   background: #fff;
   color: #111827;
   box-shadow: 0 18px 55px rgba(15, 23, 42, .24);
+}
+
+/* The shared close rail must span both columns rather than occupy the image cell. */
+.event-modal-panel > .modal-close-rail {
+  grid-column: 1 / -1;
+  min-height: 32px;
 }
 
 .event-modal-close {
@@ -37,18 +45,20 @@ body.modal-open { overflow: hidden; }
 .event-modal-image {
   display: block;
   width: 100%;
-  height: 100%;
-  min-height: 320px;
-  max-height: 420px;
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
+  height: clamp(220px, 36vh, 340px);
+  min-height: 0;
+  max-height: 340px;
+  box-sizing: border-box;
+  padding: 10px;
+  object-fit: contain;
+  background: var(--bg-soft);
   border-radius: 16px;
 }
 .event-modal-image.university-brand-image { object-fit: contain; background: #fff; padding: 12px; }
 
-.event-modal-copy { min-width: 0; padding: 8px 36px 0 0; }
+.event-modal-copy { min-width: 0; padding: 0; overflow-wrap: anywhere; }
 .event-modal-club { color: #b71c1c; font-size: .85rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
-.event-modal-copy h2 { margin: 8px 0; font-size: clamp(1.6rem, 3vw, 2.4rem); line-height: 1.15; }
+.event-modal-copy h2 { margin: 8px 0 14px; font-size: clamp(1.4rem, 2.6vw, 1.9rem); line-height: 1.25; }
 .event-modal-meta, .event-modal-description { color: #536176; font-size: 1.05rem; line-height: 1.55; }
 .event-modal-copy .event-attendance-status { color: #1d4ed8; }
 .event-modal-description { white-space: pre-wrap; }
@@ -107,10 +117,17 @@ body.modal-open { overflow: hidden; }
 .calendar-day-event-copy span { color: #687386; font-size: .82rem; }
 
 @media (max-width: 640px) {
-  .event-modal { padding: 12px; }
-  .event-modal-panel { grid-template-columns: 1fr; gap: 14px; max-height: 92vh; padding: 18px; }
-  .event-modal-image { width: min(100%, 260px); max-height: 190px; margin: 0 auto; }
+  .event-modal { padding: 10px; box-sizing: border-box; }
+  .event-modal-panel { grid-template-columns: 1fr; gap: 12px; width: min(440px, 100%); max-height: calc(100dvh - 20px); padding: 16px; border-radius: 20px; overscroll-behavior: contain; }
+  .event-modal-panel > .modal-close-rail { min-height: 40px; }
+  .event-modal-image { width: 100%; height: clamp(160px, 27dvh, 210px); min-height: 0; max-height: 210px; margin: 0 auto; padding: 8px; border-radius: 12px; }
   .event-modal-copy { padding: 0; }
-  .event-modal-close { top: 8px; right: 8px; }
+  .event-modal-club { font-size: .72rem; }
+  .event-modal-copy h2 { margin: 6px 0 10px; font-size: 1.45rem; line-height: 1.25; }
+  .event-modal-meta, .event-modal-description { margin: 8px 0; font-size: .94rem; line-height: 1.55; }
+  .event-modal .event-modal-close { display: grid; place-items: center; width: 44px; height: 44px; min-width: 44px; min-height: 44px; padding: 0; font-size: 24px; }
+  .event-modal-copy form { width: 100%; max-width: 100%; margin-top: 14px; }
+  .event-modal-copy form > button { width: 100%; min-height: 44px; padding: 11px 14px; font-size: .94rem; }
+  .event-modal-copy .admin-feedback { margin: 10px 0 0; font-size: .88rem; line-height: 1.5; }
   .calendar-day-events-panel { padding: 22px 16px 16px; }
 }

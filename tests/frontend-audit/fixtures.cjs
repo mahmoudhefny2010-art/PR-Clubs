@@ -21,8 +21,11 @@ function respond(url, method, referer, body, scenario = '') {
   if (scenario.startsWith('account-menu')) {
     if (p === '/api/pwa/version') return [200, { version: 'account-menu-fixture' }];
     const email = 'mahmoud2406700.long.account.name@miuegypt.edu.eg';
-    if (p === '/api/site/account-session') return [200, { authenticated: true, type: 'club', role: 'president', name: 'MUN', email,
-      dashboards: ['president', 'supervisor', 'pr', 'english', 'security', 'sso', 'dean', 'miu_events', 'software_development'].map(role => ({ role, label: role, clubName: ['president', 'supervisor'].includes(role) ? 'Model United Nations University Club' : '' })) }];
+    const selectedRole = scenario.match(/^account-menu-role-([a-z_]+)/)?.[1]
+      || (scenario === 'account-menu-student-dashboard' ? 'student' : 'president');
+    const accountType = selectedRole === 'student' ? 'student' : selectedRole === 'admin' ? 'admin' : 'club';
+    if (p === '/api/site/account-session') return [200, { authenticated: selectedRole !== 'expired', type: accountType, role: selectedRole, name: selectedRole === 'president' ? 'MUN' : selectedRole, email,
+      dashboards: selectedRole === 'president' ? ['president', 'vice_president', 'head', 'supervisor', 'pr', 'english', 'security', 'sso', 'dean', 'miu_events', 'software_development'].map(role => ({ role, label: role, clubName: ['president', 'vice_president', 'head', 'supervisor'].includes(role) ? 'Model United Nations University Club' : '' })) : [] }];
     if (p === '/api/site/account-photo') return [200, { url: '/assets/img/pics/mun.jpg', prompt: false }];
     if (p === '/api/notifications/config') return [200, { enabled: false }];
     if (p === '/api/miu-attendance-task') return [200, { task: null }];
@@ -32,10 +35,17 @@ function respond(url, method, referer, body, scenario = '') {
   }
   const role = /security-dashboard/.test(referer) ? 'security' : /english-dashboard/.test(referer) ? 'english' : /dean-dashboard|__audit\/dean-entry-permit/.test(referer) ? 'dean' : /pr-dashboard/.test(referer) ? 'pr' : /sso-dashboard/.test(referer) ? 'sso' : 'president';
   if (p === '/api/site/visitor-ping' || /\/view$/.test(p)) return [200, { ok: true }];
+  if (p === '/api/speaker-requests/context') return [403, { message: 'Speaker manager access required.' }];
+  if (p === '/api/report-downloads/clubs') return [200, []];
+  if (p === '/api/report-downloads/events') return [200, []];
+  if (p === '/api/pwa/version') return [200, { version: 'routing-fixture' }];
+  if (p === '/api/notifications/config') return [200, { enabled: false }];
+  if (p === '/api/student/my-forms') return [200, { forms: [] }];
+  if (p === '/api/member/attendance-assignments') return [200, []];
   if (p === '/api/site/account-session') return [200, /\/admin\/global/.test(referer) ? { authenticated: true, type: 'admin' } : { authenticated: false }];
   if (p === '/api/clubs') return [200, clubs];
   if (p === '/api/admin/homepage') return [200, { title: 'University Clubs', subtitle: 'Explore all clubs and apply to the ones that match your interests.' }];
-  if (p === '/api/club-auth/session') return [200, { authenticated: true, club: { id: ['pr', 'english', 'security', 'dean', 'sso'].includes(role) ? 0 : 1, clubId: 1, name: role === 'dean' ? 'Dean' : role === 'security' ? 'Security Office' : role.toUpperCase() === 'PRESIDENT' ? 'MUN' : role.toUpperCase(), email: 'fixture@example.test', role, committee: 'All Committees', image: clubs[0].image } }];
+  if (p === '/api/club-auth/session') return [200, scenario === 'club-dashboard-expired-session' ? { authenticated: false } : { authenticated: true, club: { id: ['pr', 'english', 'security', 'dean', 'sso'].includes(role) ? 0 : 1, clubId: 1, name: role === 'dean' ? 'Dean' : role === 'security' ? 'Security Office' : role.toUpperCase() === 'PRESIDENT' ? 'MUN' : role.toUpperCase(), email: 'fixture@example.test', role, committee: 'All Committees', image: clubs[0].image } }];
   if (p === '/api/admin/session') return [200, { authenticated: true, configured: true }];
   if (p === '/api/student-auth/session') return [200, { authenticated: true, name: 'Test Student', email: 'student@example.test' }];
   if (p === '/api/student-auth/google-config') return [200, { enabled: false }];

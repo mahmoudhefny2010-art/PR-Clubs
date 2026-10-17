@@ -99,7 +99,7 @@ test('does not make a provider request when configuration is missing', async () 
 
 test('keeps identity lookup behind account authentication and exposes no client-callable push dispatch route', () => {
   const serverSource = fs.readFileSync(require.resolve('../server'), 'utf8');
-  assert.match(serverSource, /const club = await getClubAccountFromRequest\(req\)/);
+  assert.match(serverSource, /const club = await getClubAccountFromRequest\(req(?:, res)?\)/);
   assert.match(serverSource, /if \(!student\) return res.status\(401\)/);
   assert.match(serverSource, /app\.put\('\/api\/notifications\/email-preference',\s*requireStudentAuth/);
   assert.match(serverSource, /dispatchPublishedContentNotifications\(\{/);

@@ -224,14 +224,14 @@ app.post('/api/uploads/cloudinary-signature', async (req, res) => {
       }
     }
     if (purpose === 'feed') {
-      const account = await getClubAccountFromRequest(req);
+      const account = await getClubAccountFromRequest(req, res);
       if (!account || !['president', 'head'].includes(account.role)) return res.status(403).json({ message: 'Club president or assigned committee head access is required to upload feed media.' });
     } else if (purpose === 'university') {
-      const account = await getClubAccountFromRequest(req);
-      if (account?.role !== 'miu_events' && !await isAdminSessionValid(req)) return res.status(401).json({ message: 'MIU Events dashboard access is required.' });
+      const account = await getClubAccountFromRequest(req, res);
+      if (account?.role !== 'miu_events' && !await isAdminSessionValid(req, res)) return res.status(401).json({ message: 'MIU Events dashboard access is required.' });
     } else if (purpose === 'club') {
-      const account = await getClubAccountFromRequest(req);
-      if (!await isAdminSessionValid(req) && (!account || !['president', 'pr', 'english', 'security', 'sso', 'dean'].includes(account.role))) {
+      const account = await getClubAccountFromRequest(req, res);
+      if (!await isAdminSessionValid(req, res) && (!account || !['president', 'pr', 'english', 'security', 'sso', 'dean'].includes(account.role))) {
         return res.status(403).json({ message: 'This account cannot upload club images.' });
       }
     }
@@ -729,14 +729,14 @@ function emailMatches(email) {
 }
 
 function createAdminSession() {
-  const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
+  const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
   const version = Number(adminAuthState?.sessionVersion) || 0;
   const payload = `${expiresAt}.${version}`;
   const signature = crypto.createHmac('sha256', sessionSecret).update(payload).digest('hex');
   return `${payload}.${signature}`;
 }
 
-async function isSoftwareDevelopmentSession(req) {
+async function isSoftwareDevelopmentSession(req, res = null) {
   const staffCookie = String(req.headers.cookie || '').split(';').map(value => value.trim()).find(value => value.startsWith('miu_club='));
   if (!staffCookie) return false;
   if (!mongoReady) {
@@ -752,14 +752,14 @@ async function isSoftwareDevelopmentSession(req) {
     const cached = clubAccounts.find(item => item.email === email && item.clubId === Number(parts[0]));
     if (cached && cached.role !== 'software_development') return false;
   }
-  const staff = await readAdminSessionData(() => getClubAccountFromRequest(req), mongoose);
+  const staff = await readAdminSessionData(() => getClubAccountFromRequest(req, res), mongoose);
   if (staff?.role === 'software_development') req.securityActor = { email: staff.email, role: staff.role };
   return staff?.role === 'software_development';
 }
 
-async function isAdminSessionValid(req) {
+async function isAdminSessionValid(req, res = null) {
   // Delegated administrators use a live, signed and revocable staff identity.
-  if (await isSoftwareDevelopmentSession(req)) return true;
+  if (await isSoftwareDevelopmentSession(req, res)) return true;
   const cookies = String(req.headers.cookie || '').split(';');
   const adminCookie = cookies.map((cookie) => cookie.trim()).find((cookie) => cookie.startsWith('miu_admin='));
   if (!adminCookie) return false;
@@ -776,23 +776,32 @@ async function isAdminSessionValid(req) {
 
   const resetState = await loadAdminAuthState();
   const currentVersion = Number(resetState?.sessionVersion) || 0;
-  if (version === currentVersion) req.securityActor = { email: getConfiguredAdminEmail(), role: 'admin' };
-  return version === currentVersion;
+  const valid = version === currentVersion;
+  if (valid) {
+    req.securityActor = { email: getConfiguredAdminEmail(), role: 'admin' };
+    if (res && !res.headersSent && Number(expiresAt) - Date.now() < 7 * 24 * 60 * 60 * 1000) {
+      const secure = secureCookieSuffix(req);
+      const value = `miu_admin=${createAdminSession()}; Max-Age=2592000; HttpOnly; SameSite=Strict; Path=/;${secure}`;
+      if (typeof res.append === 'function') res.append('Set-Cookie', value);
+      else res.setHeader('Set-Cookie', value);
+    }
+  }
+  return valid;
 }
 
 function setAdminSessionCookie(req, res) {
   req.securityActor = { email: getConfiguredAdminEmail(), role: 'admin' };
   const secure = secureCookieSuffix(req);
-  res.setHeader('Set-Cookie', `miu_admin=${createAdminSession()}; Max-Age=604800; HttpOnly; SameSite=Strict; Path=/;${secure}`);
+  res.setHeader('Set-Cookie', `miu_admin=${createAdminSession()}; Max-Age=2592000; HttpOnly; SameSite=Strict; Path=/;${secure}`);
 }
 
 async function requireAdmin(req, res, next) {
   try {
-    if (await isSoftwareDevelopmentSession(req)) return next();
+    if (await isSoftwareDevelopmentSession(req, res)) return next();
     if (!hasAdminPassword()) {
       return res.status(503).json({ message: 'Admin password setup is required.' });
     }
-    if (!await isAdminSessionValid(req)) {
+    if (!await isAdminSessionValid(req, res)) {
       if (req.method === 'GET' && /^\/admin(?:\/|$)/.test(req.path)) {
         return res.set('Cache-Control', 'no-store').redirect('/admin/login?returnTo=' + encodeURIComponent(req.originalUrl));
       }
@@ -812,9 +821,9 @@ async function requireAdmin(req, res, next) {
 
 async function requireMiuEventsDashboard(req, res, next) {
   try {
-    const account = await getClubAccountFromRequest(req);
+    const account = await getClubAccountFromRequest(req, res);
     if (account?.role === 'miu_events') { req.clubAccount = account; return next(); }
-    if (account?.role === 'software_development' || await isAdminSessionValid(req)) { req.clubAccount = account || null; return next(); }
+    if (account?.role === 'software_development' || await isAdminSessionValid(req, res)) { req.clubAccount = account || null; return next(); }
     return res.status(account ? 403 : 401).json({ message: account ? 'MIU Events dashboard access is not assigned to this account.' : 'Sign in with an assigned MIU Events account.' });
   } catch (error) {
     console.error('MIU Events session validation failed:', error.name);
@@ -832,7 +841,7 @@ function clubPasswordMatches(password, account) {
 }
 
 function createClubSession(account, assignment = null) {
-  const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
+  const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
   const encodedEmail = Buffer.from(account.email).toString('base64url');
   const version = Number(account.sessionVersion) || 0;
   if (assignment) {
@@ -864,7 +873,7 @@ function getInterviewFormSections(interviewForms, scope) {
   return [];
 }
 
-async function getClubAccountFromRequest(req) {
+async function getClubAccountFromRequest(req, res = null) {
   const cookies = String(req.headers.cookie || '').split(';');
   const clubCookie = cookies.map((cookie) => cookie.trim()).find((cookie) => cookie.startsWith('miu_club='));
   if (!clubCookie) return null;
@@ -877,6 +886,19 @@ async function getClubAccountFromRequest(req) {
   let payload;
   let account;
   let selectedRole = '';
+  const complete = (resolvedAccount, assignment = null) => {
+    // Keep an actively used club session alive, while still requiring a fresh
+    // sign-in after 30 days without activity.
+    if (res && !res.headersSent && Number(expiresText) - Date.now() < 7 * 24 * 60 * 60 * 1000) {
+      req.securityActor = { email: resolvedAccount.email, role: assignment?.role || resolvedAccount.role };
+      const secure = secureCookieSuffix(req);
+      const value = `miu_club=${createClubSession(resolvedAccount, assignment)}; Max-Age=2592000; HttpOnly; SameSite=Strict; Path=/;${secure}`;
+      if (typeof res.append === 'function') res.append('Set-Cookie', value);
+      else res.setHeader('Set-Cookie', value);
+    }
+    return assignment ? { ...resolvedAccount, role: assignment.role, clubId: assignment.clubId,
+      committee: assignment.committee, assignedClubIds: assignment.assignedClubIds } : resolvedAccount;
+  };
 
   if (cookieParts.length === 6) {
     const [, encodedEmail, roleText, newExpiresText, versionText, newSignature] = cookieParts;
@@ -951,26 +973,24 @@ async function getClubAccountFromRequest(req) {
       const assignment = require('./services/staff-google-auth').staffRoleAssignments(storedAccount)
         .find(item => item.role === selectedRole && item.clubId === Number(clubIdText));
       if (!assignment) return null;
-      return { ...storedAccount, role: assignment.role, clubId: assignment.clubId,
-        committee: assignment.committee, assignedClubIds: assignment.assignedClubIds };
+      return complete(storedAccount, assignment);
     }
-    return storedAccount;
+    return complete(storedAccount);
   }
   if (Number(account.sessionVersion || 0) !== version) return null;
   if (selectedRole) {
     const assignment = require('./services/staff-google-auth').staffRoleAssignments(account)
       .find(item => item.role === selectedRole && item.clubId === Number(clubIdText));
     if (!assignment) return null;
-    return { ...account, role: assignment.role, clubId: assignment.clubId,
-      committee: assignment.committee, assignedClubIds: assignment.assignedClubIds };
+    return complete(account, assignment);
   }
-  return account;
+  return complete(account);
 }
 
 function setClubSessionCookie(req, res, account, assignment = null) {
   req.securityActor = { email: account.email, role: assignment?.role || account.role };
   const secure = secureCookieSuffix(req);
-  res.setHeader('Set-Cookie', `miu_club=${createClubSession(account, assignment)}; Max-Age=604800; HttpOnly; SameSite=Strict; Path=/;${secure}`);
+  res.setHeader('Set-Cookie', `miu_club=${createClubSession(account, assignment)}; Max-Age=2592000; HttpOnly; SameSite=Strict; Path=/;${secure}`);
 }
 
 function getStaffDashboardOptions(account) {
@@ -989,7 +1009,7 @@ function getStaffDashboardOptions(account) {
 
 async function requireClubAuth(req, res, next) {
   try {
-    const account = await getClubAccountFromRequest(req);
+    const account = await getClubAccountFromRequest(req, res);
     if (!account) return res.status(401).json({ message: 'Club login required.' });
     if (['supervisor', 'miu_events', 'software_development'].includes(account.role)) return res.status(403).json({ message: 'Use your assigned dashboard for access.' });
     req.clubAccount = account;
@@ -1062,12 +1082,12 @@ function getVisitorTrackingSecret() {
   return process.env.VISITOR_TRACKING_SECRET || process.env.ADMIN_SESSION_SECRET || process.env.MONGO_URI || sessionSecret;
 }
 
-async function identifySiteVisitor(req) {
+async function identifySiteVisitor(req, res = null) {
   try {
-    if (await isAdminSessionValid(req)) {
+    if (await isAdminSessionValid(req, res)) {
       return { accountType: 'admin', accountEmail: getConfiguredAdminEmail() || '', accountName: 'Global Admin', accountLabel: 'Administrator' };
     }
-    const clubAccount = await getClubAccountFromRequest(req);
+    const clubAccount = await getClubAccountFromRequest(req, res);
     if (clubAccount) {
       const club = clubs.find((item) => Number(item.id) === Number(clubAccount.clubId));
     const roleLabels = { president: 'Club president', vice_president: 'Club vice president', head: 'Committee head', pr: 'PR', english: 'English', security: 'Security Office', sso: 'SSO', dean: 'Dean', miu_events: 'MIU Events' };
@@ -1078,7 +1098,7 @@ async function identifySiteVisitor(req) {
         accountLabel: clubAccount.committee ? `${role} · ${clubAccount.committee}` : role
       };
     }
-    const student = await getStudentAccountFromRequest(req);
+    const student = await getStudentAccountFromRequest(req, res);
     if (student) {
       return { accountType: 'student', accountEmail: student.email, accountName: student.name || 'Student', accountLabel: 'Student account' };
     }
@@ -1103,7 +1123,7 @@ app.post('/api/site/visitor-ping', async (req, res) => {
   const ipAddress = getVisitorIpAddress(req);
   const ipHash = getVisitorIpHash(ipAddress);
   const device = describeVisitorDevice(req.headers['user-agent']);
-  const identity = await identifySiteVisitor(req);
+  const identity = await identifySiteVisitor(req, res);
   const now = new Date();
   try {
     const visitorUpdate = {
@@ -1133,10 +1153,10 @@ app.post('/api/site/visitor-ping', async (req, res) => {
   }
 });
 
-async function getGoogleStudentAccountFromRequest(req) {
-  const staff = await getClubAccountFromRequest(req);
+async function getGoogleStudentAccountFromRequest(req, res = null) {
+  const staff = await getClubAccountFromRequest(req, res);
   let identity = staff;
-  if (!identity && await isAdminSessionValid(req)) {
+  if (!identity && await isAdminSessionValid(req, res)) {
     const admin = await loadAdminAuthState();
     if (admin?.email === getConfiguredAdminEmail()) identity = admin;
   }
@@ -1147,7 +1167,7 @@ async function getGoogleStudentAccountFromRequest(req) {
 async function getStudentAccountFromRequest(req, res, allowGoogleStaff = true) {
   if (!mongoReady) return null;
   const cookie = String(req.headers.cookie || '').split(';').map((part) => part.trim()).find((part) => part.startsWith('miu_student='));
-  if (!cookie) return allowGoogleStaff ? getGoogleStudentAccountFromRequest(req) : null;
+  if (!cookie) return allowGoogleStaff ? getGoogleStudentAccountFromRequest(req, res) : null;
   const parts = cookie.slice('miu_student='.length).split('.');
   if (parts.length !== 4) return null;
   const [encodedEmail, expiresText, versionText, signature] = parts;
@@ -1179,24 +1199,21 @@ async function requireStudentAuth(req, res, next) {
 }
 
 async function getSpeakerRequester(req, res) {
-  const preferredType = req.query?.as || req.body?.requesterType;
-  if (preferredType !== 'club') {
-    const student = await getStudentAccountFromRequest(req, res);
-    if (student) return {
-      type: 'student', id: String(student._id), email: student.email,
-      name: student.name, role: 'student'
-    };
-  }
-  if (preferredType !== 'student') {
-    const club = await getClubAccountFromRequest(req);
-    if (club && ['president', 'head'].includes(club.role)) return {
-      type: 'club', id: `club:${Number(club.clubId)}:${String(club.email).toLowerCase()}`,
-      email: club.email, name: club.name || `${club.role === 'head' ? club.committee + ' head' : 'Club representative'}`,
-      role: club.role, clubId: Number(club.clubId)
-    };
-  }
-  return null;
+  if (req.speakerRequester) return req.speakerRequester;
+  if (req.query?.as === 'student' || req.body?.requesterType === 'student') return null;
+  return require('./services/speaker-manager-access').speakerManagerIdentity(await getClubAccountFromRequest(req, res));
 }
+
+const requireSpeakerManager = require('./services/speaker-manager-access').createSpeakerManagerGuard({
+  getClubAccountFromRequest, getStudentAccountFromRequest, Club, requireLiveDatabase,
+  deny(req, res, status, message) {
+    if (req.path === '/speaker-request.html') return sendHttpErrorPage(res, status, 'Club Dashboard access required', message);
+    return res.status(status).json({ message });
+  }
+});
+app.get('/speaker-request.html', requireSpeakerManager, (req, res) => {
+  res.redirect(303, '/club-dashboard#speakerRequestDashboardPanel');
+});
 
 function publicSpeakerRequest(record) {
   const storedAttachments = Array.isArray(record.speakerAttachments) ? record.speakerAttachments : [];
@@ -1383,7 +1400,7 @@ function speakerInviteResponse(invite, token, reused) {
   };
 }
 
-app.post('/api/club/speaker-invites', requireClubAuth, async (req, res) => {
+app.post('/api/club/speaker-invites', requireClubAuth, requireSpeakerManager, async (req, res) => {
   if (!isSameOriginRequest(req)) return res.status(403).json({ message: 'Reload the page and try again.' });
   if (!['president', 'head'].includes(req.clubAccount?.role)) return res.status(403).json({ message: 'Only the club president or a committee head can create speaker invitation links.' });
   if (!requireLiveDatabase(res)) return;
@@ -1398,33 +1415,9 @@ app.post('/api/club/speaker-invites', requireClubAuth, async (req, res) => {
   }
 });
 
-app.get('/api/dean/speaker-invites/clubs', requireClubAuth, async (req, res) => {
-  if (req.clubAccount?.role !== 'dean') return res.status(403).json({ message: 'Only the Dean can create university speaker links.' });
-  if (!requireLiveDatabase(res)) return;
-  try {
-    const clubs = await Club.find({ archivedAt: null }).select('id name').sort({ name: 1 }).lean();
-    res.json(clubs.map(({ id, name }) => ({ id, name })));
-  } catch (error) {
-    console.error('Dean speaker invite clubs failed:', error.name);
-    res.status(503).json({ message: 'Could not load clubs for a speaker link.' });
-  }
-});
-
-app.post('/api/dean/speaker-invites', requireClubAuth, async (req, res) => {
-  if (req.clubAccount?.role !== 'dean') return res.status(403).json({ message: 'Only the Dean can create university speaker links.' });
-  if (!isSameOriginRequest(req)) return res.status(403).json({ message: 'Reload the page and try again.' });
-  if (!requireLiveDatabase(res)) return;
-  const clubId = Number(req.body?.clubId);
-  if (!Number.isSafeInteger(clubId) || clubId <= 0) return res.status(400).json({ message: 'Choose a hosting club.' });
-  try {
-    const club = await Club.findOne({ id: clubId, archivedAt: null }).select('id name').lean();
-    if (!club) return res.status(404).json({ message: 'The hosting club is not available.' });
-    const result = await getOrCreateStableSpeakerInvite(club, req.clubAccount, req.body?.rotate === true);
-    res.status(result.reused ? 200 : 201).json(speakerInviteResponse(result.invite, result.token, result.reused));
-  } catch (error) {
-    console.error('Dean speaker invitation creation failed:', error.name);
-    res.status(503).json({ message: error.message.includes('SPEAKER_INVITE_SECRET') ? error.message : 'Could not create a speaker invitation link.' });
-  }
+require('./services/staff-speaker-invites').registerStaffSpeakerInvites(app, {
+  requireClubAuth, requireLiveDatabase, isSameOriginRequest, Club,
+  getOrCreateStableSpeakerInvite, speakerInviteResponse
 });
 
 app.get('/api/public/speaker-invites/:token', async (req, res) => {
@@ -1453,7 +1446,9 @@ app.post('/api/public/speaker-invites/:token/submit', async (req, res) => {
     const validated = validatePublicSpeakerInvitePayload(req.body);
     if (validated.error) return res.status(400).json({ message: validated.error });
     if (!validated.value.speakerEmail) return res.status(400).json({ message: 'Provide an email address so the club can contact you and prevent duplicate requests.' });
-    const club = await Club.findOne({ id: invite.clubId, archivedAt: null }).select('id name').lean();
+    const club = invite.clubId === 0 && ['dean', 'supervisor'].includes(invite.createdByRole)
+      ? { id: 0, name: 'MIU' }
+      : await Club.findOne({ id: invite.clubId, archivedAt: null }).select('id name').lean();
     if (!club) return res.status(404).json({ message: 'The hosting club is no longer available.' });
     const activeRequesterKey = publicSpeakerDuplicateKey(club.id, validated.value.speakerEmail);
     if (await SpeakerRequest.exists({ activeRequesterKey })) return res.status(409).json({ message: 'You already have an active speaker request with this club.' });
@@ -1481,9 +1476,10 @@ app.post('/api/public/speaker-invites/:token/submit', async (req, res) => {
       requesterType: 'speaker', requesterId: `speaker:${validated.value.speakerEmail}`,
       requesterEmail: validated.value.speakerEmail, requesterRole: 'speaker',
       requesterName: validated.value.speakerName,
-      assignedHeadEmail: invite.createdByRole === 'dean' ? '' : invite.createdByEmail,
+      hostingType: club.id === 0 ? 'miu' : 'club',
+      assignedHeadEmail: ['president', 'head'].includes(invite.createdByRole) ? invite.createdByEmail : '',
       inviteId: invite._id,
-      cvPublicId: uploadedPublicId, cvFormat: materialFormat, cvName: materialName, speakerAttachments, status: 'pending_club', activeRequesterKey,
+      cvPublicId: uploadedPublicId, cvFormat: materialFormat, cvName: materialName, speakerAttachments, status: club.id === 0 ? 'pending_dean' : 'pending_club', activeRequesterKey,
       decisionHistory: [{ action: 'submitted', role: 'speaker', email: validated.value.speakerEmail }]
     });
     res.status(201).json({ message: 'Thank you for your interest! Your response has been submitted successfully. Our team will contact you soon.' });
@@ -1495,16 +1491,16 @@ app.post('/api/public/speaker-invites/:token/submit', async (req, res) => {
   }
 });
 
-app.get('/api/speaker-requests/context', async (req, res) => {
+app.get('/api/speaker-requests/context', requireSpeakerManager, async (req, res) => {
   if (!requireLiveDatabase(res)) return;
   try {
     const identity = await getSpeakerRequester(req, res);
-    if (!identity) return res.status(401).json({ message: 'Sign in as a student or club representative to request a speaker.' });
+    if (!identity) return res.status(401).json({ message: 'Sign in as an authorized club representative to request a speaker.' });
     const clubs = identity.type === 'student'
       ? await Club.find({ archivedAt: null }).select('id name').sort({ name: 1 }).lean()
       : [];
     const club = identity.type === 'club'
-      ? await Club.findOne({ id: identity.clubId, archivedAt: null }).select('id name').lean()
+      ? req.speakerClub || await Club.findOne({ id: identity.clubId, archivedAt: null }).select('id name').lean()
       : null;
     const clubRequestFilter = identity.role === 'head'
       ? { clubId: identity.clubId, $or: [{ assignedHeadEmail: { $in: ['', null] } }, { assignedHeadEmail: identity.email.toLowerCase() }] }
@@ -1519,13 +1515,13 @@ app.get('/api/speaker-requests/context', async (req, res) => {
   }
 });
 
-app.post('/api/speaker-requests/cv-upload', async (req, res) => {
+app.post('/api/speaker-requests/cv-upload', requireSpeakerManager, async (req, res) => {
   if (!isSameOriginRequest(req)) return res.status(403).json({ message: 'This upload request could not be verified. Reload and try again.' });
   if (!requireLiveDatabase(res)) return;
   if (!cloudinaryConfigured) return res.status(503).json({ message: 'Private CV uploads are unavailable because file storage is not configured.' });
   try {
     const identity = await getSpeakerRequester(req, res);
-    if (!identity) return res.status(401).json({ message: 'Sign in as a student or club representative before uploading a CV.' });
+    if (!identity) return res.status(401).json({ message: 'Sign in as an authorized club representative before uploading a CV.' });
     const clubId = identity.type === 'club' ? identity.clubId : 0;
     const ownerKey = requesterKey(identity, clubId);
     const attempts = (speakerUploadAttempts.get(ownerKey) || []).filter((time) => Date.now() - time < 10 * 60 * 1000);
@@ -1561,7 +1557,7 @@ app.post('/api/speaker-requests/cv-upload', async (req, res) => {
   }
 });
 
-app.get('/api/speaker-requests', async (req, res) => {
+app.get('/api/speaker-requests', requireSpeakerManager, async (req, res) => {
   if (!requireLiveDatabase(res)) return;
   try {
     const identity = await getSpeakerRequester(req, res);
@@ -1579,12 +1575,12 @@ app.get('/api/speaker-requests', async (req, res) => {
   }
 });
 
-app.post('/api/speaker-requests', async (req, res) => {
+app.post('/api/speaker-requests', requireSpeakerManager, async (req, res) => {
   if (!isSameOriginRequest(req)) return res.status(403).json({ message: 'This form submission could not be verified. Reload and try again.' });
   if (!requireLiveDatabase(res)) return;
   try {
     const identity = await getSpeakerRequester(req, res);
-    if (!identity) return res.status(401).json({ message: 'Sign in as a student or club representative to submit this request.' });
+    if (!identity) return res.status(401).json({ message: 'Sign in as an authorized club representative to submit this request.' });
     const validated = validateSpeakerPayload(req.body);
     if (validated.error) return res.status(400).json({ message: validated.error });
     const hosting = resolveSpeakerHosting(identity, req.body);
@@ -1593,7 +1589,7 @@ app.post('/api/speaker-requests', async (req, res) => {
     }
     const { hostingType, clubId } = hosting;
     const club = hostingType === 'miu' ? { id: 0, name: 'MIU (Official University)' }
-      : await Club.findOne({ id: clubId, archivedAt: null }).select('id name').lean();
+      : req.speakerClub || await Club.findOne({ id: clubId, archivedAt: null }).select('id name').lean();
     if (!club) return res.status(404).json({ message: 'The selected club was not found.' });
     const activeRequesterKey = requesterKey(identity, clubId);
     if (await SpeakerRequest.exists({ activeRequesterKey })) {
@@ -1651,7 +1647,7 @@ app.post('/api/club/speaker-requests/:id/decision', requireClubAuth, async (req,
   }
 });
 
-app.patch('/api/speaker-requests/:id/resubmit', async (req, res) => {
+app.patch('/api/speaker-requests/:id/resubmit', requireSpeakerManager, async (req, res) => {
   if (!isSameOriginRequest(req)) return res.status(403).json({ message: 'This form submission could not be verified. Reload and try again.' });
   if (!requireLiveDatabase(res)) return;
   try {
@@ -1704,14 +1700,14 @@ app.get('/api/speaker-requests/:id/cv', async (req, res) => {
   if (!cloudinaryConfigured) return res.status(503).json({ message: 'Private CV storage is temporarily unavailable.' });
   try {
     const identity = await getSpeakerRequester(req, res);
-    const committee = await getClubAccountFromRequest(req);
+    const committee = await getClubAccountFromRequest(req, res);
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ message: 'Speaker request not found.' });
     const record = await SpeakerRequest.findById(req.params.id).lean();
     if (!record) return res.status(404).json({ message: 'Speaker request not found.' });
     const owner = identity && (record.requesterType === 'student' && identity.type === 'student' && record.requesterId === identity.id
       || identity.type === 'club' && ['president', 'head'].includes(identity.role) && Number(record.clubId) === identity.clubId
         && (identity.role === 'president' || !record.assignedHeadEmail || record.assignedHeadEmail.toLowerCase() === identity.email.toLowerCase()));
-    const dean = committee?.role === 'dean' && Boolean(record.clubReviewedAt)
+    const dean = committee?.role === 'dean' && (record.hostingType === 'miu' || Boolean(record.clubReviewedAt))
       && canReviewSpeakerRequest(committee.role, record.requesterEmail, committee.email);
     const supervisor = committee?.role === 'supervisor' && require('./services/supervisor-dashboard').assignedIds(committee).includes(Number(record.clubId));
     if (!owner && !dean && !supervisor) return res.status(403).json({ message: 'You do not have access to this attachment.' });
@@ -1736,7 +1732,7 @@ app.get('/api/dean/speaker-requests', requireClubAuth, async (req, res) => {
   try {
     const records = await SpeakerRequest.find({ $or: [
       { status: 'pending_dean' },
-      { status: { $in: ['approved', 'rejected', 'changes_requested'] }, reviewerRole: 'dean', clubReviewedAt: { $ne: null } }
+      { status: { $in: ['approved', 'rejected', 'changes_requested'] }, reviewerRole: 'dean', $or: [{ hostingType: 'miu' }, { clubReviewedAt: { $ne: null } }] }
     ] }).sort({ submittedAt: -1 }).lean();
     records.sort((left, right) => Number(right.status === 'pending_dean') - Number(left.status === 'pending_dean'));
     res.json(records.map((record) => ({ ...publicSpeakerRequest(record), requesterType: record.requesterType, requesterEmail: record.requesterEmail })));
@@ -1790,7 +1786,7 @@ function isSameOriginRequest(req) {
 async function verifyGoogleRequest(req, res) {
   const nonce = requestCookie(req, 'miu_google_nonce');
   clearGoogleNonceCookie(req, res);
-  if (!nonce || !/^[A-Za-z0-9_-]{32}$/.test(nonce)) throw new Error('GOOGLE_CREDENTIAL_INVALID');
+  if (!nonce || !/^[A-Za-z0-9_-]{32}$/.test(nonce)) throw Object.assign(new Error('GOOGLE_CREDENTIAL_INVALID'), { reason: 'nonce_missing' });
   const clientId = String(process.env.GOOGLE_CLIENT_ID || '').trim();
   return verifyGoogleStudentCredential({ credential: req.body?.credential, expectedNonce: nonce, clientId });
 }
@@ -2163,11 +2159,11 @@ app.post('/api/clubs/:id/view', (req, res) => {
 
 app.get('/api/admin/session', async (req, res) => {
   try {
-    const delegatedAdmin = await isSoftwareDevelopmentSession(req);
+    const delegatedAdmin = await isSoftwareDevelopmentSession(req, res);
     res.json({
       configured: hasAdminPassword() || delegatedAdmin,
       localSetupAllowed: !httpSecurity.production(process.env) && !hasAdminPassword() && process.env.ALLOW_LOCAL_ADMIN_SETUP === 'true' && isLoopbackRequest(req),
-      authenticated: delegatedAdmin || (hasAdminPassword() && await isAdminSessionValid(req))
+      authenticated: delegatedAdmin || (hasAdminPassword() && await isAdminSessionValid(req, res))
     });
   } catch (error) {
     console.error('Admin session validation failed:', error.name);
@@ -2202,9 +2198,9 @@ require('./services/account-photo').registerAccountPhotoRoutes(app, {
   getEmail: async (req, res) => {
     const student = await getStudentAccountFromRequest(req, res);
     if (student) return student.email;
-    const staff = await getClubAccountFromRequest(req);
+    const staff = await getClubAccountFromRequest(req, res);
     if (staff) return staff.email;
-    return await isAdminSessionValid(req) ? getConfiguredAdminEmail() : '';
+    return await isAdminSessionValid(req, res) ? getConfiguredAdminEmail() : '';
   }
 });
 
@@ -2215,12 +2211,12 @@ app.get('/api/site/account-session', async (req, res) => {
     // student identity as the primary account in the profile menu.
     const studentAccount = await getStudentAccountFromRequest(req, res, false);
     if (studentAccount) {
-      const signedStaff = await getClubAccountFromRequest(req);
+      const signedStaff = await getClubAccountFromRequest(req, res);
       const staffDashboards = signedStaff ? getStaffDashboardOptions(signedStaff) : [];
-      return res.json({ authenticated: true, type: 'student', role: 'student', name: studentAccount.name || '', email: studentAccount.email || '', dashboards: staffDashboards });
+      return res.json({ authenticated: true, type: 'student', role: 'student', name: studentAccount.name || '', email: studentAccount.email || '', hasStudentDashboard: true, dashboards: staffDashboards });
     }
-    const signedStaff = await getClubAccountFromRequest(req);
-    if (!signedStaff && await isAdminSessionValid(req)) {
+    const signedStaff = await getClubAccountFromRequest(req, res);
+    if (!signedStaff && await isAdminSessionValid(req, res)) {
       const configuredEmail = getConfiguredAdminEmail();
       const staff = mongoReady && configuredEmail
         ? await ClubAccount.findOne({ email: configuredEmail }).read('primary').readConcern('majority').lean()
@@ -2236,7 +2232,10 @@ app.get('/api/site/account-session', async (req, res) => {
         authenticated: true,
         type: 'club',
         role: clubAccount.role,
+        clubId: clubAccount.clubId,
+        committee: clubAccount.committee || '',
         email: clubAccount.email || '',
+        hasStudentDashboard: Boolean(await StudentAccount.exists({ email: clubAccount.email }).catch(() => null)),
         name: ['pr', 'english', 'security', 'sso', 'dean'].includes(clubAccount.role)
           ? `${committeeRoleLabels[clubAccount.role] || clubAccount.role} Dashboard`
           : club?.name || '',
@@ -2265,15 +2264,15 @@ const notifyClubOpening = require('./services/club-opening-notifications').creat
 app.get('/api/notifications/identity', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   try {
-    if (await isAdminSessionValid(req)) {
-      const staff = await getClubAccountFromRequest(req);
+    if (await isAdminSessionValid(req, res)) {
+      const staff = await getClubAccountFromRequest(req, res);
       if (staff?.role === 'software_development') return res.json({ externalId: clubExternalId(staff), emailNotificationsEnabled: false, emailSupported: false });
       const email = getConfiguredAdminEmail();
       if (!email) return res.status(503).json({ message: 'Admin notification identity is temporarily unavailable.' });
       return res.json({ externalId: `admin-account:${crypto.createHash('sha256').update(email.toLowerCase()).digest('hex')}`,
         emailNotificationsEnabled: false, emailSupported: false });
     }
-    const club = await getClubAccountFromRequest(req);
+    const club = await getClubAccountFromRequest(req, res);
     if (club?._id) return res.json({ externalId: clubExternalId(club), emailNotificationsEnabled: false, emailSupported: false });
     const student = await getStudentAccountFromRequest(req, res);
     if (!student) return res.status(401).json({ message: 'Sign in to enable notifications.' });
@@ -2391,7 +2390,7 @@ async function dispatchSpeakerRequestStatusPush(request) {
     const parsedBase = new URL(configuredBaseUrl);
     const isLoopback = ['localhost', '127.0.0.1'].includes(parsedBase.hostname);
     if (parsedBase.protocol !== 'https:' && !(isLoopback && parsedBase.protocol === 'http:')) throw new Error('INVALID_ORIGIN');
-    notificationUrl = new URL('/speaker-request.html?as=student', parsedBase).toString();
+    notificationUrl = new URL('/', parsedBase).toString();
   } catch {
     return;
   }
@@ -2543,7 +2542,7 @@ app.post('/api/events/:clubId/:eventIndex/view', async (req, res) => {
 app.get('/api/club-auth/session', async (req, res) => {
   let account;
   try {
-    account = await getClubAccountFromRequest(req);
+    account = await getClubAccountFromRequest(req, res);
   } catch (error) {
     console.error('Club session validation failed:', error.name);
     return res.status(503).json({ message: 'Club access is temporarily unavailable.' });
@@ -2585,13 +2584,21 @@ app.post('/api/club-auth/switch-dashboard', async (req, res) => {
   if (!isSameOriginRequest(req)) return res.status(403).json({ message: 'Reload and try again.' });
   if (!mongoReady) return res.status(503).json({ message: 'Dashboard access is temporarily unavailable.' });
   try {
-    let account = await getClubAccountFromRequest(req);
-    if (!account && await isAdminSessionValid(req)) {
+    let account = await getClubAccountFromRequest(req, res);
+    if (!account && await isAdminSessionValid(req, res)) {
       const email = getConfiguredAdminEmail();
       if (email) account = await ClubAccount.findOne({ email }).read('primary').readConcern('majority').lean();
     }
     if (!account) return res.status(401).json({ message: 'Sign in to switch dashboards.' });
-    const assignment = getStaffDashboardOptions(account).find(item => item.role === req.body?.role);
+    if (req.body?.role === 'student') {
+      const studentAccount = await StudentAccount.findOne({ email: account.email }).read('primary').readConcern('majority').lean();
+      if (!studentAccount) return res.status(403).json({ message: 'A student dashboard is not linked to this account.' });
+      setStudentSessionCookie(req, res, studentAccount);
+      return res.json({ redirect: '/?myForms=1', role: 'student' });
+    }
+    const assignment = getStaffDashboardOptions(account).find(item => item.role === req.body?.role
+      && (req.body?.clubId === undefined || item.clubId === Number(req.body.clubId))
+      && (req.body?.committee === undefined || item.committee === String(req.body.committee || '')));
     if (!assignment) return res.status(403).json({ message: 'This dashboard is not assigned to your account.' });
     setClubSessionCookie(req, res, account, assignment);
     return res.json({ redirect: assignment.href, role: assignment.role });
@@ -3174,7 +3181,7 @@ async function requireAttendanceTaskAuth(req, res, next) {
   try {
     const student = await getStudentAccountFromRequest(req, res);
     if (student) { req.attendanceTaskAccount = student; return next(); }
-    const staff = await getClubAccountFromRequest(req);
+    const staff = await getClubAccountFromRequest(req, res);
     if (staff) { req.attendanceTaskAccount = staff; return next(); }
     return res.status(401).json({ message: 'Sign in to the student or staff account assigned to this task.' });
   } catch { return res.status(503).json({ message: 'Could not verify the account assigned to this task.' }); }
@@ -3881,9 +3888,9 @@ function canManageAttendance(account) {
 
 async function requireAttendanceSessionManager(req, res, next) {
   try {
-    const account = await getClubAccountFromRequest(req);
+    const account = await getClubAccountFromRequest(req, res);
     if (account) { req.clubAccount = account; return next(); }
-    if (isAdminSessionValid(req)) {
+    if (isAdminSessionValid(req, res)) {
       req.clubAccount = { role: 'admin', email: adminAuthState?.email || getConfiguredAdminEmail() || '' };
       return next();
     }
@@ -4369,37 +4376,45 @@ async function getClubMemberDirectory() {
 }
 
 app.post('/api/club/members', requireClubAuth, requireClubPresident, async (req, res) => {
-  const name = cleanText(req.body.name, 120);
-  const email = cleanText(req.body.email, 254).toLowerCase();
-  const requestedCommittee = cleanText(req.body.committee, 100);
-  const position = cleanText(req.body.position, 100);
-  const memberType = req.body.memberType;
-  const committee = clubAccounts.find((account) => account.clubId === req.clubAccount.clubId
-    && account.role === 'head' && account.committee
-    && account.committee.toLowerCase() === requestedCommittee.toLowerCase())?.committee;
-
-  if (!name) return res.status(400).json({ message: 'Enter the member name.' });
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(422).json({ message: 'Enter a valid member email.' });
-  if (!committee) return res.status(400).json({ message: 'Choose a committee managed by a committee head.' });
-  if (!position) return res.status(400).json({ message: 'Enter the member position.' });
-  if (!['new', 'senior'].includes(memberType)) return res.status(400).json({ message: 'Choose New member or Senior member.' });
-
+  const committees = [...new Set(clubAccounts.filter((account) => account.clubId === req.clubAccount.clubId
+    && account.role === 'head' && account.committee)
+    .map((account) => account.committee.trim()))];
   const club = clubs.find((item) => item.id === req.clubAccount.clubId);
   if (!club) return res.status(404).json({ message: 'Club not found.' });
-  const member = { id: crypto.randomBytes(16).toString('hex'), name, email, committee, position, memberType, createdAt: new Date().toISOString() };
   try {
     if (!requireLiveDatabase(res)) return;
+    const persistedClub = await Club.findOne({ id: req.clubAccount.clubId }).select('interviewForms').read('primary').readConcern('majority').lean();
+    if (!persistedClub) return res.status(404).json({ message: 'Club not found.' });
+    const interviewScope = getInterviewFormScope(req.clubAccount);
+    const interviewSections = getInterviewFormSections(persistedClub.interviewForms, interviewScope);
+    const questions = interviewSections.flatMap((section) => section.questions || []);
+    let memberDetails;
+    try {
+      memberDetails = require('./services/club-member-intake').validateDirectMember(
+        req.body || {}, committees, questions, require('./services/club-questions').validateAnswers
+      );
+    } catch (error) { return res.status(400).json({ message: error.message }); }
+    const existingRosterMember = await Club.exists({ id: req.clubAccount.clubId, 'memberRoster.email': memberDetails.email });
+    const existingAcceptedApplication = await Application.exists({ clubId: req.clubAccount.clubId, email: memberDetails.email, status: 'accepted' });
+    if (existingRosterMember || existingAcceptedApplication) return res.status(409).json({ message: 'This person is already listed as a member of the club.' });
+    const member = { id: crypto.randomBytes(16).toString('hex'), ...memberDetails, createdAt: new Date().toISOString() };
     const savedClub = await Club.findOneAndUpdate(
-      { id: req.clubAccount.clubId },
+      { id: req.clubAccount.clubId, 'memberRoster.email': { $ne: member.email } },
       { $push: { memberRoster: member }, $inc: { members: 1 } },
       { new: true, runValidators: true }
-    ).select('id memberRoster');
-    if (!savedClub) return res.status(404).json({ message: 'Club not found.' });
+    ).select('id members memberRoster');
+    if (!savedClub) {
+      const clubStillExists = await Club.exists({ id: req.clubAccount.clubId });
+      return clubStillExists
+        ? res.status(409).json({ message: 'This person is already listed as a member of the club.' })
+        : res.status(404).json({ message: 'Club not found.' });
+    }
     const savedMember = savedClub.memberRoster?.find((item) => item.id === member.id);
-    if (!savedMember || (email && savedMember.email !== email)) return res.status(503).json({ message: 'The member was not confirmed in the database. Please retry.' });
-    club.members = (Number(club.members) || 0) + 1;
+    if (!savedMember || savedMember.email !== member.email || savedMember.universityId !== member.universityId
+      || savedMember.interviewAnswers?.length !== member.interviewAnswers.length) return res.status(503).json({ message: 'The member was not confirmed in the database. Please retry.' });
+    club.members = Number(savedClub.members) || (Number(club.members) || 0) + 1;
     club.memberRoster = [...(club.memberRoster || []), member];
-    res.status(201).json({ member, totalCount: club.members });
+    res.status(201).json({ member: savedMember.toObject ? savedMember.toObject() : member, totalCount: club.members });
   } catch (error) {
     console.error('Database operation failed:', error.name);
     res.status(503).json({ message: 'Could not add this member right now.' });
@@ -5763,7 +5778,15 @@ app.post('/api/student-auth/google', async (req, res) => {
       return res.status(503).json({ message: 'Google sign-in is temporarily unavailable.' });
     }
     if (await countLoginSourceFailure(req, res)) return;
-    res.status(401).json({ message: 'Use a verified Google account from the MIU university domain.' });
+    const messages = {
+      nonce_missing: 'This Google check expired. Reload the page and try again.',
+      nonce_mismatch: 'Google returned a different sign-in check. Reload the page and try again.',
+      miu_domain_mismatch: 'Choose your MIU Google Workspace account ending in @miuegypt.edu.eg.',
+      email_unverified: 'Google did not confirm this email address. Verify it in your MIU Google account and try again.',
+      client_not_configured: 'Google sign-in is not configured correctly on this site. Contact the site administrator.',
+      token_rejected: 'Google could not verify this sign-in. Reload and try again; if it continues, the site administrator should check the Google OAuth client ID.'
+    };
+    res.status(401).json({ message: messages[error.reason] || 'Use a verified Google account from the MIU university domain.' });
   }
 });
 
@@ -5775,7 +5798,7 @@ app.post('/api/student-auth/google/link', requireStudentAuth, async (req, res) =
   try {
     const identity = await verifyGoogleRequest(req, res);
     if (identity.email !== String(req.studentAccount.email || '').toLowerCase()) {
-      return res.status(403).json({ message: 'The Google account email must match the signed-in student account.' });
+      return res.status(403).json({ message: `The Google account you chose (${identity.email}) does not match the signed-in student account (${String(req.studentAccount.email || '').toLowerCase()}). Choose the matching MIU account.` });
     }
     const subjectOwner = await StudentAccount.findOne({ googleSub: identity.googleSub }).select('email').lean();
     const linkDecision = decideGoogleLink({
@@ -5807,7 +5830,15 @@ app.post('/api/student-auth/google/link', requireStudentAuth, async (req, res) =
       return res.status(503).json({ message: 'Google account linking is temporarily unavailable.' });
     }
     if (await countLoginSourceFailure(req, res)) return;
-    return res.status(401).json({ message: 'Google could not verify this MIU account. Try again with your university Google account.' });
+    const messages = {
+      nonce_missing: 'This Google check expired. A fresh check is being prepared; try again.',
+      nonce_mismatch: 'This Google check did not match. A fresh check is being prepared; try again.',
+      miu_domain_mismatch: 'Google selected an account outside MIU Workspace. Choose the MIU account ending in @miuegypt.edu.eg.',
+      email_unverified: 'Google did not confirm this email address. Verify your MIU account and try again.',
+      client_not_configured: 'Google sign-in is not configured correctly on this site. Contact the site administrator.',
+      token_rejected: 'Google could not verify this sign-in. Try again; if it continues, the site administrator should check the Google OAuth client ID.'
+    };
+    return res.status(401).json({ message: messages[error.reason] || 'Google could not verify this MIU account. Try again with your university Google account.' });
   }
 });
 
@@ -6389,9 +6420,9 @@ require('./services/report-downloads').registerReportDownloads(app, {
   Club, UniversityContent, ContentRequest, AttendanceRecord, AttendanceSession, EventRegistration, StudentAccount,
   databaseReady: () => mongoReady,
   getAccount: async req => {
-    const account = await getClubAccountFromRequest(req);
+    const account = await getClubAccountFromRequest(req, res);
     if (account) return account.role === 'software_development' ? { role: 'admin' } : account;
-    return await isAdminSessionValid(req) ? { role: 'admin' } : null;
+    return await isAdminSessionValid(req, res) ? { role: 'admin' } : null;
   }
 });
 require('./services/event-reports').registerEventReports(app, {
@@ -7049,26 +7080,10 @@ app.put('/api/admin/homepage', async (req, res) => {
 
 app.post('/api/admin/clubs', async (req, res) => {
   let nextId;
-  const email = typeof req.body.clubLoginEmail === 'string' ? req.body.clubLoginEmail.trim().toLowerCase() : '';
-  const password = req.body.clubInitialPassword;
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return res.status(400).json({ message: 'Enter a valid Club Login Email.' });
-  }
-  if (typeof password !== 'string' || password.length < 12 || password.length > 200) {
-    return res.status(400).json({ message: 'Use an Initial Password between 12 and 200 characters.' });
-  }
-  if (emailMatches(email)) {
-    return res.status(409).json({ message: 'This email is already associated with an account.' });
-  }
-  try {
-    const existingAccount = mongoReady
-      ? await ClubAccount.findOne({ email }).select('_id').lean()
-      : clubAccounts.find((account) => account.email === email);
-    if (existingAccount || mongoReady && await StudentAccount.exists({ email })) return res.status(409).json({ message: 'This email is already associated with an account.' });
-  } catch (error) {
-    console.error('Club account validation failed:', error.name);
-    return res.status(503).json({ message: 'The data store is temporarily unavailable.' });
-  }
+  const { validateNewClubEmails, assignNewClubRole } = require('./services/new-club-accounts');
+  const validatedEmails = validateNewClubEmails(req.body, emailMatches);
+  if (validatedEmails.error) return res.status(400).json({ message: validatedEmails.error });
+  const { presidentEmail, supervisorEmail } = validatedEmails;
 
   if (!requireLiveDatabase(res)) return;
   let club;
@@ -7080,21 +7095,13 @@ app.post('/api/admin/clubs', async (req, res) => {
       return res.status(400).json({ message: 'Complete the required fields and upload a valid image.' });
     }
     if (club.status === 'open') club.applicationCycleStartedAt = new Date();
-    const salt = crypto.randomBytes(16).toString('hex');
-    const account = {
-      clubId: nextId,
-      email,
-      salt,
-      passwordHash: crypto.scryptSync(password, salt, 64).toString('hex'),
-      sessionVersion: 0,
-      role: 'president',
-      committee: ''
-    };
+    const savedAccounts = [];
     const session = await mongoose.startSession();
     try {
       session.startTransaction();
       await Club.create([club], { session });
-      await ClubAccount.create([account], { session });
+      savedAccounts.push(await assignNewClubRole({ ClubAccount, session, email: presidentEmail, clubId: nextId, role: 'president' }));
+      if (supervisorEmail) savedAccounts.push(await assignNewClubRole({ ClubAccount, session, email: supervisorEmail, clubId: nextId, role: 'supervisor' }));
       await session.commitTransaction();
     } catch (error) {
       await session.abortTransaction().catch(() => {});
@@ -7103,7 +7110,10 @@ app.post('/api/admin/clubs', async (req, res) => {
       await session.endSession();
     }
     clubs.push(club);
-    clubAccounts.push(account);
+    for (const account of savedAccounts) {
+      const index = clubAccounts.findIndex(item => item.email === account.email);
+      if (index >= 0) clubAccounts[index] = account; else clubAccounts.push(account);
+    }
     try {
       writePrivateClubAccountsFile();
     } catch (error) {
@@ -7114,6 +7124,7 @@ app.post('/api/admin/clubs', async (req, res) => {
   } catch (error) {
     if (club) await removeClubImage(club);
     console.error('Database operation failed:', error.name);
+    if (error.status === 409) return res.status(409).json({ message: error.message });
     if (error.code === 11000) {
       return res.status(409).json({ message: 'This email is already associated with an account.' });
     }

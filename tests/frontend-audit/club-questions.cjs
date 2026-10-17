@@ -20,6 +20,10 @@ registerClubQuestions(app, {
   getInterviewFormScope: () => '__president__', getInterviewFormSections: (forms, scope) => (forms.find(f => f.scope === scope) || forms.find(f => f.scope === '__president__'))?.sections || []
 });
 app.get('/api/club-auth/session', (_req, res) => res.json({ authenticated: true, club: { ...club, clubId: 1, role, committee: 'IT', email: 'fixture@example.test' } }));
+app.get('/api/speaker-requests/context', (_req, res) => {
+  if (!['president', 'head'].includes(role)) return res.status(403).json({ message: 'Club manager access required' });
+  res.json({ identity: { type: 'club', role, clubId: 1, name: 'Fixture manager', email: 'fixture@example.test' }, club: { id: 1, name: club.name }, requests: [] });
+});
 app.get('/api/site/account-session', (_req, res) => res.json({ authenticated: true, type: 'club', role, name: 'Fixture', email: 'fixture@example.test', dashboards: [] }));
 app.get('/api/clubs', (_req, res) => res.json([club]));
 app.get('/api/clubs/:id/application-committees', (_req, res) => res.json(['IT', 'PR'].map(committee => ({ committee, label: committee, selectable: true }))));
@@ -61,6 +65,9 @@ async function screenshot(name) { await until("!document.documentElement.classLi
   role = 'head';
   await cdp.send('Page.reload');
   await until("state.clubAccount?.role === 'head' && !document.getElementById('savePresidentApplicationFormBtn').disabled");
+  await until("!document.getElementById('speakerContent').hidden");
+  assert.equal(await cdp.evaluate("[...document.querySelectorAll('[data-speaker-manager-only]')].every(element=>!element.classList.contains('hidden'))"), true);
+  assert.equal(await cdp.evaluate("document.querySelectorAll('#myFormsView a[href*=\"speaker-request\"]').length"), 0, 'Student navigation has no Speaker Request entry');
   await cdp.evaluate("setPresidentDashboardSection('presidentFormManager'); document.getElementById('addPresidentApplicationFieldBtn').click(); const input=document.querySelector('[data-president-property=label]'); input.value='IT question'; input.dispatchEvent(new Event('input',{bubbles:true})); document.getElementById('presidentFormEditor').requestSubmit()");
   await until("document.getElementById('presidentFormFeedback').textContent.includes('Application form saved')");
   assert.equal(club.applicationFields.find(q => q.committee === 'IT').label, 'IT question');
@@ -92,6 +99,9 @@ async function screenshot(name) { await until("!document.documentElement.classLi
   await until("state.clubAccount?.role === 'vice_president' && !document.getElementById('savePresidentApplicationFormBtn').disabled");
   await cdp.evaluate("setPresidentDashboardSection('presidentFormManager')");
   assert.equal(await cdp.evaluate("document.getElementById('applicationQuestionScope').disabled"), false);
+  assert.equal(await cdp.evaluate("[...document.querySelectorAll('[data-speaker-manager-only]')].every(element=>element.classList.contains('hidden'))"), true, 'Vice President has no speaker tools without explicit permission');
+  await cdp.evaluate("setPresidentDashboardSection('speakerRequestDashboardPanel')");
+  assert.equal(await cdp.evaluate("document.getElementById('speakerRequestDashboardPanel').classList.contains('hidden')"), true, 'Manually selecting a forbidden section does not expose the form');
   assert.deepEqual(cdp.events.filter(e => e.method === 'Runtime.exceptionThrown'), []);
   console.log('PASS: browser application CRUD/reload, committee isolation, dynamic public questions, interview CRUD, Head/President/Vice President access, mobile screenshots, no JavaScript exceptions.');
 })().catch(async error => { console.error(error); if (cdp) console.log(await cdp.evaluate('JSON.stringify({feedback: document.getElementById("applicationFeedback")?.textContent, ready: state.applicationQuestionsReady, selected: state.selectedClub?.id, clubIds: state.clubs.map(c=>c.id)})')); process.exitCode = 1; }).finally(() => { cdp?.socket.close(); browser?.kill(); server.close(); });

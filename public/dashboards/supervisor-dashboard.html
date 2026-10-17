@@ -12,11 +12,13 @@
   <link rel="stylesheet" href="/assets/css/pages/supervisor-dashboard.css?v=20261014mobile-drawer1">
   <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/pics/pwa-icon-192.png?v=20261013favicon1">
   <script src="/assets/js/theme.js?v=20261009c" defer></script>
-    <script src="/assets/js/layout.js?v=20261015mainadmin1" defer></script>
-  <script src="/assets/js/supervisor-dashboard.js?v=20261015feedvideo1" defer></script>
+    <script src="/assets/js/layout.js?v=20261017myaccountroute1" defer></script>
+  <script src="/assets/js/supervisor-dashboard.js?v=20261017miuinvites1" defer></script>
   <link rel="stylesheet" href="/assets/css/modal-controls.css?v=20261015mainadmin1">
   <link rel="stylesheet" href="/assets/css/pages/event-reports.css?v=20261014mobileoptions1">
   <script src="/assets/js/feed-media.js?v=20261015videopopup1"></script>
+<link rel="stylesheet" href="/assets/css/pages/speaker-requests.css?v=20261014mobilefit1">
+<script src="/assets/js/supervisor-speaker-invitations.js?v=20261017miuinvites1" defer></script>
 </head>
 <body>
   <div id="site-header"></div>
@@ -31,6 +33,7 @@
       <select id="supervisorClub" disabled><option>Loading clubs&</option></select>
       <button class="committee-sidebar-link" data-panel="events">Events</button>
       <button class="committee-sidebar-link" data-panel="requests">Club requests</button>
+      <button class="committee-sidebar-link" data-panel="speakerInvite">Create speaker link</button>
       <button class="committee-sidebar-link" data-panel="speakers">External speaker requests</button>
       <button class="committee-sidebar-link" data-panel="reports">Activity reports</button>
       <button class="committee-sidebar-link" data-panel="miuAttendance">MIU event attendance</button>
@@ -39,6 +42,21 @@
       <div class="committee-top"><div><span class="committee-label">CLUB SUPERVISION</span><h1 id="supervisorTitle">Supervisor dashboard</h1></div>
         <button class="secondary-btn" id="supervisorRefresh" type="button">Refresh</button></div>
       <p id="supervisorFeedback" role="status" aria-live="polite">Loading assigned clubs&</p>
+                <div id="deanSpeakerInvitePanel" class="speaker-panel" hidden>
+            <span class="committee-label">SPEAKER INVITATIONS</span><h2 id="deanSpeakerInviteTitle">Create a speaker form link</h2>
+            <p class="speaker-help">Choose MIU or the hosting club, then share its permanent link or QR code with the speaker.</p>
+            <div class="speaker-form-actions">
+              <label class="speaker-invite-club-select">Hosting organization<select id="deanSpeakerInviteClub" required><option value="">Choose a club</option></select></label>
+              <button id="deanGenerateSpeakerInvite" class="primary-btn" type="button">Generate link and QR</button>
+            </div>
+            <p id="deanSpeakerInviteMessage" class="speaker-message" role="status" aria-live="polite"></p>
+            <div id="deanSpeakerInviteResult" class="speaker-invite-result" hidden>
+              <label>Permanent speaker form link<input id="deanSpeakerInviteUrl" type="url" readonly></label>
+              <div class="speaker-form-actions"><button id="deanCopySpeakerInvite" class="secondary-btn" type="button">Copy link</button><button id="deanDownloadSpeakerInviteQr" class="secondary-btn" type="button">Download QR</button><button id="deanRotateSpeakerInvite" class="secondary-btn" type="button">Revoke and create a new link</button></div>
+              <div id="deanSpeakerInviteQr" class="speaker-invite-qr" aria-label="QR code for speaker form link"></div>
+            </div>
+          </div>
+
       <div id="supervisorContent" aria-busy="true"></div>
     </section>
   </main>

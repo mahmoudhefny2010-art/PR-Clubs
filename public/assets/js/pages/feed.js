@@ -70,7 +70,7 @@
       return;
     }
     status.hidden = true;
-    list.innerHTML = visible.map((entry) => {
+    list.innerHTML = visible.map((entry, visibleIndex) => {
       const { club, item } = entry;
       const interaction = entry.university ? window.studentFeedbackForm('university', item.id, item.interaction, item.question, item.options) : '';
       const title = String(item.title || '').trim();
@@ -85,7 +85,7 @@
         return `<article class="feed-post-card">
           <header class="feed-timeline-header">${avatar}<span class="feed-timeline-meta"><span class="feed-timeline-club">${escapeHtml(club.name || '')}</span>${dateText}</span><span class="feed-post-type type-event">${escapeHtml(entry.label)}</span></header>
           <div class="feed-timeline-body"><h2 class="feed-timeline-title">${escapeHtml(title)}</h2>${meta ? `<p class="feed-timeline-date feed-event-meta">${escapeHtml(meta)}</p>` : ''}${item.attendanceEnabled === true ? '<p class="event-attendance-status">Attendance taken</p>' : ''}${image}
-            <div class="feed-event-footer">${message ? `<p class="feed-timeline-text">${escapeHtml(message)}</p>` : '<span></span>'}<a class="primary-btn feed-post-action" href="${entry.university ? `/pages/event.html?university=${encodeURIComponent(item.id)}` : `/pages/event.html?club=${encodeURIComponent(club.id)}&event=${encodeURIComponent(entry.index)}`}">View event details</a></div>
+            <div class="feed-event-footer">${message ? `<p class="feed-timeline-text">${escapeHtml(message)}</p>` : '<span></span>'}<button class="primary-btn feed-post-action" type="button" data-feed-event="${visibleIndex}" aria-haspopup="dialog">View event details</button></div>
           ${interaction}</div></article>`;
       }
         return `<article class="feed-post-card"${entry.university ? ` data-university-content-id="${escapeHtml(item.id)}"` : ''}>
@@ -93,6 +93,16 @@
         <div class="feed-timeline-body">${title ? `<h2 class="feed-timeline-title">${escapeHtml(title)}</h2>` : ''}${message ? `<p class="feed-timeline-text">${escapeHtml(message)}</p>` : ''}${image}${interaction}</div>
       </article>`;
     }).join('');
+    list.querySelectorAll('[data-feed-event]').forEach(button => button.addEventListener('click', async () => {
+      const entry = visible[Number(button.dataset.feedEvent)], item = entry.item, club = entry.club;
+      button.disabled = true;
+      try {
+        await window.openEventModal({ ...item, clubId: club.id, clubName: club.name, clubImage: club.image,
+          eventIndex: entry.index, university: entry.university === true, universityContentId: item.id });
+        button.textContent = 'View event details';
+      } catch (error) { button.textContent = error.message; }
+      finally { button.disabled = false; }
+    }));
     if (!requestedPostFocused && Number.isSafeInteger(requestedPost) && requestedPost > 0) {
       const requestedCard = list.querySelector(`[data-university-content-id="${requestedPost}"]`);
       if (requestedCard) {

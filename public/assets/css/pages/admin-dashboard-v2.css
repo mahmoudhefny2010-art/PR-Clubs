@@ -174,6 +174,10 @@ html.admin-v2-shell::-webkit-scrollbar, .admin-v2::-webkit-scrollbar,
 .admin-v2 .v2-header-actions { display: flex; align-items: center; gap: 8px; margin: 0; }
 .v2-header-icon { display: grid; place-items: center; width: 36px; height: 36px; padding: 8px; flex-shrink: 0; background: var(--bg-panel); color: var(--text-muted); border: 1px solid var(--border-color); border-radius: 10px; text-decoration: none; cursor: pointer; }
 .v2-header-icon svg { width: 17px; height: 17px; }.v2-header-icon:hover { background: var(--bg-soft); color: var(--primary-700); }
+.admin-v2 .v2-header-actions .site-theme-toggle { box-sizing: border-box; flex: 0 0 36px; width: 36px; height: 36px; min-width: 36px; min-height: 36px; padding: 8px; border-radius: 10px; }
+.admin-v2 .v2-header-actions .site-theme-toggle svg { width: 17px; height: 17px; }
+.admin-v2 .v2-header-actions .site-theme-toggle { box-sizing: border-box; flex: 0 0 36px; width: 36px; height: 36px; min-width: 36px; min-height: 36px; padding: 8px; border-radius: 10px; }
+.admin-v2 .v2-header-actions .site-theme-toggle svg { width: 17px; height: 17px; }
 :root[data-theme="dark"] .admin-v2 .v2-admin-logo { color: var(--text-main); }
 :root[data-theme="dark"] .admin-v2 .v2-header-icon { color: var(--text-muted); }
 :root[data-theme="dark"] .admin-v2 .v2-header-search { background: #0d1727; }

@@ -163,5 +163,62 @@ test('account session prefers student identity and labels software development a
   await handler({}, res);
   assert.equal(result.type, 'student');
   assert.equal(result.name, 'Mahmoud');
+  assert.equal(result.hasStudentDashboard, true);
   assert.deepEqual(result.dashboards.map(item => item.role), ['software_development']);
+});
+
+test('a club sign-in exposes the student dashboard only when a matching student account exists', async () => {
+  const source = fs.readFileSync(require.resolve('../server'), 'utf8');
+  const start = source.indexOf("app.get('/api/site/account-session',");
+  const end = source.indexOf("app.get('/api/notifications/config',", start);
+  let handler;
+  const staff = { email: identity.email, role: 'president', clubId: 8, committee: '' };
+  const context = {
+    app: { get: (_path, callback) => { handler = callback; } },
+    getStudentAccountFromRequest: async () => null,
+    getClubAccountFromRequest: async () => staff,
+    getStaffDashboardOptions: () => [{ role: 'president', clubId: 8 }],
+    StudentAccount: { exists: async filter => filter.email === identity.email },
+    isAdminSessionValid: async () => false, getConfiguredAdminEmail: () => '',
+    ClubAccount: { findOne: () => query(null) }, clubs: [{ id: 8, name: 'MUN' }], mongoReady: true, console
+  };
+  vm.createContext(context); vm.runInContext(source.slice(start, end), context);
+  const response = { setHeader() {}, status() { return this; }, json(value) { this.body = value; } };
+  await handler({}, response);
+  assert.equal(response.body.type, 'club');
+  assert.equal(response.body.hasStudentDashboard, true);
+  assert.equal(response.body.clubId, 8);
+});
+
+test('dashboard switching can open the linked student dashboard and selects the requested club assignment', async () => {
+  const source = fs.readFileSync(require.resolve('../server'), 'utf8');
+  const start = source.indexOf("app.post('/api/club-auth/switch-dashboard',");
+  const end = source.indexOf("app.post('/api/club-auth/logout',", start);
+  const assignments = [
+    { role: 'president', clubId: 3, committee: '', href: '/club-dashboard' },
+    { role: 'president', clubId: 8, committee: '', href: '/club-dashboard' },
+    { role: 'head', clubId: 8, committee: 'IT', href: '/club-dashboard' }
+  ];
+  const staff = { email: identity.email, role: 'president', clubId: 3 };
+  let handler; let studentCookie = false; let clubAssignment = null;
+  const context = {
+    app: { post: (_path, callback) => { handler = callback; } }, console,
+    isSameOriginRequest: () => true, mongoReady: true,
+    getClubAccountFromRequest: async () => staff, isAdminSessionValid: async () => false,
+    getStaffDashboardOptions: () => assignments,
+    StudentAccount: { findOne: () => query({ email: identity.email }) },
+    setStudentSessionCookie: () => { studentCookie = true; },
+    setClubSessionCookie: (_req, _res, _account, assignment) => { clubAssignment = assignment; }
+  };
+  vm.createContext(context); vm.runInContext(source.slice(start, end), context);
+  const invoke = async body => {
+    const response = { code: 200, setHeader() {}, status(code) { this.code = code; return this; }, json(value) { this.body = value; } };
+    await handler({ body }, response); return response;
+  };
+  const student = await invoke({ role: 'student' });
+  assert.equal(student.body.redirect, '/?myForms=1'); assert.equal(studentCookie, true);
+  const chosen = await invoke({ role: 'president', clubId: 8, committee: '' });
+  assert.equal(chosen.body.redirect, '/club-dashboard'); assert.equal(clubAssignment.clubId, 8);
+  const rejected = await invoke({ role: 'president', clubId: 99, committee: '' });
+  assert.equal(rejected.code, 403);
 });

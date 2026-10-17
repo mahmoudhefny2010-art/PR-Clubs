@@ -48,10 +48,11 @@ const student = { type: 'student', id: 'student-id', email: 'a@miuegypt.edu.eg' 
 assert.equal(requesterKey(student, 7), requesterKey(student, 7));
 assert.notEqual(requesterKey(student, 7), requesterKey(student, 8));
 assert.notEqual(requesterKey(student, 7), requesterKey({ ...student, id: 'other-student' }, 7));
-assert.deepEqual(resolveSpeakerHosting(student, { hostingType: 'miu' }), { hostingType: 'miu', clubId: 0 });
-assert.deepEqual(resolveSpeakerHosting(student, { clubId: '7' }), { hostingType: 'club', clubId: 7 });
+assert.equal(resolveSpeakerHosting(student, { hostingType: 'miu' }), null);
+assert.equal(resolveSpeakerHosting(student, { clubId: '7' }), null);
 assert.equal(resolveSpeakerHosting(student, { clubId: 'miu' }), null);
-assert.deepEqual(resolveSpeakerHosting({ type: 'club', clubId: 7 }, { hostingType: 'miu', clubId: 8 }), { hostingType: 'club', clubId: 7 });
+assert.equal(resolveSpeakerHosting({ type: 'club', clubId: 7 }, { hostingType: 'miu', clubId: 8 }), null);
+assert.deepEqual(resolveSpeakerHosting({ type: 'club', clubId: 7 }, { clubId: '7' }), { hostingType: 'club', clubId: 7 });
 assert.equal(speakerInviteTokenHash('a'.repeat(64)), speakerInviteTokenHash('a'.repeat(64)));
 assert.notEqual(speakerInviteTokenHash('a'.repeat(64)), speakerInviteTokenHash('b'.repeat(64)));
 assert.equal(publicSpeakerDuplicateKey(7, 'SPEAKER@example.edu'), publicSpeakerDuplicateKey(7, 'speaker@example.edu'));

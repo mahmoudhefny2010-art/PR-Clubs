@@ -8,7 +8,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script src="/assets/js/site-loading.js?v=20261014promptqueue1"></script>
     <script src="/assets/js/public-live-data.js?v=20261014events1"></script>
-    <script>if(['/club-login','/club-dashboard'].includes(location.pathname))document.documentElement.classList.add('auth-route-pending');</script>
+    <script>if(['/club-login','/club-dashboard'].includes(location.pathname)||location.pathname==='/'&&new URLSearchParams(location.search).get('myForms')==='1')document.documentElement.classList.add('auth-route-pending');</script>
     <title>Club Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -18,7 +18,7 @@
     <link rel="stylesheet" href="/assets/css/responsive.css?v=20261015mainadmin1" />
     <link rel="stylesheet" href="/assets/css/dark.css?v=20261015mainadmin1" />
     <link rel="stylesheet" href="/assets/css/features.css?v=20261015mainadmin1" />
-    <link rel="stylesheet" href="/assets/css/event-modal.css?v=20261013attendancebadge1" />
+    <link rel="stylesheet" href="/assets/css/event-modal.css?v=20261017mobilepopup1" />
     <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/pics/pwa-icon-192.png?v=20261013favicon1">
     <link rel="stylesheet" href="/assets/css/pages/home.css?v=20261013compactlogin1" />
     <link rel="stylesheet" href="/assets/css/pages/speaker-requests.css?v=20261014mobilefit1" />
@@ -166,7 +166,6 @@
                   <button class="student-dashboard-nav-item is-active" type="button" data-student-section="overview" aria-current="page"><svg class="student-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-6v-7h-4v7H4a1 1 0 0 1-1-1z"/></svg><span>Overview</span></button>
                   <button class="student-dashboard-nav-item" type="button" data-student-section="applications"><svg class="student-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg><span>Applications</span><span class="student-nav-count" id="studentSidebarApplicationCount">—</span></button>
                   <button class="student-dashboard-nav-item" type="button" data-student-section="attendance"><svg class="student-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Attendance</span><span class="student-nav-count" id="studentSidebarAttendanceCount">—</span></button>
-                  <a class="student-dashboard-nav-item" href="/speaker-request.html?as=student"><svg class="student-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v4m0 10v4M3 12h4m10 0h4M5.6 5.6l2.8 2.8m7.2 7.2 2.8 2.8m0-12.8-2.8 2.8m-7.2 7.2-2.8 2.8"/><circle cx="12" cy="12" r="5"/></svg><span>Speaker request</span></a>
                 </nav>
                 <a class="student-dashboard-explore" href="/?explore=clubs#clubGrid">Explore clubs <span aria-hidden="true">→</span></a>
               </aside>
@@ -364,8 +363,8 @@
                 <a href="#presidentApplicantsPanel" data-dashboard-section="presidentApplicantsPanel" data-unread-section="applicants">Applicants <span class="sidebar-unread-badge" data-unread-badge="applicants" hidden></span></a>
                 <span class="president-sidebar-group-title">Club operations</span>
                 <a href="/pages/report-downloads.html?type=reports" data-president-only>Event reports</a>
-                <a href="#speakerRequestDashboardPanel" data-dashboard-section="speakerRequestDashboardPanel">External speaker request</a>
-                <a href="#speakerInviteDashboardPanel" data-dashboard-section="speakerInviteDashboardPanel">Create speaker link</a>
+                <a href="#speakerRequestDashboardPanel" data-dashboard-section="speakerRequestDashboardPanel" data-speaker-manager-only>External speaker request</a>
+                <a href="#speakerInviteDashboardPanel" data-dashboard-section="speakerInviteDashboardPanel" data-speaker-manager-only>Create speaker link</a>
                 <button id="openMemberManagerBtn" class="president-sidebar-action hidden" data-unread-section="clubMembers" type="button">Club members <span class="sidebar-unread-badge" data-unread-badge="clubMembers" hidden></span></button>
                 <button id="openAttendanceManagerBtn" class="president-sidebar-action hidden" data-unread-section="eventAttendance" type="button">Event attendance <span class="sidebar-unread-badge" data-unread-badge="eventAttendance" hidden></span></button>
                 <button id="openEntryPermitDialogBtn" class="president-sidebar-action hidden" type="button">Entry permits</button>
@@ -596,12 +595,26 @@
             <div class="member-form-grid">
               <label>Full name<input name="name" maxlength="120" autocomplete="name" required /></label>
               <label>MIU email for Google sign-in<input name="email" type="email" maxlength="254" autocomplete="email" placeholder="member@miu.edu" required /></label>
+              <label>University ID<input name="universityId" maxlength="40" autocomplete="off" required /></label>
+              <label>Major<input name="major" maxlength="120" required /></label>
+              <label>Phone number<input name="phone" type="tel" maxlength="40" autocomplete="tel" required /></label>
+              <label>Age<input name="age" type="number" min="16" max="100" /></label>
               <label>Committee<select name="committee" id="clubMemberCommittee" required><option value="">Choose a committee</option></select></label>
               <label>Position in committee<input name="position" id="clubMemberPosition" maxlength="100" placeholder="Enter their committee position" required /></label>
               <label>Member level<select name="memberType" required><option value="">Choose member level</option><option value="new">New member</option><option value="senior">Senior member</option></select></label>
+              <label class="member-form-wide">Why do they want to join?<textarea name="motivation" maxlength="2000" rows="3"></textarea></label>
             </div>
+            <section id="directMemberInterview" class="direct-member-interview" aria-labelledby="directMemberInterviewTitle">
+              <h3 id="directMemberInterviewTitle">Interview questions</h3>
+              <p>Record the same answers and review notes used in the interview.</p>
+              <div id="directMemberInterviewQuestions" class="modal-interview-questions"></div>
+              <div class="member-form-grid">
+                <label class="member-form-wide">Interview notes<textarea name="interviewNotes" maxlength="2000" rows="3"></textarea></label>
+                <label>Interview rating<select name="interviewRating"><option value="0">Not rated</option><option value="1">1/5</option><option value="2">2/5</option><option value="3">3/5</option><option value="4">4/5</option><option value="5">5/5</option></select></label>
+              </div>
+            </section>
             <div class="member-form-actions">
-              <div><button id="cancelMemberFormBtn" class="secondary-btn" type="button">Cancel</button><button class="primary-btn" type="submit">Save member</button></div>
+              <div><button id="cancelMemberFormBtn" class="secondary-btn" type="button">Cancel</button><button class="primary-btn" type="submit">Add as member</button></div>
             </div>
           </form>
           <p id="clubMemberFeedback" class="admin-feedback" aria-live="polite"></p>
@@ -834,19 +847,19 @@
 
     <div id="site-footer"></div>
 
-    <script src="/assets/js/event-modal.js?v=20261013audience1" defer></script>
+    <script src="/assets/js/event-modal.js?v=20261017mobilepopup1" defer></script>
     <script src="/assets/js/committee-sidebar.js?v=20261013lighter1" defer></script>
     <script src="/assets/js/member-dashboard.js?v=20261014eventroles1" defer></script>
-    <script src="/assets/js/app-home.js?v=20261017questions1" defer></script>
+    <script src="/assets/js/app-home.js?v=20261017speakeraccess1" defer></script>
     <script src="/assets/js/cloudinary-upload.js?v=2" defer></script>
     <script src="/assets/js/student-feedback.js?v=20261013stagedload3" defer></script>
     <script src="/assets/js/event-info-popup.js?v=20261017clubinfo1" defer></script>
-    <script src="/assets/js/app-forms.js?v=20261017clubinfo1" defer></script>
+    <script src="/assets/js/app-forms.js?v=20261017popupnavigation1" defer></script>
     <script src="/assets/js/app-dashboard.js?v=20261017loaderror1" defer></script>
     <script src="/assets/js/attendance-dashboard.js?v=20261014eventroles1" defer></script>
     <script src="/assets/js/entry-permit-dashboard.js?v=20261014permitmobilecards1" defer></script>
     <script src="/assets/js/member-directory.js?v=20261013stagedload3" defer></script>
-    <script src="/assets/js/layout.js?v=20261015mainadmin1" defer></script>
+    <script src="/assets/js/layout.js?v=20261017myaccountroute1" defer></script>
     <script src="/assets/js/theme.js?v=20261009c" defer></script>
     <script src="/assets/js/pages/report-downloads.js?v=20261014progressive1" defer></script>
   <script src="/assets/js/report-dashboard-panels.js?v=20261014progressive1" defer></script>

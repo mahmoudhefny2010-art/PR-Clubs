@@ -483,6 +483,13 @@ function openClubDetail(clubId) {
     if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) ratingDialog.close();
   });
 
+  clubDetail.querySelectorAll('.detail-club-cards .club-card').forEach(card => {
+    card.style.cursor = 'pointer';
+    card.addEventListener('click', event => {
+      if (event.target.closest('button, a, input, select, textarea, video')) return;
+      card.querySelector('.event-info-btn')?.click();
+    });
+  });
   clubDetail.querySelectorAll('.event-info-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       const section = CLUB_CONTENT_SECTIONS.find(section => section.key === btn.dataset.contentSection);

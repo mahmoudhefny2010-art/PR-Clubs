@@ -683,7 +683,13 @@
 .member-add-form { margin-bottom: 18px; padding: 16px; border: 1px solid var(--border-color); border-radius: var(--radius-lg); background: var(--bg-soft); }
 .member-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .member-form-grid label { display: grid; gap: 6px; font-weight: 700; }
+.member-form-grid .member-form-wide { grid-column: 1 / -1; }
 .member-form-grid input, .member-form-grid select { width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-panel); color: var(--text-main); font: inherit; }
+.member-form-grid textarea { width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-panel); color: var(--text-main); font: inherit; resize: vertical; }
+.direct-member-interview { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border-color); }
+.direct-member-interview h3 { margin: 0 0 4px; }
+.direct-member-interview > p, .member-interview-empty { color: var(--text-muted); }
+.member-interview-empty.is-error { color: var(--danger, #b4232c); }
 .member-form-actions { align-items: flex-end; margin-top: 14px; }
 .member-form-actions p { margin: 0; }
 .member-form-actions > div { display: flex; gap: 8px; }
@@ -691,6 +697,9 @@
 .member-roster-card { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 16px; border: 1px solid var(--border-color); border-radius: var(--radius-lg); background: var(--bg-panel); }
 .member-roster-card strong { display: block; }
 .member-roster-card p { margin: 4px 0 0; color: var(--text-muted); }
+.member-intake-details { margin-top: 10px; color: var(--text-muted); font-size: .92em; }
+.member-intake-details summary { color: var(--text-main); cursor: pointer; font-weight: 700; }
+.member-intake-details p { line-height: 1.5; overflow-wrap: anywhere; }
 .member-type-pill { flex: 0 0 auto; padding: 6px 10px; border-radius: var(--radius-full); background: var(--primary-50); color: var(--primary-800); font-size: .76rem; font-weight: 800; }
 .member-roster-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .member-removal-confirmation { width: 100%; display: grid; gap: 12px; }

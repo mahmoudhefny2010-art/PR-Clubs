@@ -36,11 +36,11 @@
       return;
     }
     listEl.innerHTML = sponsors.map((sponsor) => `
-      <button type="button" class="event-timeline-item sponsor-timeline-item" data-club="${sponsor.clubId}" data-idx="${sponsor.index}">
+      <button type="button" class="event-timeline-item sponsor-timeline-item" data-club="${sponsor.clubId}" data-idx="${sponsor.index}" aria-haspopup="dialog">
         <span class="event-timeline-marker" aria-hidden="true"></span>
         <span class="event-timeline-content">
           <span class="event-timeline-header">
-            <img src="${escapeHtml(sponsor.sponsorLogo || sponsor.clubImage)}" alt="" class="feed-timeline-avatar" loading="lazy" decoding="async" />
+            <img src="${escapeHtml(sponsor.clubImage || '')}" alt="" class="feed-timeline-avatar" loading="lazy" decoding="async" />
             <span class="event-timeline-meta">
               <span class="event-tile-club">${escapeHtml(sponsor.clubName || '')}</span>
               <span class="feed-timeline-date">Upcoming Sponsor</span>
@@ -48,6 +48,10 @@
           </span>
           <span class="event-timeline-body">
             <strong class="feed-timeline-title">${escapeHtml(sponsor.title || sponsor.sponsorName || 'Sponsor')}</strong>
+            ${sponsor.sponsorCompany ? `<span class="event-timeline-location">${escapeHtml(sponsor.sponsorCompany)}</span>` : ''}
+            ${sponsor.sponsorType ? `<span class="event-timeline-location">${escapeHtml(sponsor.sponsorType)}</span>` : ''}
+            ${sponsor.sponsorDescription || sponsor.description ? `<span class="feed-timeline-text">${escapeHtml(sponsor.sponsorDescription || sponsor.description)}</span>` : ''}
+            ${sponsor.sponsorLogo ? `<img src="${escapeHtml(sponsor.sponsorLogo)}" alt="${escapeHtml(sponsor.sponsorName || sponsor.sponsorCompany || sponsor.title || 'Sponsor logo')}" class="feed-timeline-image" loading="lazy" decoding="async" />` : ''}
             <span class="event-timeline-link">View sponsor details →</span>
           </span>
         </span>
@@ -66,6 +70,7 @@
     detailTitle.textContent = sponsor.title || sponsor.sponsorName || 'Sponsor';
     detailDesc.textContent = sponsor.sponsorDescription || sponsor.description || '';
     detailEl.classList.remove('hidden');
+    detailEl.querySelector('.event-modal-panel').scrollTop = 0;
     document.body.classList.add('modal-open');
   }
 

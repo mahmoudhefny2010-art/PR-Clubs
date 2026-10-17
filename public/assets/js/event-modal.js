@@ -6,8 +6,13 @@
   const club = document.getElementById('eventModalClub');
   const title = document.getElementById('eventModalTitle');
   const meta = document.getElementById('eventModalMeta');
-  const attendance = document.getElementById('eventModalAttendance');
+  let attendance = document.getElementById('eventModalAttendance');
   const description = document.getElementById('eventModalDescription');
+  if (!attendance) {
+    attendance = document.createElement('p'); attendance.id = 'eventModalAttendance';
+    attendance.className = 'event-attendance-status'; attendance.hidden = true;
+    description.before(attendance);
+  }
   const form = document.getElementById('eventModalForm');
   const feedback = document.getElementById('eventModalFeedback');
   const closeButton = document.getElementById('eventModalClose');
@@ -58,7 +63,8 @@
     }).catch(() => { feedback.textContent = 'Registration controls could not load. Please reload.'; });
     window.MiuUI.modals.open(modal);
     document.body.classList.add('modal-open');
-    closeButton.focus();
+    closeButton.focus({ preventScroll: true });
+    modal.querySelector('.event-modal-panel').scrollTop = 0;
   };
 
   closeButton.addEventListener('click', close);

@@ -328,6 +328,63 @@ document.getElementById('saveCommitteeAvailabilityBtn')?.addEventListener('click
 
 let clubMembersLoadedAt = 0;
 let clubMembersRequestPending = false;
+let directMemberInterviewSections = [];
+let directMemberInterviewLoaded = false;
+let directMemberInterviewRequestPending = false;
+
+function renderDirectMemberInterviewQuestions() {
+  const container = document.getElementById('directMemberInterviewQuestions');
+  if (!container) return;
+  const questions = directMemberInterviewSections.flatMap(section => section.questions || []);
+  if (!questions.length) {
+    container.innerHTML = '<p class="member-interview-empty">No interview questions are configured for this club yet.</p>';
+    return;
+  }
+  container.innerHTML = directMemberInterviewSections.map(section => `
+    <section class="modal-interview-section">
+      <h4>${escapeHtml(section.title)}</h4>
+      <div class="form-row modal-interview-question-grid">
+        ${(section.questions || []).map(question => {
+          const required = question.required ? 'required' : '';
+          const control = question.type === 'select'
+            ? `<select data-direct-member-interview-answer="${escapeHtml(question.key)}" ${required}><option value="">Choose an answer</option>${(question.options || []).map(option => `<option value="${escapeHtml(option)}">${escapeHtml(option)}</option>`).join('')}</select>`
+            : question.type === 'textarea'
+              ? `<textarea data-direct-member-interview-answer="${escapeHtml(question.key)}" rows="3" maxlength="2000" ${required}></textarea>`
+              : `<input type="text" data-direct-member-interview-answer="${escapeHtml(question.key)}" maxlength="2000" ${required} />`;
+          return `<div class="modal-field"><label>${escapeHtml(question.label)}${question.required ? ' *' : ''}</label>${control}</div>`;
+        }).join('')}
+      </div>
+    </section>`).join('');
+}
+
+async function loadDirectMemberInterviewQuestions() {
+  if (directMemberInterviewLoaded || directMemberInterviewRequestPending) return;
+  directMemberInterviewRequestPending = true;
+  const submitButton = document.querySelector('#clubMemberForm button[type="submit"]');
+  if (submitButton) submitButton.disabled = true;
+  const container = document.getElementById('directMemberInterviewQuestions');
+  if (container) container.textContent = 'Loading interview questions…';
+  try {
+    const response = await fetch('/api/club/interview-form', { cache: 'no-store' });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Could not load interview questions.');
+    directMemberInterviewSections = Array.isArray(result.sections) ? result.sections : [];
+    directMemberInterviewLoaded = true;
+    renderDirectMemberInterviewQuestions();
+  } catch (error) {
+    if (container) {
+      container.replaceChildren();
+      const message = document.createElement('p');
+      message.className = 'member-interview-empty is-error';
+      message.textContent = error.message;
+      container.append(message);
+    }
+  } finally {
+    directMemberInterviewRequestPending = false;
+    if (submitButton) submitButton.disabled = !directMemberInterviewLoaded;
+  }
+}
+
 async function loadClubMembers(force = false) {
   if (clubMembersRequestPending) return;
   if (!force && clubMembersLoadedAt && Date.now() - clubMembersLoadedAt < 25_000) return;
@@ -380,6 +437,38 @@ async function loadClubMembers(force = false) {
         ? 'Accepted applicant'
         : member.memberType === 'senior' ? 'Senior member' : 'New member';
       details.append(name, meta);
+      const interviewAnswers = Array.isArray(member.interviewAnswers) ? member.interviewAnswers : [];
+      if (member.universityId || member.major || member.phone || member.age || member.motivation || interviewAnswers.length || member.interviewNotes || member.interviewRating) {
+        const disclosure = document.createElement('details');
+        disclosure.className = 'member-intake-details';
+        const summary = document.createElement('summary');
+        summary.textContent = 'Student and interview details';
+        disclosure.append(summary);
+        const profile = document.createElement('p');
+        profile.textContent = [member.universityId && `ID: ${member.universityId}`, member.major && `Major: ${member.major}`, member.phone && `Phone: ${member.phone}`, member.age && `Age: ${member.age}`].filter(Boolean).join(' · ');
+        if (profile.textContent) disclosure.append(profile);
+        if (member.motivation) {
+          const motivation = document.createElement('p');
+          motivation.textContent = `Motivation: ${member.motivation}`;
+          disclosure.append(motivation);
+        }
+        interviewAnswers.forEach(answer => {
+          const response = document.createElement('p');
+          response.textContent = `${answer.label || 'Interview answer'}: ${answer.value || '—'}`;
+          disclosure.append(response);
+        });
+        if (member.interviewNotes) {
+          const notes = document.createElement('p');
+          notes.textContent = `Interview notes: ${member.interviewNotes}`;
+          disclosure.append(notes);
+        }
+        if (member.interviewRating) {
+          const rating = document.createElement('p');
+          rating.textContent = `Interview rating: ${member.interviewRating}/5`;
+          disclosure.append(rating);
+        }
+        details.append(disclosure);
+      }
       const actions = document.createElement('div');
       actions.className = 'member-roster-actions';
       actions.append(type);
@@ -541,6 +630,7 @@ document.getElementById('openMemberManagerBtn')?.addEventListener('click', () =>
   document.getElementById('clubMemberFeedback')?.classList.toggle('hidden', isHead);
   document.querySelector('.member-dialog-toolbar')?.classList.toggle('head-member-toolbar', isHead);
   dialog?.showModal();
+  loadDirectMemberInterviewQuestions();
   loadClubMembers();
 });
 document.getElementById('closeMemberManagerBtn')?.addEventListener('click', () => memberManagerDialog?.close());
@@ -559,10 +649,20 @@ document.getElementById('clubMemberCommittee')?.addEventListener('change', (even
 document.getElementById('clubMemberForm')?.addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = event.currentTarget;
+  if (form.dataset.saving === 'true' || !directMemberInterviewLoaded) return;
+  form.dataset.saving = 'true';
   const feedback = document.getElementById('clubMemberFeedback');
   feedback.textContent = '';
   feedback.classList.remove('is-error');
+  const submitButton = form.querySelector('button[type="submit"]');
+  const originalSubmitText = submitButton.textContent;
+  submitButton.disabled = true;
+  submitButton.textContent = 'Adding member…';
   const formData = new FormData(form);
+  const interviewAnswers = [...form.querySelectorAll('[data-direct-member-interview-answer]')].map(input => ({
+    key: input.dataset.directMemberInterviewAnswer,
+    value: input.value
+  }));
   try {
     const response = await fetch('/api/club/members', {
       method: 'POST',
@@ -570,9 +670,17 @@ document.getElementById('clubMemberForm')?.addEventListener('submit', async (eve
       body: JSON.stringify({
         name: formData.get('name'),
         email: formData.get('email'),
+        universityId: formData.get('universityId'),
+        major: formData.get('major'),
+        phone: formData.get('phone'),
+        age: formData.get('age'),
+        motivation: formData.get('motivation'),
         committee: formData.get('committee'),
         position: formData.get('position'),
-        memberType: formData.get('memberType')
+        memberType: formData.get('memberType'),
+        interviewAnswers,
+        interviewNotes: formData.get('interviewNotes'),
+        interviewRating: formData.get('interviewRating')
       })
     });
     const result = await response.json();
@@ -580,11 +688,15 @@ document.getElementById('clubMemberForm')?.addEventListener('submit', async (eve
     form.reset();
     form.classList.add('hidden');
     document.getElementById('clubMemberPosition').placeholder = 'Enter their committee position';
-    feedback.textContent = `${result.member.name} was added to ${result.member.committee}.`;
+    feedback.textContent = `${result.member.name} was added to ${result.member.committee} as a member.`;
     await loadClubMembers(true);
   } catch (error) {
     feedback.textContent = error.message;
     feedback.classList.add('is-error');
+  } finally {
+    form.dataset.saving = 'false';
+    submitButton.disabled = false;
+    submitButton.textContent = originalSubmitText;
   }
 });
 

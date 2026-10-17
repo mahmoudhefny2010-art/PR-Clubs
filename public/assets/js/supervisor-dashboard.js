@@ -46,6 +46,10 @@
     return `<form data-decision-type="${type}" data-decision-id="${escape(id)}"><label>Review feedback<textarea name="comment" maxlength="2000" placeholder="Required for rejection or requested changes"></textarea></label><div class="supervisor-decision-actions"><button class="primary-btn" name="action" value="approve">Approve and forward</button><button class="secondary-btn" name="action" value="request_edit">Request changes</button><button class="secondary-btn" name="action" value="reject">Reject</button></div><span role="status" aria-live="polite"></span></form>`;
   }
   function render() {
+    const invitations = document.getElementById('deanSpeakerInvitePanel');
+    if (invitations) invitations.hidden = panel !== 'speakerInvite';
+    content.hidden = panel === 'speakerInvite';
+    if (panel === 'speakerInvite') { feedback.textContent = ''; return; }
     if (!data) return;
     const { club, requests, speakers, attendance } = data;
     document.getElementById('supervisorTitle').textContent = `${club.name} · Supervisor dashboard`;
@@ -99,11 +103,14 @@
   }
   document.querySelectorAll('[data-panel]').forEach(button => button.addEventListener('click', () => {
     panel = button.dataset.panel;
+    document.getElementById('deanSpeakerInvitePanel').hidden = panel !== 'speakerInvite';
+    content.hidden = panel === 'speakerInvite';
     document.querySelectorAll('[data-panel]').forEach(item => {
       item.classList.toggle('is-active', item === button);
       if (item === button) item.setAttribute('aria-current', 'page'); else item.removeAttribute('aria-current');
     });
-    if (panel === 'miuAttendance') void loadMiuAttendance();
+    if (panel === 'speakerInvite') render();
+    else if (panel === 'miuAttendance') { document.getElementById('deanSpeakerInvitePanel').hidden = true; content.hidden = false; void loadMiuAttendance(); }
     else if (Date.now() - clubLoadedAt >= DATA_FRESH_MS) void loadClub(false);
     else render();
   }));

@@ -3,13 +3,13 @@ module.exports = async ({ cdp, origin, fixtures, requests, until, screenshot }) 
   await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1100, deviceScaleFactor: 1, mobile: false });
   const club = fixtures['/api/clubs'][0];
   club.events = [
-    { title: 'Later workshop', date: '2026-12-12', time: '14:00', endTime: '16:00', location: 'Library room 2', description: 'Details for the later workshop only.', image: '/assets/img/pics/pwa-icon-192.png', budget: '100 EGP', registrationEnabled: true, attendanceEnabled: true, attendanceAudience: 'members' },
+    { title: 'Later workshop', date: '2026-12-12', time: '14:00', endTime: '16:00', location: 'Library room 2', description: 'Details for the later workshop only.', image: '/assets/img/pics/mun.jpg', budget: '100 EGP', registrationEnabled: true, attendanceEnabled: true, attendanceAudience: 'members' },
     { title: 'Earlier workshop', date: '2026-11-01', description: 'Earlier details <img src=x onerror=alert(1)>', image: '/missing-event-image.png' },
     { title: 'Long description workshop', date: '2026-11-15', description: 'The complete event programme remains readable. '.repeat(700), image: '/assets/img/pics/pwa-icon-192.png' },
     { title: 'Optional details omitted' }
   ];
   await cdp.send('Page.navigate', { url: origin + '/' });
-  await until("typeof openClubDetail==='function' && typeof loadClubs==='function'");
+  await until("typeof openClubDetail==='function' && typeof loadClubs==='function' && typeof window.formatSiteTime==='function'");
   await cdp.evaluate("window.miuLiveData.invalidate(['clubs']);loadClubs(true)");
   await until("state.clubs.find(c=>c.id===1)?.events?.length===4");
   await cdp.evaluate('openClubDetail(1)');
@@ -74,7 +74,7 @@ module.exports = async ({ cdp, origin, fixtures, requests, until, screenshot }) 
     { title: 'Older feed', createdAt: '2026-10-01', text: 'Older feed details' },
     { title: 'Newer feed', createdAt: '2026-10-10', text: 'Full feed text\nSecond line <img src=x onerror=alert(1)>', description: 'Additional description', author: 'Fixture author' }
   ];
-  club.sponsors = [{ title: 'Sponsor info', description: 'Original sponsor inline description', sponsorName: 'Sponsor name', sponsorCompany: 'Company name', sponsorType: 'Financial', sponsorAmount: '5000 EGP', sponsorBenefits: 'Full benefits\nSecond benefit', sponsorDescription: 'Full sponsor description' }];
+  club.sponsors = [{ title: 'Sponsor info', description: 'Original sponsor inline description', sponsorLogo: '/assets/img/pics/mun.jpg', sponsorName: 'Sponsor name', sponsorCompany: 'Company name', sponsorType: 'Financial', sponsorAmount: '5000 EGP', sponsorBenefits: 'Full benefits\nSecond benefit', sponsorDescription: 'Full sponsor description' }];
   club.booths = [{ title: 'Booth info', description: 'Original booth inline description', boothName: 'Welcome booth', boothPurpose: 'Welcome students', boothDescription: 'Complete booth description', boothLocation: 'Main courtyard', boothSize: '3 x 4', boothEquipment: 'Table and chairs', boothSetupDate: '2026-10-20', boothOpenDate: '2026-10-21', boothCloseDate: '2026-10-22' }];
   await cdp.evaluate("window.miuLiveData.invalidate(['clubs']);loadClubs(true)");
   await until("state.clubs.find(c=>c.id===1)?.posts?.length===2");
@@ -83,7 +83,7 @@ module.exports = async ({ cdp, origin, fixtures, requests, until, screenshot }) 
   assert.equal(await cdp.evaluate("document.querySelector('#clubDetail [data-content-section=posts]').dataset.contentIndex"), '1', 'Feed sort preserves identity');
   for (const [section, title, expected] of [
     ['posts', 'Newer feed', [club.posts[1].text, 'Additional description', 'Fixture author']],
-    ['sponsors', 'Sponsor info', Object.values(club.sponsors[0])],
+    ['sponsors', 'Sponsor info', Object.entries(club.sponsors[0]).filter(([key]) => key !== 'sponsorLogo').map(([, value]) => value)],
     ['booths', 'Booth info', Object.values(club.booths[0])]
   ]) {
     await cdp.evaluate(`document.querySelector('#clubDetail [data-content-section=${section}]').click()`);
@@ -106,6 +106,66 @@ module.exports = async ({ cdp, origin, fixtures, requests, until, screenshot }) 
   assert.equal(await cdp.evaluate('document.activeElement.tagName'), 'VIDEO', 'Video controls are keyboard accessible inside the focus trap');
   await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape' });
   assert.equal(await cdp.evaluate("document.querySelectorAll('#eventCardInfoModal').length"), 0);
+  await cdp.evaluate("document.querySelector('#clubDetail [data-content-section=sponsors]').closest('article').querySelector('.club-name').click()");
+  assert.equal(await cdp.evaluate("document.getElementById('eventCardInfoTitle').textContent"), 'Sponsor info', 'Clicking the card itself opens details');
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape' });
+  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+  await cdp.send('Page.navigate', { url: origin + '/pages/events.html' });
+  await until("document.querySelectorAll('#eventsList [data-event-open]').length>=3");
+  await cdp.evaluate("[...document.querySelectorAll('#eventsList [data-event-open]')].find(button=>button.textContent.includes('Earlier workshop')).click()");
+  assert.equal(await cdp.evaluate("location.pathname==='/pages/events.html' && !document.getElementById('eventModal').classList.contains('hidden')"), true, 'Event list opens its existing registration popup without navigation');
+  assert.equal(await cdp.evaluate("document.getElementById('eventModalTitle').textContent"), 'Earlier workshop');
+  const eventLayout = await cdp.evaluate("(()=>{const p=document.querySelector('#eventModal .event-modal-panel'),i=p.querySelector('img'),c=p.querySelector('.event-modal-copy'),a=i.getBoundingClientRect(),b=c.getBoundingClientRect();return {sideBySide:a.right<=b.left,aligned:Math.abs(a.top-b.top)<2,height:a.height,fit:getComputedStyle(i).objectFit,width:p.getBoundingClientRect().width}})()");
+  assert.equal(eventLayout.sideBySide, true);
+  assert.equal(eventLayout.aligned, true);
+  assert.ok(eventLayout.height<=340 && eventLayout.width<=920);
+  assert.equal(eventLayout.fit, 'contain');
+  await until("!document.documentElement.classList.contains('site-startup-pending')");
+  await screenshot('event-popup-balanced-desktop');
+  await cdp.evaluate("document.getElementById('eventModalClose').click()");
+  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 375, height: 812, deviceScaleFactor: 1, mobile: true });
+  assert.equal(await cdp.evaluate("(()=>{const c=[...document.querySelectorAll('#eventsList [data-event-open]')].find(b=>b.textContent.includes('Later workshop')),i=c.querySelector('.feed-timeline-image'),t=c.querySelector('.feed-timeline-title');return i.getBoundingClientRect().bottom<=t.getBoundingClientRect().top&&i.getBoundingClientRect().height<=200&&getComputedStyle(i).objectFit==='contain'})()"), true, 'Mobile card shows its bounded image above the title');
+  await screenshot('event-card-mobile-image-first');
+  await cdp.evaluate("[...document.querySelectorAll('#eventsList [data-event-open]')].find(b=>b.textContent.includes('Long description workshop')).click();document.querySelector('#eventModal .event-modal-panel').scrollTop=5000;document.getElementById('eventModalClose').click();[...document.querySelectorAll('#eventsList [data-event-open]')].find(b=>b.textContent.includes('Later workshop')).click()");
+  assert.equal(await cdp.evaluate("document.querySelector('#eventModal .event-modal-panel').scrollTop"), 0, 'Reopened popup starts at its image and close button');
+  assert.equal(await cdp.evaluate("(()=>{const p=document.querySelector('#eventModal .event-modal-panel'),r=p.getBoundingClientRect(),i=p.querySelector('img').getBoundingClientRect();return r.left>=0&&r.right<=innerWidth+1&&r.top>=0&&r.bottom<=innerHeight+1&&i.height<=210})()"), true);
+  await screenshot('event-popup-mobile-compact');
+  await cdp.evaluate("document.getElementById('eventModalClose').click()");
+  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+  for (const [page, selector, dialog] of [['sponsors', '.sponsor-timeline-item', 'sponsorDetail'], ['booths', '.booth-timeline-item', 'boothDetail']]) {
+    await cdp.send('Page.navigate', { url: origin + '/pages/' + page + '.html' });
+    await until(`!!document.querySelector('${selector}')`);
+    if (page === 'sponsors') {
+      const card = await cdp.evaluate("(()=>{const c=document.querySelector('.sponsor-timeline-item'),image=c.querySelector('.feed-timeline-image'),title=c.querySelector('.feed-timeline-title');return {avatar:c.querySelector('.feed-timeline-avatar').getAttribute('src'),logo:image.getAttribute('src'),contained:getComputedStyle(image).objectFit==='contain',beside:image.getBoundingClientRect().right<=title.getBoundingClientRect().left,company:c.textContent.includes('Company name')}})()");
+      assert.equal(card.avatar, club.image);
+      assert.equal(card.logo, club.sponsors[0].sponsorLogo);
+      assert.equal(card.contained, true); assert.equal(card.beside, true); assert.equal(card.company, true);
+      await until("!document.documentElement.classList.contains('site-startup-pending')");
+      await screenshot('sponsor-card-with-logo');
+    }
+    await cdp.evaluate(`document.querySelector('${selector}').click()`);
+    assert.equal(await cdp.evaluate(`location.pathname==='/pages/${page}.html' && !document.getElementById('${dialog}').classList.contains('hidden')`), true);
+    assert.equal(await cdp.evaluate(`(()=>{const p=document.querySelector('#${dialog} .event-modal-panel'),a=p.querySelector('img').getBoundingClientRect(),b=p.querySelector('.event-modal-copy').getBoundingClientRect();return a.right<=b.left&&Math.abs(a.top-b.top)<2&&a.height<=340})()`), true, `${page} keeps image and details aligned`);
+    await until("!document.documentElement.classList.contains('site-startup-pending')");
+    await screenshot(`${page}-popup-balanced-desktop`);
+    await cdp.send('Emulation.setDeviceMetricsOverride', { width: 375, height: 812, deviceScaleFactor: 1, mobile: true });
+    assert.equal(await cdp.evaluate(`(()=>{const p=document.querySelector('#${dialog} .event-modal-panel'),a=p.querySelector('img').getBoundingClientRect(),b=p.querySelector('.event-modal-copy').getBoundingClientRect(),r=p.getBoundingClientRect();return a.bottom<=b.top&&a.height<=210&&r.left>=0&&r.right<=innerWidth+1})()`), true);
+    await screenshot(`${page}-popup-balanced-mobile`);
+    await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+  }
+  await cdp.send('Page.navigate', { url: origin + '/pages/feed.html' });
+  await until("!!document.querySelector('[data-feed-event]')");
+  await cdp.evaluate("document.querySelector('[data-feed-event]').click()");
+  await until("!!document.getElementById('eventModal') && !document.getElementById('eventModal').classList.contains('hidden')");
+  assert.equal(await cdp.evaluate('location.pathname'), '/pages/feed.html', 'Feed event opens the shared popup without navigation');
+  assert.equal(await cdp.evaluate("(()=>{const p=document.querySelector('#eventModal .event-modal-panel'),i=p.querySelector('img');return getComputedStyle(p).display==='grid'&&p.getBoundingClientRect().width<=920&&i.getBoundingClientRect().height<=340&&getComputedStyle(i).objectFit==='contain'})()"), true, 'Feed loads the same bounded popup styles');
+  await cdp.evaluate("document.getElementById('eventModalClose').click()");
+  await cdp.send('Page.navigate', { url: origin + '/' });
+  await until("!!document.querySelector('.event-slide[data-club=\"0\"][data-type=event]')");
+  await cdp.evaluate("document.querySelector('.event-slide[data-club=\"0\"][data-type=event]').click()");
+  assert.equal(await cdp.evaluate("location.pathname==='/' && !document.getElementById('eventModal').classList.contains('hidden')"), true, 'University event slideshow stays on homepage');
+  await cdp.evaluate("document.getElementById('eventModalClose').click()");
+  console.log('PASS: event list, feed events, university slideshow, sponsor/booth lists and Club View cards open popups without changing pages.');
   console.log('PASS: Feed, Sponsor and Booth reuse Event Info; full descriptions/metadata, sorted identity, safe text, focus restoration, mobile layout and video controls.');
   console.log('PASS: Event Info uses shared popup styling; sorted identities, safe text, X/overlay/Escape, focus/scroll restoration, optional images, long content and 320–1440px layouts. No new API requests.');
 };

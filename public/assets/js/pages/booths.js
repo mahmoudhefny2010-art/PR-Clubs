@@ -81,6 +81,7 @@
     detailDesc.textContent = booth.boothDescription || booth.description || '';
     detailDesc.hidden = !detailDesc.textContent;
     detailEl.classList.remove('hidden');
+    detailEl.querySelector('.event-modal-panel').scrollTop = 0;
     document.body.classList.add('modal-open');
   }
 

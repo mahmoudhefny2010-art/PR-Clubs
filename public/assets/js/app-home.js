@@ -856,10 +856,11 @@ async function openClubPortal(initialSession = null) {
     if (!club) throw new Error('Could not load club dashboard.');
 
     state.clubAccount = club;
-    if (!window.speakerDashboardScriptLoaded) {
+    const canManageSpeakers = ['president', 'head'].includes(club.role);
+    if (canManageSpeakers && !window.speakerDashboardScriptLoaded) {
       window.speakerDashboardScriptLoaded = true;
       const speakerScript = document.createElement('script');
-      speakerScript.src = '/assets/js/speaker-request.js?v=20261013supervisorgate1';
+      speakerScript.src = '/assets/js/speaker-request.js?v=20261017clubonly1';
       speakerScript.defer = true;
       speakerScript.onerror = () => { window.speakerDashboardScriptLoaded = false; };
       document.body.append(speakerScript);
@@ -870,6 +871,7 @@ async function openClubPortal(initialSession = null) {
     document.getElementById('clubDashboardRoleLabel').textContent = club.role === 'president'
       ? 'PRESIDENT DASHBOARD - ALL COMMITTEES'
       : `${club.committee} - HEAD DASHBOARD`;
+    document.querySelectorAll('[data-speaker-manager-only]').forEach(element => element.classList.toggle('hidden', !canManageSpeakers));
     const isPresident = club.role === 'president';
     const canManageQuestions = ['president', 'vice_president', 'head'].includes(club.role);
     if (club.role === 'vice_president') document.getElementById('clubDashboardRoleLabel').textContent = 'VICE PRESIDENT DASHBOARD';
@@ -932,6 +934,7 @@ async function openClubPortal(initialSession = null) {
     } else {
       setPresidentDashboardSection('presidentOverviewPanel');
     }
+    if (location.hash === '#speakerRequestDashboardPanel' && canManageSpeakers) setPresidentDashboardSection('speakerRequestDashboardPanel');
     document.getElementById('interviewFormHeading').textContent = club.role !== 'head'
       ? 'Club interview questions'
       : `${club.committee} interview questions`;
@@ -988,6 +991,7 @@ async function openClubPortal(initialSession = null) {
 }
 
 function setPresidentDashboardSection(sectionId) {
+  if (['speakerRequestDashboardPanel', 'speakerInviteDashboardPanel'].includes(sectionId) && !['president', 'head'].includes(state.clubAccount?.role)) sectionId = 'presidentOverviewPanel';
   const sectionIds = ['presidentOverviewPanel', 'presidentClubStatusPanel', 'presidentHeadManager', 'presidentFormManager', 'interviewFormManager', 'presidentApplicantsPanel', 'speakerRequestDashboardPanel', 'speakerInviteDashboardPanel', 'reportInlinePanel'];
   if (state.clubAccount?.role === 'president' && sectionIds.includes(sectionId)) {
     try { localStorage.setItem(`miu-club-dashboard-section:${state.clubAccount.id}`, sectionId); } catch { /* The section still changes for this visit. */ }
@@ -1473,13 +1477,15 @@ function renderEventsSlideshow() {
       const contentType = slide.dataset.type;
       const universityItem = items.find((item) => item.university && Number(slide.dataset.club) === 0 && item.index === Number(slide.dataset.idx));
       if (universityItem) {
-        window.location.href = universityItem.type === 'event'
-          ? '/pages/event.html?university=' + universityItem.id
-          : '/pages/feed.html?post=' + universityItem.id;
+        if (universityItem.type === 'event') window.openEventModal(universityItem);
+        else window.location.href = '/pages/feed.html?post=' + universityItem.id;
         return;
       }
-      if (contentType === 'sponsor') { window.location.href = '/pages/sponsors.html'; return; }
-      if (contentType === 'booth') { window.location.href = '/pages/booths.html'; return; }
+      if (['sponsor', 'booth'].includes(contentType)) {
+        const item = items.find(item => item.contentType === contentType && Number(item.clubId) === Number(slide.dataset.club) && item.index === Number(slide.dataset.idx));
+        if (item) window.openClubContentInfoPopup(item, contentType, { name: item.clubName, image: item.clubImage }, slide);
+        return;
+      }
       const event = items.find((item) => item.contentType === 'event' && Number(item.clubId) === Number(slide.dataset.club) && item.index === Number(slide.dataset.idx));
       if (event && typeof window.openEventModal === 'function') window.openEventModal({ ...event, eventIndex: event.index });
     });

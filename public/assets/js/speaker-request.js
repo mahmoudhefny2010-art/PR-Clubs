@@ -17,8 +17,7 @@
   let identity;
   let editingId = '';
   let requests = [];
-  const accountMode = new URLSearchParams(location.search).get('as') || form.dataset.accountMode;
-  const accountQuery = accountMode === 'club' || accountMode === 'student' ? `?as=${accountMode}` : '';
+  const accountQuery = '?as=club';
 
   // Keep the user's dashboard context when leaving this page. The href remains
   // a safe fallback for direct visits or when the browser has no same-site entry.
@@ -270,6 +269,7 @@
     try {
       const context = await requestJson(`/api/speaker-requests/context${accountQuery}`);
       identity = context.identity;
+      if (identity?.type !== 'club' || !['president', 'head'].includes(identity.role)) throw new Error('Speaker requests are available only to authorized club managers.');
       document.getElementById('speakerIdentity').textContent = identity.type === 'student' ? `${identity.name} (student)` : `${identity.name} (${identity.role})`;
       const clubSelect = form.elements.clubId;
       if (identity.type === 'club') {
@@ -297,7 +297,7 @@
       requests = context.requests || [];
       renderRequests(); content.hidden = false; message.textContent = '';
     } catch (error) {
-      showMessage(message, `${error.message} Use the student or club sign-in on the home page, then return here.`, 'error');
+      showMessage(message, `${error.message} Use your assigned Club Dashboard account to access speaker requests.`, 'error');
     }
   })();
 })();

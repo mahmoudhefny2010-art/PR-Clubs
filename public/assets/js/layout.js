@@ -329,6 +329,31 @@ document.addEventListener('DOMContentLoaded', () => {
     const attendanceUsherTaskLink = document.getElementById('headerAttendanceUsherTaskLink');
     let currentHeaderSession = null;
     let headerAccountRequestId = 0;
+    const switchDashboard = async (role, label, button = null, scope = {}) => {
+      if (button) button.disabled = true;
+      if (dashboardSwitchStatus) dashboardSwitchStatus.textContent = `Opening ${label}...`;
+      try {
+        const response = await fetch('/api/club-auth/switch-dashboard', {
+          method: 'POST', credentials: 'same-origin', cache: 'no-store',
+          headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role, ...scope })
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.message || 'Could not switch dashboards.');
+        const target = new URL(result.redirect, window.location.origin);
+        if (target.origin !== window.location.origin || !target.pathname.startsWith('/')) throw new Error('This dashboard link is not valid.');
+        window.location.assign(`${target.pathname}${target.search}${target.hash}`);
+      } catch (error) {
+        if (dashboardSwitchStatus) dashboardSwitchStatus.textContent = error.message;
+        if (button) button.disabled = false;
+      }
+    };
+    const openStudentDashboard = (event) => {
+      if (!currentHeaderSession?.hasStudentDashboard || currentHeaderSession.type === 'student') return;
+      event.preventDefault();
+      void switchDashboard('student', 'Student dashboard');
+    };
+    studentProfileLink?.addEventListener('click', openStudentDashboard);
+    accountDashboardLink?.addEventListener('click', openStudentDashboard);
     const closeStudentProfileMenu = () => {
       if (!studentProfileDropdown || !studentProfileTrigger) return;
       studentProfileDropdown.hidden = true;
@@ -359,6 +384,7 @@ document.addEventListener('DOMContentLoaded', () => {
           const destinations = {
             admin: { label: 'Admin Dashboard', href: '/admin' },
             president: { label: 'Club President Dashboard', href: '/club-dashboard' },
+            vice_president: { label: 'Club Vice President Dashboard', href: '/club-dashboard' },
             head: { label: 'Committee Head Dashboard', href: '/club-dashboard' },
             pr: { label: 'PR Dashboard', href: '/dashboards/pr-dashboard.html' },
             english: { label: 'English Dashboard', href: '/dashboards/english-dashboard.html' },
@@ -389,21 +415,25 @@ document.addEventListener('DOMContentLoaded', () => {
           }
           const isAuthenticated = Boolean(account && session?.authenticated);
           const isStudent = session?.type === 'student' && isAuthenticated;
+          const hasStudentDashboard = Boolean(session?.hasStudentDashboard || isStudent);
           const studentDashboardHref = '/?myForms=1';
-          if (studentProfileLink) studentProfileLink.href = studentDashboardHref;
+          if (studentProfileLink) studentProfileLink.href = hasStudentDashboard ? studentDashboardHref : account?.href || '/pages/applicant-login.html';
           if (studentProfileMenu) studentProfileMenu.hidden = !isAuthenticated;
           if (authBtn) authBtn.hidden = isAuthenticated;
           if (studentSignoutBtn) studentSignoutBtn.hidden = !isAuthenticated;
           if (accountDashboardLink && account) {
-            accountDashboardLink.href = isStudent ? studentDashboardHref : account.href;
-            accountDashboardLink.textContent = isStudent ? 'Student dashboard' : account.label;
-            accountDashboardLink.title = isStudent ? 'Student dashboard and forms' : account.label;
+            accountDashboardLink.href = hasStudentDashboard ? studentDashboardHref : account.href;
+            accountDashboardLink.textContent = hasStudentDashboard ? 'Student dashboard' : account.label;
+            accountDashboardLink.title = hasStudentDashboard ? 'Student dashboard and forms' : account.label;
             accountDashboardLink.hidden = false;
           }
           if (dashboardChoiceList) {
             dashboardChoiceList.replaceChildren();
             const choices = Array.isArray(session.dashboards)
               ? session.dashboards.filter(item => destinations[item.role]) : [];
+            if (hasStudentDashboard && choices.length && !choices.some(item => item.role === 'student')) {
+              choices.unshift({ role: 'student', label: destinations.student.label });
+            }
             if (dashboardChoices) dashboardChoices.hidden = choices.length === 0;
             choices.forEach(choice => {
               const button = document.createElement('button');
@@ -413,25 +443,9 @@ document.addEventListener('DOMContentLoaded', () => {
               const shortLabels = { president: 'President', head: 'Committee head', software_development: 'Developer', miu_events: 'MIU Events', pr: 'PR', sso: 'SSO', dean: 'Dean', english: 'English', security: 'Security', supervisor: 'Supervisor' };
               button.textContent = [shortLabels[choice.role] || choice.label, choice.clubName || choice.committee].filter(Boolean).join(' · ');
               button.title = [destinations[choice.role].label, choice.committee, choice.clubName].filter(Boolean).join(' · ');
-              if (choice.role === session.role) button.setAttribute('aria-current', 'page');
-              button.addEventListener('click', async () => {
-                button.disabled = true;
-                if (dashboardSwitchStatus) dashboardSwitchStatus.textContent = `Opening ${choice.label}...`;
-                try {
-                  const response = await fetch('/api/club-auth/switch-dashboard', {
-                    method: 'POST', credentials: 'same-origin', cache: 'no-store',
-                    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role: choice.role })
-                  });
-                  const result = await response.json().catch(() => ({}));
-                  if (!response.ok) throw new Error(result.message || 'Could not switch dashboards.');
-                  const target = new URL(result.redirect, window.location.origin);
-                  if (target.origin !== window.location.origin || !target.pathname.startsWith('/')) throw new Error('This dashboard link is not valid.');
-                  window.location.assign(`${target.pathname}${target.search}${target.hash}`);
-                } catch (error) {
-                  if (dashboardSwitchStatus) dashboardSwitchStatus.textContent = error.message;
-                  button.disabled = false;
-                }
-              });
+              if (choice.role === session.role || choice.role === 'student' && isStudent) button.setAttribute('aria-current', 'page');
+              button.addEventListener('click', () => switchDashboard(choice.role, choice.label, button,
+                choice.role === 'student' ? {} : { clubId: choice.clubId, committee: choice.committee }));
               dashboardChoiceList.append(button);
             });
           }
