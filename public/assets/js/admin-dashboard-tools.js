@@ -24,6 +24,7 @@
     ['club-feedback', 'Student club feedback', 'Review club ratings, comments and individual responses.', 'insights', 'messageStar', 'amber'],
     ['university-feedback', 'MIU polls & evaluations', 'View poll votes and university evaluation responses.', 'insights', 'vote', 'green'],
     ['club-analytics', 'Club performance', 'Compare demand, capacity, acceptance and club page views.', 'insights', 'trend', 'blue'],
+    ['quiz-points', 'Club quiz points', 'See club quiz points, counted once per signed-in account.', 'insights', 'chart', 'violet'],
     ['event-analytics', 'Event performance', 'Explore views, registrations, interest and verified check-ins.', 'insights', 'calendarChart', 'violet'],
     ['analytics', 'Visitor analytics', 'See visitor totals, online accounts and device activity.', 'insights', 'chart', 'blue'],
     ['all-activity-log', 'All Activity Log', 'Review every recorded change across website accounts and roles.', 'insights', 'history', 'violet'],

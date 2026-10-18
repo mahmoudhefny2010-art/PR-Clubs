@@ -11,6 +11,7 @@
     [/^\/api\/admin\/dashboard-clubs\/\d+$/, 'clubs'],
     [/^\/api\/admin\/clubs\/\d+\/committee-availability$/, 'committees'],
     [/^\/api\/admin\/club-views$/, 'club-analytics'], [/^\/api\/admin\/event-analytics$/, 'event-analytics'],
+    [/^\/api\/admin\/quiz-points$/, 'quiz-points'],
     [/^\/api\/admin\/university-content$/, 'website-content'],
     [/^\/api\/feedback\/results\/club$/, 'club-feedback'], [/^\/api\/feedback\/results\/university$/, 'university-feedback'],
     [/^\/api\/admin\/staff-accounts(?:\?.*)?$/, 'staff'], [/^\/api\/admin\/supervisors$/, 'supervisors'],

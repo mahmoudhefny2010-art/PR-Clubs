@@ -35,7 +35,7 @@ test('all-activity and developer-activity logs are separate first-class dashboar
   assert.match(dashboard, /actorRole \|\| ''\)\.toLowerCase\(\) === 'software_development'/);
   assert.match(dashboard, /Edited club information/);
   assert.doesNotMatch(dashboard, /<strong>Request:<\/strong> \$\{escape\(entry\.action/);
-  assert.match(renderDashboardPage(root), /20261017clubimport1/);
+  assert.match(renderDashboardPage(root), /20261018quizpoints1/);
 });
 test('Excel club import is an admin-only, full-workbook review with an explicit confirmation step', () => {
   assert.ok(toolIds.includes('excel-review'));

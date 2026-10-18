@@ -531,4 +531,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
   inject('site-header', '/components/site-header.html?v=20261014accountphoto2');
   inject('site-footer', '/components/site-footer.html?v=20261017mobilecolon1');
+
+  // "Find Your Club" quiz launcher and modal. Kept dependency-free and lazy:
+  // the module creates the launcher itself; nothing opens automatically.
+  const quizScripts = [
+    '/assets/js/quiz-clubs.js',
+    '/assets/js/quiz-questions.js',
+    '/assets/js/quiz-scoring.js',
+    '/assets/js/quiz-ui.js'
+  ];
+  (function loadNext() {
+    const src = quizScripts.shift();
+    if (!src) return;
+    const script = document.createElement('script');
+    script.src = src;
+    script.onload = loadNext;
+    script.onerror = function () {
+      console.error('Quiz script failed to load: ' + src);
+    };
+    document.head.appendChild(script);
+  })();
 });

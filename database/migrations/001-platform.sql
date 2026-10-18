@@ -581,6 +581,19 @@ CREATE UNIQUE NONCLUSTERED INDEX [IX_PasswordResetToken_0_78c8ef] ON [dbo].[Pass
 CREATE UNIQUE NONCLUSTERED INDEX [IX_PasswordResetToken_1_915415] ON [dbo].[PasswordResetToken] ([accountType] ASC, [email] ASC);
 CREATE NONCLUSTERED INDEX [IX_PasswordResetToken_2_cd5875] ON [dbo].[PasswordResetToken] ([expiresAt] ASC);
 
+CREATE TABLE [dbo].[QuizSubmission] (
+  [attemptId] NVARCHAR(254) COLLATE Latin1_General_100_BIN2 NOT NULL,
+  [_id] CHAR(24) COLLATE Latin1_General_100_BIN2 NOT NULL,
+  [createdAt] DATETIME2(3) NULL,
+  [updatedAt] DATETIME2(3) NULL,
+  [__v] FLOAT(53) NULL,
+  [_payload] NVARCHAR(MAX) NOT NULL CHECK (ISJSON([_payload]) = 1),
+  [_version] BIGINT NOT NULL DEFAULT 0,
+  CONSTRAINT [PK_QuizSubmission] PRIMARY KEY ([_id]),
+  CHECK ([_id] IS NULL OR (LEN([_id]) = 24 AND [_id] NOT LIKE '%[^0-9a-f]%'))
+);
+CREATE UNIQUE NONCLUSTERED INDEX [IX_QuizSubmission_0_8b6dfb] ON [dbo].[QuizSubmission] ([attemptId] ASC);
+
 CREATE TABLE [dbo].[SiteNetwork] (
   [ipHash] NVARCHAR(254) COLLATE Latin1_General_100_BIN2 NOT NULL,
   [firstSeenAt] DATETIME2(3) NOT NULL,

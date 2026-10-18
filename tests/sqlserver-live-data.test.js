@@ -15,7 +15,7 @@ test('SQL and Azure notification DDL tracks bulk writes and deletions inside the
   assert.match(sql, /SET NOCOUNT ON/);
   assert.match(sql, /NOT EXISTS \(SELECT 1 FROM inserted\) AND NOT EXISTS \(SELECT 1 FROM deleted\)/);
   assert.doesNotMatch(sql, /\bDROP\b|\bTRUNCATE\b|DELETE FROM|ServiceBroker|CHANGE_TRACKING/i);
-  assert.equal(fs.readFileSync('database/migrations/002-public-live.sql', 'utf8'), require('../scripts/sqlserver-live-schema.cjs').sql);
+  assert.equal(fs.readFileSync('database/migrations/002-public-live.sql', 'utf8').replace(/\r\n/g, '\n'), require('../scripts/sqlserver-live-schema.cjs').sql.replace(/\r\n/g, '\n'));
 });
 
 test('revision comparisons retain full BIGINT precision and detect SQL target changes', async () => {

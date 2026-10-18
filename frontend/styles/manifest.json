@@ -7,6 +7,7 @@
     "frontend/styles/navigation.css",
     "frontend/styles/buttons.css",
     "frontend/styles/forms.css",
-    "frontend/styles/components.css"
+    "frontend/styles/components.css",
+    "frontend/styles/quiz.css"
   ]
 }

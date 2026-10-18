@@ -9,6 +9,25 @@ data/club-logins.generated.json
 # Local frontend audit snapshots, browser profiles, and screenshots.
 .frontend-audit/
 
+# Temporary browser profiles and local debugging helpers.
+/.tmp-*/
+/tmp-debug-*.js
+*.tmp
+
+# Generated logs and test reports.
+*.log
+coverage/
+playwright-report/
+test-results/
+
+# Personal editor and operating-system files.
+.vscode/
+.idea/
+*.code-workspace
+.DS_Store
+Thumbs.db
+Desktop.ini
+
 # Private conversation exports and database backups.
 ses_*.json
 *.bak

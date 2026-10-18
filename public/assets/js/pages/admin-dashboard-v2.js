@@ -91,7 +91,7 @@
   }
   const urls = { clubs: '/api/clubs?media=links', applications: '/api/admin/applications', heads: '/api/admin/club-heads',
     homepage: '/api/admin/homepage', archives: '/api/admin/clubs/archived', members: '/api/admin/club-members',
-    analytics: '/api/admin/visitor-analytics', data: '/api/admin/system/data-status' };
+    analytics: '/api/admin/visitor-analytics', 'quiz-points': '/api/admin/quiz-points', data: '/api/admin/system/data-status' };
   let overviewVersion = 0;
   async function overview(force = false) {
     const version = ++overviewVersion;
@@ -152,6 +152,13 @@
         $('toolContent').innerHTML = list(data.map(club => record(club.name, club.category || 'Archived club', `<button type="button" data-restore="${escape(club.id)}">Restore club</button>`)));
       } else if (id === 'members') {
         $('toolContent').innerHTML = data.map(club => `<section><h3>${escape(club.name)} <small>(${escape(club.totalCount ?? 0)} members)</small></h3>${list((club.members || []).map(member => record(member.name || member.studentName || member.email, [member.email, member.committee, member.position, member.memberType].filter(Boolean).join(' · '))))}</section>`).join('') || '<p class="v2-panel-note">No clubs to display.</p>';
+      } else if (id === 'quiz-points') {
+        const number = value => Number(value || 0).toLocaleString();
+        const maximum = Math.max(1, ...data.clubs.map(club => club.points));
+        $('toolContent').innerHTML = record('Accounts counted', number(data.totalSubmissions))
+          + '<p class="v2-panel-note">Each signed-in account contributes once per club. Retaking the quiz or reviewing answers updates that account’s points. Anonymous results are excluded.</p>'
+          + (data.totalSubmissions ? '' : '<p class="v2-panel-note" role="status">No signed-in quiz results recorded yet. Club totals will update as signed-in accounts finish the quiz.</p>')
+          + '<div class="v2-quiz-points">' + data.clubs.map((club, index) => `<article class="v2-quiz-points-row"><span class="v2-quiz-rank">${index + 1}</span><div><strong>${escape(club.name)}</strong><progress max="${maximum}" value="${club.points}" aria-label="${escape(club.name)} quiz points"></progress></div><strong>${number(club.points)} <small>pts</small></strong></article>`).join('') + '</div>';
       } else if (id === 'analytics') {
         $('toolContent').innerHTML = list([
           record('Unique visitors', data.uniqueVisitors ?? 'Unavailable'), record('Unique IP addresses', data.uniqueIpAddresses ?? 'Unavailable'),

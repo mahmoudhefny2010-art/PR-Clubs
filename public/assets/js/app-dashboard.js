@@ -1122,6 +1122,11 @@ async function init() {
       await openApplicationForm(requestedApplicationClubId);
       return;
     }
+    const requestedClubId = Number(query.get('club'));
+    if (requestedClubId && state.clubs.some((club) => club.id === requestedClubId)) {
+      await openClubDetail(requestedClubId);
+      return;
+    }
     if (query.get('myForms') === '1') {
       await loadMyForms();
       showView('myForms');

@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { toolIds } = require('./admin-dashboard-pages');
 const dependencies = {
+  'quiz-points': ['QuizSubmission', 'Club'],
   committees: ['Club', 'ClubAccount'], 'club-order': ['Club'], 'application-forms': ['Club'],
   'club-feedback': ['StudentFeedback', 'Club'], 'university-feedback': ['StudentFeedback', 'UniversityContent'],
   'club-analytics': ['Club', 'Application', 'SiteSetting', 'LocalClubViews'], 'event-analytics': ['Club', 'EventRegistration', 'StudentInterest', 'AttendanceRecord', 'SiteSetting', 'LocalEventViews'],

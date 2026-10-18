@@ -6405,6 +6405,16 @@ app.post('/api/password-reset/confirm', limitPasswordResetRequests, async (req, 
 });
 
 registerFeedbackRoutes(app, { Club, UniversityContent, requireStudentAuth, isAdminSessionValid, getClubAccountFromRequest, requireLiveDatabase });
+require('./services/quiz-analytics').registerQuizAnalytics(app, {
+  requireAdmin, requireLiveDatabase, getClubs: () => clubs,
+  getAccountEmail: async (req, res) => {
+    const student = await getStudentAccountFromRequest(req, res, false);
+    if (student) return student.email;
+    const staff = await getClubAccountFromRequest(req, res);
+    if (staff) return staff.email;
+    return await isAdminSessionValid(req, res) ? getConfiguredAdminEmail() : '';
+  }
+});
 app.use('/api/admin', requireAdmin);
 require('./services/security-center').registerSecurityCenter(app, { requireAdmin, AuditLog });
 app.get('/api/admin/login-settings', (req, res) => {

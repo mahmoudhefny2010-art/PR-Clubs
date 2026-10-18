@@ -36,6 +36,7 @@ const requests = [];
 let failSave = false;
 let homepage = { title: 'Welcome to MIU Clubs', subtitle: 'Find your community.' };
 const fixtures = {
+  '/api/admin/quiz-points': { totalSubmissions: 3, clubs: [{ clubId: 1, name: 'Science Club', points: 75 }, { clubId: 2, name: 'Art Club', points: 21 }] },
   '/api/clubs': [{ id: 1, name: 'Science Club', committee: 'Science', tagline: 'Explore science', description: 'Our science community', requirements: 'Curiosity', category: 'Science', status: 'open', image: '/assets/img/pics/pwa-icon-192.png', imagePublicId: 'existing/club', applicants: 7, seats: 20, members: 12, applicationFields: [{ key: 'interest', label: 'Interest', type: 'text' }] }, { id: 2, name: 'Art Club', status: 'closed' }],
   '/api/admin/applications': [{ id: 1, studentName: '<Student>', email: 'student@example.test', clubId: 1, committee: 'PR', status: 'pending' }],
   '/api/admin/club-heads': [{ clubId: 1, clubName: 'Science Club', email: 'head@example.test', committee: 'PR' }],
@@ -222,6 +223,23 @@ async function screenshot(name) {
   }
   await cdp.evaluate("document.documentElement.dataset.theme='light'");
   await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1100, deviceScaleFactor: 1, mobile: false });
+  if (process.argv.includes('--quiz-only')) {
+    assert.ok(await cdp.evaluate("!!document.querySelector('.v2-widget[data-tool=\"quiz-points\"]')"));
+    await cdp.send('Page.navigate', { url: origin + '/admin/quiz-points' });
+    await until("document.querySelectorAll('.v2-quiz-points-row').length===2");
+    assert.ok(await cdp.evaluate("document.getElementById('toolContent').textContent.includes('75') && document.getElementById('toolContent').textContent.includes('21')"));
+    for (const theme of ['light', 'dark']) {
+      await cdp.evaluate(`document.documentElement.dataset.theme='${theme}'`);
+      for (const width of [1440, 375]) {
+        await cdp.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: width < 760 });
+        assert.equal(await cdp.evaluate('document.documentElement.scrollWidth<=innerWidth'), true, 'Quiz points fit the viewport');
+        await screenshot(`quiz-points-${theme}-${width}`);
+      }
+    }
+    assert.deepEqual(cdp.events.filter(event => event.method === 'Runtime.exceptionThrown'), [], 'No browser script errors');
+    console.log('PASS: quiz points widget and club totals on desktop/mobile in both themes. Fixture data only.');
+    return;
+  }
   if (process.argv.includes('--appearance-only')) {
     await require('./admin-tool-appearance-checks.cjs')({ cdp, origin, toolIds, until, screenshot });
     assert.deepEqual(cdp.events.filter(event => event.method === 'Runtime.exceptionThrown'), [], 'No browser script errors');
