@@ -200,6 +200,22 @@ test('SQL unit of work commits successful callbacks and rolls back failures unde
   assert.deepEqual(calls.slice(-6), ['begin', 'lock', 'rollback', 'begin', 'lock', 'commit']);
 });
 
+test('SQL session startup preserves the original lock failure when rollback also fails', async t => {
+  const sql = require('mssql'), originals = { ConnectionPool: sql.ConnectionPool, Transaction: sql.Transaction, Request: sql.Request };
+  const saved = Object.fromEntries(Object.keys(env).map(k => [k, process.env[k]])); Object.assign(process.env, env);
+  const original = Object.assign(new Error('Injected application lock failure.'), { code: 'EREQUEST' });
+  const rollback = Object.assign(new Error('Transaction already aborted.'), { name: 'TransactionError', code: 'EABORT' });
+  sql.ConnectionPool = class extends require('node:events').EventEmitter { async connect() { this.connected = true; } async close() { this.connected = false; } request() { return { query: async () => ({ recordset: [{ level: 150 }] }) }; } };
+  sql.Transaction = class extends require('node:events').EventEmitter { async begin() {} async rollback() { throw rollback; } };
+  sql.Request = class { async query() { throw original; } };
+  t.after(async () => { await runtime.disconnect(); Object.assign(sql, originals); for (const [key, value] of Object.entries(saved)) if (value === undefined) delete process.env[key]; else process.env[key] = value; });
+  await runtime.connect({ readiness: false });
+  const session = new runtime.Session();
+  await assert.rejects(session.startTransaction(), error => error === original);
+  assert.equal(original.rollbackError, rollback);
+  assert.equal(session.transaction, null);
+});
+
 test('a migration connection cannot bypass later runtime readiness or missing notification triggers', async t => {
   const sql = require('mssql'), OriginalPool = sql.ConnectionPool;
   const saved = Object.fromEntries([...Object.keys(env), 'NODE_ENV'].map(key => [key, process.env[key]]));

@@ -11,6 +11,7 @@
   const current = new Map();
   const syncSucceeded = new Set();
   const actionableSections = new Set(['requests', 'attendanceApprovals', 'applicants']);
+  if (scope === 'supervisor') ['speakerRequests', 'miuAttendance'].forEach(section => actionableSections.add(section));
   if (['english', 'pr', 'security'].includes(scope)) actionableSections.add('allRequests');
   if (['pr', 'security'].includes(scope)) actionableSections.add('entryPermits');
   let activeSection = '';

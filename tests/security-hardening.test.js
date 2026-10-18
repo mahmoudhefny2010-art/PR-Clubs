@@ -6,7 +6,7 @@ const crypto = require('node:crypto');
 const express = require('express');
 const cors = require('cors');
 const security = require('../services/http-security');
-const { auditMiddleware } = require('../services/security-audit');
+const { auditMiddleware, summarizeChanges } = require('../services/security-audit');
 const { publicAbuseLimits } = require('../services/public-abuse-limits');
 const { sanitizePublicClub, publicClubProjection } = require('../services/public-club-media');
 const { validSponsorAttachment } = require('../services/attachment-validation');
@@ -88,10 +88,19 @@ test('security audit awaits persistence, redacts secrets and records actor/resul
   app.use(auditMiddleware({ model: { create: async entry => { await new Promise(resolve => setTimeout(resolve, 5)); entries.push(entry); } }, ready: () => true, ip: () => '192.0.2.1', adminEmail: () => '' }));
   app.post('/api/admin/accounts/password', (req, res) => res.json({ ok: true }));
   const origin = await listen(t, app);
-  const response = await fetch(origin + '/api/admin/accounts/password?token=do-not-log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: 'do-not-log', cookie: 'do-not-log', token: 'do-not-log' }) });
+  const response = await fetch(origin + '/api/admin/accounts/password?token=do-not-log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: 'do-not-log', cookie: 'do-not-log', token: 'do-not-log', title: 'Updated club title', status: 'open' }) });
   assert.equal(response.status, 200); assert.equal(entries.length, 1);
   assert.equal(entries[0].actorRole, 'admin'); assert.ok(Number.isSafeInteger(entries[0].id));
   assert.equal(JSON.stringify(entries).includes('do-not-log'), false);
+  assert.deepEqual(JSON.parse(entries[0].details).changes, [{ field: 'title', value: 'Updated club title' }, { field: 'status', value: 'open' }]);
+});
+test('audit change summaries expose safe requested fields and values while excluding private fields and values', () => {
+  const summary = summarizeChanges({ status: 'accepted', clubId: 4, title: 'Science Fair', name: 'Private Person', email: 'private@example.test', password: 'secret', attachment: 'private-file', customField: 'private note' });
+  assert.deepEqual(summary, [
+    { field: 'status', value: 'accepted' }, { field: 'clubId', value: 4 }, { field: 'title', value: 'Science Fair' }, { field: 'name' }, { field: 'customField' }
+  ]);
+  assert.equal(JSON.stringify(summary).includes('private@example.test'), false);
+  assert.equal(JSON.stringify(summary).includes('Private Person'), false);
 });
 test('public abuse limits share database counts across app instances and fail closed when storage is unavailable', async t => {
   const rows = new Map();

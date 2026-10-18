@@ -227,7 +227,10 @@
 .entry-permit-table tr:last-child td { border-bottom: 0; }
 .entry-permit-table input { font-weight: 400; }
 .content-review-update { margin: 8px 0; padding: 9px 11px; border: 1px solid #f1d39a; border-left: 3px solid #d97706; border-radius: 10px; background: #fff7e6; color: #78350f; font-size: .88rem; line-height: 1.5; overflow-wrap: anywhere; }
+.req-card > .content-review-update { box-sizing: border-box; flex: 1 0 100%; width: 100%; min-width: 0; }
 .content-review-update strong { color: #92400e; }
+.content-review-update > summary { cursor: pointer; color: inherit; font-weight: 700; }
+.content-review-update > p { margin: 8px 0 0; white-space: pre-wrap; }
 .content-card-permit-items { margin-top: 10px; }
 .entry-permit-row-remove { min-width: 38px; min-height: 38px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-soft); color: var(--text-main); font: inherit; cursor: pointer; }
 .entry-permit-form-footer { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding-top: 14px; border-top: 1px solid var(--border-color); }
@@ -621,10 +624,6 @@
   .status-overview-dialog .req-actions button { padding: 8px 10px; white-space: normal; }
 }
 
-@media (max-width: 380px) {
-  .status-overview-dialog .status-overview-list .req-card .req-actions { grid-template-columns: minmax(0, 1fr); }
-  .status-overview-dialog .status-overview-list .req-card .req-actions > * { grid-column: 1; }
-}
 .attendance-qr-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 14px; margin: 20px 0; }
 .attendance-qr-form label { display: grid; gap: 7px; font-weight: 700; }
 .attendance-qr-form select { min-width: 0; width: 100%; padding: 11px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-panel); color: var(--text-main); }

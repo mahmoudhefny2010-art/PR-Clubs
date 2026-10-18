@@ -4,7 +4,7 @@ const express = require('express');
 const { assignedIds, registerSupervisorDashboard } = require('../services/supervisor-dashboard');
 const { registerSupervisorAdmin } = require('../services/supervisor-admin');
 
-function query(value) { return { select() { return this; }, sort() { return this; }, lean: async () => value }; }
+function query(value) { return { select() { return this; }, sort() { return this; }, read() { return this; }, lean: async () => value }; }
 async function harness(t, overrides = {}) {
   const filters = []; const writes = [];
   const account = { _id: 'abc', email: 'doctor@example.edu', role: 'supervisor', assignedClubIds: [1] };
@@ -16,6 +16,11 @@ async function harness(t, overrides = {}) {
     ContentRequest: { aggregate: async pipeline => { filters.push(pipeline[0].$match); return []; }, find: filter => { filters.push(filter); return query([]); }, exists: async filter => { filters.push(filter); return filter.clubId === 1 && filter.id === 2; } },
     SpeakerRequest: { find: filter => { filters.push(filter); return query([]); }, exists: async filter => { filters.push(filter); return false; } },
     AttendanceRecord: { aggregate: async filter => { filters.push(filter[0].$match); return []; } },
+    EventRegistration: { find: filter => { filters.push(filter); return query([
+      { eventIndex: 0, eventTitle: 'Event', name: 'Student One', email: 'student@example.edu', createdAt: new Date('2026-10-18T08:00:00Z') },
+      { eventIndex: 0, eventTitle: 'Renamed event', name: 'Stale record', email: 'stale@example.edu' },
+      { eventIndex: 3, eventTitle: 'Event', name: 'Different event', email: 'other@example.edu' }
+    ]); } },
     Review: { find: filter => { filters.push(filter); return query([]); }, findOneAndUpdate: async (filter, update) => { writes.push(filter); return { note: update.$set.note, updatedAt: new Date() }; } },
     publicSpeakerRequest: value => value,
     ...overrides
@@ -43,11 +48,20 @@ test('assigned supervisor reads scoped data without attendee personal informatio
   assert.equal(result.body.club.events[0].attendeeEmail, undefined);
   assert.ok(filters.every(filter => filter.clubId === 1 || filter.id === 1));
 });
+test('assigned supervisor can view registrations grouped only under current assigned-club events', async t => {
+  const { request, filters } = await harness(t);
+  const result = await request('/clubs/1/registrations');
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body.events, [{ title: 'Event', date: '', time: '', location: '', registrations: [
+    { name: 'Student One', email: 'student@example.edu', registeredAt: '2026-10-18T08:00:00.000Z' }
+  ] }]);
+  assert.deepEqual(filters.find(filter => filter && filter.clubId === 1), { clubId: 1 });
+});
 test('anonymous, other roles, unassigned URLs and malformed IDs are denied before lookup', async t => {
   const { request, filters } = await harness(t);
   assert.equal((await request('/clubs', { headers: { 'x-account': 'none' } })).status, 401);
   assert.equal((await request('/clubs', { headers: { 'x-account': 'president' } })).status, 403);
-  for (const path of ['/clubs/2', '/clubs/1e0', '/clubs/-1']) assert.equal((await request(path)).status, 404);
+  for (const path of ['/clubs/2', '/clubs/2/registrations', '/clubs/1e0', '/clubs/-1']) assert.equal((await request(path)).status, 404);
   assert.equal(filters.length, 0);
 });
 test('review writes enforce both assigned club and request ownership; do not change workflow status', async t => {

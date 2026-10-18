@@ -68,7 +68,7 @@ const ContentStudio = (() => {
         <div class="meta"><span class="type-badge type-${escapeHtml(item.type)}">${escapeHtml(label)}</span>${escapeHtml(contentMeta(item)) || 'no details'}</div>
         ${renderPermitItems(item)}
         <div><span class="status-badge status-${escapeHtml(item.status)}" title="Request status">${escapeHtml(item.status.replaceAll('_', ' '))}</span></div>
-        ${item.clubNotice ? `<div class="content-review-update" role="status"><strong>Review update:</strong> ${escapeHtml(item.clubNotice)}</div>` : ''}
+        ${item.clubNotice ? `<details class="content-review-update"><summary title="Open the full review update">Review update</summary><p>${escapeHtml(item.clubNotice)}</p></details>` : ''}
         ${activeComment ? `<section class="review-comments" style="margin-top:10px"><strong>Active comment</strong><p class="meta" style="margin:5px 0;white-space:pre-wrap"><strong>${reviewerNames[activeComment.role]}:</strong> ${escapeHtml(activeComment.text)}</p></section>` : ''}
         <div class="content-task-actions">
           ${accountRole === 'head'

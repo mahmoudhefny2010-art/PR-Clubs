@@ -8,7 +8,7 @@ const dependencies = {
   'club-analytics': ['Club', 'Application', 'SiteSetting', 'LocalClubViews'], 'event-analytics': ['Club', 'EventRegistration', 'StudentInterest', 'AttendanceRecord', 'SiteSetting', 'LocalEventViews'],
   'account-passwords': ['ClubAccount'], 'admin-settings': ['AdminAuthState'],
   'website-content': ['Club', 'UniversityContent'], profile: ['AccountPhoto', 'AdminAuthState', 'ClubAccount'],
-  clubs: ['Club'], archives: ['Club'], homepage: ['SiteSetting'], applications: ['Application', 'Club'],
+  clubs: ['Club'], archives: ['Club'], 'excel-review': ['Club', 'ClubAccount'], homepage: ['SiteSetting'], applications: ['Application', 'Club'],
   heads: ['ClubAccount', 'Club'], members: ['Club', 'Application'], staff: ['ClubAccount', 'Club', 'AdminAuthState'],
   supervisors: ['ClubAccount', 'Club'], publishing: ['UniversityContent'],
   'miu-attendance': ['UniversityContent', 'AttendanceSession', 'AttendanceAssignment', 'AttendanceActivityClosure'],

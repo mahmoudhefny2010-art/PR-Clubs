@@ -19,6 +19,7 @@ function renderDashboardPage(root, tool = '') {
   const assets = [], scripts = [];
   let content = '';
   if (tool === 'clubs') scripts.push('cloudinary-upload');
+  if (tool === 'excel-review') scripts.push('cloudinary-upload', 'pages/admin-excel-import');
   if (tool === 'profile') scripts.push('cloudinary-upload');
   const main = relative => source(relative).match(/<main\b[^>]*>([\s\S]*?)<\/main>/i)[1];
   if (['staff', 'supervisors'].includes(tool)) {
@@ -40,7 +41,7 @@ function renderDashboardPage(root, tool = '') {
   html = html.replace('data-tool=""', `data-tool="${tool}"`)
     .replace('<!-- TOOL_CONTENT -->', content)
     .replace('<!-- TOOL_STYLES -->', assets.map(name => `<link rel="stylesheet" href="/assets/css/pages/${name}.css">`).join('\n'))
-    .replace('<!-- TOOL_SCRIPTS -->', scripts.map(name => `<script src="/assets/js/${name}.js?v=20261015supervisoremail1" defer></script>`).join('\n'));
+    .replace('<!-- TOOL_SCRIPTS -->', scripts.map(name => `<script src="/assets/js/${name}.js?v=20261017clubimport2" defer></script>`).join('\n'));
   if (tool) html = html.replace('id="overviewPage"', 'id="overviewPage" hidden').replace('id="toolPage" hidden', 'id="toolPage"');
   return html;
 }

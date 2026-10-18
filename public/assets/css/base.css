@@ -1348,6 +1348,15 @@ button:disabled,
 
 .president-dashboard-main { min-width: 0; }
 .president-dashboard-main [id] { scroll-margin-top: 24px; }
+.club-registrations-list { display: grid; gap: 12px; margin-top: 16px; }
+.club-registration-event { min-width: 0; padding: 16px; border: 1px solid var(--border-color); border-radius: var(--radius-lg); background: var(--bg-panel); box-shadow: var(--shadow-sm); }
+.club-registration-event > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.club-registration-event h4 { margin: 0 0 6px; overflow-wrap: anywhere; }
+.club-registration-event header p { margin: 0; color: var(--text-muted); }
+.club-registration-event header > strong { color: var(--primary-700); font-size: 1.2rem; }
+.club-registration-event li > div { display: grid; gap: 4px; min-width: 0; }
+.club-registration-event li a { overflow-wrap: anywhere; }
+.club-registration-event time { flex: 0 0 auto; color: var(--text-muted); font-size: .85rem; }
 
 .president-overview-heading { margin-bottom: 16px; }
 .president-dashboard-section .stats-row {
@@ -2424,6 +2433,7 @@ button:disabled,
 }
 
 .footer-credit { min-width: 0; }
+.footer-mobile-colon { display: none; }
 .footer-authors { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 0 5px; }
 .footer-authors > a { white-space: nowrap; }
 
@@ -2477,9 +2487,12 @@ button:disabled,
   }
 
   .footer-copy,
-  .footer-credit { max-width: 100%; font-size: .82rem; text-wrap: pretty; }
+  .footer-credit { width: 100%; max-width: 100%; font-size: .82rem; text-wrap: pretty; overflow-wrap: anywhere; }
   .footer-credit > span:first-child { display: block; }
-  .footer-authors { flex-wrap: nowrap; gap: 0 6px; }
+  .footer-mobile-colon { display: inline; }
+  .footer-authors { display: flex; width: 100%; flex-wrap: wrap; gap: 2px 6px; }
+  .footer-authors > a { white-space: normal; overflow-wrap: anywhere; }
+  .footer-authors > span[aria-hidden="true"] { display: none; }
 }
 
 @media (max-width: 380px) {

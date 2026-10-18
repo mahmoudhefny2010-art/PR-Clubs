@@ -56,11 +56,19 @@ class Session {
       // One application write lock avoids lock-order deadlocks across the legacy
       // multi-model workflows. Revisit partitioning only after concurrency QA.
       await request(this).query("SET XACT_ABORT ON; DECLARE @result INT; EXEC @result = sys.sp_getapplock @Resource=N'miu-platform-write-v1', @LockMode='Exclusive', @LockOwner='Transaction', @LockTimeout=15000; IF @result < 0 THROW 51000, 'Platform write lock unavailable.', 1;");
-    } catch (error) { await this.abortTransaction(); throw error; }
+    } catch (error) {
+      try { await this.abortTransaction(); }
+      catch (rollbackError) { error.rollbackError = rollbackError; }
+      throw error;
+    }
   }
   startTransaction() { this.pending = this.begin(); return this.pending; }
   async commitTransaction() { await this.pending; if (this.transaction && !this.rolledBack) await this.transaction.commit(); this.transaction = null; }
-  async abortTransaction() { if (this.transaction && !this.rolledBack) await this.transaction.rollback(); this.transaction = null; }
+  async abortTransaction() {
+    const transaction = this.transaction;
+    this.transaction = null;
+    if (transaction && !this.rolledBack) await transaction.rollback();
+  }
   async endSession() { await this.pending?.catch(() => {}); await this.abortTransaction(); }
   async withTransaction(fn) {
     await this.begin();

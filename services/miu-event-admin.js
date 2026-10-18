@@ -1,5 +1,5 @@
 function registerMiuEventAdmin(app, deps) {
-  const { UniversityContent, databaseReady, sameOrigin, cleanText, parseInteraction, readCloudinaryAsset,
+  const { UniversityContent, EventRegistration, databaseReady, sameOrigin, cleanText, parseInteraction, readCloudinaryAsset,
     cloudinary, cloudinaryFolders, cloudinaryConfigured, dispatchPublishedContentNotifications, toApiRecord,
     requireMiuEventsDashboard } = deps;
   app.use('/api/miu-events', requireMiuEventsDashboard);
@@ -12,6 +12,26 @@ function registerMiuEventAdmin(app, deps) {
     } catch (error) {
       console.error('MIU Events dashboard read failed:', error.name);
       res.status(503).json({ message: 'Could not load MIU updates right now.' });
+    }
+  });
+  app.get('/api/miu-events/registrations', async (req, res) => {
+    try {
+      if (!databaseReady()) return res.status(503).json({ message: 'MIU event storage is temporarily unavailable.' });
+      const [events, registrations] = await Promise.all([
+        UniversityContent.find({ type: 'event', registrationEnabled: true }).read('primary').readConcern('majority').sort({ date: 1, id: 1 }).lean(),
+        EventRegistration.find({ clubId: 0 }).read('primary').readConcern('majority').sort({ createdAt: -1 }).lean()
+      ]);
+      res.setHeader('Cache-Control', 'no-store');
+      res.json(events.map(event => ({
+        id: event.id, title: event.title, date: event.date || '', time: event.time || '', location: event.location || '',
+        registrations: registrations.filter(registration => registration.eventIndex === event.id
+          && (registration.eventRequestId === event.id || registration.eventRequestId == null)
+          && (!registration.eventTitle || registration.eventTitle === event.title))
+          .map(registration => ({ name: registration.name, email: registration.email, registeredAt: registration.createdAt }))
+      })));
+    } catch (error) {
+      console.error('MIU event registrations read failed:', error.name);
+      res.status(503).json({ message: 'Could not load MIU event registrations right now.' });
     }
   });
   app.post('/api/miu-events/content', async (req, res) => {

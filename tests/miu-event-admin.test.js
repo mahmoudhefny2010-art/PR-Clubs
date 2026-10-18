@@ -19,6 +19,7 @@ async function fixture(t, options = {}) {
       exists: () => ({ read() { return this; }, readConcern() { return this; }, then(resolve) { resolve(null); } }),
       ...options.model
     },
+    EventRegistration: { find: () => query(options.registrations || []) },
     databaseReady: () => options.databaseReady !== false,
     sameOrigin: req => req.headers.origin === 'http://127.0.0.1',
     cleanText: (value, max) => String(value || '').trim().slice(0, max),
@@ -41,6 +42,23 @@ test('MIU events content API is isolated to the assigned role and handles databa
   const { request } = await fixture(t, { databaseReady: false });
   assert.equal((await request('/api/miu-events/content')).status, 403);
   assert.equal((await request('/api/miu-events/content', 'miu_events')).status, 503);
+});
+
+test('MIU event registration list is protected and groups registrations under their event', async t => {
+  const { request } = await fixture(t, { registrations: [
+    { eventIndex: 17, eventRequestId: 17, eventTitle: 'Welcome', name: 'Student One', email: 'one@miuegypt.edu.eg', createdAt: '2026-10-01T10:00:00.000Z' },
+    { eventIndex: 18, eventRequestId: 18, eventTitle: 'Old Other title', name: 'Wrong Event', email: 'wrong@miuegypt.edu.eg' }
+  ], model: { find: () => query([
+    { id: 17, type: 'event', registrationEnabled: true, title: 'Welcome', date: '2026-10-22' },
+    { id: 18, type: 'event', registrationEnabled: true, title: 'Other' }
+  ]) } });
+  assert.equal((await request('/api/miu-events/registrations')).status, 403);
+  const response = await request('/api/miu-events/registrations', 'miu_events');
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), [
+    { id: 17, title: 'Welcome', date: '2026-10-22', time: '', location: '', registrations: [{ name: 'Student One', email: 'one@miuegypt.edu.eg', registeredAt: '2026-10-01T10:00:00.000Z' }] },
+    { id: 18, title: 'Other', date: '', time: '', location: '', registrations: [] }
+  ]);
 });
 
 test('MIU Events event publishing requires an explicit audience before writing', async t => {

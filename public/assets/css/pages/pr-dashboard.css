@@ -12,6 +12,15 @@
       .req-actions .delete { background: #fee2e2; border-color: #fca5a5; color: #991b1b; }
       .req-actions .view-details { display: inline-flex; align-items: center; gap: 6px; }
       .req-actions .view-details svg { width: 15px; height: 15px; }
+      /* The action bar intentionally occupies its own row. Let the card wrap
+         so the summary and action buttons keep their natural readable width. */
+      #requestsList { display: grid; gap: 12px; min-width: 0; }
+      #requestsList > .req-card { box-sizing: border-box; width: 100%; min-width: 0; align-items: center; flex-wrap: wrap; gap: 12px 14px; margin: 0; }
+      #requestsList > .req-card > img { box-sizing: border-box; flex: 0 0 90px; width: 90px; height: 90px; }
+      #requestsList > .req-card > .req-summary { flex: 1 1 calc(100% - 110px) !important; min-width: 0; overflow-wrap: anywhere; }
+      #requestsList > .req-card > .req-actions { display: flex; flex: 1 0 100%; align-items: center; gap: 8px; width: 100%; margin: 0; }
+      #requestsList > .req-card > .req-actions > input { flex: 1 1 220px; min-width: min(100%, 220px); }
+      #requestsList > .req-card > .req-actions > button { flex: 0 0 auto; min-height: 40px; white-space: nowrap; }
       .request-dialog { width: min(680px, calc(100% - 28px)); max-height: min(82vh, 800px); padding: 0; border: 0; border-radius: 20px; box-shadow: 0 24px 80px #0004; }
       .request-dialog, .status-overview-dialog, .review-history-dialog { color-scheme: light; background: #fff; color: #111827; }
       :root[data-theme="dark"] .request-dialog, :root[data-theme="dark"] .status-overview-dialog, :root[data-theme="dark"] .review-history-dialog { color-scheme: dark; background: #202020; color: #f3f4f6; }
@@ -48,3 +57,12 @@
       .status-overview-pill.rejected { background: #fee2e2; color: #991b1b; }
       .status-overview-pill.draft { background: #f3f4f6; color: #4b5563; }
       @media (max-width: 560px) { .detail-grid { grid-template-columns: 1fr; } .detail-wide { grid-column: auto; } }
+      @media (max-width: 700px) {
+        #requestsList > .req-card { align-items: flex-start; }
+        #requestsList > .req-card > img { flex-basis: 64px; width: 64px; height: 64px; }
+        #requestsList > .req-card > .req-summary { flex-basis: calc(100% - 78px) !important; }
+        #requestsList > .req-card > .req-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        #requestsList > .req-card > .req-actions > input,
+        #requestsList > .req-card > .req-actions > .view-details { grid-column: 1 / -1; width: 100%; }
+        #requestsList > .req-card > .req-actions > :is(button, input) { box-sizing: border-box; min-width: 0; max-width: 100%; min-height: 42px; white-space: normal; overflow-wrap: anywhere; }
+      }

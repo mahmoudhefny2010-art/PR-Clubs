@@ -14,6 +14,8 @@
     external: '<path d="M14 3h7v7m0-7L10 14M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5"/>',
     arrow: '<path d="M5 12h14m-6-6 6 6-6 6"/>',
     refresh: '<path d="M20 7v5h-5M4 17v-5h5M5 8a8 8 0 0 1 13-3l2 3M4 16l2 3a8 8 0 0 0 13-3"/>',
+    history: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5m4-1v5l3 2"/>',
+    code: '<path d="m8 17-5-5 5-5m8 10 5-5-5-5m-2-12-4 24"/>',
     search: '<circle cx="10" cy="10" r="6"/><path d="m15 15 6 6"/>',
     archive: '<rect x="3" y="3" width="18" height="5" rx="1"/><path d="M5 8v13h14V8m-10 5h6"/>',
     shield: '<path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3Z"/><path d="m8 12 3 3 5-6"/>',
@@ -58,9 +60,14 @@
     const response = await fetch(url, { credentials: 'same-origin', cache: 'no-store', ...options,
       headers: { 'Content-Type': 'application/json', ...options.headers } });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(response.status === 401 || response.status === 403
-      ? 'Your admin session has expired or access is unavailable. Sign in again to continue.'
-      : data.message || 'Could not load this information. Please try again.');
+    if (!response.ok) {
+      const error = new Error(response.status === 401 || response.status === 403
+        ? 'Your admin session has expired or access is unavailable. Sign in again to continue.'
+        : data.message || 'Could not load this information. Please try again.');
+      error.status = response.status;
+      error.commitUncertain = data.commitUncertain === true;
+      throw error;
+    }
     return data;
   }
   const read = url => request(url);
@@ -133,6 +140,8 @@
           const result = await request('/api/admin/accounts/password-reset', { method: 'POST', body: JSON.stringify({ email: form.elements.email.value.trim() }) });
           return result.message || 'Password reset link sent.';
         }));
+      } else if (id === 'excel-review') {
+        window.mountAdminExcelImport({ read, request, escape, invalidate, refresh: () => overview(true) });
       } else if (id === 'clubs') {
         await window.renderAdminClubEditor({ data, request, read, escape, list, record, saveForm });
       } else if (id === 'heads') {
@@ -151,7 +160,7 @@
         ]) + '<h2 class="v2-section-title">Who is online</h2>' + list((data.activePeople || []).map(person => record(person.name || person.email || person.deviceCode || 'Visitor',
           [person.email, person.label, person.deviceCode, person.deviceName, person.browserName, person.ipAddress, person.lastSeenAt ? new Date(person.lastSeenAt).toLocaleString() : ''].filter(Boolean).join(' · '))));
       } else if (id === 'data') {
-        const security = await read('/api/admin/security/audit').catch(() => null);
+        const security = await read('/api/admin/security/audit?limit=50').catch(() => null);
         if (version !== panelVersion) return;
         $('toolContent').innerHTML = record('Database', data.database?.connected ? 'Connected' : 'Unavailable')
           + list((data.sections || []).map(section => record(section.title, `${section.count ?? '—'} records · ${section.detail || ''}`)))
@@ -161,6 +170,60 @@
           + '<a class="v2-action secondary" href="https://myaccount.google.com/signinoptions/two-step-verification" target="_blank" rel="noopener noreferrer">Protect your Google account</a>'
           + '<h2 class="v2-section-title">Recent security activity</h2>'
           + (security ? list(security.logs.map(entry => record(entry.action, [entry.actorEmail, entry.actorRole, entry.timestamp ? new Date(entry.timestamp).toLocaleString() : '', entry.targetId].filter(Boolean).join(' · ')))) : '<p class="v2-panel-note">Security activity is temporarily unavailable. Refresh to try again.</p>');
+      } else if (id === 'all-activity-log' || id === 'developer-activity-log') {
+        const developerOnly = id === 'developer-activity-log';
+        const security = await read(developerOnly ? '/api/admin/security/audit?actorRole=software_development' : '/api/admin/security/audit');
+        if (version !== panelVersion) return;
+        const logs = (Array.isArray(security.logs) ? security.logs : []).filter(entry => (!developerOnly || String(entry.actorRole || '').toLowerCase() === 'software_development')
+          && !/(?:switch-dashboard|\/login(?:\/|$)|\/logout(?:\/|$)|\/session(?:\/|$))/.test(String(entry.action || '')));
+        const date = value => {
+          const parsed = value ? new Date(value) : null;
+          return parsed && !Number.isNaN(parsed.getTime()) ? parsed.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : 'Time unavailable';
+        };
+        const actionName = (value, changes = []) => {
+          const match = String(value || '').match(/^(GET|POST|PUT|PATCH|DELETE)\s+(.+)$/);
+          if (!match) return changes.length ? `Updated ${changes.slice(0, 3).map(change => escape(change.field)).join(', ')}` : 'Earlier change (details unavailable)';
+          const route = match[2].toLowerCase();
+          if (/\/clubs(?:\/|$)/.test(route)) {
+            if (/\/archive(?:\/|$)/.test(route)) return 'Archived a club';
+            if (/\/restore(?:\/|$)/.test(route)) return 'Restored a club';
+            if (/\/order(?:\/|$)/.test(route)) return 'Changed club display order';
+            return match[1] === 'POST' ? 'Added a club' : 'Edited club information';
+          }
+          const topics = [
+            [/club-heads|staff-accounts|supervisors/, 'staff roles and access'], [/applications/, 'an application'],
+            [/homepage/, 'the homepage'], [/university-content/, 'university events or announcements'],
+            [/club\/content|content-requests/, 'club content'], [/speaker-requests|speaker-invites/, 'speaker request details'],
+            [/members/, 'club member details'], [/attendance/, 'event attendance settings'], [/committee-availability/, 'committee availability'],
+            [/password-reset|accounts\/password/, 'account access settings']
+          ];
+          const subject = topics.find(([pattern]) => pattern.test(route))?.[1];
+          if (subject) {
+            if (match[1] === 'DELETE') return `Removed ${subject}`;
+            if (match[1] === 'POST' && /^(?:\/api\/admin\/club-heads|\/api\/admin\/university-content|\/api\/admin\/clubs)$/.test(route)) return `Added ${subject}`;
+            return `Edited ${subject}`;
+          }
+          const fields = changes.slice(0, 3).map(change => String(change.field || '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').toLowerCase()).filter(Boolean);
+          return fields.length ? `Updated ${fields.join(', ')}` : 'Earlier change (details unavailable)';
+        };
+        const entries = logs.map(entry => {
+          let outcome = '';
+          let auditDetails = {};
+          try { auditDetails = JSON.parse(entry.details || '{}'); outcome = auditDetails.outcome || ''; } catch {}
+          const status = outcome === 'success' ? 'Completed' : outcome === 'denied-or-failed' ? 'Denied or failed' : '';
+          const target = entry.targetId ? `Record ${entry.targetId}` : '';
+          const detailId = `activity-${logs.indexOf(entry)}`;
+          const changes = Array.isArray(auditDetails.changes) ? auditDetails.changes : [];
+          const title = actionName(entry.action, changes);
+          const changeRows = changes.length ? changes.map(change => `<li><strong>${escape(String(change.field || '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').toLowerCase())}</strong>${Object.hasOwn(change, 'value') ? ` <span aria-label="submitted value">→ ${escape(typeof change.value === 'object' ? JSON.stringify(change.value) : change.value)}</span>` : ''}</li>`).join('') : `<li>${Array.isArray(auditDetails.changes) ? 'No editable fields were included in this operation.' : 'Field details were not recorded for this older log entry.'}</li>`;
+          const resultText = outcome === 'success' ? 'Saved successfully' : auditDetails.status === 403 ? 'Not saved: this account does not have permission' : auditDetails.status === 401 ? 'Not saved: sign in again and retry' : auditDetails.status >= 500 ? 'Not saved: the server encountered an error' : 'Not saved: check the information and try again';
+          const roleLabels = { software_development: 'Software Development', admin: 'Administrator', president: 'Club President', vice_president: 'Vice President', head: 'Committee Head', supervisor: 'Supervisor', student: 'Student', dean: 'Dean', miu_events: 'MIU Events', pr: 'PR', english: 'English Department', security: 'Security Office', sso: 'SSO' };
+          const roleLabel = roleLabels[String(entry.actorRole || '').toLowerCase()] || String(entry.actorRole || 'Staff').replace(/[_-]+/g, ' ');
+          return `<article class="v2-activity-entry"><span class="v2-activity-icon" aria-hidden="true">${icon(developerOnly ? 'code' : 'history')}</span><div class="v2-activity-main"><div class="v2-activity-heading"><strong>${escape(title)}</strong><time datetime="${escape(entry.timestamp || '')}">${escape(date(entry.timestamp))}</time></div><p><button type="button" class="v2-activity-actor" aria-expanded="false" aria-controls="${detailId}" data-activity-toggle="${detailId}">${escape(entry.actorEmail || 'Unknown account')}</button><span class="v2-activity-role">${escape(roleLabel)}</span>${target ? `<span>${escape(target)}</span>` : ''}<span class="v2-activity-status ${outcome === 'success' ? 'is-success' : 'is-error'}">${escape(resultText)}</span></p><div class="v2-activity-detail" id="${detailId}" hidden><p><strong>Activity:</strong> ${escape(title)}</p><p><strong>Result:</strong> ${escape(resultText)}</p><p><strong>What was changed:</strong></p><ul>${changeRows}</ul></div></div></article>`;
+        });
+        const heading = developerOnly ? 'Developer Activity Log' : 'All Activity Log';
+        const description = developerOnly ? 'Changes made by Software Development accounts.' : 'All recorded changes across website accounts and roles.';
+        $('toolContent').innerHTML = `<section class="v2-activity-card" aria-label="${heading}"><div class="v2-activity-card-heading"><div><h2>${heading}</h2><p>${description}</p></div><span class="v2-activity-count">${logs.length} ${logs.length === 1 ? 'change' : 'changes'}</span></div>${entries.length ? `<div class="v2-activity-list">${entries.join('')}</div>` : '<p class="v2-panel-note">No recorded changes are available yet.</p>'}<p class="v2-activity-note">All available recorded changes are shown. Private fields are excluded.</p></section>`;
       } else {
         await window.renderAdminDashboardFeature({ id, data, request, read, escape, list, record, saveForm });
       }
@@ -181,6 +244,12 @@
     finally { button.disabled = false; }
   }
   $('toolContent').addEventListener('click', async event => {
+    const activityToggle = event.target.closest('[data-activity-toggle]');
+    if (activityToggle) {
+      const panel = $(activityToggle.dataset.activityToggle);
+      if (panel) { panel.hidden = !panel.hidden; activityToggle.setAttribute('aria-expanded', String(!panel.hidden)); }
+      return;
+    }
     const button = event.target.closest('[data-application], [data-restore]');
     if (!button || button.disabled) return;
     const restore = button.hasAttribute('data-restore');
@@ -219,7 +288,8 @@
   $('dashboardDate').textContent = new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
   const dirty = () => $('toolContent').dataset.v2Saving === 'true'
     || Boolean(document.querySelector('#toolContent form[data-miu-dirty="true"]'))
-    || Boolean($('miuAttendanceQr') && !$('miuAttendanceQr').classList.contains('hidden'));
+    || Boolean($('miuAttendanceQr') && !$('miuAttendanceQr').classList.contains('hidden'))
+    || Boolean(activeTool === 'excel-review' && ($('excelReviewFile')?.files?.length || $('excelImportConfirm')?.disabled));
   async function refreshData(manual = false) {
     if (dirty()) {
       if (!manual) { $('pendingUpdates').hidden = false; return; }

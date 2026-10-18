@@ -57,13 +57,13 @@ test('removes a manual member, updates count and cache, and does not remove othe
   assert.equal((await h.remove('one')).statusCode, 200);
   const s = h.snapshot();
   assert.deepEqual(s.dbClub.memberRoster, [{ id: 'two' }]);
-  assert.equal(s.dbClub.members, 22);
+  assert.equal(s.dbClub.members, 1, 'stored count is synchronized from the remaining member records');
   assert.equal(s.dbClub.removedMembers[0].status, 'removed');
   assert.equal(s.dbClub.removedMembers[0].id, 'one');
   assert.deepEqual(s.clubs[0], s.dbClub);
   assert.equal(s.ended, true);
   assert.equal((await h.remove('one')).statusCode, 404);
-  assert.equal(h.snapshot().dbClub.members, 22);
+  assert.equal(h.snapshot().dbClub.members, 1);
 });
 
 test('removes both membership sources and duplicate accepted applications without deleting history or touching another club', async () => {

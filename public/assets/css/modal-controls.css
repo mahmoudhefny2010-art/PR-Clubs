@@ -126,6 +126,56 @@ dialog::backdrop {
 
 /* Keep action buttons aligned and easy to tap in cards on narrow screens. */
 @media (max-width: 600px) {
+  :is(.committee-dashboard-layout, .admin-v2) :is(
+    .committee-top .top-actions, .sso-hero .top-actions, .president-form-actions,
+    .committee-head-actions, .committee-head-edit-actions, .form-actions,
+    .button-row, .button-group, .dialog-actions, .modal-actions, .card-actions,
+    .review-actions, .dashboard-actions, .supervisor-decision-actions,
+    .supervisor-request-actions
+  ) {
+    box-sizing: border-box;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+  }
+
+  :is(.committee-dashboard-layout, .admin-v2) :is(
+    .committee-top .top-actions, .sso-hero .top-actions, .president-form-actions,
+    .committee-head-actions, .committee-head-edit-actions, .form-actions,
+    .button-row, .button-group, .dialog-actions, .modal-actions, .card-actions,
+    .review-actions, .dashboard-actions, .supervisor-decision-actions,
+    .supervisor-request-actions
+  ) > :is(a, button, input, select, textarea) {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    min-height: 44px;
+  }
+
+  :is(.committee-dashboard-layout, .admin-v2) :is(
+    .committee-top .top-actions, .sso-hero .top-actions, .president-form-actions,
+    .committee-head-actions, .committee-head-edit-actions, .form-actions,
+    .button-row, .button-group, .dialog-actions, .modal-actions, .card-actions,
+    .review-actions, .dashboard-actions, .supervisor-decision-actions,
+    .supervisor-request-actions
+  ) > :is(input[type="text"], input[type="email"], input[type="search"], select, textarea, [role="status"]) {
+    grid-column: 1 / -1;
+  }
+
+  :is(.committee-dashboard-layout, .admin-v2) :is(
+    .committee-top .top-actions, .sso-hero .top-actions, .president-form-actions,
+    .committee-head-actions, .committee-head-edit-actions, .form-actions,
+    .button-row, .button-group, .dialog-actions, .modal-actions, .card-actions,
+    .review-actions, .dashboard-actions, .supervisor-decision-actions,
+    .supervisor-request-actions
+  ) > :is(button, a, input[type="button"], input[type="submit"]):last-of-type:nth-of-type(odd) {
+    grid-column: 1 / -1;
+  }
+
   :is(.req-card, .application-card, .record, .content-card, .speaker-request-card)
   :is(.req-actions, .card-actions, .record-actions, .application-actions, .content-card-actions) {
     display: grid !important;
@@ -157,10 +207,19 @@ dialog::backdrop {
 
   :is(.req-card, .application-card, .record, .content-card, .speaker-request-card)
   :is(.req-actions, .card-actions, .record-actions, .application-actions, .content-card-actions)
+  > :is(input, .view-details, [role="status"]) { grid-column: 1 / -1; }
+
+  .req-card .req-actions > .view-details svg { display: block; flex: 0 0 18px; width: 18px; height: 18px; }
+
+  :is(.req-card, .application-card, .record, .content-card, .speaker-request-card)
+  :is(.req-actions, .card-actions, .record-actions, .application-actions, .content-card-actions)
   > :is(.delete, .delete-request, [data-action="delete"]) { grid-column: 1 / -1; }
 
   /* Keep request-card actions balanced: decision buttons and edit/delete share rows. */
   .req-card .req-actions > :is(.changes, .delete) { grid-column: auto; }
+  /* A third decision is a full row; the preceding two remain a balanced pair. */
+  .req-card .req-actions > .changes:nth-last-child(2) { grid-column: 1 / -1; }
+  .supervisor-request-card .req-actions > .reject { grid-column: 1 / -1; }
   /* Applicant Preview and Delete stay balanced; the generic delete rule spans a row. */
   .head-applicant-card .head-applicant-actions > [data-action="delete"] { grid-column: auto; }
 }

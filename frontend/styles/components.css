@@ -1559,6 +1559,7 @@
 }
 
 .footer-credit { min-width: 0; }
+.footer-mobile-colon { display: none; }
 .footer-authors { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 0 5px; }
 .footer-authors > a { white-space: nowrap; }
 
@@ -1612,9 +1613,12 @@
   }
 
   .footer-copy,
-  .footer-credit { max-width: 100%; font-size: .82rem; text-wrap: pretty; }
+  .footer-credit { width: 100%; max-width: 100%; font-size: .82rem; text-wrap: pretty; overflow-wrap: anywhere; }
   .footer-credit > span:first-child { display: block; }
-  .footer-authors { flex-wrap: nowrap; gap: 0 6px; }
+  .footer-mobile-colon { display: inline; }
+  .footer-authors { display: flex; width: 100%; flex-wrap: wrap; gap: 2px 6px; }
+  .footer-authors > a { white-space: normal; overflow-wrap: anywhere; }
+  .footer-authors > span[aria-hidden="true"] { display: none; }
 }
 
 @media (max-width: 380px) {

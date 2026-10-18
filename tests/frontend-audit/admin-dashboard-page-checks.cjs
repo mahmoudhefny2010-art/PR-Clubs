@@ -96,6 +96,8 @@ module.exports = async ({ cdp, origin, requests, homepage, fixtures, setFailSave
   await screenshot('club-management');
   await openTool('clubs?club=1'); await until("!!document.getElementById('clubEditorForm')");
   assert.equal(await cdp.evaluate("document.querySelector('#clubEditorForm [name=name]').value"), 'Science Club');
+  assert.equal(await cdp.evaluate("!document.querySelector('#clubEditorForm [name=applicants], #clubEditorForm [name=members], #clubEditorForm [name=seats]')"), true, 'Applicant, member and seat totals are not manually editable');
+  assert.equal(await cdp.evaluate("document.querySelector('#clubEditorForm').textContent.includes('Applicant and member totals update automatically')"), true, 'The editor explains how totals are calculated');
   await cdp.evaluate("document.querySelector('#clubEditorForm [name=description]').value='Updated science community'; document.getElementById('clubEditorForm').requestSubmit()");
   await until("document.getElementById('toolFeedback').textContent==='Club saved.'");
   assert.equal(fixtures['/api/clubs'][0].description, 'Updated science community');

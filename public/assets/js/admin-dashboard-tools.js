@@ -7,6 +7,7 @@
     ['recovery', 'Account recovery', 'Send a reset link to a registered club or dashboard account.', 'staff', 'key', 'amber'],
     ['admin-settings', 'Administrator login', 'View the current administrator and permitted login settings.', 'staff', 'settings', 'violet'],
     ['clubs', 'Club management', 'Create and edit club details, images and registration settings.', 'website', 'clubs', 'violet'],
+    ['excel-review', 'Import clubs from Excel', 'Review club details and embedded logos, then create or update clubs and assign their President and Vice President roles.', 'people', 'file', 'green'],
     ['applications', 'Applications', 'Review full applications, interview notes, ratings and decisions.', 'people', 'clipboard', 'amber'],
     ['members', 'Member directory', 'Look up member profiles, committees and club rosters.', 'people', 'addressBook', 'amber'],
     ['committees', 'Committee registration', 'Open, close or mark individual club committees as full.', 'website', 'door', 'green'],
@@ -25,6 +26,8 @@
     ['club-analytics', 'Club performance', 'Compare demand, capacity, acceptance and club page views.', 'insights', 'trend', 'blue'],
     ['event-analytics', 'Event performance', 'Explore views, registrations, interest and verified check-ins.', 'insights', 'calendarChart', 'violet'],
     ['analytics', 'Visitor analytics', 'See visitor totals, online accounts and device activity.', 'insights', 'chart', 'blue'],
+    ['all-activity-log', 'All Activity Log', 'Review every recorded change across website accounts and roles.', 'insights', 'history', 'violet'],
+    ['developer-activity-log', 'Developer Activity Log', 'Review changes made by Software Development accounts.', 'insights', 'code', 'blue'],
     ['data', 'Data status', 'Check database availability and saved website records.', 'insights', 'database', 'violet'],
     ['profile', 'My account photo', 'Add, change or remove your administrator profile photo.', 'people', 'camera', 'green']
   ];

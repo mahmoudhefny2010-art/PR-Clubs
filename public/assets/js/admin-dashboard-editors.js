@@ -53,29 +53,39 @@
     }
     let current = data.find(club => String(club.id) === selected);
     if (selected !== 'new' && !current) throw new Error('Club not found. Return to the club list and choose an active club.');
+    const archivedClubs = selected === 'new' ? await read('/api/admin/clubs/archived').catch(() => []) : [];
     if (current) current = { ...current, ...await read(`/api/admin/dashboard-clubs/${encodeURIComponent(current.id)}`) };
     const club = current || {};
-    root().innerHTML = `<form id="clubEditorForm" class="v2-form v2-editor-grid">
+    root().innerHTML = `<form id="clubEditorForm" class="v2-form v2-editor-grid" autocomplete="off">
       ${field(escape, 'name', 'Club name', club.name, 'text', true, 'maxlength="80"')}
       ${field(escape, 'committee', 'Main committee', club.committee, 'text', true, 'maxlength="100"')}
       ${field(escape, 'category', 'Category', club.category, 'text', true, 'maxlength="80"')}
       ${field(escape, 'tagline', 'Tagline', club.tagline, 'text', true, 'maxlength="140"')}
       <label>Registration status<select name="status">${['open', 'opening-soon', 'full', 'closed'].map(status => `<option value="${status}" ${status === club.status ? 'selected' : ''}>${escape(status)}</option>`).join('')}</select></label>
       <label>Image display<select name="imageFit"><option value="contain">Fit full image</option><option value="cover" ${club.imageFit === 'cover' ? 'selected' : ''}>Fill image area</option></select></label>
-      ${field(escape, 'seats', 'Available seats', club.seats || 0, 'number', true, 'min="0" step="1"')}
-      ${field(escape, 'members', 'Member count', club.members || 0, 'number', true, 'min="0" step="1"')}
-      ${field(escape, 'applicants', 'Applicant count', club.applicants || 0, 'number', true, 'min="0" step="1"')}
       <label class="v2-checkbox"><input type="checkbox" name="pinned" ${club.pinned ? 'checked' : ''}>Pin club when registration is open</label>
+      <p class="v2-panel-note">No application limit while registration is open. Applicant and member totals update automatically from saved records.</p>
       <label class="v2-wide">Description<textarea name="description" required maxlength="1200">${escape(club.description)}</textarea></label>
       <label class="v2-wide">Requirements<textarea name="requirements" required maxlength="600">${escape(club.requirements)}</textarea></label>
-      ${field(escape, 'applicationIntro', 'Application introduction', club.applicationIntro, 'text', false, 'maxlength="240"')}
-      <label>Club image${club.image ? `<img class="v2-club-preview" src="${escape(club.image)}" alt="Current club image">` : ''}<input name="photo" type="file" accept="image/png,image/jpeg,image/webp" ${current ? '' : 'required'}><small>${current ? 'Leave empty to keep the current image.' : 'Upload the club image.'}</small></label>
-      ${current ? '' : `<fieldset id="clubInitialAccount" class="v2-wide v2-editor-grid"><legend>Club Google accounts</legend>${field(escape, 'clubLoginEmail', 'President MIU Google email', '', 'email', true, 'maxlength="254" pattern="[a-zA-Z0-9._%+-]+@miuegypt[.]edu[.]eg"')}${field(escape, 'supervisorEmail', 'Supervisor MIU Google email (optional)', '', 'email', false, 'maxlength="254" pattern="[a-zA-Z0-9._%+-]+@miuegypt[.]edu[.]eg"')}<small class="v2-wide">Use MIU Google to sign in. Leave the supervisor empty to assign one later from Staff accounts &amp; roles.</small></fieldset>`}
+      <label class="v2-club-intro-field">Application introduction<textarea name="applicationIntro" maxlength="240" rows="3" placeholder="Optional text shown to students before they apply">${escape(club.applicationIntro)}</textarea><small>Optional. Shown before the application questions.</small></label>
+      <label class="v2-club-image-field">Club image${club.image ? `<img class="v2-club-preview" src="${escape(club.image)}" alt="Current club image">` : ''}<input name="photo" type="file" accept="image/png,image/jpeg,image/webp" ${current ? '' : 'required'}><small>${current ? 'Leave empty to keep the current image.' : 'Upload the club image.'}</small></label>
+      ${current ? '' : `<fieldset id="clubInitialAccount" class="v2-wide v2-editor-grid"><legend>Club Google accounts</legend>${field(escape, 'clubLoginEmail', 'President MIU Google email', '', 'email', true, 'maxlength="254" pattern="[a-zA-Z0-9._%+-]+@miuegypt[.]edu[.]eg" autocomplete="section-club-president email" autocapitalize="none" spellcheck="false"')}${field(escape, 'supervisorEmail', 'Supervisor MIU Google email (optional)', '', 'email', false, 'maxlength="254" pattern="[a-zA-Z0-9._%+-]+@miuegypt[.]edu[.]eg" autocomplete="section-club-supervisor email" autocapitalize="none" spellcheck="false"')}<small class="v2-wide">Use MIU Google to sign in. Leave the supervisor empty to assign one later from Staff accounts &amp; roles.</small></fieldset>`}
       <button class="v2-action v2-wide" type="submit">Save club</button></form>`;
     document.getElementById('clubEditorForm').addEventListener('submit', event => saveForm(event, async form => {
       const payload = { ...current, ...Object.fromEntries(new FormData(form)), pinned: form.elements.pinned.checked };
       delete payload.photo;
       delete payload.imagePublicId; delete payload.imageUrl;
+      delete payload.applicants; delete payload.members; delete payload.seats;
+      if (!current) {
+        const normalizeName = value => String(value || '').normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-US');
+        const requestedName = normalizeName(payload.name);
+        const duplicate = [...data, ...archivedClubs].find(existing => normalizeName(existing.name) === requestedName);
+        if (duplicate) {
+          throw new Error(duplicate.archivedAt
+            ? `“${duplicate.name}” already exists in Archived clubs. Restore or edit it there instead of creating a duplicate.`
+            : `“${duplicate.name}” already exists. Open it from Club management to edit it instead of creating a duplicate.`);
+        }
+      }
       const image = form.elements.photo.files[0];
       if (image) { const uploaded = await window.uploadImageToCloudinary(image, 'club'); payload.imageUrl = uploaded.url; payload.imagePublicId = uploaded.publicId; }
       const saved = await request(current ? `/api/admin/clubs/${current.id}` : '/api/admin/clubs', { method: current ? 'PATCH' : 'POST', body: JSON.stringify(payload) });

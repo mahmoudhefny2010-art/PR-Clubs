@@ -40,7 +40,7 @@ function registerClubMemberRemoval(app, { requireClubAuth, requireClubPresident,
           memberType: target.memberType || 'new', source: applicationId === null ? 'manual' : 'accepted-application',
           applicationIds: removedApplications, status: 'removed', removedAt: new Date()
         }];
-        club.members = Math.max(0, (Number(club.members) || 0) - 1, identities.size);
+        club.members = identities.size;
         await club.save({ session });
         result = { memberRoster: remainingRoster, removedMembers: club.removedMembers, totalCount: club.members, removedApplications };
       }, { writeConcern: { w: 'majority' } });

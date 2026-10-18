@@ -44,10 +44,30 @@
     try { const posts = await request('/api/miu-events/content', { cache: 'no-store', siteStartupNonBlocking: true }); if (version === loadVersion) render(Array.isArray(posts) ? posts : []); }
     catch (error) { if (version === loadVersion) { showMessage(listMessage, error.message, true); list.replaceChildren(); $('miuEventsCount').textContent = '—'; } }
   }
+  let registrationLoadVersion = 0;
+  async function loadRegistrations() {
+    const message = $('miuRegistrationsMessage'), container = $('miuRegistrationsList');
+    if (!message || !container) return;
+    const version = ++registrationLoadVersion;
+    showMessage(message, 'Loading event registrations…');
+    try {
+      const events = await request('/api/miu-events/registrations', { cache: 'no-store' });
+      if (version !== registrationLoadVersion) return;
+      const rows = Array.isArray(events) ? events : [];
+      const total = rows.reduce((sum, event) => sum + (event.registrations?.length || 0), 0);
+      showMessage(message, `${rows.length} event${rows.length === 1 ? '' : 's'} · ${total} registration${total === 1 ? '' : 's'}.`);
+      container.innerHTML = rows.map(event => `<article class="record registration-event"><header class="record-head"><div><h3 class="record-title">${escapeHtml(event.title)}</h3><p class="record-meta">${[event.date, event.time ? (window.formatSiteTime?.(event.time) || event.time) : '', event.location].filter(Boolean).map(escapeHtml).join(' · ') || 'Date and location not set'}</p></div><strong>${event.registrations?.length || 0}</strong></header>${event.registrations?.length ? `<ul>${event.registrations.map(person => `<li><div><strong>${escapeHtml(person.name)}</strong><a href="mailto:${escapeHtml(person.email)}">${escapeHtml(person.email)}</a></div><time>${person.registeredAt ? escapeHtml(window.formatSiteTime?.(person.registeredAt) || new Date(person.registeredAt).toLocaleString()) : ''}</time></li>`).join('')}</ul>` : '<p class="registration-empty">No one has registered yet.</p>'}</article>`).join('') || '<p class="empty">No MIU events currently allow registration.</p>';
+    } catch (error) {
+      if (version !== registrationLoadVersion) return;
+      showMessage(message, error.message, true); container.replaceChildren();
+    }
+  }
   $('universityPostType').addEventListener('change', updateFields);
   $('universityPostRegistration').addEventListener('change', updateFields);
   $('universityInteraction').addEventListener('change', updateFields);
   $('refreshUniversityPostsBtn').addEventListener('click', loadPosts);
+  $('refreshMiuRegistrationsBtn')?.addEventListener('click', loadRegistrations);
+  document.addEventListener('dashboard:panel-change', event => { if (event.detail?.panelId === 'miuEventRegistrationsPanel') loadRegistrations(); });
   document.querySelectorAll('input[name="imageChoice"]').forEach(radio => radio.addEventListener('change', () => {
     const custom = form.elements.imageChoice.value === 'custom';
     $('universityImageField').hidden = !custom;

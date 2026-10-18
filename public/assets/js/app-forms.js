@@ -451,7 +451,7 @@ function openClubDetail(clubId) {
       </div>
       <div class="detail-box">
         <p>Available seats</p>
-        <strong>${Math.max((Number(club.seats) || 0) - (Number(club.members) || 0), 0)}</strong>
+        <strong>Unlimited</strong>
       </div>
       <div class="detail-box">
         <p>Applicants</p>
@@ -794,6 +794,8 @@ applicationForm.addEventListener('submit', async (event) => {
       const uploadedPhoto = await window.uploadImageToCloudinary(applicantPhoto, 'applicant');
       payload.photo = uploadedPhoto.url;
       payload.photoPublicId = uploadedPhoto.publicId;
+      payload.photoUploadSignature = uploadedPhoto.signature;
+      payload.photoVersion = uploadedPhoto.version;
     } else if (!state.editingMyForm && state.defaultApplicantPhoto) {
       payload.photo = state.defaultApplicantPhoto.url;
       payload.photoPublicId = state.defaultApplicantPhoto.publicId;

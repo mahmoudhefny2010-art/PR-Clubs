@@ -11,6 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const nodemailer = require('nodemailer');
 const cloudinary = require('cloudinary').v2;
+const { verifyPublicCloudinaryImage, verifyCloudinaryUploadResponse } = require('./services/cloudinary-image-validation');
 const { validateFeedMedia, MAX_FEED_VIDEO_BYTES, FEED_MEDIA_FOLDER } = require('./services/feed-video');
 const { verifyGoogleStudentCredential, decideGoogleAccount, decideGoogleLink } = require('./services/google-auth');
 const { createAskAiRouter } = require('./services/ask-ai');
@@ -176,15 +177,23 @@ function signCloudinaryUpload(folder) {
 async function readCloudinaryAsset(url, publicId, expectedFolder) {
   if (typeof url !== 'string' || typeof publicId !== 'string') return null;
   try {
-    const parsed = new URL(url);
     const cloudName = cloudinaryCredentials?.cloud_name;
-    if (parsed.protocol !== 'https:' || parsed.hostname !== 'res.cloudinary.com'
-      || !parsed.pathname.startsWith(`/${cloudName}/image/upload/`)
-      || !publicId.split('/').pop().startsWith(`${expectedFolder}-`)) return null;
-    const asset = await cloudinary.api.resource(publicId, { resource_type: 'image', type: 'upload' });
-    if (asset.bytes > MAX_IMAGE_UPLOAD_BYTES || !['png', 'jpg', 'jpeg', 'webp'].includes(asset.format)
-      || asset.secure_url !== parsed.href) return null;
-    return { url: parsed.href, publicId };
+    const publicIdParts = publicId.split('/');
+    const leafId = publicIdParts.at(-1);
+    if (!leafId?.startsWith(`${expectedFolder}-`)
+      || !new RegExp(`^${expectedFolder}-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`, 'i').test(leafId)
+      || (publicIdParts.length > 2)
+      || (publicIdParts.length === 2 && publicIdParts[0] !== expectedFolder)) return null;
+
+    // Cloudinary's Admin API can be unavailable even when a signed browser
+    // upload completed. Verify the public asset over HTTPS instead, bounded by
+    // the same size and image-format rules as the client upload.
+    const verification = await verifyPublicCloudinaryImage(url, publicId, cloudName, MAX_IMAGE_UPLOAD_BYTES);
+    if (!verification.valid) {
+      console.warn('Cloudinary image verification failed:', verification.reason);
+      return null;
+    }
+    return { url, publicId };
   } catch {
     return null;
   }
@@ -192,6 +201,12 @@ async function readCloudinaryAsset(url, publicId, expectedFolder) {
 
 async function getApplicantPhoto(payload) {
   if (payload?.photoPublicId) {
+    if (payload.photoUploadSignature && payload.photoVersion) {
+      const verified = verifyCloudinaryUploadResponse(payload.photo, payload.photoPublicId, payload.photoVersion,
+        payload.photoUploadSignature, cloudinaryFolders.applicant, cloudinaryCredentials?.cloud_name,
+        cloudinaryCredentials?.api_secret, cloudinary.utils);
+      return verified ? { url: payload.photo, publicId: payload.photoPublicId } : null;
+    }
     return readCloudinaryAsset(payload.photo, payload.photoPublicId, cloudinaryFolders.applicant);
   }
   const match = typeof payload?.photo === 'string'
@@ -598,7 +613,7 @@ function normalizeApplicationFields(fields) {
   });
 }
 
-async function makeClub(payload, existing, id) {
+async function makeClub(payload, existing, id, verifiedImage = null) {
   const status = ['open', 'opening-soon', 'full', 'closed'].includes(payload.status) ? payload.status : 'open';
   const club = {
     id,
@@ -613,11 +628,11 @@ async function makeClub(payload, existing, id) {
     imagePublicId: existing?.imagePublicId || '',
     imageFit: payload.imageFit === 'cover' ? 'cover' : 'contain',
     status,
-    seats: positiveNumber(payload.seats),
-    members: positiveNumber(payload.members),
+    seats: 0,
+    members: existing?.members ?? 0,
     memberRoster: existing?.memberRoster || [],
     committeeAvailability: existing?.committeeAvailability || [],
-    applicants: positiveNumber(payload.applicants),
+    applicants: existing?.applicants ?? 0,
     description: cleanText(payload.description, 1200),
     requirements: cleanText(payload.requirements, 600),
     applicationIntro: cleanText(payload.applicationIntro, 240),
@@ -628,7 +643,10 @@ async function makeClub(payload, existing, id) {
     return null;
   }
 
-  if (payload.imageUrl || payload.imagePublicId) {
+  if (verifiedImage) {
+    club.image = verifiedImage.url;
+    club.imagePublicId = verifiedImage.publicId;
+  } else if (payload.imageUrl || payload.imagePublicId) {
     const uploadedImage = await readCloudinaryAsset(payload.imageUrl, payload.imagePublicId, cloudinaryFolders.club);
     if (!uploadedImage) return null;
     club.image = uploadedImage.url;
@@ -2103,7 +2121,7 @@ app.get('/api/clubs', async (req, res) => {
           combinedCount += 1;
         }
       }
-      return [club.id, Math.max(Number(club.members) || 0, combinedCount)];
+      return [club.id, combinedCount];
     }));
     const applicantsByClub = new Map(applicationTotals.map((club) => [Number(club._id), club.count]));
     const ratingByClub = new Map(ratings.map((row) => [row._id, row]));
@@ -3842,18 +3860,26 @@ app.post('/api/attendance/:token', requireStudentAuth, async (req, res) => {
 
 // Club admins can view their event registrations.
 app.get('/api/club/event-registrations', requireClubAuth, async (req, res) => {
-  if (!['president', 'head'].includes(req.clubAccount.role)) {
-    return res.status(403).json({ message: 'Only club presidents and heads can view registrations.' });
+  if (!['president', 'vice_president', 'head'].includes(req.clubAccount.role)) {
+    return res.status(403).json({ message: 'Only club leaders can view registrations.' });
   }
   try {
-    const records = mongoReady
-      ? await EventRegistration.find({ clubId: req.clubAccount.clubId }).sort({ createdAt: -1 }).lean()
-      : [];
+    if (!requireLiveDatabase(res)) return;
+    const [club, records] = await Promise.all([
+      Club.findOne({ id: req.clubAccount.clubId, archivedAt: null }).select('id events').read('primary').lean(),
+      EventRegistration.find({ clubId: req.clubAccount.clubId }).sort({ createdAt: -1 }).read('primary').lean()
+    ]);
+    if (!club) return res.status(404).json({ message: 'Club not found.' });
+    const events = (Array.isArray(club.events) ? club.events : []).flatMap((event, eventIndex) => {
+      const title = cleanText(event?.title, 140);
+      if (!title) return [];
+      const requestId = Number(event.requestId) > 0 ? Number(event.requestId) : null;
+      const registrations = records.filter(record => record.eventIndex === eventIndex && record.eventTitle === title
+        && (requestId ? (record.eventRequestId === requestId || record.eventRequestId == null) : record.eventRequestId == null));
+      return [{ title, date: cleanText(event.date, 80), time: cleanText(event.time, 40), location: cleanText(event.location, 160), registrations: registrations.map(record => ({ name: record.name, email: record.email, registeredAt: record.createdAt })) }];
+    });
     res.setHeader('Cache-Control', 'no-store');
-    res.json(records.map((record) => {
-      const { _id, __v, ...rest } = record;
-      return rest;
-    }));
+    res.json(events);
   } catch (error) {
     console.error('Database operation failed:', error.name);
     res.status(503).json({ message: 'The data store is temporarily unavailable.' });
@@ -4271,7 +4297,7 @@ function buildClubMemberListing(club, acceptedApplications) {
     id: club.id,
     name: club.name,
     members,
-    totalCount: Math.max(Number(club.members) || 0, members.length)
+    totalCount: members.length
   };
 }
 
@@ -6412,7 +6438,7 @@ require('./services/supervisor-admin').registerSupervisorAdmin(app, {
   }
 });
 require('./services/miu-event-admin').registerMiuEventAdmin(app, {
-  UniversityContent, databaseReady: () => mongoReady, sameOrigin: isSameOriginRequest, cleanText, parseInteraction,
+  UniversityContent, EventRegistration, databaseReady: () => mongoReady, sameOrigin: isSameOriginRequest, cleanText, parseInteraction,
   readCloudinaryAsset, cloudinary, cloudinaryFolders, cloudinaryConfigured,
   dispatchPublishedContentNotifications, toApiRecord, requireMiuEventsDashboard
 });
@@ -6431,7 +6457,7 @@ require('./services/event-reports').registerEventReports(app, {
 });
 require('./services/supervisor-dashboard').registerSupervisorDashboard(app, {
   getAccount: getClubAccountFromRequest, databaseReady: () => mongoReady,
-  Club, ContentRequest, SpeakerRequest, AttendanceRecord, AttendanceSession, Review: SupervisorReview,
+  Club, ContentRequest, SpeakerRequest, AttendanceRecord, AttendanceSession, EventRegistration, Review: SupervisorReview,
   sameOrigin: isSameOriginRequest, publicSpeakerRequest,
   notifyContent: notifyContentRequest, notifySpeaker: notifySpeakerWorkflow, notifyAttendance: notifyAttendanceWorkflow,
   attendanceClosureMapFor, attendanceActivityKey, isAttendanceActivityEnded
@@ -6827,6 +6853,353 @@ app.get('/api/admin/clubs/archived', async (req, res) => {
   }
 });
 
+app.post('/api/admin/clubs/import/cleanup', async (req, res) => {
+  if (!isSameOriginRequest(req)) return res.status(403).json({ message: 'Reload the page and try again.' });
+  const publicIds = Array.isArray(req.body?.publicIds) ? [...new Set(req.body.publicIds)] : [];
+  const isTemporaryClubImageId = id => typeof id === 'string'
+    && new RegExp(`^${cloudinaryFolders.club}/${cloudinaryFolders.club}-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`, 'i').test(id);
+  if (publicIds.length > 2000 || publicIds.some(id => !isTemporaryClubImageId(id))) {
+    return res.status(400).json({ message: 'Invalid temporary image list.' });
+  }
+  if (cloudinaryConfigured) await Promise.all(publicIds.map(id => cloudinary.uploader.destroy(id, { resource_type: 'image' }).catch(() => null)));
+  return res.json({ cleaned: publicIds.length });
+});
+
+const clubImportUndoAction = 'club_import_undo_state';
+const clubImportUndoService = require('./services/club-import-undo');
+const clubImportUndoFields = club => ({ name: club.name, category: club.category, description: club.description,
+  image: club.image, imagePublicId: club.imagePublicId || '', updatedAt: club.updatedAt || null });
+const clubImportUndoId = () => crypto.randomUUID();
+const clubImportUndoAuditId = () => Date.now() * 1000 + Math.floor(Math.random() * 1000);
+
+app.get('/api/admin/clubs/import/undo/latest', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  if (!requireLiveDatabase(res)) return;
+  try {
+    const record = (await AuditLog.find({ action: clubImportUndoAction }).sort({ timestamp: -1 }).limit(1).read('primary').lean())[0];
+    if (!record) return res.json({ available: false });
+    const snapshot = clubImportUndoService.open(record.details, sessionSecret);
+    if (snapshot.undoneAt || snapshot.supersededAt) return res.json({ available: false });
+    return res.json({ available: true, importId: record.targetId, imported: snapshot.clubs.length,
+      timestamp: record.timestamp, hasRoleChanges: snapshot.accounts.length > 0 });
+  } catch (error) {
+    console.error('Club import undo status failed:', error.name);
+    return res.status(503).json({ message: 'Undo status is temporarily unavailable.' });
+  }
+});
+
+app.post('/api/admin/clubs/import/undo', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  if (!isSameOriginRequest(req)) return res.status(403).json({ message: 'Reload the page and try again.' });
+  if (!requireLiveDatabase(res)) return;
+  const importId = typeof req.body?.importId === 'string' ? req.body.importId : '';
+  if (!/^[0-9a-f-]{36}$/i.test(importId)) return res.status(400).json({ message: 'Choose a valid import to undo.' });
+  const removedImages = [];
+  try {
+    const record = await AuditLog.findOne({ action: clubImportUndoAction, targetId: importId }).read('primary').lean();
+    if (!record) return res.status(404).json({ message: 'This import is no longer available to undo.' });
+    const snapshot = clubImportUndoService.open(record.details, sessionSecret);
+    const latest = (await AuditLog.find({ action: clubImportUndoAction }).sort({ timestamp: -1 }).limit(1).read('primary').lean())[0];
+    if (latest?.targetId !== importId || snapshot.undoneAt || snapshot.supersededAt) {
+      return res.status(409).json({ message: 'Only the latest completed import can be undone. A later import has replaced this undo option.' });
+    }
+    const session = await mongoose.startSession();
+    const restoredClubs = [], deletedClubIds = [];
+    const restoredAccounts = new Map();
+    try {
+      session.startTransaction({ writeConcern: { w: 'majority' } });
+      for (const entry of snapshot.clubs) {
+        const current = await Club.findOne({ id: entry.id }).session(session).lean();
+        if (!current || clubImportUndoService.fingerprint(clubImportUndoFields(current)) !== entry.afterFingerprint) {
+          throw Object.assign(new Error(`Club ${entry.after.name} changed after this import. Reload the dashboard; the undo was not applied.`), { status: 409 });
+        }
+        if (!entry.before) {
+          const [applications, content, registrations, attendanceSessions, attendanceAssignments, attendanceRecords, speakers, invites, interests] = await Promise.all([
+            Application.countDocuments({ clubId: entry.id }).session(session), ContentRequest.countDocuments({ clubId: entry.id }).session(session),
+            EventRegistration.countDocuments({ clubId: entry.id }).session(session), AttendanceSession.countDocuments({ clubId: entry.id }).session(session),
+            AttendanceAssignment.countDocuments({ clubId: entry.id }).session(session), AttendanceRecord.countDocuments({ clubId: entry.id }).session(session),
+            SpeakerRequest.countDocuments({ clubId: entry.id }).session(session), SpeakerInvite.countDocuments({ clubId: entry.id }).session(session),
+            StudentInterest.countDocuments({ clubId: entry.id }).session(session)
+          ]);
+          if (applications + content + registrations + attendanceSessions + attendanceAssignments + attendanceRecords + speakers + invites + interests > 0) {
+            throw Object.assign(new Error(`${entry.after.name} has new activity since the import, so it was kept. No undo changes were applied.`), { status: 409 });
+          }
+        }
+      }
+      for (const entry of snapshot.accounts) {
+        const current = await ClubAccount.findOne({ email: entry.email }).session(session).lean();
+        const fingerprint = current ? clubImportUndoService.fingerprint(current) : null;
+        if (fingerprint !== entry.afterFingerprint) {
+          throw Object.assign(new Error(`The club account ${entry.email} changed after import. No undo changes were applied.`), { status: 409 });
+        }
+      }
+      for (const entry of snapshot.clubs) {
+        if (entry.before) {
+          const restored = await Club.findOneAndUpdate({ id: entry.id }, { $set: entry.before }, { new: true, runValidators: true, session }).lean();
+          if (!restored) throw Object.assign(new Error(`Could not restore ${entry.before.name}.`), { status: 409 });
+          restoredClubs.push(restored);
+        } else {
+          const result = await Club.deleteOne({ id: entry.id }, { session });
+          if (!result.deletedCount) throw Object.assign(new Error(`Could not remove newly imported club ${entry.after.name}.`), { status: 409 });
+          deletedClubIds.push(entry.id);
+        }
+        if (entry.after.imagePublicId && entry.after.imagePublicId !== entry.before?.imagePublicId) removedImages.push(entry.after.imagePublicId);
+      }
+      for (const entry of snapshot.accounts) {
+        await ClubAccount.deleteOne({ email: entry.email }, { session });
+        if (entry.before) {
+          const [restored] = await ClubAccount.create([entry.before], { session });
+          restoredAccounts.set(entry.email, restored?.toObject ? restored.toObject() : restored);
+        } else restoredAccounts.set(entry.email, null);
+      }
+      snapshot.undoneAt = new Date().toISOString();
+      await AuditLog.findOneAndUpdate({ id: record.id }, { $set: { details: clubImportUndoService.seal(snapshot, sessionSecret) } }, { new: true, session }).lean();
+      await session.commitTransaction();
+    } catch (error) {
+      await session.abortTransaction().catch(() => {});
+      throw error;
+    } finally { await session.endSession(); }
+
+    for (const id of deletedClubIds) {
+      const index = clubs.findIndex(club => Number(club.id) === Number(id));
+      if (index >= 0) clubs.splice(index, 1);
+    }
+    for (const restored of restoredClubs) {
+      const index = clubs.findIndex(club => Number(club.id) === Number(restored.id));
+      if (index < 0) clubs.push(restored); else clubs[index] = restored;
+    }
+    for (const [email, account] of restoredAccounts) {
+      const index = clubAccounts.findIndex(item => item.email === email);
+      if (!account) { if (index >= 0) clubAccounts.splice(index, 1); }
+      else if (index < 0) clubAccounts.push(account); else clubAccounts[index] = account;
+    }
+    if (cloudinaryConfigured) await Promise.all([...new Set(removedImages)].map(id => cloudinary.uploader.destroy(id, { resource_type: 'image' }).catch(() => null)));
+    return res.json({ undone: snapshot.clubs.length, message: `Restored ${snapshot.clubs.length} clubs to their pre-import state.` });
+  } catch (error) {
+    console.error('Club spreadsheet undo failed:', error.name);
+    return res.status(error.status || 503).json({ message: error.status ? error.message : 'The import could not be safely undone.' });
+  }
+});
+
+app.post('/api/admin/clubs/import', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  if (!isSameOriginRequest(req)) return res.status(403).json({ message: 'Reload the page and try again.' });
+  if (!requireLiveDatabase(res)) return;
+  const { assignNewClubRole, removeClubRoleAssignment } = require('./services/new-club-accounts');
+  const records = req.body?.records;
+  if (!Array.isArray(records) || !records.length || records.length > 25) {
+    return res.status(400).json({ message: 'Import requests are limited to 25 club rows. The admin tool splits larger workbooks into safe batches.' });
+  }
+  const normalizeName = value => String(value || '').normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-US');
+  const knownClubAliases = new Map([['miu theatre','theater'],['tuners','tunners'],['ieee miu sb','ieee'],['miu-munal','mun']]);
+  const importKey = name => knownClubAliases.get(normalizeName(name)) || normalizeName(name);
+  const validEmail = value => typeof value === 'string' && value.length <= 254 && /^[a-z0-9._%+-]+@miuegypt\.edu\.eg$/i.test(value.trim());
+  const isTemporaryClubImageId = id => typeof id === 'string'
+    && new RegExp(`^${cloudinaryFolders.club}/${cloudinaryFolders.club}-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`, 'i').test(id);
+  const names = new Set();
+  const uploadedIds = records.map(item => item?.image?.publicId).filter(id => typeof id === 'string');
+  const importId = typeof req.body?.importId === 'string' && /^[0-9a-f-]{36}$/i.test(req.body.importId) ? req.body.importId : clubImportUndoId();
+  let committed = false;
+  let commitAttempted = false;
+  try {
+    const normalized = [];
+    for (let index = 0; index < records.length; index += 1) {
+      const row = records[index] || {};
+      const rawName = typeof row.name === 'string' ? row.name.trim() : '';
+      const name = cleanText(rawName, 80);
+      const key = importKey(name);
+      if (!key || rawName.length > 80 || names.has(key)) throw Object.assign(new Error(`Club name is empty, longer than 80 characters, or duplicated at data row ${index + 2}.`), { status: 400 });
+      names.add(key);
+      const presidentEmail = String(row.presidentEmail || '').trim().toLowerCase();
+      const vicePresidentEmail = String(row.vicePresidentEmail || '').trim().toLowerCase();
+      const presidentName = cleanText(row.presidentName, 120);
+      const vicePresidentName = cleanText(row.vicePresidentName, 120);
+      if (!name || presidentEmail && (!validEmail(presidentEmail) || String(row.presidentName || '').trim().length > 120)
+        || vicePresidentEmail && (!validEmail(vicePresidentEmail) || String(row.vicePresidentName || '').trim().length > 120)
+        || presidentEmail && vicePresidentEmail && presidentEmail === vicePresidentEmail) {
+        throw Object.assign(new Error(`Check the supplied President/Vice President names and MIU emails on data row ${index + 2}.`), { status: 400 });
+      }
+      if (emailMatches(presidentEmail) || emailMatches(vicePresidentEmail)) {
+        throw Object.assign(new Error(`A club manager email on data row ${index + 2} cannot be the configured admin account.`), { status: 400 });
+      }
+      const category = cleanText(row.category, 80);
+      const description = cleanText(row.description, 1200);
+      if (!description || !row.image || typeof row.image.url !== 'string' || !isTemporaryClubImageId(row.image.publicId)) {
+        throw Object.assign(new Error(`Description and an embedded club image are required on data row ${index + 2}.`), { status: 400 });
+      }
+      const image = await readCloudinaryAsset(row.image.url, row.image.publicId, cloudinaryFolders.club);
+      if (!image) throw Object.assign(new Error(`The club image could not be verified on data row ${index + 2}. Upload it again and retry.`), { status: 400 });
+      const newDetails = row.newClub && typeof row.newClub === 'object' ? row.newClub : row;
+      normalized.push({ name, category, description, image, presidentEmail, vicePresidentEmail,
+        presidentName, vicePresidentName,
+        newClub: {
+          committee: cleanText(newDetails.committee, 100) || name,
+          tagline: cleanText(newDetails.tagline, 140) || description.slice(0, 140),
+          requirements: cleanText(newDetails.requirements, 600) || 'Contact the club for current application requirements.'
+        } });
+    }
+
+    const currentClubs = await Club.find({}).select('id name archivedAt image imagePublicId sortOrder members memberRoster committeeAvailability applicants applicationFields').read('primary').lean();
+    const byName = new Map(currentClubs.map(club => [normalizeName(club.name), club]));
+    const findClubByImportName = name => byName.get(normalizeName(name)) || byName.get(importKey(name)) || null;
+    for (const row of normalized) {
+      const match = findClubByImportName(row.name);
+      if (match?.archivedAt) throw Object.assign(new Error(`${row.name} is archived. Restore it before importing.`), { status: 409 });
+    }
+
+    const savedAccounts = [];
+    const changedAccounts = new Map();
+    const importedClubs = [];
+    const preparedRows = [];
+    const undoClubs = [];
+    const accountBefore = new Map();
+    const captureAccount = async (email, session) => {
+      if (!email || accountBefore.has(email)) return;
+      accountBefore.set(email, await ClubAccount.findOne({ email }).session(session).lean());
+    };
+    const session = await mongoose.startSession();
+    try {
+      session.startTransaction({ writeConcern: { w: 'majority' } });
+      let nextId = (Math.max(0, ...currentClubs.map(club => Number(club.id) || 0))) + 1;
+      for (const row of normalized) {
+        let club = findClubByImportName(row.name);
+        if (club) {
+          const before = clubImportUndoFields(club);
+          const previousNameKey = normalizeName(club.name);
+          const clubUpdate = { name: row.name, description: row.description, image: row.image.url, imagePublicId: row.image.publicId };
+          if (row.category) clubUpdate.category = row.category;
+          const updated = await Club.findOneAndUpdate({ id: club.id, archivedAt: null }, { $set: clubUpdate }, { new: true, runValidators: true, session }).lean();
+          if (!updated) throw Object.assign(new Error(`Could not update ${row.name}.`), { status: 409 });
+          club = updated;
+          if (previousNameKey !== normalizeName(row.name)) byName.delete(previousNameKey);
+          const after = clubImportUndoFields(club);
+          undoClubs.push({ id: club.id, before, after, afterFingerprint: clubImportUndoService.fingerprint(after) });
+        } else {
+          const payload = { name: row.name, category: row.category || 'Other', description: row.description,
+            committee: row.newClub.committee, tagline: row.newClub.tagline, requirements: row.newClub.requirements,
+            imageUrl: row.image.url, imagePublicId: row.image.publicId, status: 'open' };
+          club = await makeClub(payload, null, nextId, row.image);
+          if (!club) throw Object.assign(new Error(`Complete the new-club details for ${row.name}.`), { status: 400 });
+          club.applicationCycleStartedAt = new Date();
+          club.createdAt = new Date(); club.updatedAt = club.createdAt;
+          const [createdClub] = await Club.create([club], { session });
+          if (createdClub) club = createdClub.toObject ? createdClub.toObject() : createdClub;
+          const after = clubImportUndoFields(club);
+          undoClubs.push({ id: club.id, before: null, after, afterFingerprint: clubImportUndoService.fingerprint(after) });
+          nextId += 1;
+        }
+        byName.set(normalizeName(row.name), club);
+        importedClubs.push(club);
+        preparedRows.push({ row, club });
+      }
+      // Remove obsolete assignments for every imported club before adding any new
+      // assignments. This lets an officer move between clubs within one workbook
+      // without the spreadsheet row order causing a false role conflict.
+      for (const { row, club } of preparedRows) {
+        for (const [role, email] of [['president', row.presidentEmail], ['vice_president', row.vicePresidentEmail]]) {
+          if (!email) continue;
+          const currentRoleAccounts = await ClubAccount.find({ $or: [
+            { roleAssignments: { $elemMatch: { role, clubId: club.id } } },
+            { role, clubId: club.id }
+          ] }).session(session).lean();
+          for (const account of currentRoleAccounts) {
+            if (account.email === email) continue;
+            await captureAccount(account.email, session);
+            const result = await removeClubRoleAssignment({ ClubAccount, session, email: account.email, clubId: club.id, role });
+            if (result.removed) changedAccounts.set(account.email, result.account);
+          }
+        }
+      }
+      for (const { row, club } of preparedRows) {
+        if (row.presidentEmail) { await captureAccount(row.presidentEmail, session); savedAccounts.push(await assignNewClubRole({ ClubAccount, session, email: row.presidentEmail, clubId: club.id, role: 'president' })); }
+        if (row.vicePresidentEmail) { await captureAccount(row.vicePresidentEmail, session); savedAccounts.push(await assignNewClubRole({ ClubAccount, session, email: row.vicePresidentEmail, clubId: club.id, role: 'vice_president' })); }
+      }
+      const undoAccounts = [];
+      for (const [email, before] of accountBefore) {
+        const after = await ClubAccount.findOne({ email }).session(session).lean();
+        undoAccounts.push({ email, before, afterFingerprint: after ? clubImportUndoService.fingerprint(after) : null });
+      }
+      const currentUndo = await AuditLog.findOne({ action: clubImportUndoAction, targetId: importId }).session(session).lean();
+      const latestUndo = (await AuditLog.find({ action: clubImportUndoAction }).sort({ timestamp: -1 }).limit(1).session(session).lean())[0];
+      let undoSnapshot = currentUndo ? clubImportUndoService.open(currentUndo.details, sessionSecret) : { version: 1, clubs: [], accounts: [] };
+      if (latestUndo && latestUndo.targetId !== importId) {
+        try {
+          const priorSnapshot = clubImportUndoService.open(latestUndo.details, sessionSecret);
+          if (!priorSnapshot.undoneAt && !priorSnapshot.supersededAt) {
+            priorSnapshot.supersededAt = new Date().toISOString();
+            await AuditLog.findOneAndUpdate({ id: latestUndo.id }, { $set: { details: clubImportUndoService.seal(priorSnapshot, sessionSecret) } }, { new: true, session }).lean();
+          }
+        } catch (error) { console.error('Previous club import undo could not be retired:', error.name); }
+      }
+      undoSnapshot.clubs.push(...undoClubs);
+      for (const entry of undoAccounts) {
+        const existing = undoSnapshot.accounts.findIndex(item => item.email === entry.email);
+        if (existing < 0) undoSnapshot.accounts.push(entry);
+        else undoSnapshot.accounts[existing].afterFingerprint = entry.afterFingerprint;
+      }
+      const sealedUndo = clubImportUndoService.seal(undoSnapshot, sessionSecret);
+      if (currentUndo) {
+        await AuditLog.findOneAndUpdate({ id: currentUndo.id }, { $set: { details: sealedUndo, timestamp: new Date() } }, { new: true, session }).lean();
+      } else {
+        const [undoRecord] = await AuditLog.create([{ id: clubImportUndoAuditId(), actorEmail: adminAuthState?.email || getConfiguredAdminEmail() || 'admin',
+          actorRole: 'admin', action: clubImportUndoAction, targetType: 'club_import', targetId: importId,
+          targetName: `Import of ${undoSnapshot.clubs.length} clubs`, details: sealedUndo, timestamp: new Date() }], { session });
+        if (!undoRecord) throw Object.assign(new Error('Could not save an undo point for this import.'), { status: 503 });
+      }
+      commitAttempted = true;
+      await session.commitTransaction();
+      committed = true;
+    } catch (error) {
+      await session.abortTransaction().catch(() => {});
+      throw error;
+    } finally { await session.endSession(); }
+
+    for (const club of importedClubs) {
+      const index = clubs.findIndex(item => Number(item.id) === Number(club.id));
+      if (index < 0) clubs.push(club); else clubs[index] = club;
+    }
+    for (const [email, account] of changedAccounts) {
+      const index = clubAccounts.findIndex(item => item.email === email);
+      if (!account) { if (index >= 0) clubAccounts.splice(index, 1); }
+      else if (index < 0) clubAccounts.push(account); else clubAccounts[index] = account;
+    }
+    for (const account of savedAccounts) {
+      const index = clubAccounts.findIndex(item => item.email === account.email);
+      if (index < 0) clubAccounts.push(account); else clubAccounts[index] = account;
+    }
+    const priorUndo = (await AuditLog.find({ action: clubImportUndoAction }).sort({ timestamp: -1 }).limit(2).read('primary').lean())
+      .find(entry => entry.targetId !== importId);
+    if (priorUndo) {
+      try {
+        const priorSnapshot = clubImportUndoService.open(priorUndo.details, sessionSecret);
+        const supersededImageIds = new Set(priorSnapshot.clubs.map(entry => entry.before?.imagePublicId).filter(Boolean));
+        const currentImageIds = new Set(normalized.map(row => row.image.publicId));
+        if (cloudinaryConfigured) await Promise.all([...supersededImageIds].filter(id => !currentImageIds.has(id))
+          .map(id => cloudinary.uploader.destroy(id, { resource_type: 'image' }).catch(() => null)));
+      } catch (error) { console.error('Superseded club images could not be removed:', error.name); }
+    }
+    try { writePrivateClubAccountsFile(); } catch (error) { console.error('Club credential cache update failed:', error.name); }
+    return res.json({ imported: importedClubs.length, created: importedClubs.filter(club => !currentClubs.some(old => old.id === club.id)).length,
+      updated: importedClubs.filter(club => currentClubs.some(old => old.id === club.id)).length,
+      rolesAssigned: savedAccounts.length, undoAvailable: true, importId,
+      message: `Imported ${importedClubs.length} clubs and verified ${savedAccounts.length} dashboard role assignments.` });
+  } catch (error) {
+    // A lost commit acknowledgement is ambiguous. Keep images in that case so
+    // a committed club can never be left pointing at a deleted asset.
+    if (!committed && !commitAttempted) await Promise.all(uploadedIds.map(id => {
+      if (cloudinaryConfigured && isTemporaryClubImageId(id)) {
+        return cloudinary.uploader.destroy(id, { resource_type: 'image' }).catch(() => {});
+      }
+      return Promise.resolve();
+    }));
+    console.error('Club spreadsheet import failed:', error.name, error.code || error.originalError?.code || '', error.message || error.originalError?.message || '');
+    return res.status(error.status || 503).json({
+      message: error.status ? error.message : 'The import could not be confirmed. Reload and check the clubs before retrying.',
+      commitUncertain: commitAttempted && !committed
+    });
+  }
+});
+
 app.get('/api/admin/applications', async (req, res) => {
   try {
     if (!requireLiveDatabase(res)) return;
@@ -7088,6 +7461,23 @@ app.post('/api/admin/clubs', async (req, res) => {
   if (!requireLiveDatabase(res)) return;
   let club;
   try {
+    const normalizeClubName = (value) => String(value || '').normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-US');
+    const requestedName = normalizeClubName(req.body?.name);
+    if (requestedName) {
+      const existingClubs = await Club.find().select('id name archivedAt').lean();
+      const duplicate = existingClubs.find((item) => normalizeClubName(item.name) === requestedName);
+      if (duplicate) {
+        const archived = Boolean(duplicate.archivedAt);
+        return res.status(409).json({
+          code: 'CLUB_ALREADY_EXISTS',
+          existingClubId: duplicate.id,
+          archived,
+          message: archived
+            ? `A club named “${String(duplicate.name).trim()}” already exists in Archived clubs. Restore or edit it instead of creating a duplicate.`
+            : `A club named “${String(duplicate.name).trim()}” already exists. Open it from Club management to edit it instead of creating a duplicate.`
+        });
+      }
+    }
     const lastClub = await Club.findOne().sort({ id: -1 }).select('id').lean();
     nextId = (Number(lastClub?.id) || 0) + 1;
     club = await makeClub(req.body, null, nextId);
@@ -7338,7 +7728,11 @@ app.post('/api/applications', async (req, res) => {
 
   const applicantPhoto = await getApplicantPhoto(payload);
   if (!applicantPhoto) {
-    return res.status(400).json({ message: 'A PNG, JPG, or WebP applicant photo is required.' });
+    const photoNeedsRefresh = Boolean(payload.photoPublicId)
+      && !(payload.photoUploadSignature && payload.photoVersion);
+    return res.status(400).json({ message: photoNeedsRefresh
+      ? 'This form page is out of date. Refresh the page, reopen the application, choose the photo again, and submit.'
+      : 'A PNG, JPG, or WebP applicant photo is required.' });
   }
 
   let answers;

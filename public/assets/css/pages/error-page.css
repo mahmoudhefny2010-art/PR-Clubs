@@ -32,15 +32,17 @@ body {
 }
 
 .error-brand {
-  display: inline-flex;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 11px;
-  margin-bottom: 22px;
+  gap: 8px;
+  width: fit-content;
+  margin: 0 auto 22px;
   color: #172033;
   font-size: .92rem;
   font-weight: 850;
   letter-spacing: .025em;
-  text-align: left;
+  text-align: center;
 }
 
 .error-brand small {
@@ -109,11 +111,13 @@ h1 { margin: 0 0 10px; font-size: clamp(1.45rem, 5vw, 1.9rem); line-height: 1.2;
   to { opacity: 1; transform: scale(1); }
 }
 
-@media (max-width: 420px) {
+@media (max-width: 560px) {
   body { padding: 14px; }
-  .error-card { padding: 27px 20px; border-radius: 21px; }
-  .error-actions { display: grid; grid-template-columns: 1fr 1fr; }
-  .error-actions > * { width: 100%; }
+  .error-card { padding: clamp(22px, 6vw, 30px) clamp(16px, 5vw, 22px); border-radius: 21px; }
+  .error-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 21px; }
+  .error-actions > * { width: 100%; min-width: 0; padding-inline: 10px; }
+  .error-actions > :only-child, .error-actions > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .error-reference { line-height: 1.6; }
 }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; } }

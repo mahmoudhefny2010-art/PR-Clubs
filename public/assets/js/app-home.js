@@ -383,8 +383,14 @@ async function loadHomepageSettings(force = false) {
 }
 
 async function loadApplications() {
-  const response = await fetch('/api/club/applications');
-  if (!response.ok) throw new Error('Club login required to view applications.');
+  const response = await fetch('/api/club/applications', { credentials: 'same-origin', cache: 'no-store' });
+  if (!response.ok) {
+    const result = await response.json().catch(() => ({}));
+    if (response.status === 401) throw new Error('Your club dashboard session is not active. Choose President · MUN from My dashboards, then try again.');
+    if (response.status === 403) throw new Error(result.message || 'This account does not have access to these applications.');
+    if (response.status >= 500) throw new Error(result.message || 'Your login is active, but applications could not be loaded from the database. Try again shortly.');
+    throw new Error(result.message || 'Applications could not be loaded. Please try again.');
+  }
   state.applications = await response.json();
   window.dashboardUnread?.update('applicants', state.applications.filter((item) => item.status === 'pending').map((item) => `${item.id}:${item.updatedAt || item.status || ''}`));
   renderHeadDashboard();
@@ -923,7 +929,7 @@ async function openClubPortal(initialSession = null) {
     toggleInterviewFormBtn.setAttribute('aria-expanded', 'false');
     toggleInterviewFormBtn.textContent = 'Manage interview questions';
     if (club.role === 'president') {
-      const allowedSections = new Set(['presidentOverviewPanel', 'presidentClubStatusPanel', 'presidentHeadManager', 'presidentFormManager', 'interviewFormManager', 'presidentApplicantsPanel', 'speakerRequestDashboardPanel', 'speakerInviteDashboardPanel']);
+      const allowedSections = new Set(['presidentOverviewPanel', 'presidentClubStatusPanel', 'presidentHeadManager', 'presidentFormManager', 'interviewFormManager', 'presidentApplicantsPanel', 'clubRegistrationsPanel', 'speakerRequestDashboardPanel', 'speakerInviteDashboardPanel']);
       let savedSection = '';
       const navigationEntry = window.performance?.getEntriesByType?.('navigation')?.[0];
       const isReloadNavigation = navigationEntry?.type === 'reload' || (!navigationEntry && window.performance?.navigation?.type === 1);
@@ -992,7 +998,7 @@ async function openClubPortal(initialSession = null) {
 
 function setPresidentDashboardSection(sectionId) {
   if (['speakerRequestDashboardPanel', 'speakerInviteDashboardPanel'].includes(sectionId) && !['president', 'head'].includes(state.clubAccount?.role)) sectionId = 'presidentOverviewPanel';
-  const sectionIds = ['presidentOverviewPanel', 'presidentClubStatusPanel', 'presidentHeadManager', 'presidentFormManager', 'interviewFormManager', 'presidentApplicantsPanel', 'speakerRequestDashboardPanel', 'speakerInviteDashboardPanel', 'reportInlinePanel'];
+  const sectionIds = ['presidentOverviewPanel', 'presidentClubStatusPanel', 'presidentHeadManager', 'presidentFormManager', 'interviewFormManager', 'presidentApplicantsPanel', 'clubRegistrationsPanel', 'speakerRequestDashboardPanel', 'speakerInviteDashboardPanel', 'reportInlinePanel'];
   if (state.clubAccount?.role === 'president' && sectionIds.includes(sectionId)) {
     try { localStorage.setItem(`miu-club-dashboard-section:${state.clubAccount.id}`, sectionId); } catch { /* The section still changes for this visit. */ }
   }
@@ -1003,7 +1009,34 @@ function setPresidentDashboardSection(sectionId) {
   });
   const unreadSection = ({ presidentHeadManager: 'committeeHeads', presidentApplicantsPanel: 'applicants' })[sectionId];
   window.dashboardUnread?.activate(unreadSection || '');
+  if (sectionId === 'clubRegistrationsPanel') loadClubEventRegistrations();
 }
+
+let clubRegistrationsLoadVersion = 0;
+async function loadClubEventRegistrations() {
+  const message = document.getElementById('clubRegistrationsMessage');
+  const list = document.getElementById('clubRegistrationsList');
+  if (!message || !list) return;
+  const version = ++clubRegistrationsLoadVersion;
+  message.textContent = 'Loading registrations…';
+  message.classList.remove('is-error');
+  try {
+    const response = await fetch('/api/club/event-registrations', { credentials: 'same-origin', cache: 'no-store' });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Could not load registrations.');
+    if (version !== clubRegistrationsLoadVersion) return;
+    const events = Array.isArray(data) ? data : [];
+    const total = events.reduce((sum, event) => sum + (Array.isArray(event.registrations) ? event.registrations.length : 0), 0);
+    message.textContent = `${events.length} event${events.length === 1 ? '' : 's'} · ${total} registration${total === 1 ? '' : 's'}.`;
+    list.innerHTML = events.map(event => `<article class="club-registration-event"><header><div><h4>${escapeHtml(event.title)}</h4><p>${[event.date, event.time ? (window.formatSiteTime?.(event.time) || event.time) : '', event.location].filter(Boolean).map(escapeHtml).join(' · ') || 'Date and location not set'}</p></div><strong>${(event.registrations || []).length}</strong></header>${event.registrations?.length ? `<ul>${event.registrations.map(person => `<li><div><strong>${escapeHtml(person.name)}</strong><a href="mailto:${escapeHtml(person.email)}">${escapeHtml(person.email)}</a></div><time>${person.registeredAt ? escapeHtml(window.formatSiteTime?.(person.registeredAt) || new Date(person.registeredAt).toLocaleString()) : ''}</time></li>`).join('')}</ul>` : '<p class="club-registration-empty">No one has registered yet.</p>'}</article>`).join('') || '<p class="club-registration-empty">No club events are available yet.</p>';
+  } catch (error) {
+    if (version !== clubRegistrationsLoadVersion) return;
+    message.textContent = error.message || 'Could not load registrations.';
+    message.classList.add('is-error');
+    list.replaceChildren();
+  }
+}
+document.getElementById('refreshClubRegistrationsBtn')?.addEventListener('click', loadClubEventRegistrations);
 
 document.getElementById('presidentOverviewApplicantsBtn')?.addEventListener('click', () => {
   if (['president', 'head'].includes(state.clubAccount?.role)) setPresidentDashboardSection('presidentApplicantsPanel');
@@ -1417,24 +1450,25 @@ function renderEventsSlideshow() {
     }, true);
   }
   const todayStart = startOfLocalDay(new Date());
-  const tomorrowStart = new Date(todayStart);
-  tomorrowStart.setDate(tomorrowStart.getDate() + 1);
   const universityItems = (state.universityContent || []).map((item) => ({
     ...item, contentType: item.type === 'event' ? 'event' : 'feed',
     clubId: 0, clubName: 'Misr International University',
     clubImage: '/assets/img/pics/logo.svg.png', university: true,
     universityContentId: item.id, index: item.id,
-    parsedDate: parseEventDate(item.createdAt || item.date) || todayStart
+    parsedDate: parseEventDate(item.date || item.createdAt) || todayStart
   }));
   const items = getAllEvents().filter((event) => !event.university)
     .map((event) => ({ ...event, contentType: 'event', index: event.eventIndex, parsedDate: parseEventDate(event.date) }))
-    .filter((event) => event.parsedDate && event.parsedDate < tomorrowStart)
-    .concat(universityItems)
+    .filter((event) => event.parsedDate && event.parsedDate >= todayStart)
+    .concat(universityItems.filter((item) => item.contentType !== 'event' || (item.parsedDate && item.parsedDate >= todayStart)))
     .sort((left, right) => {
+      const leftEvent = left.contentType === 'event';
+      const rightEvent = right.contentType === 'event';
+      if (leftEvent !== rightEvent) return leftEvent ? -1 : 1;
       const leftDay = startOfLocalDay(left.parsedDate);
       const rightDay = startOfLocalDay(right.parsedDate);
-      if (leftDay.getTime() !== rightDay.getTime()) return rightDay - leftDay;
-      return left.parsedDate - right.parsedDate;
+      if (leftDay.getTime() !== rightDay.getTime()) return leftEvent ? leftDay - rightDay : rightDay - leftDay;
+      return leftEvent ? left.parsedDate - right.parsedDate : right.parsedDate - left.parsedDate;
     });
   if (!items.length) {
     slideItemCount = 0;
@@ -1453,7 +1487,7 @@ function renderEventsSlideshow() {
     const isToday = startOfLocalDay(item.parsedDate).getTime() === todayStart.getTime();
     const badge = item.university
       ? ({ poll: 'MIU POLL', evaluation: 'MIU EVALUATION' }[item.interaction] || (item.type === 'event' ? 'MIU EVENT' : 'MIU ANNOUNCEMENT'))
-      : (isToday ? 'TODAY ? NEW' : 'PAST EVENT');
+      : (isToday ? 'TODAY · NEW' : 'UPCOMING EVENT');
     const metaLine = item.contentType === 'sponsor'
       ? [item.sponsorType, item.sponsorAmount].filter(Boolean).join(' · ')
       : `${item.date || ''}${item.location ? ' · ' + escapeHtml(item.location) : ''}`;

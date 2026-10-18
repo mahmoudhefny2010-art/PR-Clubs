@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const crypto = require('node:crypto');
 const { Club, ClubAccount } = require('../models');
+const { assignNewClubRole, removeClubRoleAssignment } = require('../services/new-club-accounts');
 const source = fs.readFileSync(require.resolve('../server'), 'utf8');
 
 function chain(value) {
@@ -12,7 +13,7 @@ function chain(value) {
   return result;
 }
 function fixture() {
-  const routes = new Map(); const dbClubs = [{ id: 50, name: 'Existing', archivedAt: null }]; const dbAccounts = [];
+  const routes = new Map(); const dbClubs = [{ id: 50, name: 'Existing', members: 18, memberRoster: [], archivedAt: null }]; const dbAccounts = [];
   let failAccount = false; let studentCollision = false; let aborted = 0;
   const session = { pendingUpdates: [], pendingClubs: [], pendingAccounts: [], startTransaction() {},
     async commitTransaction() { dbClubs.push(...this.pendingClubs); dbAccounts.push(...this.pendingAccounts); for (const update of this.pendingUpdates) Object.assign(update.existing,update.value); },
@@ -24,7 +25,7 @@ function fixture() {
       get: (path, ...handlers) => routes.set(`GET ${path}`, handlers.at(-1)) },
     mongoose: { startSession: async () => session },
     Club: {
-      findOne: () => chain(dbClubs.at(-1)), find: () => chain(dbClubs.filter(club => !club.archivedAt)),
+      findOne: () => chain(dbClubs.at(-1)), find: () => chain(dbClubs),
       aggregate: () => chain(dbClubs.filter(club => !club.archivedAt)),
       create: async ([value], { session }) => {
         const doc = new Club(value); const error = doc.validateSync(); if (error) throw error;
@@ -83,11 +84,57 @@ function fixture() {
     studentCollision: () => { studentCollision = true; }, aborted: () => aborted };
 }
 
+test('club import cannot silently move a Vice President role from another club', async () => {
+  const current = { _id:'account-1', email:'vp@miuegypt.edu.eg', role:'vice_president', clubId:8,
+    roleAssignments:[{ role:'vice_president', clubId:8, assignedClubIds:[], committee:'' }], sessionVersion:2 };
+  const ClubAccount = { findOne: () => ({ session() { return this; }, lean: async () => current }) };
+  await assert.rejects(assignNewClubRole({ ClubAccount, session:{}, email:current.email, clubId:9, role:'vice_president' }),
+    error => error.status === 409 && /already manages another club/i.test(error.message));
+});
+
+test('replacing an imported officer removes only that club role and preserves other account roles', async () => {
+  const account = { _id: 'account-1', email: 'officer@miuegypt.edu.eg', role: 'president', clubId: 8,
+    roleAssignments: [
+      { role: 'president', clubId: 8, committee: '' },
+      { role: 'head', clubId: 12, committee: 'Media' }
+    ], sessionVersion: 3 };
+  let update;
+  const ClubAccount = {
+    findOne: () => ({ session() { return this; }, lean: async () => account }),
+    findOneAndUpdate(filter, value) {
+      assert.equal(filter.sessionVersion, 3);
+      update = { ...account, ...value.$set, sessionVersion: 4 };
+      return { session() { return this; }, lean: async () => update };
+    }
+  };
+  const result = await removeClubRoleAssignment({ ClubAccount, session: {}, email: account.email, clubId: 8, role: 'president' });
+  assert.equal(result.removed, true);
+  assert.deepEqual(result.account.roleAssignments, [{ role: 'head', clubId: 12, assignedClubIds: [], committee: 'Media' }]);
+  assert.equal(result.account.role, 'head');
+  assert.equal(result.account.clubId, 12);
+  assert.equal(result.account.sessionVersion, 4);
+});
+
+test('replacing an imported officer deletes an account only when that was its final role', async () => {
+  const account = { _id: 'account-2', email: 'officer@miuegypt.edu.eg', role: 'vice_president', clubId: 8,
+    roleAssignments: [{ role: 'vice_president', clubId: 8 }], sessionVersion: 0 };
+  let deleted = false;
+  const ClubAccount = {
+    findOne: () => ({ session() { return this; }, lean: async () => account }),
+    deleteOne: async (filter, options) => { assert.equal(filter._id, account._id); assert.ok(options.session); deleted = true; return { deletedCount: 1 }; }
+  };
+  const result = await removeClubRoleAssignment({ ClubAccount, session: {}, email: account.email, clubId: 8, role: 'vice_president' });
+  assert.equal(deleted, true);
+  assert.equal(result.removed, true);
+  assert.equal(result.account, null);
+});
+
 test('new club receives a president account and appears in both public API variants and its dashboard', async () => {
   const state = fixture();
   const created = await state.call('POST', '/api/admin/clubs');
   assert.equal(created.code, 201);
   assert.equal(created.body.id, 51, 'ID comes from database rather than stale instance cache');
+  assert.equal(created.body.seats, 0, 'clubs have no application seat limit');
   assert.equal(state.dbAccounts[0].clubId, 51); assert.equal(state.dbAccounts[0].role, 'president');
   assert.equal(state.dbAccounts[0].password, undefined);
   assert.ok(state.dbAccounts[0].passwordHash);
@@ -97,6 +144,7 @@ test('new club receives a president account and appears in both public API varia
     const homepage = await state.call('GET', '/api/clubs', { query });
     assert.equal(homepage.code, 200);
     assert.ok(homepage.body.some(club => club.id === 51 && club.name === state.payload.name));
+    assert.equal(homepage.body.find(club => club.id === 50).members, 0, 'member totals come from roster and accepted applications, not the legacy manual count');
   }
   const login = await require('../services/staff-google-auth').resolveStaffGoogleAccount(state.context.ClubAccount,
     { email: state.payload.clubLoginEmail, googleSub: 'verified-google-subject' });
@@ -113,6 +161,24 @@ test('account write failure rolls back club creation and does not update the pub
   assert.equal(result.code, 503); assert.equal(state.aborted(), 1);
   assert.equal(state.dbClubs.length, 1); assert.equal(state.dbAccounts.length, 0);
   assert.equal(state.context.clubs.length, 1); assert.equal(state.context.clubAccounts.length, 0);
+});
+test('club creation rejects an existing name regardless of case, spacing, or archive status', async () => {
+  const active = fixture();
+  const activeResult = await active.call('POST', '/api/admin/clubs', { body: { ...active.payload, name: '  eXISTING  ' } });
+  assert.equal(activeResult.code, 409);
+  assert.equal(activeResult.body.code, 'CLUB_ALREADY_EXISTS');
+  assert.equal(activeResult.body.existingClubId, 50);
+  assert.equal(activeResult.body.archived, false);
+  assert.equal(active.dbClubs.length, 1);
+  assert.equal(active.dbAccounts.length, 0);
+
+  const archived = fixture();
+  archived.dbClubs[0].archivedAt = new Date();
+  const archivedResult = await archived.call('POST', '/api/admin/clubs', { body: { ...archived.payload, name: 'Existing' } });
+  assert.equal(archivedResult.code, 409);
+  assert.equal(archivedResult.body.archived, true);
+  assert.match(archivedResult.body.message, /Archived clubs/);
+  assert.equal(archived.dbClubs.length, 1);
 });
 test('existing student can become president through Google; invalid emails and missing image reject creation', async () => {
   const student = fixture(); student.studentCollision();

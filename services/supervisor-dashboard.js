@@ -6,7 +6,7 @@ function assignedIds(account) {
 }
 
 function registerSupervisorDashboard(app, deps) {
-  const { getAccount, databaseReady, Club, ContentRequest, SpeakerRequest, AttendanceRecord, AttendanceSession, Review,
+  const { getAccount, databaseReady, Club, ContentRequest, SpeakerRequest, AttendanceRecord, AttendanceSession, EventRegistration, Review,
     sameOrigin, publicSpeakerRequest, attendanceClosureMapFor, attendanceActivityKey, isAttendanceActivityEnded } = deps;
   const router = express.Router();
   router.use(async (req, res, next) => {
@@ -82,14 +82,34 @@ function registerSupervisorDashboard(app, deps) {
     req.supervisorClubId = id;
     next();
   });
+  router.get('/clubs/:clubId/registrations', async (req, res) => {
+    try {
+      const clubId = req.supervisorClubId;
+      const [club, records] = await Promise.all([
+        Club.findOne({ id: clubId, archivedAt: null }).select('id name events').lean(),
+        EventRegistration.find({ clubId }).sort({ createdAt: -1 }).read('primary').lean()
+      ]);
+      if (!club) return res.status(404).json({ message: 'Assigned club not found.' });
+      const events = (Array.isArray(club.events) ? club.events : []).flatMap((event, eventIndex) => {
+        const title = String(event?.title || '').trim();
+        if (!title) return [];
+        const requestId = Number(event.requestId) > 0 ? Number(event.requestId) : null;
+        const registrations = records.filter(record => record.eventIndex === eventIndex && record.eventTitle === title
+          && (requestId ? (record.eventRequestId === requestId || record.eventRequestId == null) : record.eventRequestId == null));
+        return [{ title, date: String(event.date || ''), time: String(event.time || ''), location: String(event.location || ''),
+          registrations: registrations.map(record => ({ name: record.name, email: record.email, registeredAt: record.createdAt })) }];
+      });
+      res.json({ club: { id: club.id, name: club.name }, events });
+    } catch { res.status(503).json({ message: 'Could not load registrations for this assigned club.' }); }
+  });
   router.get('/clubs/:clubId', async (req, res) => {
     try {
       const clubId = req.supervisorClubId;
-      const club = await Club.findOne({ id: clubId }).select('id name category description status events').lean();
+      const club = await Club.findOne({ id: clubId }).select('id name image category description status events').lean();
       if (!club) return res.status(404).json({ message: 'Assigned club not found.' });
       const [requests, speakers, attendance, reviews] = await Promise.all([
         ContentRequest.aggregate([{ $match: { clubId } }, { $sort: { createdAt: -1 } }, { $project: {
-          ...Object.fromEntries('id clubId type title description date time location status clubNotice comments supervisorNextStage createdAt updatedAt'.split(' ').map(key => [key, 1])),
+          ...Object.fromEntries('id clubId type title description date time location budget registrationEnabled attendanceEnabled attendanceAudience sponsorName sponsorCompany sponsorContact sponsorEmail sponsorPhone sponsorType sponsorAmount sponsorBenefits sponsorDescription sponsorLogo sponsorNotes boothName boothPurpose boothDescription boothLocation boothSize boothEquipment boothSetupDate boothOpenDate boothCloseDate boothContact boothNotes permitItems status clubNotice comments supervisorNextStage workflowHistory commentHistory submittedAt createdAt updatedAt'.split(' ').map(key => [key, 1])),
           image: { $cond: [{ $and: [{ $eq: ['$type', 'feed'] }, { $regexMatch: { input: { $ifNull: ['$image', ''] }, regex: '^https://res[.]cloudinary[.]com/[^/]+/video/upload/' } }] }, '$image', ''] }
         } }]),
         SpeakerRequest.find({ clubId }).sort({ submittedAt: -1 }).lean(),
@@ -103,7 +123,7 @@ function registerSupervisorDashboard(app, deps) {
       // Events are projected explicitly; never expose embedded registration or attendee data.
       club.events = (club.events || []).map((event, index) => ({ index, title: event.title, date: event.date,
         time: event.time, location: event.location, description: event.description, requestId: event.requestId }));
-      res.json({ club, requests, speakers: speakers.map(publicSpeakerRequest), attendance,
+      res.json({ club, requests: requests.map(request => ({ ...request, clubName: club.name, clubImage: club.image })), speakers: speakers.map(publicSpeakerRequest), attendance,
         reviews: reviews.map(({ targetType, targetId, note, updatedAt }) => ({ targetType, targetId, note, updatedAt })) });
     } catch { res.status(503).json({ message: 'Could not load club information. Please try again.' }); }
   });

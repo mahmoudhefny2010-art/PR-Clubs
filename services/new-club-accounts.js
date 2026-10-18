@@ -15,8 +15,10 @@ function validateNewClubEmails(body, isAdminEmail) {
 async function assignNewClubRole({ ClubAccount, session, email, clubId, role }) {
   const existing = await ClubAccount.findOne({ email }).session(session).lean();
   const assignments = staffRoleAssignments(existing);
-  if (role === 'president' && assignments.some(item => item.role === 'president' && item.clubId !== clubId)) {
-    const error = new Error('This president already manages another club. Choose another MIU email.');
+  if (['president', 'vice_president'].includes(role)
+    && assignments.some(item => item.role === role && item.clubId !== clubId)) {
+    const title = role === 'president' ? 'president' : 'vice president';
+    const error = new Error(`This ${title} already manages another club. Choose another MIU email.`);
     error.status = 409; throw error;
   }
   const previous = assignments.find(item => item.role === role);
@@ -37,4 +39,40 @@ async function assignNewClubRole({ ClubAccount, session, email, clubId, role }) 
   const [created] = await ClubAccount.create([{ email, ...primary, roleAssignments, salt, passwordHash, sessionVersion: 0 }], { session });
   return created.toObject();
 }
-module.exports = { validateNewClubEmails, assignNewClubRole };
+
+async function removeClubRoleAssignment({ ClubAccount, session, email, clubId, role }) {
+  const existing = await ClubAccount.findOne({ email }).session(session).lean();
+  if (!existing) return { account: null, removed: false };
+  const assignments = staffRoleAssignments(existing);
+  const remaining = assignments.filter(item => !(item.role === role && item.clubId === clubId));
+  if (remaining.length === assignments.length) return { account: existing, removed: false };
+
+  const version = Number.isSafeInteger(Number(existing.sessionVersion)) ? Number(existing.sessionVersion) : 0;
+  const versionFilter = existing.sessionVersion == null
+    ? { $or: [{ sessionVersion: { $exists: false } }, { sessionVersion: null }, { sessionVersion: 0 }] }
+    : { sessionVersion: version };
+  const filter = { _id: existing._id, email, ...versionFilter };
+
+  if (!remaining.length) {
+    const result = await ClubAccount.deleteOne(filter, { session });
+    if (result.deletedCount !== 1) {
+      const error = new Error('The staff account changed. Refresh and try again.');
+      error.status = 409;
+      throw error;
+    }
+    return { account: null, removed: true };
+  }
+
+  const primary = remaining[0];
+  const saved = await ClubAccount.findOneAndUpdate(filter,
+    { $set: { ...primary, roleAssignments: remaining }, $inc: { sessionVersion: 1 } },
+    { session, new: true, runValidators: true }).lean();
+  if (!saved) {
+    const error = new Error('The staff account changed. Refresh and try again.');
+    error.status = 409;
+    throw error;
+  }
+  return { account: saved, removed: true };
+}
+
+module.exports = { validateNewClubEmails, assignNewClubRole, removeClubRoleAssignment };

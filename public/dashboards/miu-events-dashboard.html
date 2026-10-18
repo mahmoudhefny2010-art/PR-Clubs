@@ -4,12 +4,12 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#101827"><title>MIU Events Dashboard Â· MIU Clubs</title>
   <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="stylesheet" href="/assets/css/base.css?v=20261015mainadmin1">
+  <link rel="stylesheet" href="/assets/css/base.css?v=20261018clubregistrations1">
   <link rel="stylesheet" href="/assets/css/responsive.css?v=20261015mainadmin1">
   <link rel="stylesheet" href="/assets/css/dark.css?v=20261015mainadmin1">
-  <link rel="stylesheet" href="/assets/css/features.css?v=20261015mainadmin1">
+  <link rel="stylesheet" href="/assets/css/features.css?v=20261018fullwidthreviewnotice1">
   <link rel="stylesheet" href="/assets/css/pages/event-reports.css?v=20261014mobileoptions1">
-  <link rel="stylesheet" href="/assets/css/pages/miu-events-dashboard.css?v=20261014design3">
+  <link rel="stylesheet" href="/assets/css/pages/miu-events-dashboard.css?v=20261018registrations1">
   <script src="/assets/js/shared.js?v=20261015mainadmin1"></script>
   <script src="/assets/js/site-loading.js?v=20261014promptqueue1"></script>
   <script src="/assets/js/theme.js?v=20261009c" defer></script>
@@ -24,6 +24,7 @@
       <a class="committee-sidebar-link is-active" href="#miuEventsOverview" data-dashboard-panel="miuEventsOverview">Overview</a>
       <h3>EVENT MANAGEMENT</h3>
       <a class="committee-sidebar-link" href="#miuEventsPanel" data-dashboard-panel="miuEventsPanel">MIU events &amp; posts</a>
+      <a class="committee-sidebar-link" href="#miuEventRegistrationsPanel" data-dashboard-panel="miuEventRegistrationsPanel">Registrations</a>
       <h3>DOWNLOADS</h3>
       <a class="committee-sidebar-link" href="/pages/miu-attendance.html">Take MIU event attendance</a>
     </aside>
@@ -62,11 +63,16 @@
         </div>
         <section class="miu-post-records"><h3>Published MIU updates</h3><p id="universityPostListMessage" class="message" role="status" aria-live="polite">Loading updates</p><div id="universityPostRecords" class="records"></div></section>
       </section>
+      <section id="miuEventRegistrationsPanel" class="committee-overview-panel" hidden>
+        <header class="miu-events-section-heading"><div><span class="committee-label">MIU EVENT REGISTRATIONS</span><h2>Registrations</h2><p>View students registered for each MIU event.</p></div><div class="miu-events-section-actions"><button id="refreshMiuRegistrationsBtn" class="secondary-btn" type="button">Refresh registrations</button></div></header>
+        <p id="miuRegistrationsMessage" class="message" role="status" aria-live="polite">Loading registrations</p>
+        <div id="miuRegistrationsList" class="records"></div>
+      </section>
     </section>
   </main>
   <div id="site-footer"></div>
   <script src="/assets/js/committee-sidebar.js?v=20261013lighter1" defer></script>
   <script src="/assets/js/pages/report-downloads.js?v=20261014progressive1" defer></script>
   <script src="/assets/js/report-dashboard-panels.js?v=20261014progressive1" defer></script>
-  <script src="/assets/js/miu-events-dashboard.js?v=20261014progressive1" defer></script>
+  <script src="/assets/js/miu-events-dashboard.js?v=20261018registrations1" defer></script>
 </body></html>

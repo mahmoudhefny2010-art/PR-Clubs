@@ -94,7 +94,9 @@ app.use((req, res, next) => {
   if (req.path === '/api/admin/accounts/password') { assert.equal(req.body.password, req.body.confirmPassword); return res.json({ message: 'Fixture password saved.' }); }
   if (req.path === '/api/admin/dashboard-clubs/1') return res.json(fixtures['/api/clubs'][0]);
   if (req.path === '/api/admin/clubs/1' && req.method === 'PATCH') {
-    assert.equal(req.body.applicants, '7'); assert.equal(req.body.seats, '20');
+    assert.equal(req.body.applicants, undefined, 'applicant count is computed from application records');
+    assert.equal(req.body.members, undefined, 'member count is computed from membership records');
+    assert.equal(req.body.seats, undefined, 'club applications have no manual seat limit');
     assert.equal(req.body.imagePublicId, undefined, 'Keeping an image does not revalidate it as a new upload');
     assert.equal(req.body.applicationFields[0].key, 'interest');
     fixtures['/api/clubs'][0] = { ...fixtures['/api/clubs'][0], ...req.body };

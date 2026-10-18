@@ -554,6 +554,7 @@ async function loadRequests(sharedResponse = null, invalidateStatus = true) {
       const meta = document.createElement('div');
       meta.className = 'req-meta';
       meta.textContent = contentListMeta(item);
+      let reviewNotice = null;
       const actions = document.createElement('div');
       actions.className = 'req-actions';
       const comment = document.createElement('input');
@@ -593,7 +594,10 @@ async function loadRequests(sharedResponse = null, invalidateStatus = true) {
       actions.append(viewButton);
       summary.append(title, meta);
       if (item.clubNotice) {
-        const notice = document.createElement('div'); notice.className = 'content-review-update'; notice.setAttribute('role', 'status'); notice.textContent = `Review update: ${item.clubNotice}`; summary.append(notice);
+        reviewNotice = document.createElement('details'); reviewNotice.className = 'content-review-update';
+        const noticeSummary = document.createElement('summary'); noticeSummary.textContent = 'Review update'; noticeSummary.title = 'Open the full review update';
+        const noticeText = document.createElement('p'); noticeText.textContent = item.clubNotice;
+        reviewNotice.append(noticeSummary, noticeText);
       }
       const returnAction = Array.isArray(item.workflowHistory)
         ? [...item.workflowHistory].reverse().find((event) => event.role === 'dean' && event.action === `returned_to_${currentRole}`)
@@ -605,7 +609,9 @@ async function loadRequests(sharedResponse = null, invalidateStatus = true) {
         note.textContent = `Dean's note for ${{ pr: 'PR', english: 'English', security: 'Security Office' }[currentRole] || 'committee'}: ${returnAction.comment}`;
         summary.append(note);
       }
-      card.append(summary, actions);
+      card.append(summary);
+      if (reviewNotice) card.append(reviewNotice);
+      card.append(actions);
       requestsList.append(card);
     }
   } catch (error) {

@@ -14,16 +14,16 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" /></noscript>
-    <link rel="stylesheet" href="/assets/css/base.css?v=20261017loaderror1" />
+    <link rel="stylesheet" href="/assets/css/base.css?v=20261018clubregistrations1" />
     <link rel="stylesheet" href="/assets/css/responsive.css?v=20261015mainadmin1" />
     <link rel="stylesheet" href="/assets/css/dark.css?v=20261015mainadmin1" />
-    <link rel="stylesheet" href="/assets/css/features.css?v=20261015mainadmin1" />
+    <link rel="stylesheet" href="/assets/css/features.css?v=20261018fullwidthreviewnotice1" />
     <link rel="stylesheet" href="/assets/css/event-modal.css?v=20261017mobilepopup1" />
     <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/pics/pwa-icon-192.png?v=20261013favicon1">
     <link rel="stylesheet" href="/assets/css/pages/home.css?v=20261013compactlogin1" />
     <link rel="stylesheet" href="/assets/css/pages/speaker-requests.css?v=20261014mobilefit1" />
       <script defer src="/assets/js/pwa-register.js?v=20261014localfresh1"></script>
-    <link rel="stylesheet" href="/assets/css/modal-controls.css?v=20261015mainadmin1">
+    <link rel="stylesheet" href="/assets/css/modal-controls.css?v=20261018fullwidthreviewnotice1">
   <link rel="stylesheet" href="/assets/css/pages/event-reports.css?v=20261014mobileoptions1">
   <script src="/assets/js/feed-media.js?v=20261015videopopup1"></script>
 </head>
@@ -361,6 +361,7 @@
                 <a href="#presidentFormManager" data-dashboard-section="presidentFormManager">Application form</a>
                 <a href="#interviewFormManager" data-dashboard-section="interviewFormManager">Interview questions</a>
                 <a href="#presidentApplicantsPanel" data-dashboard-section="presidentApplicantsPanel" data-unread-section="applicants">Applicants <span class="sidebar-unread-badge" data-unread-badge="applicants" hidden></span></a>
+                <a href="#clubRegistrationsPanel" data-dashboard-section="clubRegistrationsPanel">Registrations</a>
                 <span class="president-sidebar-group-title">Club operations</span>
                 <a href="/pages/report-downloads.html?type=reports" data-president-only>Event reports</a>
                 <a href="#speakerRequestDashboardPanel" data-dashboard-section="speakerRequestDashboardPanel" data-speaker-manager-only>External speaker request</a>
@@ -570,6 +571,12 @@
               </div>
               <div id="applicationsList" class="applications-list" aria-live="polite"></div>
             </div>
+            <section id="clubRegistrationsPanel" class="committee-head-manager hidden" aria-labelledby="clubRegistrationsTitle">
+              <div class="admin-section-heading"><div><span class="admin-eyebrow">EVENT REGISTRATIONS</span><h3 id="clubRegistrationsTitle">Registrations</h3></div><button id="refreshClubRegistrationsBtn" class="secondary-btn" type="button">Refresh</button></div>
+              <p>See everyone registered for your club events.</p>
+              <p id="clubRegistrationsMessage" class="admin-feedback" role="status" aria-live="polite">Loading registrations…</p>
+              <div id="clubRegistrationsList" class="club-registrations-list"></div>
+            </section>
               </div>
             </div>
           </div>
@@ -850,16 +857,16 @@
     <script src="/assets/js/event-modal.js?v=20261017mobilepopup1" defer></script>
     <script src="/assets/js/committee-sidebar.js?v=20261013lighter1" defer></script>
     <script src="/assets/js/member-dashboard.js?v=20261014eventroles1" defer></script>
-    <script src="/assets/js/app-home.js?v=20261017speakeraccess1" defer></script>
-    <script src="/assets/js/cloudinary-upload.js?v=2" defer></script>
+    <script src="/assets/js/app-home.js?v=20261018clubregistrations1" defer></script>
+    <script src="/assets/js/cloudinary-upload.js?v=20261018signedresponse1" defer></script>
     <script src="/assets/js/student-feedback.js?v=20261013stagedload3" defer></script>
     <script src="/assets/js/event-info-popup.js?v=20261017clubinfo1" defer></script>
-    <script src="/assets/js/app-forms.js?v=20261017popupnavigation1" defer></script>
+    <script src="/assets/js/app-forms.js?v=20261018signedphoto1" defer></script>
     <script src="/assets/js/app-dashboard.js?v=20261017loaderror1" defer></script>
     <script src="/assets/js/attendance-dashboard.js?v=20261014eventroles1" defer></script>
     <script src="/assets/js/entry-permit-dashboard.js?v=20261014permitmobilecards1" defer></script>
     <script src="/assets/js/member-directory.js?v=20261013stagedload3" defer></script>
-    <script src="/assets/js/layout.js?v=20261017myaccountroute1" defer></script>
+    <script src="/assets/js/layout.js?v=20261017footercache2" defer></script>
     <script src="/assets/js/theme.js?v=20261009c" defer></script>
     <script src="/assets/js/pages/report-downloads.js?v=20261014progressive1" defer></script>
   <script src="/assets/js/report-dashboard-panels.js?v=20261014progressive1" defer></script>

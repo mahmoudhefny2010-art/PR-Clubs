@@ -30,10 +30,11 @@
       body: form
     });
     const uploaded = await response.json().catch(() => ({}));
-    if (!response.ok || typeof uploaded.secure_url !== 'string' || typeof uploaded.public_id !== 'string') {
+    if (!response.ok || typeof uploaded.secure_url !== 'string' || typeof uploaded.public_id !== 'string'
+      || typeof uploaded.signature !== 'string' || !uploaded.version) {
       throw new Error(uploaded.error?.message || 'The image could not be uploaded to Cloudinary.');
     }
-    return { url: uploaded.secure_url, publicId: uploaded.public_id };
+    return { url: uploaded.secure_url, publicId: uploaded.public_id, signature: uploaded.signature, version: String(uploaded.version) };
   };
   window.uploadFeedVideo = async function uploadFeedVideo(file) {
     if (!(file instanceof File) || !['video/mp4', 'video/webm'].includes(file.type)) throw new Error('Choose an MP4 or WebM video.');

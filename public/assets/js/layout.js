@@ -530,5 +530,5 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   inject('site-header', '/components/site-header.html?v=20261014accountphoto2');
-  inject('site-footer', '/components/site-footer.html');
+  inject('site-footer', '/components/site-footer.html?v=20261017mobilecolon1');
 });
