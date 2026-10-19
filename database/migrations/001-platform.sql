@@ -320,7 +320,23 @@ CREATE UNIQUE NONCLUSTERED INDEX [IX_AttendanceAssignment_3_91565c] ON [dbo].[At
 CREATE NONCLUSTERED INDEX [IX_AttendanceAssignment_4_ca04b2] ON [dbo].[AttendanceAssignment] ([memberEmail] ASC, [eventDate] ASC);
 CREATE UNIQUE NONCLUSTERED INDEX [IX_AttendanceAssignment_5_34fb9f] ON [dbo].[AttendanceAssignment] ([activeMemberDayKey] ASC) WHERE [activeMemberDayKey] IS NOT NULL;
 
+CREATE TABLE [dbo].[AttendanceDeviceBinding] (
+  [deviceHash] NVARCHAR(254) COLLATE Latin1_General_100_BIN2 NOT NULL,
+  [expiresAt] DATETIME2(3) NOT NULL,
+  [_id] CHAR(24) COLLATE Latin1_General_100_BIN2 NOT NULL,
+  [createdAt] DATETIME2(3) NULL,
+  [updatedAt] DATETIME2(3) NULL,
+  [__v] FLOAT(53) NULL,
+  [_payload] NVARCHAR(MAX) NOT NULL CHECK (ISJSON([_payload]) = 1),
+  [_version] BIGINT NOT NULL DEFAULT 0,
+  CONSTRAINT [PK_AttendanceDeviceBinding] PRIMARY KEY ([_id]),
+  CHECK ([_id] IS NULL OR (LEN([_id]) = 24 AND [_id] NOT LIKE '%[^0-9a-f]%'))
+);
+CREATE UNIQUE NONCLUSTERED INDEX [IX_AttendanceDeviceBinding_0_3d2050] ON [dbo].[AttendanceDeviceBinding] ([deviceHash] ASC);
+CREATE NONCLUSTERED INDEX [IX_AttendanceDeviceBinding_1_cd5875] ON [dbo].[AttendanceDeviceBinding] ([expiresAt] ASC);
+
 CREATE TABLE [dbo].[AttendanceRecord] (
+  [accountEventKey] NVARCHAR(254) COLLATE Latin1_General_100_BIN2 NULL,
   [universityId] NVARCHAR(40) COLLATE Latin1_General_100_BIN2 NULL,
   [major] NVARCHAR(120) COLLATE Latin1_General_100_BIN2 NULL,
   [attendanceAudience] NVARCHAR(254) COLLATE Latin1_General_100_BIN2 NULL,
@@ -346,6 +362,7 @@ CREATE TABLE [dbo].[AttendanceRecord] (
   [_payload] NVARCHAR(MAX) NOT NULL CHECK (ISJSON([_payload]) = 1),
   [_version] BIGINT NOT NULL DEFAULT 0,
   CONSTRAINT [PK_AttendanceRecord] PRIMARY KEY ([_id]),
+  [_has_accountEventKey] BIT NOT NULL,
   CHECK ([attendanceAudience] IS NULL OR [attendanceAudience] IN (N'members', N'all_students')),
   CHECK ([membershipStatus] IS NULL OR [membershipStatus] IN (N'member', N'non_member', N'unknown')),
   CHECK ([sessionId] IS NULL OR (LEN([sessionId]) = 24 AND [sessionId] NOT LIKE '%[^0-9a-f]%')),
@@ -353,14 +370,15 @@ CREATE TABLE [dbo].[AttendanceRecord] (
   CHECK ([approvalStatus] IS NULL OR [approvalStatus] IN (N'pending_supervisor', N'pending_pr', N'pending_sso', N'pending_dean', N'approved', N'rejected')),
   CHECK ([_id] IS NULL OR (LEN([_id]) = 24 AND [_id] NOT LIKE '%[^0-9a-f]%'))
 );
-CREATE NONCLUSTERED INDEX [IX_AttendanceRecord_0_196406] ON [dbo].[AttendanceRecord] ([attendanceAudience] ASC);
-CREATE NONCLUSTERED INDEX [IX_AttendanceRecord_1_1bc295] ON [dbo].[AttendanceRecord] ([membershipStatus] ASC);
-CREATE NONCLUSTERED INDEX [IX_AttendanceRecord_2_0b9bac] ON [dbo].[AttendanceRecord] ([sessionId] ASC);
-CREATE NONCLUSTERED INDEX [IX_AttendanceRecord_3_8ee33f] ON [dbo].[AttendanceRecord] ([clubId] ASC);
-CREATE NONCLUSTERED INDEX [IX_AttendanceRecord_4_f2ba58] ON [dbo].[AttendanceRecord] ([itemType] ASC);
-CREATE NONCLUSTERED INDEX [IX_AttendanceRecord_5_7e8004] ON [dbo].[AttendanceRecord] ([approvalStatus] ASC);
-CREATE UNIQUE NONCLUSTERED INDEX [IX_AttendanceRecord_6_f32fa6] ON [dbo].[AttendanceRecord] ([clubId] ASC, [itemType] ASC, [eventRequestId] ASC, [email] ASC);
-CREATE UNIQUE NONCLUSTERED INDEX [IX_AttendanceRecord_7_db3a8e] ON [dbo].[AttendanceRecord] ([clubId] ASC, [itemType] ASC, [eventRequestId] ASC, [deviceHash] ASC) WHERE [deviceHash] IS NOT NULL;
+CREATE UNIQUE NONCLUSTERED INDEX [IX_AttendanceRecord_0_7309a9] ON [dbo].[AttendanceRecord] ([accountEventKey] ASC) WHERE ([_has_accountEventKey] = 1);
+CREATE NONCLUSTERED INDEX [IX_AttendanceRecord_1_196406] ON [dbo].[AttendanceRecord] ([attendanceAudience] ASC);
+CREATE NONCLUSTERED INDEX [IX_AttendanceRecord_2_1bc295] ON [dbo].[AttendanceRecord] ([membershipStatus] ASC);
+CREATE NONCLUSTERED INDEX [IX_AttendanceRecord_3_0b9bac] ON [dbo].[AttendanceRecord] ([sessionId] ASC);
+CREATE NONCLUSTERED INDEX [IX_AttendanceRecord_4_8ee33f] ON [dbo].[AttendanceRecord] ([clubId] ASC);
+CREATE NONCLUSTERED INDEX [IX_AttendanceRecord_5_f2ba58] ON [dbo].[AttendanceRecord] ([itemType] ASC);
+CREATE NONCLUSTERED INDEX [IX_AttendanceRecord_6_7e8004] ON [dbo].[AttendanceRecord] ([approvalStatus] ASC);
+CREATE UNIQUE NONCLUSTERED INDEX [IX_AttendanceRecord_7_f32fa6] ON [dbo].[AttendanceRecord] ([clubId] ASC, [itemType] ASC, [eventRequestId] ASC, [email] ASC);
+CREATE UNIQUE NONCLUSTERED INDEX [IX_AttendanceRecord_8_db3a8e] ON [dbo].[AttendanceRecord] ([clubId] ASC, [itemType] ASC, [eventRequestId] ASC, [deviceHash] ASC) WHERE [deviceHash] IS NOT NULL;
 CREATE UNIQUE NONCLUSTERED INDEX [IX_AttendanceRecord_legacy_0_3927ab] ON [dbo].[AttendanceRecord] ([sessionId] ASC, [email] ASC);
 CREATE UNIQUE NONCLUSTERED INDEX [IX_AttendanceRecord_legacy_1_04b557] ON [dbo].[AttendanceRecord] ([clubId] ASC, [eventRequestId] ASC, [email] ASC);
 
@@ -501,8 +519,9 @@ CREATE TABLE [dbo].[EventRegistration] (
 );
 CREATE UNIQUE NONCLUSTERED INDEX [IX_EventRegistration_0_037c92] ON [dbo].[EventRegistration] ([id] ASC);
 CREATE NONCLUSTERED INDEX [IX_EventRegistration_1_8ee33f] ON [dbo].[EventRegistration] ([clubId] ASC);
-CREATE UNIQUE NONCLUSTERED INDEX [IX_EventRegistration_2_539f72] ON [dbo].[EventRegistration] ([clubId] ASC, [eventIndex] ASC, [email] ASC);
-CREATE UNIQUE NONCLUSTERED INDEX [IX_EventRegistration_3_0e6e72] ON [dbo].[EventRegistration] ([registrationKey] ASC) WHERE ([_has_registrationKey] = 1);
+CREATE NONCLUSTERED INDEX [IX_EventRegistration_2_539f72] ON [dbo].[EventRegistration] ([clubId] ASC, [eventIndex] ASC, [email] ASC);
+CREATE UNIQUE NONCLUSTERED INDEX [IX_EventRegistration_3_04b557] ON [dbo].[EventRegistration] ([clubId] ASC, [eventRequestId] ASC, [email] ASC) WHERE [eventRequestId] IS NOT NULL;
+CREATE UNIQUE NONCLUSTERED INDEX [IX_EventRegistration_4_0e6e72] ON [dbo].[EventRegistration] ([registrationKey] ASC) WHERE ([_has_registrationKey] = 1);
 
 CREATE TABLE [dbo].[EventReport] (
   [clubId] BIGINT NOT NULL,

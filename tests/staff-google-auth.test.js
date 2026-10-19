@@ -62,7 +62,7 @@ test('Google sign-in endpoint verifies the credential before assigning the store
   const start = source.indexOf("app.post('/api/student-auth/google',");
   const end = source.indexOf("app.post('/api/student-auth/google/link'", start);
   let handler; let invalidCredential = false; let createdStudent = 0; let staffCookie = null;
-  const context = {
+  const context = { reverseAttendanceService: { bindDevice: async () => {} },
     app: { post: (path, callback) => { handler = callback; } },
     isSameOriginRequest: () => true, checkLoginSourceLock: async () => false, mongoReady: true,
     verifyGoogleRequest: async () => { if (invalidCredential) throw new Error('GOOGLE_ACCOUNT_NOT_ALLOWED'); return identity; },
@@ -90,7 +90,7 @@ test('Google sign-in retries database readiness and fails closed while it is sti
   const end = source.indexOf("app.post('/api/student-auth/google/link'", start);
   for (const recovers of [true, false]) {
     let handler, attempts = 0, credentialChecks = 0;
-    const context = {
+    const context = { reverseAttendanceService: { bindDevice: async () => {} },
       app: { post: (_path, callback) => { handler = callback; } },
       isSameOriginRequest: () => true, checkLoginSourceLock: async () => false, mongoReady: false,
       ensureReady: async () => { attempts++; context.mongoReady = recovers; },
@@ -132,7 +132,7 @@ test('configured MIU administrator signs in through the verified Google endpoint
   const end = source.indexOf("app.post('/api/student-auth/google/link'", start);
   let handler; let cookieRole; let body; const cleared = [];
   const account = { _id: 'admin', email: identity.email, sessionVersion: 7, googleSub: identity.googleSub };
-  const context = {
+  const context = { reverseAttendanceService: { bindDevice: async () => {} },
     app: { post: (path, callback) => { handler = callback; } }, console,
     isSameOriginRequest: () => true, checkLoginSourceLock: async () => false, mongoReady: true,
     verifyGoogleRequest: async () => identity, getConfiguredAdminEmail: () => identity.email,
@@ -156,7 +156,7 @@ test('account session prefers student identity and labels software development a
   const start = source.indexOf("app.get('/api/site/account-session',");
   const end = source.indexOf("app.get('/api/notifications/config',", start);
   let handler;
-  const context = {
+  const context = { reverseAttendanceService: { bindDevice: async () => {} },
     app: { get: (_path, callback) => { handler = callback; } },
     getStudentAccountFromRequest: async () => ({ name: 'Mahmoud', email: identity.email }),
     getClubAccountFromRequest: async () => account,
@@ -183,7 +183,7 @@ test('a club sign-in exposes the student dashboard only when a matching student 
   const end = source.indexOf("app.get('/api/notifications/config',", start);
   let handler;
   const staff = { email: identity.email, role: 'president', clubId: 8, committee: '' };
-  const context = {
+  const context = { reverseAttendanceService: { bindDevice: async () => {} },
     app: { get: (_path, callback) => { handler = callback; } },
     getStudentAccountFromRequest: async () => null,
     getClubAccountFromRequest: async () => staff,
@@ -211,7 +211,7 @@ test('dashboard switching can open the linked student dashboard and selects the 
   ];
   const staff = { email: identity.email, role: 'president', clubId: 3 };
   let handler; let studentCookie = false; let clubAssignment = null;
-  const context = {
+  const context = { reverseAttendanceService: { bindDevice: async () => {} },
     app: { post: (_path, callback) => { handler = callback; } }, console,
     isSameOriginRequest: () => true, mongoReady: true,
     getClubAccountFromRequest: async () => staff, isAdminSessionValid: async () => false,

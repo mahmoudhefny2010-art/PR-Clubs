@@ -5,6 +5,7 @@ const { toolIds } = require('./admin-dashboard-pages');
 const dependencies = {
   workflows: ['WorkflowDefinition', 'ContentRequest', 'SpeakerRequest', 'WorkflowNotification', 'ClubAccount', 'CustomStaffRole'],
   'blocked-requests': ['ContentRequest', 'SpeakerRequest', 'ClubAccount', 'CustomStaffRole'],
+  'secure-attendance': ['Club', 'UniversityContent', 'EventRegistration', 'AttendanceRecord', 'AttendanceSession', 'AttendanceAssignment', 'AttendanceActivityClosure'],
   'custom-roles': ['CustomStaffRole', 'ClubAccount', 'Club'],
   'quiz-points': ['QuizSubmission', 'Club'],
   committees: ['Club', 'ClubAccount'], 'club-order': ['Club'], 'application-forms': ['Club'],

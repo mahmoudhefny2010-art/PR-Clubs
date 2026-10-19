@@ -59,10 +59,13 @@
     feedback.textContent = '';
     form.reset();
     form.hidden = event.registrationEnabled === false;
-    if (!event.university) import('/assets/js/student-event-registration.js?v=20261014registrationbuttons1').then(() => {
-      if (activeEvent === event) window.mountStudentEventRegistration(form, feedback, `/api/events/${event.clubId}/${event.eventIndex}/registrations`);
+    if (!event.university) import('/assets/js/student-event-registration.js?v=20261019reverseQR1').then(() => {
+      if (activeEvent === event) window.mountStudentEventRegistration(form, feedback, `/api/events/${event.clubId}/${event.eventIndex}/registrations${event.requestId > 0 ? '?eventRequestId=' + event.requestId : ''}`);
     }).catch(() => { feedback.textContent = 'Registration controls could not load. Please reload.'; });
-    else if (event.attendanceAudience === 'members' && event.registrationEnabled === true) import('/assets/js/student-event-registration.js?v=20261014registrationbuttons1').then(() => {
+    if (event.university && event.attendanceAudience !== 'members' && event.registrationEnabled === true) import('/assets/js/student-event-registration.js?v=20261019reverseQR1').then(() => {
+      if (activeEvent === event) window.mountPublicEventCapacity(form, `/api/university-content/${event.universityContentId || event.id}/registrations`);
+    }).catch(() => { feedback.textContent = 'Registration availability could not load. Please reload.'; });
+    else if (event.university && event.attendanceAudience === 'members' && event.registrationEnabled === true) import('/assets/js/student-event-registration.js?v=20261019reverseQR1').then(() => {
       if (activeEvent === event) window.mountStudentEventRegistration(form, feedback, `/api/university-content/${encodeURIComponent(event.universityContentId || event.id)}/registrations`);
     }).catch(() => { feedback.textContent = 'Registration controls could not load. Please reload.'; });
     window.MiuUI.modals.open(modal);
@@ -128,6 +131,7 @@
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.message || 'This form was not saved. Please try again.');
       feedback.textContent = result.message || 'You are registered for this event.';
+      const qrLink = document.createElement('a'); qrLink.href = '/pages/attendance-qr.html?source=miu&clubId=0&eventIndex=' + encodeURIComponent(activeEvent.universityContentId || activeEvent.id); qrLink.textContent = ' Show my attendance QR'; feedback.append(qrLink);
       form.reset();
     } catch (error) {
       feedback.textContent = error.message || 'This form was not saved. Please try again.';

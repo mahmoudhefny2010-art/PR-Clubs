@@ -83,6 +83,7 @@ function defaults(type) {
   }) }, type);
 }
 function assignments(actor) { return actor?.assignments?.length ? actor.assignments : actor ? [actor] : []; }
+function sameEmail(left, right) { return String(left || '').trim().toLowerCase() === String(right || '').trim().toLowerCase(); }
 function permitted(actor, role, action) {
   if (!require('./staff-role-keys').isCustomRole(role)) return true;
   return !!actor?.customRoles?.some(custom => custom.key === role && custom.enabled && custom.modules.includes('requests') && custom.permissions.includes(action));
@@ -102,13 +103,13 @@ function owner(actor, record) { return !!actor && (actor.admin || actor.email ==
 function eligibleRoles(actor, record, stage) {
   if (!actor || actor.email === record.workflow?.ownerEmail) return [];
   return stage.roles.filter(role => (actor.admin && role === 'admin' || scoped(actor, role, record))
-    && (!record.workflow.assignedEmails?.length || record.workflow.assignedEmails.includes(actor.email)));
+    && (!record.workflow.assignedEmails?.length || record.workflow.assignedEmails.some(email => sameEmail(email, actor.email))));
 }
 function mayView(actor, record) {
   if (!record.workflow) return false;
   if (owner(actor, record)) return true;
   return record.workflow.definition.stages.some(stage => stage.roles.some(role => scoped(actor, role, record)
-    && (stage.id === record.workflow.stageId && (!record.workflow.assignedEmails?.length || record.workflow.assignedEmails.includes(actor.email)) || stage.permissions[role]?.includes('view_all') && permitted(actor, role, 'view_all'))));
+    && (stage.id === record.workflow.stageId && (!record.workflow.assignedEmails?.length || record.workflow.assignedEmails.some(email => sameEmail(email, actor.email))) || stage.permissions[role]?.includes('view_all') && permitted(actor, role, 'view_all'))));
 }
 function authorize(actor, record, action) {
   if (!mayView(actor, record)) fail(404, 'Request not found.');

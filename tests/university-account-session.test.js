@@ -88,7 +88,7 @@ test('event registration status accepts the existing Google multi-role cookie wi
   const source = fs.readFileSync(require.resolve('../server'), 'utf8');
   const start = source.indexOf('async function requireStudentAuth');
   const end = source.indexOf('async function getSpeakerRequester', start);
-  const context = { mongoReady: true, getStudentAccountFromRequest: state.get, console };
+  const context = { mongoReady: true, getStudentAccountFromRequest: state.get, reverseAttendanceService: { bindDevice: async () => {} }, console };
   vm.createContext(context); vm.runInContext(source.slice(start, end), context);
   const app = express();
   registerStudentEvents(app, {

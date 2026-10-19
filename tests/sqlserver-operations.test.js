@@ -7,7 +7,7 @@ const { ttlTargets, verifiedBackups, backupName } = require('../scripts/sqlserve
 
 test('SQL cleanup selects only reviewed zero-second expiresAt TTL models', () => {
   const targets = ttlTargets().map(t => t.name).sort();
-  assert.deepEqual(targets, ['LoginAttempt', 'PasswordRecoveryRateLimit', 'PasswordResetToken', 'SpeakerCvUpload', 'StudentEmailCode', 'SiteVisitorPresence'].sort());
+  assert.deepEqual(targets, ['AttendanceDeviceBinding', 'LoginAttempt', 'PasswordRecoveryRateLimit', 'PasswordResetToken', 'SpeakerCvUpload', 'StudentEmailCode', 'SiteVisitorPresence'].sort());
   const spec = { name: 'Bad', columns: [{ name: 'expiresAt', path: { instance: 'Date' } }], indexes: [{ keys: { other: 1 }, options: { expireAfterSeconds: 0 } }] };
   assert.throws(() => ttlTargets([spec]), /Unreviewed TTL/);
 });

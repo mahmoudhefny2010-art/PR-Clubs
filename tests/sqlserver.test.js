@@ -35,7 +35,7 @@ test('SQL configuration rejects unverified production TLS, bad ports and unsuppo
 test('generated DDL accounts for all declared models, uniqueness, references, global scope and retained review history', () => {
   const sql = schemaSql();
   assert.equal(fs.readFileSync(path.resolve(__dirname, '../database/migrations/001-platform.sql'), 'utf8'), sql);
-  assert.equal(specs.length, 34);
+  assert.equal(specs.length, 35);
   assert.ok(specs.some(model => model.name === 'QuizSubmission'));
   for (const s of specs) assert.ok(sql.includes(`CREATE TABLE ${s.table}`), s.name);
   assert.match(sql, /FK_AttendanceRecord_sessionId/);

@@ -49,10 +49,23 @@
       <textarea required maxlength="2000" name="note">${escape(previous?.note || '')}</textarea></label>
       <button class="primary-btn" type="submit">Save supervision note</button><span role="status" aria-live="polite"></span></form>`;
   }
-  function decisionForm(type, id, status) {
+  function workflowFieldOptions(workflow) {
+    if (!workflow?.revision || !workflow.actions?.includes('request_changes') || !workflow.editableFields?.length) return '';
+    return `<fieldset class="supervisor-workflow-fields"><legend>Fields to correct</legend>${workflow.editableFields.map(field => `<label><input type="checkbox" name="fields" value="${escape(field.id)}"> ${escape(field.label)}</label>`).join('')}</fieldset>`;
+  }
+  function decisionButtons(workflow = null) {
+    const actions = workflow?.revision ? workflow.actions : ['approve', 'request_edit', 'reject'];
+    return actions.map(action => {
+      const value = action === 'request_changes' ? 'request_edit' : action;
+      const label = action === 'approve' ? 'Approve and forward' : action === 'reject' ? 'Reject' : 'Request changes';
+      const className = action === 'approve' ? 'approve' : action === 'reject' ? 'reject' : 'changes';
+      return `<button class="${className}" name="action" value="${value}">${label}</button>`;
+    }).join('');
+  }
+  function decisionForm(type, id, status, workflow = null) {
     const controls = `<button class="view-details" type="button" data-request-details="${escape(id)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg><span>View Details</span></button>`;
     if (status !== 'pending_supervisor') return `<div class="req-actions supervisor-request-actions">${controls}</div>`;
-    return `<form class="req-actions supervisor-request-actions" data-decision-type="${type}" data-decision-id="${escape(id)}"><input type="text" name="comment" maxlength="2000" aria-label="Review feedback" placeholder="Comment for changes or rejection"><button class="approve" name="action" value="approve">Approve and forward</button><button class="changes" name="action" value="request_edit">Request changes</button><button class="reject" name="action" value="reject">Reject</button>${controls}<span role="status" aria-live="polite"></span></form>`;
+    return `<form class="req-actions supervisor-request-actions" data-decision-type="${type}" data-decision-id="${escape(id)}"${workflow?.revision ? ` data-workflow-revision="${escape(workflow.revision)}"` : ''}><input type="text" name="comment" maxlength="2000" aria-label="Review feedback" placeholder="Comment for changes or rejection">${type === 'speaker' ? workflowFieldOptions(workflow) : ''}${decisionButtons(workflow)}${controls}<span role="status" aria-live="polite"></span></form>`;
   }
   function requestHistory(item) {
     let events = Array.isArray(item.workflowHistory) ? [...item.workflowHistory] : [];
@@ -80,7 +93,7 @@
     const type = ({ event: 'Event', booth: 'Booth', feed: 'Feed post', entry_permit: 'Entry permit' })[item.type] || text(item.type);
     const meta = [item.clubName, type, item.date].filter(Boolean).map(escape).join(' · ');
     const image = item.clubImage || '/assets/img/pics/logo.svg.png';
-    return `<article class="supervisor-record req-card supervisor-request-card"><img src="${escape(image)}" alt="${escape(item.clubName || 'Club')} logo" loading="lazy"><div class="req-summary supervisor-request-heading"><strong>${escape(item.title || 'Untitled request')}</strong><div class="req-meta">${meta}</div><span class="badge-status">${text(item.status)}</span></div>${item.clubNotice ? `<details class="supervisor-request-notice"><summary title="Open the full review update">Review update</summary><p>${escape(item.clubNotice)}</p></details>` : ''}${decisionForm('content', item.id, item.status)}</article>`;
+    return `<article class="supervisor-record req-card supervisor-request-card"><img src="${escape(image)}" alt="${escape(item.clubName || 'Club')} logo" loading="lazy"><div class="req-summary supervisor-request-heading"><strong>${escape(item.title || 'Untitled request')}</strong><div class="req-meta">${meta}</div><span class="badge-status">${text(item.status)}</span></div>${item.clubNotice ? `<details class="supervisor-request-notice"><summary title="Open the full review update">Review update</summary><p>${escape(item.clubNotice)}</p></details>` : ''}${decisionForm('content', item.id, item.status, item.workflowRevision ? { revision: item.workflowRevision, actions: item.workflowActions, editableFields: item.workflowEditableFields } : null)}</article>`;
   }
   function appendRequestDetail(label, value, wide = false) {
     const section = document.createElement('section');
@@ -153,7 +166,7 @@
       requestDetails.append(section);
     }
     requestDialogActions.innerHTML = `<section class="supervisor-details-review"><button class="secondary-btn" type="button" data-toggle-review-history aria-expanded="false">Review All Edits</button><div class="detail-grid supervisor-history-panel" data-review-history-panel hidden><section class="detail-item detail-wide"><h3>Review history</h3>${requestHistory(item)}</section><section class="detail-item detail-wide"><h3>My supervision note</h3>${reviewForm('content', item.id)}</section></div></section>${item.status === 'pending_supervisor'
-      ? `<form class="supervisor-dialog-review" data-modal-decision-id="${escape(item.id)}"><section class="detail-item detail-wide"><h3>Review comment</h3><textarea name="comment" maxlength="2000" placeholder="Optional for approval; required for requesting changes or rejection"></textarea></section><div class="dialog-actions"><button class="approve" type="submit" name="action" value="approve">Approve and forward</button><button class="changes" type="submit" name="action" value="request_edit">Request changes</button><button class="reject" type="submit" name="action" value="reject">Reject</button></div><span role="status" aria-live="polite"></span></form>`
+      ? `<form class="supervisor-dialog-review" data-modal-decision-id="${escape(item.id)}"${item.workflowRevision ? ` data-workflow-revision="${escape(item.workflowRevision)}"` : ''}><section class="detail-item detail-wide"><h3>Review comment</h3><textarea name="comment" maxlength="2000" placeholder="Optional for approval; required for requesting changes or rejection"></textarea></section>${workflowFieldOptions(item.workflowRevision ? { revision: item.workflowRevision, actions: item.workflowActions, editableFields: item.workflowEditableFields } : null)}<div class="dialog-actions">${decisionButtons(item.workflowRevision ? { revision: item.workflowRevision, actions: item.workflowActions } : null)}</div><span role="status" aria-live="polite"></span></form>`
       : ''}`;
     requestDialog.showModal();
   }
@@ -202,9 +215,11 @@
       content.innerHTML = `<h2>Event registrations</h2><p class="supervisor-muted">Students registered for ${escape(club.name)} events.</p><p class="supervisor-muted" data-registration-message role="status" aria-live="polite">Loading registrations…</p><div class="club-registrations-list" data-registration-list></div>`;
       if (registrationLoadFor !== String(club.id)) void loadRegistrations(club.id);
     } else if (panel === 'requests') {
-      content.innerHTML = '<h2>Club requests · Supervisor review</h2>' + (requests.map(renderClubRequest).join('') || empty('No club requests have been submitted.'));
+      const pendingRequests = requests.filter(item => item.status === 'pending_supervisor');
+      content.innerHTML = `<h2>Club requests awaiting review (${pendingRequests.length})</h2>`
+        + (pendingRequests.map(renderClubRequest).join('') || empty('No requests are currently awaiting your review.'));
     } else if (panel === 'speakers') {
-      content.innerHTML = '<h2>External speaker requests</h2>' + (speakers.map(item => `<article class="supervisor-record"><h3>${escape(item.speakerName)}</h3><span class="supervisor-status">${text(item.status)}</span><p>${escape(item.jobTitleCompany || item.professionalDetails)}</p><p><strong>Talk topic:</strong> ${escape(item.proposedTopic)}</p><p><strong>Selection reason:</strong> ${escape(item.speakerSelectionReason || item.eventPurpose)}</p><p><strong>Student benefit:</strong> ${escape(item.expectedStudentBenefit)}</p><p><strong>Email:</strong> ${escape(item.speakerEmail)}</p><p><strong>LinkedIn:</strong> ${escape(item.linkedinProfile)}</p><p><strong>Session format:</strong> ${escape(item.sessionFormat)}</p><p><strong>Availability:</strong> ${escape(item.availability)}</p><p><strong>Short bio:</strong> ${escape(item.shortBio)}</p><p><strong>Special requirements:</strong> ${escape(item.specialRequirements)}</p><p><strong>Club feedback:</strong> ${escape(item.clubReviewerComment)}</p><p><strong>Reviewer feedback:</strong> ${escape(item.reviewerComment)}</p>${(item.attachments || []).map((file, index) => `<button class="secondary-btn" type="button" data-attachment="${escape(item.id)}" data-index="${index}">Download ${escape(file.name)}</button>`).join('')}${decisionForm('speaker', item.id, item.status)}${reviewForm('speaker', item.id)}</article>`).join('') || empty('No speaker requests have been submitted.'));
+      content.innerHTML = '<h2>External speaker requests</h2>' + (speakers.map(item => `<article class="supervisor-record"><h3>${escape(item.speakerName)}</h3><span class="supervisor-status">${text(item.status)}</span><p>${escape(item.jobTitleCompany || item.professionalDetails)}</p><p><strong>Talk topic:</strong> ${escape(item.proposedTopic)}</p><p><strong>Selection reason:</strong> ${escape(item.speakerSelectionReason || item.eventPurpose)}</p><p><strong>Student benefit:</strong> ${escape(item.expectedStudentBenefit)}</p>${item.speakerEmail ? `<p><strong>Email:</strong> ${escape(item.speakerEmail)}</p>` : ''}<p><strong>LinkedIn:</strong> ${escape(item.linkedinProfile)}</p><p><strong>Session format:</strong> ${escape(item.sessionFormat)}</p><p><strong>Availability:</strong> ${escape(item.availability)}</p><p><strong>Short bio:</strong> ${escape(item.shortBio)}</p><p><strong>Special requirements:</strong> ${escape(item.specialRequirements)}</p><p><strong>Club feedback:</strong> ${escape(item.clubReviewerComment)}</p><p><strong>Reviewer feedback:</strong> ${escape(item.reviewerComment)}</p>${(item.attachments || []).map((file, index) => `<button class="secondary-btn" type="button" data-attachment="${escape(item.id)}" data-index="${index}">Download ${escape(file.name)}</button>`).join('')}${decisionForm('speaker', item.id, item.status, item.workflowRevision ? { revision: item.workflowRevision, actions: item.workflowActions, editableFields: item.workflowEditableFields } : null)}${reviewForm('speaker', item.id)}</article>`).join('') || empty('No speaker requests have been submitted.'));
     } else {
       content.innerHTML = '<h2>Activity reports</h2><p class="supervisor-muted">Attendance summaries from the existing event records. Open-event check-ins show club membership captured at scan time.</p>' + (attendance.map(item => `<article class="supervisor-record"><h3>${escape(item.title)}</h3><span class="supervisor-status">${text(item._id.approvalStatus)}</span><p>${escape(item.date)} · ${text(item._id.itemType)} · ${item._id.attendanceAudience === 'all_students' ? 'Open student attendance' : 'Club member attendance'} · ${item.count} check-ins</p><details><summary>Review attendee sheet</summary>${(item.people || []).map(person => `<p>${escape(person.name)} · ${escape(person.email)} &middot; ${escape(window.MiuUI.attendanceEventRoleLabel(person))} · ${person.membershipStatus === 'member' ? `Member · ${escape((person.memberClubNames || []).join(', '))}` : person.membershipStatus === 'non_member' ? 'Non-member' : 'Club member'}</p>`).join('')}</details>${item._id.approvalStatus === 'pending_supervisor' ? `<form data-attendance-type="${escape(item._id.itemType)}" data-attendance-id="${item._id.eventRequestId}" data-attendance-audience="${item._id.attendanceAudience === 'all_students' ? 'all_students' : 'members'}"><label>Review feedback<textarea name="comment" maxlength="500"></textarea></label><div class="supervisor-decision-actions"><button class="primary-btn" name="action" value="approve">Approve and send to PR</button><button class="secondary-btn" name="action" value="reject">Reject</button></div><span role="status" aria-live="polite"></span></form>` : ''}</article>`).join('') || empty('No attendance reports are available.'));
     }
@@ -294,13 +309,19 @@
     event.preventDefault();
     const action = event.submitter?.value;
     const comment = form.elements.comment.value.trim();
+    const fields = [...form.querySelectorAll('input[name="fields"]:checked')].map(input => input.value);
     const status = form.querySelector('[role="status"]');
     if (action !== 'approve' && !comment) { status.textContent = 'Provide feedback before rejecting or requesting changes.'; form.elements.comment.focus(); return; }
+    if (action === 'request_edit' && form.dataset.workflowRevision && !fields.length) { status.textContent = 'Select at least one field to correct.'; return; }
     const buttons = [...form.querySelectorAll('button')]; buttons.forEach(button => button.disabled = true);
     const clubId = data.club.id;
+    const managed = Boolean(form.dataset.workflowRevision);
     try {
-      await api(`/api/supervisor/clubs/${clubId}/decisions/content/${encodeURIComponent(form.dataset.modalDecisionId)}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, comment })
+      await api(managed
+        ? `/api/workflow/requests/content/${encodeURIComponent(form.dataset.modalDecisionId)}/decision`
+        : `/api/supervisor/clubs/${clubId}/decisions/content/${encodeURIComponent(form.dataset.modalDecisionId)}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: managed && action === 'request_edit' ? 'request_changes' : action, comment,
+          ...(managed ? { revision: Number(form.dataset.workflowRevision), fields } : {}) })
       });
       requestDialog.close();
       if (data?.club.id === clubId) await loadClub();
@@ -329,14 +350,32 @@
       const action = event.submitter?.value;
       const status = decision.querySelector('[role="status"]');
       const comment = decision.elements.comment.value.trim();
+      if (action === 'request_edit' && decision.dataset.workflowRevision && decision.dataset.decisionType) {
+        if (!comment) { status.textContent = 'Provide feedback before requesting changes.'; decision.elements.comment.focus(); return; }
+        const item = data?.requests.find(request => String(request.id) === decision.dataset.decisionId);
+        if (!item) { status.textContent = 'This request is no longer available. Refresh and try again.'; return; }
+        openRequestDetails(item);
+        const detailForm = requestDialog.querySelector('form[data-modal-decision-id]');
+        if (detailForm) {
+          detailForm.elements.comment.value = comment;
+          detailForm.querySelector('input[name="fields"]')?.focus();
+        }
+        return;
+      }
+      const fields = [...decision.querySelectorAll('input[name="fields"]:checked')].map(input => input.value);
       if (action !== 'approve' && !comment) { status.textContent = 'Provide feedback before rejecting or requesting changes.'; decision.elements.comment.focus(); return; }
+      if (action === 'request_edit' && decision.dataset.workflowRevision && !fields.length) { status.textContent = 'Select at least one field to correct.'; return; }
       const buttons = [...decision.querySelectorAll('button')]; buttons.forEach(button => button.disabled = true);
       const clubId = data.club.id;
-      const path = decision.dataset.decisionType
-        ? `/api/supervisor/clubs/${clubId}/decisions/${decision.dataset.decisionType}/${decision.dataset.decisionId}`
-        : `/api/supervisor/clubs/${clubId}/attendance/${decision.dataset.attendanceType}/${decision.dataset.attendanceId}/decision?audience=${encodeURIComponent(decision.dataset.attendanceAudience || 'members')}`;
+      const managed = Boolean(decision.dataset.workflowRevision);
+      const path = managed
+        ? `/api/workflow/requests/${decision.dataset.decisionType}/${encodeURIComponent(decision.dataset.decisionId)}/decision`
+        : decision.dataset.decisionType
+          ? `/api/supervisor/clubs/${clubId}/decisions/${decision.dataset.decisionType}/${decision.dataset.decisionId}`
+          : `/api/supervisor/clubs/${clubId}/attendance/${decision.dataset.attendanceType}/${decision.dataset.attendanceId}/decision?audience=${encodeURIComponent(decision.dataset.attendanceAudience || 'members')}`;
       try {
-        await api(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, comment }) });
+        await api(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: managed && action === 'request_edit' ? 'request_changes' : action, comment,
+          ...(managed ? { revision: Number(decision.dataset.workflowRevision), fields } : {}) }) });
         if (data?.club.id === clubId) await loadClub();
       } catch (error) { status.textContent = error.message; }
       finally { buttons.forEach(button => button.disabled = false); }
@@ -351,6 +390,7 @@
     if (overviewCard) {
       const nav = [...document.querySelectorAll('.committee-sidebar [data-panel]')].find(item => item.dataset.panel === overviewCard.dataset.panel);
       selectPanel(overviewCard.dataset.panel, nav || overviewCard);
+      if (overviewCard.dataset.panel === 'requests') void loadClub(true);
       return;
     }
     const detailButton = event.target.closest('[data-request-details]');

@@ -420,6 +420,11 @@ document.addEventListener('DOMContentLoaded', () => {
           const isAuthenticated = Boolean(account && session?.authenticated);
           const isStudent = session?.type === 'student' && isAuthenticated;
           const hasStudentDashboard = Boolean(session?.hasStudentDashboard || isStudent);
+          const personalQrLink = document.getElementById('headerPersonalAttendanceLink');
+          if (personalQrLink) personalQrLink.hidden = !hasStudentDashboard;
+          const scannerLink = document.getElementById('headerAttendanceScannerLink');
+          const scannerRoles = [...(session.dashboards || []), { role: session.type === 'admin' ? 'admin' : session.role, committee: session.committee }];
+          if (scannerLink) scannerLink.hidden = !isAuthenticated || !scannerRoles.some(choice => ['admin','software_development','president','supervisor','pr','sso','dean','miu_events'].includes(choice.role) || choice.role === 'head' && /(^|[^a-z])it([^a-z]|$)|information technology/i.test(choice.committee || ''));
           const studentDashboardHref = '/?myForms=1';
           if (studentProfileLink) studentProfileLink.href = hasStudentDashboard ? studentDashboardHref : account?.href || '/pages/applicant-login.html';
           if (studentProfileMenu) studentProfileMenu.hidden = !isAuthenticated;
@@ -462,6 +467,7 @@ document.addEventListener('DOMContentLoaded', () => {
               .then(response => response.ok ? response.json() : null)
               .then(result => {
                 if (requestId === headerAccountRequestId) attendanceUsherTaskLink.hidden = !Boolean(result?.task);
+                if (requestId === headerAccountRequestId && result?.task?.accepted && scannerLink) scannerLink.hidden = false;
               })
               .catch(() => {
                 if (requestId === headerAccountRequestId) attendanceUsherTaskLink.hidden = true;
@@ -536,7 +542,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  inject('site-header', '/components/site-header.html?v=20261018dashboardMenu1');
+  inject('site-header', '/components/site-header.html?v=20261019hideAskAi1');
   inject('site-footer', '/components/site-footer.html?v=20261017mobilecolon1');
   const workflowShortcuts = document.createElement('script');
   workflowShortcuts.src = '/assets/js/workflow-shortcuts.js?v=20261018workflowNavigation1';

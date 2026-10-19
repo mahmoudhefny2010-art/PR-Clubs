@@ -1,0 +1,21 @@
+.reverse-attendance-page { max-width: 880px; margin: 28px auto; padding: 24px; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: var(--radius-lg,16px); color: var(--text-main); }
+.reverse-attendance-page label { display: grid; gap: 7px; margin: 16px 0; }
+.reverse-attendance-page :is(select,input:not([type=checkbox]),textarea) { box-sizing: border-box; width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 9px; background: var(--bg-panel); color: var(--text-main); font: inherit; }
+.reverse-attendance-page textarea { min-height: 88px; resize: vertical; }
+.reverse-attendance-page p { line-height: 1.6; overflow-wrap: anywhere; }
+.reverse-attendance-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0; }
+.reverse-attendance-page video { width: 100%; max-height: 420px; background: #111827; border-radius: 12px; }
+.reverse-qr:not(:empty) { padding: 16px; background: #fff; border-radius: 12px; width: fit-content; max-width: 100%; margin: 20px auto; }
+.reverse-qr img, .reverse-qr canvas { max-width: 100%; height: auto; }
+.reverse-attendance-result { padding: 16px; margin: 18px 0; border: 2px solid var(--border-color); border-radius: 12px; background: var(--bg-soft); }
+.reverse-attendance-result[data-color=green] { border-color: #15803d; background: #dcfce7; color: #14532d; }
+.reverse-attendance-result[data-color=red] { border-color: #b91c1c; background: #fee2e2; color: #7f1d1d; }
+.reverse-attendance-result[data-color=yellow] { border-color: #a16207; background: #fef3c7; color: #713f12; }
+:root[data-theme="dark"] .reverse-attendance-result[data-color=green] { border-color: #4ade80; background: #052e16; color: #bbf7d0; }
+:root[data-theme="dark"] .reverse-attendance-result[data-color=red] { border-color: #f87171; background: #450a0a; color: #fecaca; }
+:root[data-theme="dark"] .reverse-attendance-result[data-color=yellow] { border-color: #facc15; background: #422006; color: #fef08a; }
+:root[data-theme="dark"] body .reverse-attendance-result :is(strong,p) { color: inherit !important; }
+.reverse-attendance-page .reverse-checkbox { display: flex; gap: 10px; align-items: flex-start; }
+.reverse-attendance-page [hidden] { display: none; }
+.reverse-attendance-page [data-ra-settings] { border-top: 1px solid var(--border-color); margin-top: 24px; padding-top: 12px; }
+@media(max-width:600px) { .reverse-attendance-page { width: calc(100% - 24px); margin: 16px auto; padding: 16px; box-sizing: border-box; } .reverse-attendance-page h1 { font-size: 1.5rem; } }

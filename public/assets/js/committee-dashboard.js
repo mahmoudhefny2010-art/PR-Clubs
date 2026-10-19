@@ -200,8 +200,32 @@ function getActiveComment(item) {
   return legacy ? { role, text: legacy, legacy: true } : null;
 }
 
+function addWorkflowCardActions(actions, item, source = 'queue') {
+  const allowed = new Set(item.workflowActions || []);
+  if (!allowed.size) return;
+  const comment = document.createElement('input');
+  comment.placeholder = allowed.has('reject') ? 'Comment (required for rejection)' : 'Comment (optional)';
+  comment.dataset.comment = item.id;
+  comment.dataset.workflowComment = 'true';
+  actions.append(comment);
+  for (const [action, label, className] of [['approve', 'Approve', 'approve'], ['reject', 'Reject', 'reject']]) {
+    if (!allowed.has(action)) continue;
+    const button = document.createElement('button');
+    button.type = 'button'; button.className = className; button.textContent = label;
+    button.addEventListener('click', () => act(item, action, false, source));
+    actions.append(button);
+  }
+  if (allowed.has('request_changes')) {
+    const editButton = document.createElement('button');
+    editButton.type = 'button'; editButton.className = 'changes'; editButton.textContent = 'Request Edit';
+    editButton.addEventListener('click', () => openDetails(item));
+    actions.append(editButton);
+  }
+}
+
 function openDetails(item, context = 'pending') {
   if (!item) return;
+  if (item.workflow) { window.location.assign(`/pages/workflow.html?kind=content&id=${Number(item.id)}`); return; }
   const requestImage = item.image
     || (item.type === 'sponsor' ? item.sponsorLogo : '')
     || (['entry_permit', 'booth'].includes(item.type) ? item.clubImage : '');
@@ -557,33 +581,27 @@ async function loadRequests(sharedResponse = null, invalidateStatus = true) {
       let reviewNotice = null;
       const actions = document.createElement('div');
       actions.className = 'req-actions';
-      const comment = document.createElement('input');
-      comment.placeholder = 'Comment (optional)';
-      comment.dataset.comment = item.id;
-      actions.append(comment);
-      for (const [action, label, className] of [['approve', 'Approve', 'approve'], ['reject', 'Reject', 'reject']]) {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = className;
-        button.textContent = label;
-        button.addEventListener('click', () => act(item, action));
-        actions.append(button);
-      }
-      if (['pr', 'english', 'security'].includes(currentRole)) {
-        const editButton = document.createElement('button');
-        editButton.type = 'button'; editButton.className = 'changes'; editButton.textContent = 'Request Edit';
-        editButton.addEventListener('click', () => act(item, 'request_edit'));
-        actions.append(editButton);
-      }
-      if (currentRole === 'dean' || currentRole === 'pr') {
-        const deleteBtn = document.createElement('button');
-        deleteBtn.type = 'button'; deleteBtn.className = 'delete'; deleteBtn.textContent = 'Delete';
-        deleteBtn.addEventListener('click', () => {
-          if (confirm(`Are you sure you want to delete this ${contentItemLabel(item)}? It will be removed from the published content.`)) {
-            act(item, 'delete');
-          }
-        });
-        actions.append(deleteBtn);
+      if (item.workflow) {
+        addWorkflowCardActions(actions, item, 'queue');
+      } else {
+        const comment = document.createElement('input');
+        comment.placeholder = 'Comment (optional)';
+        comment.dataset.comment = item.id;
+        actions.append(comment);
+        for (const [action, label, className] of [['approve', 'Approve', 'approve'], ['reject', 'Reject', 'reject']]) {
+          const button = document.createElement('button');
+          button.type = 'button'; button.className = className; button.textContent = label;
+          button.addEventListener('click', () => act(item, action)); actions.append(button);
+        }
+        if (['pr', 'english', 'security'].includes(currentRole)) {
+          const editButton = document.createElement('button'); editButton.type = 'button'; editButton.className = 'changes'; editButton.textContent = 'Request Edit';
+          editButton.addEventListener('click', () => act(item, 'request_edit')); actions.append(editButton);
+        }
+        if (currentRole === 'dean' || currentRole === 'pr') {
+          const deleteBtn = document.createElement('button'); deleteBtn.type = 'button'; deleteBtn.className = 'delete'; deleteBtn.textContent = 'Delete';
+          deleteBtn.addEventListener('click', () => { if (confirm(`Are you sure you want to delete this ${contentItemLabel(item)}? It will be removed from the published content.`)) act(item, 'delete'); });
+          actions.append(deleteBtn);
+        }
       }
       const viewButton = document.createElement('button');
       viewButton.type = 'button';
@@ -812,7 +830,9 @@ async function loadStatusOverview(itemsSnapshot = null) {
       actions.className = 'req-actions';
       const canReview = item.status === reviewStage;
       const canRestart = ['pr', 'english', 'security'].includes(currentRole) && !['draft', 'changes_requested', ({ pr: 'pending_pr', english: 'pending_english', security: 'pending_security' })[currentRole]].includes(item.status) && (currentRole !== 'security' || item.type === 'entry_permit');
-      if (canReview || canRestart) {
+      if (item.workflow) {
+        addWorkflowCardActions(actions, item, 'status');
+      } else if (canReview || canRestart) {
         const comment = document.createElement('input');
         comment.placeholder = 'Comment (optional)';
         comment.dataset.comment = item.id;
@@ -845,9 +865,9 @@ async function loadStatusOverview(itemsSnapshot = null) {
       viewButton.type = 'button';
       viewButton.className = 'view-details';
       viewButton.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg><span>View Details</span>';
-      viewButton.addEventListener('click', () => loadStatusDetails(item.id));
+      viewButton.addEventListener('click', () => item.workflow ? openDetails(item, 'status') : loadStatusDetails(item.id));
       actions.append(viewButton);
-      if (currentRole === 'dean') {
+      if (currentRole === 'dean' && !item.workflow) {
         const historyButton = document.createElement('button');
         historyButton.type = 'button';
         historyButton.className = 'view-details';
@@ -855,7 +875,7 @@ async function loadStatusOverview(itemsSnapshot = null) {
         historyButton.addEventListener('click', () => loadReviewHistory(item.id));
         actions.append(historyButton);
       }
-      if (currentRole === 'dean' || currentRole === 'pr') {
+      if (!item.workflow && (currentRole === 'dean' || currentRole === 'pr')) {
         const deleteBtn = document.createElement('button');
         deleteBtn.type = 'button';
         deleteBtn.className = 'delete';
@@ -1146,23 +1166,40 @@ async function returnToCommittee(targetRole, actionButton) {
 }
 
 async function act(item, action, fromDialog = false, source = 'queue') {
-  if (item.workflow) { window.location.assign(`/pages/workflow.html?kind=content&id=${Number(item.id)}`); return; }
   const list = source === 'status' ? statusOverviewList : requestsList;
-  const card = list?.querySelector(`[data-comment="${item.id}"]`)?.closest('.req-card');
+  const commentInput = list?.querySelector(`[data-comment="${item.id}"]`);
+  const card = commentInput?.closest('.req-card') || commentInput?.closest('article');
   const comment = fromDialog
     ? (document.getElementById('dialogComment')?.value || '')
-    : (card?.querySelector(`[data-comment="${item.id}"]`)?.value || '');
+    : (commentInput?.value || '');
+  if (item.workflow && action === 'request_edit') {
+    openDetails(item);
+    return;
+  }
   if (action === 'request_edit' && !comment.trim()) {
     alert('Add a comment explaining the edits required.');
     return;
   }
-  const buttons = [...(card?.querySelectorAll('button') || []), ...(fromDialog ? requestDialog.querySelectorAll('[data-dialog-action], #sendCommentBtn') : [])];
+  if (item.workflow && !new Set(item.workflowActions || []).has(action)) {
+    alert('This action is not enabled for your current review stage.');
+    return;
+  }
+  if (item.workflow && action === 'reject' && !comment.trim()) {
+    alert('Add a comment explaining why you are rejecting this request.');
+    return;
+  }
+  const actionContainer = commentInput?.closest('.req-actions') || card;
+  const buttons = [...(actionContainer?.querySelectorAll('button') || []), ...(fromDialog ? requestDialog.querySelectorAll('[data-dialog-action], #sendCommentBtn') : [])];
   buttons.forEach((button) => { button.disabled = true; });
   try {
-    const response = await fetch(`/api/committee/requests/${item.id}/action`, {
+    const response = await fetch(item.workflow
+      ? `/api/workflow/requests/content/${encodeURIComponent(item.id)}/decision`
+      : `/api/committee/requests/${item.id}/action`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, comment })
+      body: JSON.stringify(item.workflow
+        ? { action, comment, revision: item.workflowRevision }
+        : { action, comment })
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Action failed.');

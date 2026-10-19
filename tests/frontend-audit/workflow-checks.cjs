@@ -129,6 +129,12 @@ exports.run = async ({ cdp, origin, until, screenshot, state, emitUpdate }) => {
   await cdp.evaluate("document.querySelector('[name=comment]').value='Admin note'; document.querySelector('[data-workflow-action=comment]').click()");
   await until("document.querySelector('.workflow-history').textContent.includes('Administrator on behalf of Security')");
   assert.equal(state.adminReviews[0].reviewRole, 'security'); assert.equal(state.adminReviews[0].action, 'comment');
+  await cdp.evaluate("document.querySelector('[name=reviewRole]').value='english'; document.querySelector('[name=reviewRole]').dispatchEvent(new Event('change')); document.querySelector('[name=comment]').value='Correct the description'; document.querySelector('[data-workflow-action=request_changes]').click()");
+  await until("document.querySelector('[data-workflow-decision] [data-workflow-feedback]').textContent.includes('Select at least one field')");
+  assert.equal(state.adminReviews.length, 1, 'Request changes cannot be submitted without selecting a field');
+  await cdp.evaluate("document.querySelector('[name=revisionFields][value=description]').click(); document.querySelector('[data-workflow-action=request_changes]').click()");
+  await until("document.querySelector('.workflow-history').textContent.includes('request changes')");
+  assert.deepEqual(state.adminReviews[1].fields, ['description'], 'The selected field is sent with the review decision');
   for (const theme of ['light', 'dark']) for (const width of [1440, 375]) {
     await cdp.evaluate(`document.documentElement.dataset.theme='${theme}'`);
     await cdp.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: width < 760 });
@@ -138,7 +144,7 @@ exports.run = async ({ cdp, origin, until, screenshot, state, emitUpdate }) => {
   }
   await cdp.evaluate("document.querySelector('[name=reviewRole]').value='english'; document.querySelector('[name=reviewRole]').dispatchEvent(new Event('change')); document.querySelector('[name=comment]').value='Approved by administrator'; document.querySelector('[data-workflow-action=approve]').click()");
   await until("document.querySelector('.workflow-badge').textContent==='approved'");
-  assert.equal(state.adminReviews[1].reviewRole, 'english'); assert.equal(state.adminReviews[1].action, 'approve');
+  assert.equal(state.adminReviews[2].reviewRole, 'english'); assert.equal(state.adminReviews[2].action, 'approve');
   await cdp.send('Page.navigate', { url: origin + '/pages/workflow.html?kind=content&id=900' });
   await until("!!document.querySelector('[data-field=description]')");
   assert.equal(await cdp.evaluate("!document.querySelector('[data-field=description]').readOnly"), true);

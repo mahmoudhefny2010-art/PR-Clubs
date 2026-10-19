@@ -34,6 +34,7 @@ function indexFilter(spec, index) {
     if (value === null) conditions.push(`${identifier(key)} IS NULL`);
     else if (typeof value === 'boolean') conditions.push(`${identifier(key)} = ${value ? 1 : 0}`);
     else if (value?.$type === 'string' && col.path.instance === 'String') conditions.push(`${identifier(key)} IS NOT NULL`);
+    else if (value?.$type === 'number' && col.path.instance === 'Number') conditions.push(`${identifier(key)} IS NOT NULL`);
     else throw new Error(`Unsupported partial index predicate ${spec.name}.${key}`);
   }
   // All current sparse indexes have one key. SQL filtered indexes prohibit OR.

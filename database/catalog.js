@@ -6,6 +6,7 @@ function catalog() {
     StudentFeedback: require('../services/student-feedback').StudentFeedback,
     QuizSubmission: require('../services/quiz-analytics').QuizSubmission,
     ...require('../services/workflow-models'),
+    ...require('../services/attendance-device-model'),
     ...require('../services/custom-staff-role-model')
   };
   // Parent order is explicit; references cannot be inferred from field names.

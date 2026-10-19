@@ -57,6 +57,44 @@ test('assigned supervisor can view registrations grouped only under current assi
   ] }]);
   assert.deepEqual(filters.find(filter => filter && filter.clubId === 1), { clubId: 1 });
 });
+test('managed club submissions at the supervisor stage appear in the dashboard and use workflow decisions', async t => {
+  const record = { id: 44, clubId: 1, type: 'event', title: 'Test event', date: '2026-10-20', status: 'pending_pr',
+    privateField: 'must not leak', workflow: { state: 'review', stageId: 'supervisor', revision: 3, ownerEmail: 'club@example.edu', approvals: [], assignedEmails: ['DOCTOR@EXAMPLE.EDU'],
+      history: [{ action: 'submitted', actorRole: 'president', actorEmail: 'club@example.edu', at: new Date('2026-10-19T08:00:00Z') }],
+      definition: { stages: [{ id: 'supervisor', approvalRule: 'all_roles', roles: ['pr', 'supervisor'], permissions: { pr: ['approve'], supervisor: ['approve', 'request_changes'] },
+        reviewFields: ['title', 'date'], editableFields: ['title'] }] } } };
+  const calls = [];
+  const { request } = await harness(t, {
+    ContentRequest: { aggregate: async () => [], find: () => query([record]), findOne: () => query(record), exists: async () => true },
+    workflowEngine: { decide: async (...args) => { calls.push(args); return { status: 'pending_pr' }; } }
+  });
+  const dashboard = await request('/clubs/1');
+  assert.equal(dashboard.status, 200);
+  assert.equal(dashboard.body.requests.length, 1);
+  assert.equal(dashboard.body.requests[0].title, 'Test event');
+  assert.equal(dashboard.body.requests[0].workflowRevision, 3);
+  assert.deepEqual(dashboard.body.requests[0].workflowEditableFields, [{ id: 'title', label: 'Title' }]);
+  assert.equal(dashboard.body.requests[0].privateField, undefined);
+  const decision = await request('/clubs/1/decisions/content/44', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'approve', revision: 3, comment: '' }) });
+  assert.equal(decision.status, 200);
+  assert.equal(decision.body.status, 'pending_pr');
+  assert.equal(calls[0][0], 'content');
+  assert.equal(calls[0][1], '44');
+  assert.equal(calls[0][2].role, 'supervisor');
+  assert.deepEqual(calls[0][2].assignments, [{ role: 'supervisor', assignedClubIds: [1] }]);
+  assert.equal(calls[0][3].revision, 3);
+});
+test('supervisor dashboard stops showing a multi-role stage after supervisor approval', async t => {
+  const record = { id: 45, clubId: 1, type: 'event', title: 'Already reviewed', status: 'pending_pr', workflow: {
+    state: 'review', stageId: 'combined', approvals: [{ role: 'supervisor', email: 'doctor@example.edu' }],
+    definition: { stages: [{ id: 'combined', approvalRule: 'all_roles', roles: ['supervisor', 'pr'], permissions: { supervisor: ['approve'], pr: ['approve'] }, reviewFields: ['title'], editableFields: [] }] }
+  } };
+  const { request } = await harness(t, { ContentRequest: { aggregate: async () => [], find: () => query([record]), exists: async () => true } });
+  const dashboard = await request('/clubs/1');
+  assert.equal(dashboard.status, 200);
+  assert.deepEqual(dashboard.body.requests, []);
+});
 test('anonymous, other roles, unassigned URLs and malformed IDs are denied before lookup', async t => {
   const { request, filters } = await harness(t);
   assert.equal((await request('/clubs', { headers: { 'x-account': 'none' } })).status, 401);

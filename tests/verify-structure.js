@@ -25,6 +25,11 @@ const standaloneTemplates = new Set([
 ]);
 function checkAsset(url, source) {
   if (!url.startsWith('/assets/') && !url.startsWith('/components/')) return;
+  if (url === '/assets/vendor/jsQR.js') {
+    assert.ok(fs.existsSync(require.resolve('jsqr/dist/jsQR.js')));
+    assert.match(read(path.join(root,'server.js')), /app\.get\('\/assets\/vendor\/jsQR\.js'/);
+    references++; return;
+  }
   const file = path.join(publicRoot, url.split(/[?#]/)[0]);
   assert.ok(fs.existsSync(file) && fs.statSync(file).isFile(), `${relative(source)} references missing asset ${url}`);
   references++;

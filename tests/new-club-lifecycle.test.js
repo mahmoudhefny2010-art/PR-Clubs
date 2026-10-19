@@ -18,7 +18,7 @@ function fixture() {
   const session = { pendingUpdates: [], pendingClubs: [], pendingAccounts: [], startTransaction() {},
     async commitTransaction() { dbClubs.push(...this.pendingClubs); dbAccounts.push(...this.pendingAccounts); for (const update of this.pendingUpdates) Object.assign(update.existing,update.value); },
     async abortTransaction() { aborted++; this.pendingClubs = []; this.pendingAccounts = []; this.pendingUpdates = []; }, async endSession() {} };
-  const context = {
+  const context = { reverseAttendanceService: { bindDevice: async () => {} },
     console: { error() {} }, crypto, Buffer, mongoReady: true,
     clubs: [{ id: 1, name: 'Stale cached club' }], clubAccounts: [],
     app: { post: (path, ...handlers) => routes.set(`POST ${path}`, handlers.at(-1)),

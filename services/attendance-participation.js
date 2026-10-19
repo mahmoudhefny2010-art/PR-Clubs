@@ -5,14 +5,18 @@ function attendanceCategory(record) {
   if (role === 'organizer' || role === 'usher') return labels[role];
   return record?.membershipStatus === 'member' ? 'Member' : record?.membershipStatus === 'non_member' ? 'Non-member' : '';
 }
-async function membershipSnapshot(email, { Club, Application }) {
+async function membershipSnapshot(email, { Club, Application }, session) {
   const normalized = String(email || '').trim().toLowerCase();
-  const [roster, applications] = await Promise.all([
-    Club.find({ archivedAt: null, 'memberRoster.email': normalized }).select('id name memberRoster').lean(),
-    Application.find({ email: normalized, status: 'accepted' }).select('clubId').lean()
-  ]);
+  const rosterQuery = Club.find({ archivedAt: null, 'memberRoster.email': normalized }).select('id name memberRoster');
+  const applicationQuery = Application.find({ email: normalized, status: 'accepted' }).select('clubId');
+  if (session) { rosterQuery.session(session); applicationQuery.session(session); }
+  // A transaction uses one SQL connection; do not start concurrent requests on it.
+  const roster = await rosterQuery.lean();
+  const applications = await applicationQuery.lean();
   const ids = [...new Set(applications.map(record => Number(record.clubId)))];
-  const accepted = ids.length ? await Club.find({ archivedAt: null, id: { $in: ids } }).select('id name').lean() : [];
+  const acceptedQuery = ids.length ? Club.find({ archivedAt: null, id: { $in: ids } }).select('id name') : null;
+  if (session && acceptedQuery) acceptedQuery.session(session);
+  const accepted = acceptedQuery ? await acceptedQuery.lean() : [];
   const names = [...new Set([...roster, ...accepted].map(club => club.name).filter(Boolean))];
   return { membershipStatus: names.length ? 'member' : 'non_member', memberClubNames: names };
 }

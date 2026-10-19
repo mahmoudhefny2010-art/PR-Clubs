@@ -8,7 +8,7 @@ module.exports = async ({ cdp, origin, until, screenshot }) => {
   await cdp.send('Page.navigate', { url: origin + '/admin' });
   await until("document.querySelectorAll('[data-tool-group]').length===10 && !document.getElementById('arrangeCards').disabled");
   await until("!document.documentElement.classList.contains('site-startup-pending')");
-  assert.equal(await cdp.evaluate("document.getElementById('toolsCount').textContent.includes('34 tools')"), true);
+  assert.equal(await cdp.evaluate("document.getElementById('toolsCount').textContent.includes('35 tools')"), true);
   assert.equal(await cdp.evaluate("getComputedStyle(document.getElementById('dashboardSummary')).display!=='none'"), true, 'Overview retains its statistics');
   for (const theme of ['light', 'dark']) for (const width of [1440, 375, 320]) {
     await cdp.evaluate(`document.documentElement.dataset.theme='${theme}'`);
@@ -41,8 +41,8 @@ module.exports = async ({ cdp, origin, until, screenshot }) => {
   await cdp.evaluate("document.querySelector('#categoryFilters [data-category=attendance]').click()");
   assert.equal(await cdp.evaluate("document.querySelectorAll('.v2-widget').length"), 1);
   await cdp.evaluate("document.querySelector('[data-tool-group=attendance-reports]').click()");
-  await until("document.querySelectorAll('.v2-widget').length===4 && document.getElementById('toolsHeading')?.textContent==='Attendance & reports'");
-  assert.deepEqual(await cdp.evaluate("[...document.querySelectorAll('.v2-widget')].map(card=>card.dataset.tool).sort()"), ['attendance', 'miu-attendance', 'open-attendance', 'reports']);
+  await until("document.querySelectorAll('.v2-widget').length===5 && document.getElementById('toolsHeading')?.textContent==='Attendance & reports'");
+  assert.deepEqual(await cdp.evaluate("[...document.querySelectorAll('.v2-widget')].map(card=>card.dataset.tool).sort()"), ['attendance', 'miu-attendance', 'open-attendance', 'reports', 'secure-attendance']);
   await cdp.send('Page.navigate', { url: origin + '/admin?group=approvals' });
   await until("document.querySelector('.v2-widget[data-tool=blocked-requests] [data-blocked-badge]')");
   await until("!document.documentElement.classList.contains('site-startup-pending')");

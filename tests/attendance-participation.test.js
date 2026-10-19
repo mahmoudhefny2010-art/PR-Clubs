@@ -148,16 +148,16 @@ async function scanFixture(t, duplicateWrite = false) {
   t.after(() => new Promise(resolve => server.close(resolve)));
   return fetch('http://127.0.0.1:' + server.address().port + '/api/attendance/' + 'X'.repeat(43), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
 }
-test('ordinary QR attendee cannot reuse a device already checked in as an usher', async t => {
-  const response = await scanFixture(t); assert.equal(response.status, 409);
-  assert.match((await response.json()).message, /already been recorded from this device/);
+test('legacy university QR cannot write event attendance', async t => {
+  const response = await scanFixture(t); assert.equal(response.status, 403);
+  assert.match((await response.json()).message, /authorized supervisor/);
 });
-test('concurrent ordinary attendance duplicate is handled without losing the session scope', async t => {
-  const response = await scanFixture(t, true); assert.equal(response.status, 200);
-  assert.equal((await response.json()).alreadyRecorded, true);
+test('legacy event self-check-in stays denied even when a duplicate write was attempted', async t => {
+  const response = await scanFixture(t, true); assert.equal(response.status, 403);
+  assert.equal((await response.json()).code, 'SUPERVISOR_SCAN_REQUIRED');
 });
 
-test('usher page accepts the task, prefills identity and confirms self attendance after reload', async () => {
+test('usher page accepts task and opens authorized scanner instead of self recording', async () => {
   const ids = ['usherTaskMessage', 'usherTask', 'usherTaskTitle', 'usherTaskDate', 'acceptUsherTask', 'openUsherQr', 'usherSelfCheckinForm', 'usherAttendanceStatus', 'usherName', 'usherUniversityId', 'usherMajor', 'recordUsherAttendance', 'usherSelfCheckinFeedback'];
   const elements = Object.fromEntries(ids.map(id => [id, { hidden: true, value: '', textContent: '', dataset: {}, handlers: {}, addEventListener(type, handler) { this.handlers[type] = handler; } }]));
   const task = { eventTitle: 'MIU Event', eventDate: 'today', accepted: false, attendanceAsUsher: false, profile: { name: 'Verified Student', universityId: '00012', major: 'Engineering' } };
@@ -172,13 +172,10 @@ test('usher page accepts the task, prefills identity and confirms self attendanc
     document: { getElementById: id => elements[id] }, window: { MiuUI: { createJsonClient: () => api }, addEventListener() {} }
   });
   await Promise.resolve(); assert.equal(elements.usherSelfCheckinForm.hidden, true);
-  await elements.acceptUsherTask.handlers.click(); assert.equal(elements.usherSelfCheckinForm.hidden, false);
+  await elements.acceptUsherTask.handlers.click(); assert.equal(elements.usherSelfCheckinForm.hidden, true);
   assert.equal(elements.usherUniversityId.value, '00012');
-  await elements.usherSelfCheckinForm.handlers.submit({ preventDefault() {}, currentTarget: elements.usherSelfCheckinForm });
-  assert.equal(elements.usherSelfCheckinForm.hidden, true); assert.equal(elements.usherSelfCheckinForm.dataset.miuDirty, undefined);
-  assert.match(elements.usherAttendanceStatus.textContent, /recorded as an Usher/);
-  const submitted = calls.find(call => call.url.endsWith('/check-in'));
-  assert.equal(JSON.parse(submitted.body).universityId, '00012');
+  assert.equal(elements.openUsherQr.textContent, 'Open attendance scanner');
+  assert.equal(calls.some(call => call.url.endsWith('/check-in')), false);
 });
 
 test('MIU supervisor reviews both audience lanes, preserves event roles and approves only the selected assigned list', async t => {

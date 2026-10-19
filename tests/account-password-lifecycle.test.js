@@ -32,7 +32,7 @@ async function fixture(t) {
     }
   };
   const app = express(); app.use(express.json());
-  const context = {
+  const context = { reverseAttendanceService: { bindDevice: async () => {} },
     app, crypto, ClubAccount, StudentAccount: { findOne: () => query(studentShadow) }, mongoReady: true,
     clubAccounts: [], checkLoginSourceLock: async () => false, countLoginSourceFailure: async () => false,
     clearLoginSourceFailures: async () => true, recordSuccessfulSignIn: async () => {},

@@ -105,6 +105,7 @@ const siteSettingSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 const universityContentSchema = new mongoose.Schema({
+  attendanceSettings: { type: mongoose.Schema.Types.Mixed, default: () => ({}) },
   interaction: { type: String, enum: ['none', 'poll', 'evaluation'], default: 'none' },
   question: { type: String, default: '', maxlength: 300 },
   options: { type: [String], default: [] },
@@ -172,6 +173,7 @@ const clubAccountSchema = new mongoose.Schema({
 }, { timestamps: true, autoIndex: false });
 
 const contentRequestSchema = new mongoose.Schema({
+  attendanceSettings: { type: mongoose.Schema.Types.Mixed, default: undefined },
   workflow: { type: mongoose.Schema.Types.Mixed, default: undefined },
   id: { type: Number, required: true, unique: true, index: true },
   clubId: { type: Number, required: true, index: true },
@@ -362,7 +364,9 @@ const eventRegistrationSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true, maxlength: 160 },
   email: { type: String, required: true, trim: true, lowercase: true, maxlength: 254 }
 }, { timestamps: true });
-eventRegistrationSchema.index({ clubId: 1, eventIndex: 1, email: 1 }, { unique: true });
+// Array positions can change when club events are republished or reordered.
+eventRegistrationSchema.index({ clubId: 1, eventIndex: 1, email: 1 });
+eventRegistrationSchema.index({ clubId: 1, eventRequestId: 1, email: 1 }, { unique: true, partialFilterExpression: { eventRequestId: { $type: 'number' } } });
 eventRegistrationSchema.index({ registrationKey: 1 }, { unique: true, sparse: true });
 
 const attendanceSessionSchema = new mongoose.Schema({
@@ -422,6 +426,8 @@ attendanceAssignmentSchema.index({ activeMemberDayKey: 1 }, {
 });
 
 const attendanceRecordSchema = new mongoose.Schema({
+  accountEventKey: { type: String, unique: true, sparse: true },
+  reverseAttendance: { type: mongoose.Schema.Types.Mixed },
   eventParticipation: {
     role: { type: String, enum: ['attendee', 'organizer', 'usher', 'president', 'head'] }
   },

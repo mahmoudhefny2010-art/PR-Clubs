@@ -5,7 +5,7 @@ function contentResumeStage(record) {
 }
 
 function registerSupervisorDecisions(router, deps) {
-  const { ContentRequest, SpeakerRequest, AttendanceRecord, sameOrigin, notifyContent,
+  const { ContentRequest, SpeakerRequest, AttendanceRecord, sameOrigin, notifyContent, workflowEngine,
     notifySpeaker, notifyAttendance, attendanceClosureMapFor, attendanceActivityKey, isAttendanceActivityEnded } = deps;
   router.post('/clubs/:clubId/decisions/:targetType/:targetId', async (req, res) => {
     if (!sameOrigin(req)) return res.status(403).json({ message: 'Reload the page and try again.' });
@@ -24,6 +24,19 @@ function registerSupervisorDecisions(router, deps) {
       const filter = { clubId: req.supervisorClubId, ...(targetType === 'content' ? { id: Number(targetId) } : { _id: targetId }) };
       const record = await model.findOne(filter).lean();
       if (!record) return res.status(404).json({ message: 'Request not found.' });
+      if (record.workflow) {
+        if (String(record.workflow.ownerEmail || '').toLowerCase() === String(req.supervisor.email).toLowerCase()) {
+          return res.status(403).json({ message: 'You cannot approve or review your own request.' });
+        }
+        if (!workflowEngine) return res.status(503).json({ message: 'Workflow decisions are temporarily unavailable.' });
+        if (action === 'request_edit' && (!Array.isArray(req.body.fields) || !req.body.fields.length)) {
+          return res.status(400).json({ message: 'Choose at least one field to correct.' });
+        }
+        const saved = await workflowEngine.decide(targetType, targetId, {
+          email: req.supervisor.email, role: 'supervisor', assignments: [{ role: 'supervisor', assignedClubIds: req.assignedIds }]
+        }, { action: action === 'request_edit' ? 'request_changes' : action, comment, revision: req.body.revision, fields: req.body.fields });
+        return res.json({ status: saved.status, message: 'Supervisor decision saved.' });
+      }
       if (record.status !== 'pending_supervisor') return res.status(409).json({ message: 'This request is no longer waiting for supervisor approval.' });
       const submittedBy = targetType === 'speaker' ? record.requesterEmail
         : [...(record.workflowHistory || [])].reverse().find(event => event.role === 'club')?.actorEmail;
@@ -63,7 +76,10 @@ function registerSupervisorDecisions(router, deps) {
       // Notifications cannot turn a successfully saved decision into an error response.
       try { await (targetType === 'content' ? notifyContent?.(saved) : notifySpeaker?.(saved)); } catch {}
       res.json({ status: saved.status, message: 'Supervisor decision saved.' });
-    } catch { res.status(503).json({ message: 'The decision could not be saved. Reload the request before retrying.' }); }
+    } catch (error) {
+      if (error.status) return res.status(error.status).json({ message: error.message });
+      res.status(503).json({ message: 'The decision could not be saved. Reload the request before retrying.' });
+    }
   });
   router.post('/clubs/:clubId/attendance/:itemType/:eventRequestId/decision', async (req, res) => {
     if (!sameOrigin(req)) return res.status(403).json({ message: 'Reload and try again.' });

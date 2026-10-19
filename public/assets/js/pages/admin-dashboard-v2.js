@@ -49,7 +49,7 @@
   const toolGroups = tools.groups || [];
   let selectedGroup = toolGroups.find(group => group.key === new URLSearchParams(location.search).get('group')) || null;
   const activeTool = document.body.dataset.tool;
-  const specialized = new Set(['staff', 'supervisors', 'publishing', 'miu-attendance', 'reports', 'attendance', 'open-attendance']);
+  const specialized = new Set(['staff', 'supervisors', 'publishing', 'miu-attendance', 'secure-attendance', 'reports', 'attendance', 'open-attendance']);
   const route = id => '/admin/' + id;
   window.miuDashboardGoBack = () => {
     if (!activeTool) return false;

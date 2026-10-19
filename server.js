@@ -1212,6 +1212,7 @@ async function requireStudentAuth(req, res, next) {
     if (!mongoReady) return res.status(503).json({ message: 'Student sign-in is temporarily unavailable.' });
     const account = await getStudentAccountFromRequest(req, res);
     if (!account) return res.status(401).json({ message: 'Sign in with your verified MIU account to check in.' });
+    await reverseAttendanceService.bindDevice(account, req, res);
     req.studentAccount = account;
     next();
   } catch (error) {
@@ -1442,17 +1443,17 @@ const dynamicWorkflowEngine = require('./services/workflow-engine').createWorkfl
   customRoles: require('./services/custom-staff-role-model').CustomStaffRole,
   transport: getPasswordRecoveryTransport,
   afterCommit: async record => {
-    if (record.type && record.status === 'published') await dispatchPublishedContentNotifications({ source: 'club', contentId: record.id, revision: record.publishedAt?.getTime() || Date.now(), type: record.type, title: record.title });
+    if (record.type && record.status === 'published') {
+      const activeClub = await Club.findOne({ id: record.clubId, archivedAt: null }).select('id').lean();
+      if (activeClub) await dispatchPublishedContentNotifications({ source: 'club', contentId: record.id, revision: record.publishedAt?.getTime() || Date.now(), type: record.type, title: record.title });
+    }
   },
   publish: async (record, session) => {
     if (record.type === 'entry_permit') return;
     if (missingRequiredPublicContentImage(record.type, record)) throw new (require('./services/workflow-policy').WorkflowError)(422, 'Add the required image before final approval.');
-    const club = await Club.findOne({ id: record.clubId, archivedAt: null }).session(session);
-    if (!club) throw new (require('./services/workflow-policy').WorkflowError)(409, 'The club is no longer available.');
-    const field = contentClubField[record.type];
-    club[field] = (club[field] || []).filter(item => Number(item.requestId) !== Number(record.id));
-    club[field].push(buildPublishedItem({ ...record, publishedAt: new Date() }, club));
-    await club.save({ session });
+    await require('./services/workflow-content-publisher').publishApprovedContent(record, session, {
+      Club, contentClubField, buildPublishedItem
+    });
   },
   validatePatch: async (record, patch, actor, session) => {
     const { WorkflowError } = require('./services/workflow-policy');
@@ -2711,6 +2712,7 @@ app.post('/api/club-auth/switch-dashboard', async (req, res) => {
     if (req.body?.role === 'student') {
       const studentAccount = await StudentAccount.findOne({ email: account.email }).read('primary').readConcern('majority').lean();
       if (!studentAccount) return res.status(403).json({ message: 'A student dashboard is not linked to this account.' });
+      await reverseAttendanceService.bindDevice(studentAccount, req, res);
       setStudentSessionCookie(req, res, studentAccount);
       return res.json({ redirect: '/?myForms=1', role: 'student' });
     }
@@ -2796,6 +2798,16 @@ require('./services/student-event-registration').registerStudentEvents(app, {
   Club, Application, EventRegistration, StudentInterest, mongoose, requireStudentAuth,
   sameOrigin: isSameOriginRequest, databaseReady: () => mongoReady
 });
+const reverseAttendanceService = require('./services/reverse-attendance').createReverseAttendance({
+  database: mongoose, Club, ContentRequest, UniversityContent, Application, EventRegistration, AttendanceRecord, AttendanceSession, AttendanceAssignment, AttendanceActivityClosure, StudentAccount, AuditLog,
+  DeviceBinding: require('./services/attendance-device-model').AttendanceDeviceBinding, secret: sessionSecret,
+  deviceHash: (req, res) => attendanceDeviceHashes(req, res)[0], isItHead: isItCommitteeHead,
+  bindAssignedDevice: (assignment, source, email, req, res) => source === 'miu' ? bindUsherDevice(assignment, email, req, res) : bindMemberAttendanceDevice(assignment, email, req, res)
+});
+require('./services/reverse-attendance-routes').registerReverseAttendance(app, {
+  service: reverseAttendanceService, requireStudentAuth, Club, UniversityContent, EventRegistration, ready: () => mongoReady, sameOrigin: isSameOriginRequest,
+  actorFor: async (req, res) => { const staff = await getClubAccountFromRequest(req, res); if (staff) return staff; if (await isAdminSessionValid(req, res)) return { admin: true, role: 'admin', email: adminAuthState?.email || getConfiguredAdminEmail() }; return getStudentAccountFromRequest(req, res); }
+});
 // Existing all-student MIU registration keeps the public form, while member-only
 // MIU events require a signed-in student identity and a verified club membership.
 async function requireMiuMemberRegistrationAuth(req, res, next) {
@@ -2811,67 +2823,14 @@ async function requireMiuMemberRegistrationAuth(req, res, next) {
   }
 }
 async function handleUniversityEventRegistration(req, res) {
-  const eventId = Number(req.params.id);
-  if (!Number.isSafeInteger(eventId) || eventId < 1) {
-    return res.status(400).json({ message: 'This event could not be found.' });
-  }
-  if (req.method !== 'GET' && !isSameOriginRequest(req)) return res.status(403).json({ message: 'Reload the event page before registering.' });
-
-  try {
-    if (!requireLiveDatabase(res)) return;
-    const event = await UniversityContent.findOne({ id: eventId, type: 'event' })
-      .read('primary').readConcern('majority').lean();
-    if (!event) return res.status(404).json({ message: 'This event could not be found.' });
-    if (event.registrationEnabled !== true) {
-      return res.status(409).json({ message: 'Registration is not open for this event.' });
-    }
-    const audience = event.attendanceAudience === 'members' ? 'members' : 'all_students';
-    const student = req.studentAccount;
-    const email = audience === 'members' ? cleanText(student?.email, 254).toLowerCase() : cleanText(req.body?.email, 254).toLowerCase();
-    const name = audience === 'members' ? cleanText(student?.name, 160) : cleanText(req.body?.name, 160);
-    if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return res.status(400).json({ message: audience === 'members' ? 'Complete your signed-in MIU student profile before registering.' : 'Enter your name and a valid university email.' });
-    }
-    const rulesMessage = require('./services/student-event-registration').eventRules(event);
-    if (rulesMessage) return res.status(409).json({ message: rulesMessage });
-    let isClubMember = audience === 'all_students';
-    if (audience === 'members') {
-      const [rosterClubs, acceptedMemberships] = await Promise.all([
-        Club.find({ archivedAt: null, 'memberRoster.email': email }).select('id').lean(),
-        Application.find({ email, status: 'accepted' }).select('clubId').lean()
-      ]);
-      isClubMember = rosterClubs.length > 0 || acceptedMemberships.length > 0;
-    }
-    const existing = await EventRegistration.findOne({ clubId: 0, eventIndex: eventId, email }).lean();
-    if (req.method === 'GET') {
-      const registeredCount = await EventRegistration.countDocuments({ clubId: 0, eventIndex: eventId });
-      return res.json({ registered: Boolean(existing), eligible: isClubMember, audience,
-        message: existing ? 'You are registered for this event.' : !isClubMember ? 'Registration is limited to current members of any MIU club.'
-          : audience === 'members' ? 'Registration is open to current MIU club members.' : 'Registration is open to all university students.',
-        cancellationAllowed: false, capacity: null, registeredCount });
-    }
-    if (!isClubMember) return res.status(403).json({ message: 'Registration is limited to current members of any MIU club.' });
-    if (existing) return res.status(409).json({ message: 'This email is already registered for the event.' });
-    const registration = await EventRegistration.create({
-      id: Date.now() * 1000 + crypto.randomInt(1000), clubId: 0, eventIndex: eventId, eventRequestId: eventId,
-      registrationKey: `miu:${eventId}:${email}`, eventTitle: cleanText(event.title, 140), name, email,
-      ...(student?._id ? { studentAccountId: student._id } : {})
-    });
-    const confirmed = await EventRegistration.findById(registration._id)
-      .read('primary').readConcern('majority').select('_id').lean();
-    if (!confirmed) throw new Error('University event registration was not confirmed in the database.');
-    res.setHeader('Cache-Control', 'no-store');
-    res.status(201).json({ message: 'You are registered for this event.', registrationId: registration.id });
-  } catch (error) {
-    if (error.code === 11000) {
-      return res.status(409).json({ message: 'This email is already registered for the event.' });
-    }
-    console.error('University event registration failed:', error.name);
-    res.status(503).json({ message: 'This form was not saved. Please try again.' });
-  }
+  if (!requireLiveDatabase(res)) return;
+  try { if (!req.studentAccount) req.studentAccount = await getStudentAccountFromRequest(req, res); }
+  catch { return res.status(503).json({ message: 'Registration identity could not be confirmed. Please retry.' }); }
+  return require('./services/university-event-registration').handleUniversityRegistration(req, res, { Club, UniversityContent, Application, EventRegistration, database: mongoose, sameOrigin: isSameOriginRequest });
 }
 app.get('/api/university-content/:id/registrations', requireMiuMemberRegistrationAuth, handleUniversityEventRegistration);
 app.post('/api/university-content/:id/registrations', requireMiuMemberRegistrationAuth, handleUniversityEventRegistration);
+app.delete('/api/university-content/:id/registrations', requireStudentAuth, handleUniversityEventRegistration);
 
 // Attendance sessions are backed by MongoDB. Only a club president or an IT
 // committee head can create sessions and review the resulting attendance.
@@ -3005,6 +2964,7 @@ app.post('/api/attendance/admin-self-checkin', requireClubAuth, async (req, res)
   const clubId = Number(req.body.clubId);
   const eventRequestId = Number(req.body.eventRequestId);
   const itemType = ['event', 'booth'].includes(req.body.itemType) ? req.body.itemType : '';
+  if (req.path === '/api/attendance/admin-self-checkin' && itemType === 'event') return res.status(403).json({ code: 'SUPERVISOR_SCAN_REQUIRED', message: 'Event attendance requires an authorized supervisor scan.' });
   const name = cleanText(req.body.name, 160);
   const email = cleanText(account.email, 254).toLowerCase();
   if (typeof req.body.universityId !== 'string' || !req.body.universityId.trim() || req.body.universityId.length > 40
@@ -3366,6 +3326,7 @@ app.post('/api/miu-attendance-task/qr-challenge', requireAttendanceTaskAuth, asy
   } catch { res.status(503).json({ message: 'A fresh attendance QR could not be created.' }); }
 });
 
+app.post('/api/miu-attendance-task/check-in', requireAttendanceTaskAuth, (req, res) => res.status(403).json({ code: 'SUPERVISOR_SCAN_REQUIRED', message: 'Event presence requires another authorized supervisor to scan your personal student QR.', qrUrl: '/pages/attendance-qr.html' }));
 require('./services/attendance-participation').registerUsherSelfCheckin(app, {
   requireAttendanceTaskAuth, requireLiveDatabase, sameOrigin: isSameOriginRequest,
   AttendanceSession, AttendanceRecord, StudentAccount, UniversityContent, Club, Application,
@@ -3568,6 +3529,7 @@ app.post('/api/member/attendance-assignments/:id/check-in', requireStudentAuth, 
     if (!assignment || String(assignment._id) !== req.params.id || assignment.status !== 'accepted') {
       return res.status(403).json({ message: 'Only the member who accepted this attendance task can check in.' });
     }
+    if (assignment.itemType === 'event') return res.status(403).json({ code: 'SUPERVISOR_SCAN_REQUIRED', message: 'Display your personal event QR for a supervisor to scan.' });
     if (!isActivityScheduledToday(assignment.eventDate)) return res.status(409).json({ message: 'You can check in only on the event or booth date.' });
     if (await isAttendanceActivityManuallyEnded(assignment.clubId, assignment.itemType, assignment.eventRequestId)) {
       return res.status(410).json({ message: 'Attendance has ended for this event or booth.' });
@@ -3802,6 +3764,7 @@ app.get('/api/attendance/:token', async (req, res) => {
     if (!requireLiveDatabase(res)) return;
     const session = await AttendanceSession.findOne({ tokenHash: attendanceTokenHash(token), active: true }).lean();
     if (!session) return res.status(404).json({ message: 'This attendance QR code is invalid or expired.' });
+    if (session.itemType !== 'booth') return res.status(403).json({ code: 'SUPERVISOR_SCAN_REQUIRED', message: 'Display your personal event QR for an authorized supervisor to scan.', qrUrl: '/pages/attendance-qr.html' });
     if (!isActivityScheduledToday(session.eventDate)) return res.status(410).json({ message: 'This attendance QR code expired when the event day ended.' });
     if (await isAttendanceActivityManuallyEnded(session.clubId, session.itemType || 'event', session.eventRequestId)) {
       return res.status(410).json({ message: 'Attendance has ended for this event or booth.' });
@@ -3842,6 +3805,7 @@ app.post('/api/attendance/:token', requireStudentAuth, async (req, res) => {
     if (!requireLiveDatabase(res)) return;
     session = await AttendanceSession.findOne({ tokenHash: attendanceTokenHash(token), active: true }).lean();
     if (!session) return res.status(404).json({ message: 'This attendance QR code is invalid or expired.' });
+    if (session.itemType !== 'booth') return res.status(403).json({ code: 'SUPERVISOR_SCAN_REQUIRED', message: 'Display your personal event QR for an authorized supervisor to scan.', qrUrl: '/pages/attendance-qr.html' });
     if (!isActivityScheduledToday(session.eventDate)) return res.status(410).json({ message: 'Attendance is closed because the event day is over.' });
     if (await isAttendanceActivityManuallyEnded(session.clubId, session.itemType || 'event', session.eventRequestId)) {
       clearAttendanceScanProofCookie(req, res);
@@ -4961,6 +4925,10 @@ function buildPublishedItem(record, club) {
     createdAt: record.createdAt
   };
   if (record.type === 'event') {
+    if (record.attendanceSettings) {
+      item.attendanceSettings = record.attendanceSettings;
+      item.capacity = record.attendanceSettings.registrationCapacity ?? null;
+    }
     item.registrationEnabled = record.registrationEnabled !== false;
     item.attendanceEnabled = record.registrationEnabled !== false && record.attendanceEnabled === true;
     item.attendanceAudience = record.attendanceAudience === 'members' ? 'members' : 'all_students';
@@ -5399,7 +5367,10 @@ app.get('/api/committee/requests', requireClubAuth, requireCommitteeRole, async 
         : { status: stage };
     filter.workflow = { $exists: false };
     const records = await ContentRequest.find(filter).sort({ id: -1 }).lean();
-    res.json(records.map(addCommitteeClubImage));
+    const managed = await ContentRequest.find({ 'workflow.state': 'review', workflow: { $exists: true } }).sort({ updatedAt: -1 }).lean();
+    const shapeManaged = require('./services/committee-workflow').shapeCommitteeWorkflowRequest;
+    res.json([...records.map(addCommitteeClubImage), ...managed.map(record => shapeManaged(record, req.clubAccount, req.clubAccount.role,
+      { activeOnly: true, clubImage: clubs.find(club => Number(club.id) === Number(record.clubId))?.image || '' })).filter(Boolean)]);
   } catch (error) {
     console.error('Database operation failed:', error.name);
     res.status(503).json({ message: 'Could not load requests right now.' });
@@ -5417,7 +5388,10 @@ app.get('/api/committee/status', requireClubAuth, requireCommitteeRole, async (r
       .select('id clubId clubName type title date time status image submittedAt publishedAt clubNotice editRequestedBy comments commentHistory hiddenCommentRoles createdAt sponsorName sponsorCompany sponsorContact sponsorEmail sponsorPhone sponsorType sponsorAmount sponsorBenefits sponsorDescription sponsorLogo sponsorAttachment sponsorNotes boothName boothPurpose boothDescription boothLocation boothSize boothEquipment boothSetupDate boothOpenDate boothCloseDate boothContact boothNotes')
       .sort({ id: -1 })
       .lean();
-    res.json(records.map(addCommitteeClubImage));
+    const managed = await ContentRequest.find({ workflow: { $exists: true }, ...(filter.type ? { type: filter.type } : {}) }).sort({ updatedAt: -1 }).lean();
+    const shapeManaged = require('./services/committee-workflow').shapeCommitteeWorkflowRequest;
+    res.json([...records.map(addCommitteeClubImage), ...managed.map(record => shapeManaged(record, req.clubAccount, req.clubAccount.role,
+      { clubImage: clubs.find(club => Number(club.id) === Number(record.clubId))?.image || '' })).filter(Boolean)]);
   } catch (error) {
     console.error('Database operation failed:', error.name);
     res.status(503).json({ message: 'Could not load request statuses right now.' });
@@ -5900,6 +5874,7 @@ app.post('/api/student-auth/google', async (req, res) => {
     }
     if (!await clearLoginSourceFailures(req, res)) return;
     await recordSuccessfulSignIn('student', account.email);
+    await reverseAttendanceService.bindDevice(account, req, res);
     setStudentSessionCookie(req, res, account);
     res.append('Set-Cookie', `miu_club=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/;${secureCookieSuffix(req)}`);
     res.append('Set-Cookie', `miu_admin=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/;${secureCookieSuffix(req)}`);
@@ -6121,6 +6096,7 @@ app.post('/api/auth/login', async (req, res) => {
   if (studentAccount && typeof password === 'string' && clubPasswordMatches(password, studentAccount)) {
     if (!await clearLoginSourceFailures(req, res)) return;
     await recordSuccessfulSignIn('student', studentAccount.email);
+    await reverseAttendanceService.bindDevice(studentAccount, req, res);
     setStudentSessionCookie(req, res, studentAccount);
     res.append('Set-Cookie', `miu_club=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/;${secureCookieSuffix(req)}`);
     res.append('Set-Cookie', `miu_admin=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/;${secureCookieSuffix(req)}`);
@@ -6587,6 +6563,7 @@ require('./services/supervisor-dashboard').registerSupervisorDashboard(app, {
   Club, ContentRequest, SpeakerRequest, AttendanceRecord, AttendanceSession, EventRegistration, Review: SupervisorReview,
   sameOrigin: isSameOriginRequest, publicSpeakerRequest,
   notifyContent: notifyContentRequest, notifySpeaker: notifySpeakerWorkflow, notifyAttendance: notifyAttendanceWorkflow,
+  workflowEngine: dynamicWorkflowEngine,
   attendanceClosureMapFor, attendanceActivityKey, isAttendanceActivityEnded
 });
 
@@ -8123,6 +8100,7 @@ app.get('/club-application.html', (req, res) => {
 app.get('/committee-dashboard.html', (req, res) => res.redirect(302, '/club-login'));
 app.get('/attendance', (req, res) => res.sendFile(path.join(__dirname, 'public', 'attendance.html')));
 
+app.get('/assets/vendor/jsQR.js', (req, res) => res.sendFile(require.resolve('jsqr/dist/jsQR.js')));
 app.get('/assets/vendor/exceljs.min.js', (req, res) => res.sendFile(path.join(__dirname, 'node_modules', 'exceljs', 'dist', 'exceljs.min.js')));
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders: require('./services/static-assets').staticAssetHeaders

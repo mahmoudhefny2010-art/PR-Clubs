@@ -67,6 +67,7 @@
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.message || 'This form was not saved. Please try again.');
       feedbackEl.textContent = result.message || 'You are registered for this event.';
+      const qrLink = document.createElement('a'); qrLink.href = '/pages/attendance-qr.html?source=miu&clubId=0&eventIndex=' + encodeURIComponent(universityContentId); qrLink.textContent = ' Show my attendance QR'; feedbackEl.append(qrLink);
       registrationForm.reset();
     } catch (error) {
       feedbackEl.textContent = error.message || 'This form was not saved. Please try again.';
@@ -98,10 +99,13 @@
       registrationForm.dataset.studentManaged = event.attendanceAudience === 'members' ? 'true' : 'false';
       const ticket = ++generation;
       if (event.registrationEnabled === true && event.attendanceAudience === 'members') {
-        import('/assets/js/student-event-registration.js?v=20261014registrationbuttons1').then(() => {
+        import('/assets/js/student-event-registration.js?v=20261019reverseQR1').then(() => {
           if (ticket === generation) window.mountStudentEventRegistration(registrationForm, feedbackEl, '/api/university-content/' + event.id + '/registrations');
         }).catch(() => { feedbackEl.textContent = 'Registration controls could not load. Please reload.'; });
       }
+      if (event.registrationEnabled === true && event.attendanceAudience !== 'members') import('/assets/js/student-event-registration.js?v=20261019reverseQR1').then(() => {
+        if (ticket === generation) window.mountPublicEventCapacity(registrationForm, '/api/university-content/' + event.id + '/registrations');
+      }).catch(() => { feedbackEl.textContent = 'Registration availability could not load. Please reload.'; });
       document.title = (event.title || 'University Event') + ' - MIU';
     }
     function refreshUniversityEvent() {
@@ -162,7 +166,7 @@
       }
       registrationForm.hidden = event.registrationEnabled === false;
       registrationForm.dataset.studentManaged = 'false';
-          import('/assets/js/student-event-registration.js?v=20261014registrationbuttons1').then(() => window.mountStudentEventRegistration(registrationForm, feedbackEl, `/api/events/${clubId}/${eventIndex}/registrations`))
+          import('/assets/js/student-event-registration.js?v=20261019reverseQR1').then(() => window.mountStudentEventRegistration(registrationForm, feedbackEl, `/api/events/${clubId}/${eventIndex}/registrations${event.requestId > 0 ? '?eventRequestId=' + event.requestId : ''}`))
         .catch(() => { feedbackEl.textContent = 'Registration controls could not load. Please reload.'; });
       statusEl.hidden = true;
       contentEl.hidden = false;

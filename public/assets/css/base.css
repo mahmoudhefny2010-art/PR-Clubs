@@ -470,6 +470,10 @@ html.site-startup-pending .site-loading-indicator { opacity: 0; visibility: hidd
   transition: all var(--transition-fast);
 }
 
+#site-header .nav-link[data-nav="askai"][hidden] {
+  display: none !important;
+}
+
 :root[data-theme="dark"] .nav-link {
   color: var(--slate-300);
 }

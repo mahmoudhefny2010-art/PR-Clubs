@@ -8,21 +8,21 @@ const crypto = require('node:crypto');
 async function fixture(t, options = {}) {
   const registrations = [];
   const event = { id: 10, type: 'event', title: 'MIU event', date: '2099-10-15', registrationEnabled: true, attendanceAudience: 'members', ...options.event };
-  const query = value => ({ select() { return this; }, read() { return this; }, readConcern() { return this; }, lean: async () => value });
+  const query = value => ({ select() { return this; }, session() { return this; }, then(resolve,reject) { return Promise.resolve(value).then(resolve,reject); }, read() { return this; }, readConcern() { return this; }, lean: async () => value });
   const app = express(); app.use(express.json());
   const records = {
-    UniversityContent: { findOne: () => query(options.dbFailure ? null : event) },
-    Club: { find: filter => query((options.members || []).includes(filter['memberRoster.email']) ? [{ id: 1 }] : []) },
-    Application: { find: filter => query((options.accepted || []).includes(filter.email) ? [{ clubId: 2 }] : []) },
+    UniversityContent: { updateOne: async () => {}, findOne: () => query(options.dbFailure ? null : event) },
+    Club: { findOne: filter => query((options.members || []).includes(filter['memberRoster.email']) ? { id: 1 } : null), find: filter => query((options.members || []).includes(filter['memberRoster.email']) ? [{ id: 1 }] : []) },
+    Application: { findOne: filter => query((options.accepted || []).includes(filter.email) ? { clubId: 2 } : null), find: filter => query((options.accepted || []).includes(filter.email) ? [{ clubId: 2 }] : []) },
     EventRegistration: {
       findOne: filter => query(registrations.find(record => record.email === filter.email) || null),
-      countDocuments: async () => registrations.length,
-      create: async value => { const record = { ...value, _id: String(registrations.length + 1) }; registrations.push(record); return record; },
+      countDocuments: () => query(registrations.length),
+      create: async ([value]) => { const record = { ...value, _id: String(registrations.length + 1) }; registrations.push(record); return [record]; },
       findById: id => query(registrations.find(record => record._id === id) || null)
     }
   };
   const context = {
-    app, ...records, crypto,
+    app, ...records, crypto, getStudentAccountFromRequest: async () => null, mongoose: { startSession: async () => ({ withTransaction: async fn => fn(), endSession: async () => {} }) },
     cleanText: (value, max) => String(value || '').trim().slice(0, max),
     requireLiveDatabase(res) { if (!options.databaseDown) return true; res.status(503).json({ message: 'Database unavailable.' }); return false; },
     isSameOriginRequest: () => true,
@@ -33,7 +33,7 @@ async function fixture(t, options = {}) {
       return next();
     },
     console,
-    require: name => name === './services/student-event-registration' ? require('../services/student-event-registration') : require(name)
+    require: name => name.startsWith('./services/') ? require('../' + name.slice(2)) : require(name)
   };
   vm.createContext(context);
   const source = fs.readFileSync(require.resolve('../server'), 'utf8');

@@ -245,7 +245,7 @@ async function screenshot(name) {
   if (process.argv.includes('--workflow-only')) {
     await workflowChecks.run({ cdp, origin, until, screenshot, state: workflowState, emitUpdate });
     assert.deepEqual(cdp.events.filter(event => event.method === 'Runtime.exceptionThrown'), [], 'No browser script errors');
-    console.log('PASS: workflow stage configuration save, description-only corrections, locked fields, resubmission and responsive light/dark views. Fixture data only.');
+    console.log('PASS: workflow configuration, required correction-field selection, locked fields, resubmission and responsive light/dark views. Fixture data only.');
     return;
   }
   if (process.argv.includes('--custom-roles-only')) {

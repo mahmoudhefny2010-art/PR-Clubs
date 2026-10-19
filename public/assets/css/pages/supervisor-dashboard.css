@@ -81,6 +81,17 @@
 .supervisor-request-card .req-actions > button:hover { filter: brightness(.97); }
 .supervisor-request-card .req-actions > [role="status"] { flex: 1 0 100%; color: var(--primary-700); }
 .supervisor-request-card .req-actions > [role="status"]:empty { display: none; }
+.supervisor-request-card .req-actions > .supervisor-workflow-fields,
+.supervisor-request-dialog .supervisor-workflow-fields {
+  box-sizing: border-box; display: grid; flex: 1 0 100%; grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
+  gap: 8px 16px; min-width: 0; margin: 0; padding: 12px 14px 14px; border: 1px solid var(--border-color);
+  border-radius: 12px; color: var(--text-main); background: var(--bg-panel);
+}
+.supervisor-workflow-fields legend { padding: 0 6px; font-weight: 700; }
+.supervisor-workflow-fields > label { display: flex; align-items: center; gap: 9px; min-width: 0; margin: 0; color: var(--text-main); cursor: pointer; }
+.supervisor-main .supervisor-workflow-fields input[type="checkbox"] {
+  flex: 0 0 18px; width: 18px; height: 18px; margin: 0; padding: 0; accent-color: var(--primary-700);
+}
 .supervisor-request-card > .supervisor-request-extra,
 .supervisor-request-card > .supervisor-note-form { flex: 1 0 100%; min-width: 0; }
 .supervisor-request-card > .supervisor-note-form form { margin-top: 0; }

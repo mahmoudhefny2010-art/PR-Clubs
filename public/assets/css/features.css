@@ -1191,9 +1191,30 @@ body :is(button[aria-label*="close" i], button[aria-label*="exit" i], button[tit
 }
 .event-attendance-status[hidden] { display: none !important; }
 
-/* Keep committee request actions on their own row so card content can shrink safely. */
+/* Committee cards need a wrapping row layout so notices never squeeze the summary. */
 .req-card > .req-summary { min-width: 0; overflow-wrap: anywhere; }
 .req-card > .req-actions { flex: 1 0 100%; min-width: 0; }
+#requestsList { display: grid; gap: 12px; min-width: 0; }
+#requestsList > .req-card {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 14px;
+  margin: 0;
+}
+#requestsList > .req-card > img { box-sizing: border-box; flex: 0 0 90px; width: 90px; height: 90px; }
+#requestsList > .req-card > .req-summary { flex: 1 1 calc(100% - 110px); min-width: 0; }
+#requestsList > .req-card > .content-review-update { flex: 1 0 100%; width: 100%; min-width: 0; }
+#requestsList > .req-card > .req-actions { display: flex; flex: 1 0 100%; align-items: center; gap: 8px; width: 100%; margin: 0; }
+#requestsList > .req-card > .req-actions > input { flex: 1 1 220px; min-width: min(100%, 220px); }
+
+@media (max-width: 700px) {
+  #requestsList > .req-card { align-items: flex-start; gap: 10px 12px; }
+  #requestsList > .req-card > img { flex-basis: 64px; width: 64px; height: 64px; }
+  #requestsList > .req-card > .req-summary { flex-basis: calc(100% - 78px); }
+}
 
 @media (max-width: 700px) {
   #requestsList > .req-card {

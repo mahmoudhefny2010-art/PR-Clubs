@@ -33,6 +33,9 @@ function renderDashboardPage(root, tool = '') {
   } else if (tool === 'publishing') {
     content = '<div class="miu-events-dashboard-page v2-publishing-content"><span id="miuEventsCount" hidden></span>' + element(source('dashboards/miu-events-dashboard.html'), 'section', 'miuEventsPanel').replace(' hidden', '') + '</div>';
     assets.push('event-reports', 'miu-events-dashboard'); scripts.push('cloudinary-upload', 'miu-events-dashboard');
+  } else if (tool === 'secure-attendance') {
+    content = '<div class="reverse-attendance-page" data-reverse-attendance="scanner">' + main('pages/attendance-scanner.html') + '</div>';
+    assets.push('reverse-attendance'); scripts.push('reverse-attendance');
   } else if (tool === 'miu-attendance') {
     content = main('pages/miu-attendance.html').replace(/<a\b[^>]*data-history-back[^>]*>[\s\S]*?<\/a>/, '');
     assets.push('event-reports'); scripts.push('pages/miu-attendance');
@@ -43,7 +46,7 @@ function renderDashboardPage(root, tool = '') {
   html = html.replace('data-tool=""', `data-tool="${tool}"`)
     .replace('<!-- TOOL_CONTENT -->', content)
     .replace('<!-- TOOL_STYLES -->', assets.map(name => `<link rel="stylesheet" href="/assets/css/pages/${name}.css${name === 'miu-events-dashboard' ? '?v=20261019miusync1' : name === 'workflow' ? '?v=20261019blockedBadge1' : ''}">`).join('\n'))
-    .replace('<!-- TOOL_SCRIPTS -->', scripts.map(name => `<script src="/assets/js/${name}.js?v=${name === 'pages/admin-excel-import' ? '20261019excelRowLog1' : name === 'workflow-ui' ? '20261019blockedBadge1' : name === 'miu-events-dashboard' ? '20261019miusync1' : ['custom-role-admin', 'staff-management'].includes(name) ? '20261018customRoles1' : '20261017clubimport2'}" defer></script>`).join('\n'));
+    .replace('<!-- TOOL_SCRIPTS -->', scripts.map(name => `<script src="/assets/js/${name}.js?v=${name === 'pages/admin-excel-import' ? '20261019excelRowLog1' : name === 'workflow-ui' ? '20261019requiredRevisionFields1' : name === 'miu-events-dashboard' ? '20261019miusync1' : ['custom-role-admin', 'staff-management'].includes(name) ? '20261018customRoles1' : '20261017clubimport2'}" defer></script>`).join('\n'));
   if (tool) html = html.replace('id="overviewPage"', 'id="overviewPage" hidden').replace('id="toolPage" hidden', 'id="toolPage"');
   return html;
 }

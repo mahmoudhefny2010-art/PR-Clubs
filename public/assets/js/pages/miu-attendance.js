@@ -81,16 +81,16 @@
       const results = $('miuAttendanceAssignedList'); results.replaceChildren();
       result.sessions.forEach((session, index) => {
         const item = document.createElement('li');
-        item.textContent = `Team ${index + 1}: usher ${session.assignedMemberEmail} · Supervisor ${session.assignedSupervisorEmail} · usher must accept the task from their account before opening their QR.`;
+        item.textContent = `Team ${index + 1}: usher ${session.assignedMemberEmail} · Supervisor ${session.assignedSupervisorEmail} · usher must accept the task from their account before opening their attendance scanner.`;
         results.append(item);
       });
-      $('miuAttendanceAssignmentsResult').textContent = `${result.assignmentsCreated} attendance team${result.assignmentsCreated === 1 ? '' : 's'} assigned. Each usher gets a separate QR session; duplicate student check-ins are still prevented.`;
+      $('miuAttendanceAssignmentsResult').textContent = `${result.assignmentsCreated} attendance team${result.assignmentsCreated === 1 ? '' : 's'} assigned. Each usher scans student QR codes in their assigned lane; duplicate attendance is prevented.`;
       panel.classList.remove('hidden'); feedback.textContent = 'Attendance teams are assigned. Each usher can now accept the task from their account.';
     } catch (error) { feedback.textContent = error.message; }
     finally { start.disabled = false; }
   });
   $('miuAttendanceEnd').addEventListener('click', async () => {
-    if (!eventId || !await (window.miuConfirmAction || window.confirm)('End check-in for this MIU event and close all assigned usher QR sessions?')) return;
+    if (!eventId || !await (window.miuConfirmAction || window.confirm)('End attendance for this MIU event and close all assigned scanner lanes?')) return;
     $('miuAttendanceEnd').disabled = true;
     try {
       await api(`/api/miu/attendance-events/${encodeURIComponent(eventId)}/end`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });

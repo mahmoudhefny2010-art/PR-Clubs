@@ -396,6 +396,10 @@
   selfCheckinForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const option = selfCheckinEvent.selectedOptions[0];
+    if (option?.dataset.itemType === 'event') {
+      window.location.href = '/pages/attendance-qr.html';
+      return;
+    }
     const name = document.getElementById('attendanceSelfCheckinName').value.trim();
     if (!name || !option?.dataset.clubId || String(option.dataset.clubId) !== String(dialog.dataset.clubId)) return;
     const button = document.getElementById('attendanceSelfCheckinBtn');
@@ -467,6 +471,10 @@
     event.preventDefault();
     const option = eventSelect.selectedOptions[0];
     if (!option?.dataset.clubId) return;
+    if (option.dataset.itemType === 'event') {
+      window.location.href = '/pages/attendance-scanner.html';
+      return;
+    }
     const audienceControl = document.getElementById('attendanceAllStudents');
     if (audienceControl && option.dataset.attendanceAudience) {
       audienceControl.checked = option.dataset.attendanceAudience === 'all_students';

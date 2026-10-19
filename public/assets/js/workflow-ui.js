@@ -274,6 +274,11 @@
     }
     if (decision) decision.onclick = async event => {
       const target = event.target.closest('[data-workflow-action]'); if (!target) return;
+      if (target.dataset.workflowAction === 'request_changes' && !selected(decision, 'revisionFields').length) {
+        notify(decision, 'Select at least one field to correct before requesting changes.', true);
+        decision.querySelector('input[name="revisionFields"]')?.focus();
+        return;
+      }
       const buttons = [...decision.querySelectorAll('button')]; buttons.forEach(button => { button.disabled = true; });
       try {
         const payload = { revision: flow.revision, action: target.dataset.workflowAction, reviewRole: $(decision, '[name=reviewRole]')?.value, comment: $(decision, '[name=comment]').value,

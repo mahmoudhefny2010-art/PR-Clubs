@@ -1,4 +1,10 @@
 const express = require('express');
+const WorkflowPolicy = require('./workflow-policy');
+
+function assignedToReviewer(flow, email) {
+  return !flow?.assignedEmails?.length || flow.assignedEmails.some(assigned =>
+    String(assigned || '').trim().toLowerCase() === String(email || '').trim().toLowerCase());
+}
 
 function assignedIds(account) {
   return account?.role === 'supervisor'
@@ -120,10 +126,49 @@ function registerSupervisorDashboard(app, deps) {
         } }]),
         Review.find({ clubId, supervisorId: req.supervisor._id }).sort({ updatedAt: -1 }).lean()
       ]);
+      const managedRecords = await ContentRequest.find({ clubId, 'workflow.state': 'review', workflow: { $exists: true } }).sort({ updatedAt: -1 }).lean();
+      const managedRequests = managedRecords.flatMap(record => {
+        const flow = record.workflow;
+        const stage = flow?.definition?.stages?.find(item => item.id === flow.stageId);
+        if (!stage?.roles.includes('supervisor')
+          || stage.approvalRule === 'all_roles' && flow.approvals?.some(approval => approval.role === 'supervisor')
+          || !assignedToReviewer(flow, req.supervisor.email)) return [];
+        const visibleFields = stage.reviewFields || [];
+        const values = Object.fromEntries(visibleFields.filter(key => Object.hasOwn(WorkflowPolicy.fields[record.type] || {}, key))
+          .map(key => [key, record[key]]));
+        return [{ id: record.id, clubId, clubName: club.name, clubImage: club.image, type: record.type, status: 'pending_supervisor',
+          title: values.title || values.sponsorName || values.boothName || record.title, date: values.date || values.boothOpenDate || '',
+          clubNotice: record.clubNotice || '', ...values, workflowRevision: flow.revision,
+          workflowActions: (stage.permissions?.supervisor || []).filter(action => ['approve', 'reject', 'request_changes'].includes(action)),
+          workflowEditableFields: (stage.editableFields || []).filter(key => Object.hasOwn(WorkflowPolicy.fields[record.type] || {}, key))
+            .map(key => ({ id: key, label: WorkflowPolicy.fields[record.type][key][0] })),
+          workflowHistory: (flow.history || []).map(event => ({ role: event.actorRole || (event.actorEmail === flow.ownerEmail ? 'club' : 'system'),
+            actorEmail: event.actorEmail, action: event.action, comment: event.comment, fromStatus: '', toStatus: '', createdAt: event.at })) }];
+      });
+      const managedSpeakerRecords = await SpeakerRequest.find({ clubId, 'workflow.state': 'review', workflow: { $exists: true } }).sort({ submittedAt: -1 }).lean();
+      const managedSpeakers = managedSpeakerRecords.flatMap(record => {
+        const flow = record.workflow;
+        const stage = flow?.definition?.stages?.find(item => item.id === flow.stageId);
+        if (!stage?.roles.includes('supervisor')
+          || stage.approvalRule === 'all_roles' && flow.approvals?.some(approval => approval.role === 'supervisor')
+          || !assignedToReviewer(flow, req.supervisor.email)) return [];
+        const type = flow.definition.type || 'speaker';
+        const visibleFields = stage.reviewFields || [];
+        const shaped = publicSpeakerRequest(record);
+        for (const key of Object.keys(WorkflowPolicy.fields[type] || {})) if (!visibleFields.includes(key)) delete shaped[key];
+        if (!visibleFields.includes('speakerAttachments')) shaped.attachments = [];
+        delete shaped.speakerEmail; delete shaped.contactDetails; delete shaped.requesterEmail;
+        return [{ ...shaped, status: 'pending_supervisor', workflowRevision: flow.revision,
+          workflowActions: (stage.permissions?.supervisor || []).filter(action => ['approve', 'reject', 'request_changes'].includes(action)),
+          workflowEditableFields: (stage.editableFields || []).filter(key => Object.hasOwn(WorkflowPolicy.fields[type] || {}, key))
+            .map(key => ({ id: key, label: WorkflowPolicy.fields[type][key][0] })),
+          workflowHistory: (flow.history || []).map(event => ({ role: event.actorRole || (event.actorEmail === flow.ownerEmail ? 'club' : 'system'),
+            actorEmail: event.actorEmail, action: event.action, comment: event.comment, fromStatus: '', toStatus: '', createdAt: event.at })) }];
+      });
       // Events are projected explicitly; never expose embedded registration or attendee data.
       club.events = (club.events || []).map((event, index) => ({ index, title: event.title, date: event.date,
         time: event.time, location: event.location, description: event.description, requestId: event.requestId }));
-      res.json({ club, requests: requests.map(request => ({ ...request, clubName: club.name, clubImage: club.image })), speakers: speakers.map(publicSpeakerRequest), attendance,
+      res.json({ club, requests: [...requests.map(request => ({ ...request, clubName: club.name, clubImage: club.image })), ...managedRequests], speakers: [...speakers.map(publicSpeakerRequest), ...managedSpeakers], attendance,
         reviews: reviews.map(({ targetType, targetId, note, updatedAt }) => ({ targetType, targetId, note, updatedAt })) });
     } catch { res.status(503).json({ message: 'Could not load club information. Please try again.' }); }
   });
