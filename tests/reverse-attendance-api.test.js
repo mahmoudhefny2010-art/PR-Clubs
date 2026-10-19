@@ -8,7 +8,7 @@ const {localInstant}=require('../services/event-attendance-context');
 async function fixture(t){
   const students=['a','b','c'].map((name,i)=>({_id:String(i+1).repeat(24),name,email:name+'@example.test',universityId:'000'+i}));
   const event={requestId:99,title:'Concurrency event',date:'2099-10-19',time:'12:00',attendanceEnabled:true,registrationEnabled:true,capacity:1,cancellationEnabled:true};
-  const store=attendanceStore({StudentAccount:students,Club:[{id:1,archivedAt:null,events:[event],memberRoster:[]}],UniversityContent:[{...event,id:9,type:'event',attendanceSettings:{registrationCapacity:1}}]});
+  const store=attendanceStore({StudentAccount:students,Club:[{id:1,name:'Test Club',image:'/club.png',archivedAt:null,events:[event],memberRoster:[]}],UniversityContent:[{...event,id:9,type:'event',attendanceSettings:{registrationCapacity:1}}]});
   const app=express();app.use(express.json());let ready=true;
   const requireStudentAuth=(req,res,next)=>{const s=students.find(s=>s.name===req.headers['x-account']);if(!s)return res.status(401).json({message:'Sign in'});req.studentAccount=s;next();};
   const service=createReverseAttendance({...store.models,database:store.database,secret:'api-test-secret-with-more-than-thirty-two-chars',clock:()=>localInstant(event.date,'11:50'),deviceHash:req=>req.headers['x-device']||req.headers['x-account']});
@@ -37,11 +37,11 @@ test('real HTTP route auth, CSRF, scope, validation and failures never return an
   assert.equal((await f.request(base+'/settings','PUT',{capacity:1},{'x-admin':'true',origin:'https://untrusted.test'})).status,403);
   assert.equal((await f.request(base+'/scan','POST',{token:'forged'},{'x-admin':'true'})).data.code,'INVALID_QR');
   await f.request('/api/events/1/0/registrations','POST',{});
-  const myEvents=(await f.request('/api/reverse-attendance/my-events')).data.items;assert.equal(myEvents.length,1);assert.equal(myEvents[0].time,'12:00');
+  const myEvents=(await f.request('/api/reverse-attendance/my-events')).data.items;assert.equal(myEvents.length,1);assert.equal(myEvents[0].time,'12:00');assert.equal(myEvents[0].logo,'/club.png');assert.equal(myEvents[0].logoLabel,'Test Club');
   assert.equal((await f.request(base,'GET',null,{'x-admin':'true'})).data.time,'12:00');
   assert.equal((await f.request('/api/reverse-attendance/managed-events')).data.items.length,0);
-  const managed=(await f.request('/api/reverse-attendance/managed-events','GET',null,{'x-admin':'true'})).data.items;assert.equal(managed.length,2);assert.ok(managed.every(item=>item.time==='12:00'));
-  const qr=await f.request(base+'/qr');f.store.faults.commit=true;
+  const managed=(await f.request('/api/reverse-attendance/managed-events','GET',null,{'x-admin':'true'})).data.items;assert.equal(managed.length,2);assert.ok(managed.every(item=>item.time==='12:00'));assert.equal(managed[0].logo,'/club.png');assert.equal(managed[1].logo,'/assets/img/pics/logo.svg.png');
+  const qr=await f.request(base+'/qr');assert.equal(qr.data.qrLogo,'/club.png');assert.equal(qr.data.qrLabel,'Test Club');f.store.faults.commit=true;
   const result=await f.request(base+'/scan','POST',{token:qr.data.token},{'x-admin':'true'});assert.equal(result.status,503);assert.equal(result.data.savedToDatabase,false);assert.equal(result.data.color,'red');assert.equal(f.store.rows.AttendanceRecord.length,0);
   f.setReady(false);assert.equal((await f.request(base+'/qr')).status,503);
 });

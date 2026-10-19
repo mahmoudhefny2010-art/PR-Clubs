@@ -27,13 +27,13 @@ function registerReverseAttendance(app, deps) {
     for (const registration of registrations) {
       const reference = { source: registration.clubId === 0 ? 'miu' : 'club', clubId: registration.clubId, eventIndex: registration.eventIndex };
       if (reference.source === 'club' && registration.eventRequestId > 0) { const club = await Club.findOne({ id: registration.clubId, archivedAt: null }).select('events').lean(); reference.eventIndex = club?.events?.findIndex(event => Number(event.requestId) === Number(registration.eventRequestId)); }
-      try { const ctx = await service.context.resolve(reference); items.push({ ...reference, eventRequestId: ctx.eventRequestId, title: ctx.event.title, date: ctx.event.date, time: ctx.event.time, source: ctx.source }); } catch (error) { if (![400, 404].includes(error.status) && error.code !== 'EVENT_ID_MIGRATION_REQUIRED') throw error; }
+      try { const ctx = await service.context.resolve(reference); items.push({ ...reference, eventRequestId: ctx.eventRequestId, title: ctx.event.title, date: ctx.event.date, time: ctx.event.time, source: ctx.source, logo: ctx.source === 'miu' ? '/assets/img/pics/logo.svg.png' : ctx.club.image, logoLabel: ctx.source === 'miu' ? 'MIU' : ctx.club.name }); } catch (error) { if (![400, 404].includes(error.status) && error.code !== 'EVENT_ID_MIGRATION_REQUIRED') throw error; }
     }
     res.json({ items });
   }));
   app.get('/api/reverse-attendance/managed-events', safe('scanner', async (req, res, actor) => {
-    const [clubs, university] = await Promise.all([Club.find({ archivedAt: null }).select('id events').lean(), UniversityContent.find({ type: 'event' }).select('id title date time').lean()]);
-    const candidates = [...clubs.flatMap(club => (club.events || []).map((event, eventIndex) => ({ source: 'club', clubId: club.id, eventIndex, title: event.title, date: event.date, time: event.time }))), ...university.map(event => ({ source: 'miu', clubId: 0, eventIndex: event.id, title: event.title, date: event.date, time: event.time }))], items = [];
+    const [clubs, university] = await Promise.all([Club.find({ archivedAt: null }).select('id name image events').lean(), UniversityContent.find({ type: 'event' }).select('id title date time').lean()]);
+    const candidates = [...clubs.flatMap(club => (club.events || []).map((event, eventIndex) => ({ source: 'club', clubId: club.id, eventIndex, title: event.title, date: event.date, time: event.time, logo: club.image, logoLabel: club.name }))), ...university.map(event => ({ source: 'miu', clubId: 0, eventIndex: event.id, title: event.title, date: event.date, time: event.time, logo: '/assets/img/pics/logo.svg.png', logoLabel: 'MIU' }))], items = [];
     for (const item of candidates) { try { const ctx = await service.context.resolve(item); const access = await service.permission(ctx, actor, req, res); items.push({ ...item, eventRequestId: ctx.eventRequestId, ...access }); } catch (error) { if (![403, 404].includes(error.status) && error.code !== 'EVENT_ID_MIGRATION_REQUIRED') throw error; } }
     res.json({ items });
   }));

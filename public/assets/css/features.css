@@ -780,6 +780,7 @@ body :is(button[aria-label*="close" i], button[aria-label*="exit" i], button[tit
 .attendance-qr-result p { color: var(--text-muted); }
 .attendance-qr-canvas { display: grid; place-items: center; width: 250px; min-height: 250px; max-width: 100%; margin: 0 auto; padding: 10px; background: #fff; border-radius: var(--radius-md); }
 .attendance-qr-canvas canvas, .attendance-qr-canvas img { display: block; max-width: 100%; }
+.attendance-qr-canvas .attendance-qr-art { width: min(320px, 100%); max-width: 100%; height: auto; border-radius: 18px; }
 .attendance-records-section { margin-top: 28px; }
 .attendance-records-section .admin-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .attendance-records-table { width: 100%; min-width: 1245px; table-layout: fixed; border-collapse: collapse; text-align: left; }

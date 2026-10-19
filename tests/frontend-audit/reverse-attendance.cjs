@@ -7,7 +7,7 @@ const root=path.resolve(__dirname,'../..'),output=path.join(root,'.frontend-audi
 const generator=path.join(output,'qrcode.min.js');assert.ok(fs.existsSync(generator),'Cache the existing pinned qrcodejs@1.0.0 generator in .frontend-audit/reverse-attendance/qrcode.min.js first.');
 const students=['a','b','c'].map((name,i)=>({_id:String(i+1).repeat(24),name:'Browser Student '+name,email:name+'@example.test',universityId:'000'+i}));
 const event={title:'Browser test event',requestId:99,date:'2026-10-19',time:'12:00',attendanceEnabled:true,capacity:3};
-const store=attendanceStore({Club:[{id:1,archivedAt:null,events:[event],memberRoster:[]}],StudentAccount:students,EventRegistration:students.map(s=>({clubId:1,eventIndex:0,eventRequestId:99,email:s.email}))});
+const store=attendanceStore({Club:[{id:1,name:'Browser Club',image:'/assets/img/pics/logo.svg.png',archivedAt:null,events:[event],memberRoster:[]}],StudentAccount:students,EventRegistration:students.map(s=>({clubId:1,eventIndex:0,eventRequestId:99,email:s.email}))});
 let activeStudent=students[0],admin=true;const start=Date.now(),base=localInstant(event.date,'11:50');
 const service=createReverseAttendance({...store.models,database:store.database,secret:'browser-fixture-secret-over-thirty-two-characters',clock:()=>base+Date.now()-start,deviceHash:req=>req.device||'browser'});
 const app=express();app.use(express.json());const testAdmin={admin:true,email:'browser-admin@example.test',role:'admin'};

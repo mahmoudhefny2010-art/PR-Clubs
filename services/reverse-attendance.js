@@ -87,7 +87,7 @@ function createReverseAttendance(deps) {
     try { binding = await bindDevice(student, req, res); } catch (error) { if (error.code !== 11000) throw error; binding = await bindDevice(student, req, res); }
     const now = clock(), exp = Math.min(now + PERIOD, window.endsAt);
     const token = cipher.seal({ purpose: 'attendance', account: String(student._id), version: student.sessionVersion || 0, event: ctx.key, device: binding.deviceHash, generation: binding.state.generation, iat: now, exp });
-    return { ...window, available: true, token, expiresAt: exp, refreshAfterMs: exp - now, deviceWarning: binding.state.switched, message: binding.state.switched ? 'This browser has switched accounts. The attendance supervisor will verify your university card.' : 'Show this QR to the attendance supervisor.' };
+    return { ...window, available: true, token, expiresAt: exp, refreshAfterMs: exp - now, deviceWarning: binding.state.switched, qrLogo: ctx.source === 'miu' ? '/assets/img/pics/logo.svg.png' : ctx.club.image, qrLabel: ctx.source === 'miu' ? 'MIU' : ctx.club.name, message: binding.state.switched ? 'This browser has switched accounts. The attendance supervisor will verify your university card.' : 'Show this QR to the attendance supervisor.' };
   }
   async function scan(ref, actor, body, req, res) {
     const saved = await transaction(async session => {

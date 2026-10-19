@@ -5,8 +5,9 @@
 .reverse-attendance-page p { line-height: 1.6; overflow-wrap: anywhere; }
 .reverse-attendance-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0; }
 .reverse-attendance-page video { width: 100%; max-height: 420px; background: #111827; border-radius: 12px; }
-.reverse-qr:not(:empty) { padding: 16px; background: #fff; border-radius: 12px; width: fit-content; max-width: 100%; margin: 20px auto; }
+.reverse-qr:not(:empty) { padding: 12px; background: #292b2f; border: 1px solid #3b3e43; border-radius: 24px; width: fit-content; max-width: 100%; margin: 20px auto; box-shadow: 0 14px 34px #11182724; }
 .reverse-qr img, .reverse-qr canvas { max-width: 100%; height: auto; }
+.reverse-qr .attendance-qr-art { display: block; width: min(336px, calc(100vw - 78px)); border-radius: 16px; }
 .reverse-attendance-result { padding: 16px; margin: 18px 0; border: 2px solid var(--border-color); border-radius: 12px; background: var(--bg-soft); }
 .reverse-attendance-result[data-color=green] { border-color: #15803d; background: #dcfce7; color: #14532d; }
 .reverse-attendance-result[data-color=red] { border-color: #b91c1c; background: #fee2e2; color: #7f1d1d; }

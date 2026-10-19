@@ -46,7 +46,7 @@
       if (data.attended || data.state === 'closed') { $('[data-ra-clock]').textContent = data.attendedAt ? 'Recorded: ' + new Date(data.attendedAt).toLocaleString() : ''; return; }
       if (data.available) {
         await window.ensureQRCode(); if (ticket !== generation || Date.now() + serverOffset >= data.expiresAt) { if (ticket === generation) timer = setTimeout(loadQr, 50); return; }
-        new window.QRCode($('[data-ra-qr]'), { text: data.token, width: 256, height: 256, colorDark: '#111827', colorLight: '#ffffff', correctLevel: window.QRCode.CorrectLevel.M });
+        await window.renderAttendanceQr($('[data-ra-qr]'), data.token, { size: 336, logo: data.qrLogo, label: data.qrLabel, alt: `Rotating attendance QR for ${select.selectedOptions[0]?.textContent || 'event'}` });
       }
       const deadline = data.available ? data.expiresAt : data.opensAt;
       const tick = () => { const seconds = Math.max(0, Math.ceil((deadline - Date.now() - serverOffset) / 1000)); $('[data-ra-clock]').textContent = data.available ? `QR refreshes in ${seconds}s` : `QR available in ${Math.floor(seconds / 60)}m ${seconds % 60}s (${data.timeZone})`; if (!seconds) $('[data-ra-qr]').replaceChildren(); };

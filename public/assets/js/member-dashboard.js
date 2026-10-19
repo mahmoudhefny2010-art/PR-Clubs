@@ -8,6 +8,8 @@
   let activeToken = String(savedQr.token || '');
   let activeAssignmentId = String(savedQr.assignmentId || '');
   let activeQrDate = String(savedQr.eventDate || '');
+  let activeQrLogo = String(savedQr.logo || '');
+  let activeQrLabel = String(savedQr.logoLabel || 'MIU');
   let activeQrTimer = 0;
   let activeQrCountdown = 0;
   let assignmentLoadPromise = null;
@@ -89,6 +91,8 @@
       card.append(qr);
       list.append(card);
       if (assignment.id === activeAssignmentId && activeToken) {
+        activeQrLogo = assignment.logo || '';
+        activeQrLabel = assignment.logoLabel || assignment.clubName || 'MIU';
         qr.classList.remove('hidden');
         refreshQr(qr, activeToken, activeQrDate);
       }
@@ -184,7 +188,7 @@
       scanUrl.searchParams.set('token', token);
       scanUrl.searchParams.set('code', challenge.code);
       qr.replaceChildren();
-      new window.QRCode(qr, { text: scanUrl.toString(), width: 220, height: 220, colorDark: '#102a43', colorLight: '#ffffff', correctLevel: window.QRCode.CorrectLevel.M });
+      await window.renderAttendanceQr(qr, scanUrl.toString(), { size: 300, logo: activeQrLogo, label: activeQrLabel, alt: `Rotating attendance QR for ${activeQrLabel}` });
       const note = document.createElement('p');
       const updateCountdown = () => {
         const expiresAt = typeof challenge.expiresAt === 'number' ? challenge.expiresAt : Date.parse(challenge.expiresAt);
@@ -237,7 +241,9 @@
       activeToken = result.token;
       activeAssignmentId = assignment.id;
       activeQrDate = assignment.eventDate;
-      window.sessionStorage.setItem('memberAttendanceQr', JSON.stringify({ token: activeToken, assignmentId: activeAssignmentId, eventDate: activeQrDate }));
+      activeQrLogo = assignment.logo || '';
+      activeQrLabel = assignment.clubName || 'MIU';
+      window.sessionStorage.setItem('memberAttendanceQr', JSON.stringify({ token: activeToken, assignmentId: activeAssignmentId, eventDate: activeQrDate, logo: activeQrLogo, logoLabel: activeQrLabel }));
       await refreshQr(qr, activeToken, activeQrDate);
     } catch (error) {
       qr.textContent = error.message;

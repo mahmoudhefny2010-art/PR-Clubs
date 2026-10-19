@@ -24,6 +24,8 @@
   let attendanceDataDate = '';
   let activeQrToken = '';
   let activeQrActivityKey = '';
+  let activeQrLogo = '';
+  let activeQrLabel = 'MIU';
   let qrRefreshTimeout = 0;
   let qrCountdownInterval = 0;
   let recordsPollTimeout = 0;
@@ -104,13 +106,11 @@
       scanUrl.searchParams.set('token', token);
       scanUrl.searchParams.set('code', challenge.code);
       qrCanvas.replaceChildren();
-      new window.QRCode(qrCanvas, {
-        text: scanUrl.toString(),
-        width: 230,
-        height: 230,
-        colorDark: '#102a43',
-        colorLight: '#ffffff',
-        correctLevel: window.QRCode.CorrectLevel.M
+      await window.renderAttendanceQr(qrCanvas, scanUrl.toString(), {
+        size: 320,
+        logo: activeQrLogo,
+        label: activeQrLabel,
+        alt: `Rotating attendance QR for ${document.getElementById('attendanceQrEventTitle').textContent}`
       });
       window.clearInterval(qrCountdownInterval);
       const updateCountdown = () => {
@@ -151,6 +151,8 @@
       option.dataset.itemType = event.itemType || 'event';
       option.dataset.eventRequestId = String(event.eventRequestId);
       option.dataset.title = event.title;
+      option.dataset.logo = event.logo || '';
+      option.dataset.logoLabel = event.clubName || 'MIU';
       option.dataset.attendanceAudience = event.attendanceAudience || '';
       eventSelect.add(option);
     });
@@ -498,6 +500,8 @@
         })
       });
       activeQrToken = result.token;
+      activeQrLogo = option.dataset.logo || '';
+      activeQrLabel = option.dataset.logoLabel || 'MIU';
       activeQrActivityKey = attendanceActivityKey({ clubId: option.dataset.clubId, itemType: option.dataset.itemType, eventRequestId: option.dataset.eventRequestId });
       const itemLabel = option.dataset.itemType === 'booth' ? 'Booth' : 'Event';
       document.getElementById('attendanceQrEventTitle').textContent = `${itemLabel}: ${option.dataset.title}${option.dataset.clubName ? ` — ${option.dataset.clubName}` : ''}`;

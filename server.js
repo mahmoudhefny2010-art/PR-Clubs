@@ -2845,7 +2845,7 @@ app.get('/api/club/attendance-events', requireClubAuth, async (req, res) => {
     const filter = canManageAttendance(req.clubAccount) && isItCommitteeHead(req.clubAccount)
       ? { archivedAt: null }
       : { id: req.clubAccount.clubId, archivedAt: null };
-    const records = await Club.find(filter).select('id name events booths').sort({ name: 1 }).lean();
+    const records = await Club.find(filter).select('id name image events booths').sort({ name: 1 }).lean();
     const activities = records.flatMap((club) => ['event', 'booth'].flatMap((itemType) => {
       const items = itemType === 'event' ? club.events : club.booths;
       return (Array.isArray(items) ? items : []).flatMap((item, itemIndex) => {
@@ -2862,6 +2862,7 @@ app.get('/api/club/attendance-events', requireClubAuth, async (req, res) => {
         return [{
           clubId: club.id,
           clubName: club.name,
+          logo: club.image,
           itemType,
           eventRequestId,
           title,
@@ -4202,7 +4203,8 @@ app.get('/api/member/attendance-assignments', requireStudentAuth, async (req, re
       clubId: assignment.clubId, itemType: assignment.itemType,
       eventRequestId: assignment.eventRequestId, email: req.studentAccount.email
     }).select('eventParticipation').lean();
-    res.json([{ ...publicAssignment, id: String(_id), attendanceRecorded: Boolean(attendance), attendanceRole: attendance?.eventParticipation?.role || 'attendee' }]);
+    const club = await Club.findOne({ id: assignment.clubId, archivedAt: null }).select('image').lean();
+    res.json([{ ...publicAssignment, id: String(_id), logo: club?.image || '', logoLabel: assignment.clubName || 'MIU', attendanceRecorded: Boolean(attendance), attendanceRole: attendance?.eventParticipation?.role || 'attendee' }]);
   } catch (error) {
     console.error('Member attendance tasks could not be loaded:', error.name);
     res.status(503).json({ message: 'Could not load your club attendance tasks.' });
