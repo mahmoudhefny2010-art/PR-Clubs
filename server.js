@@ -2078,6 +2078,10 @@ function studentApplicationOwnerFilter(account) {
 }
 
 async function initializeMongoData() {
+  await require('./services/event-registration-indexes').removeLegacyPositionalUniqueIndex({
+    EventRegistration,
+    db: mongoose.connection.db
+  });
   await Promise.all([
     ...Object.values(require('./services/workflow-models')).map(model => model.init()),
     require('./services/custom-staff-role-model').CustomStaffRole.init(),
