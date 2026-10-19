@@ -11,6 +11,7 @@ window.MiuQuiz = (function () {
   const STORAGE_VERSION = 1;
   const STORAGE_KEY = 'miu:quiz:v1';
   const DISMISSED_KEY = 'miu:quiz:message-dismissed-v1';
+  const GREETING_SEEN_KEY = 'miu:quiz:greeting-seen-v1';
   const ATTEMPT_KEY = 'miu:quiz:attempt-v1';
   const PENDING_REPORT_KEY = 'miu:quiz:pending-report-v1';
   const TOTAL_QUESTIONS = questions.questions.length;
@@ -41,6 +42,7 @@ window.MiuQuiz = (function () {
 
     let launcherButton = null;
     let launcherBubble = null;
+    let showGreeting = false;
     let dialogEl = null;
     let openerElement = null;
     let stopFooterTracking = null;
@@ -171,8 +173,16 @@ window.MiuQuiz = (function () {
       if (win.addEventListener) win.addEventListener('online', flushQuizReport);
       flushQuizReport();
 
-      // Show the greeting again on each page load, including after a refresh.
-      try { storage.setItem(DISMISSED_KEY, '0'); } catch { /* ignore */ }
+      // Only the first home visit in this tab/app session plays the greeting.
+      // Other pages must not consume it before the visitor reaches home.
+      const isHomepage = win.location.pathname === '/' || win.location.pathname === '/index.html';
+      let seen = false;
+      try { seen = storage.getItem(GREETING_SEEN_KEY) === '1'; } catch { /* in-memory fallback */ }
+      showGreeting = isHomepage && !seen;
+      if (showGreeting) {
+        try { storage.setItem(GREETING_SEEN_KEY, '1'); } catch { /* ignore */ }
+      }
+      if (!showGreeting) wrapper.classList.add('quiz-launcher-quiet');
       updateMessageVisibility();
     }
 
@@ -206,7 +216,7 @@ window.MiuQuiz = (function () {
     function updateMessageVisibility() {
       let dismissed = false;
       try { dismissed = storage.getItem(DISMISSED_KEY) === '1'; } catch { /* ignore */ }
-      if (launcherBubble) launcherBubble.style.display = dismissed ? 'none' : '';
+      if (launcherBubble) launcherBubble.style.display = !showGreeting || dismissed ? 'none' : '';
     }
 
     function reportQuizPoints() {

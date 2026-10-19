@@ -137,7 +137,8 @@
     email.value = account.email;
     updateEmailRoleStatus();
     rowsHost.replaceChildren();
-    currentAssignments(account).forEach(makeAssignmentRow);
+    const editableAssignments = currentAssignments(account).filter(item => Object.hasOwn(data.roles, item.role));
+    if (editableAssignments.length) editableAssignments.forEach(makeAssignmentRow); else makeAssignmentRow();
     refreshRows();
     form.scrollIntoView({ block: 'start', behavior: 'auto' }); email.focus({ preventScroll: true });
     feedback.textContent = `Editing ${account.email}`;

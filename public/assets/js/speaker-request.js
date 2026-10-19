@@ -179,6 +179,7 @@
   }
 
   function startEdit(item) {
+    if (item.workflow) { window.location.assign(`/pages/workflow.html?kind=speaker&id=${encodeURIComponent(item.id)}`); return; }
     editingId = item.id;
     const clubSelect = form.elements.clubId;
     if (clubSelect) {

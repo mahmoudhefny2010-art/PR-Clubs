@@ -102,6 +102,8 @@ function registerStaffAccountAdmin(app, { ClubAccount, Club, databaseReady, same
         return res.status(400).json({ message: 'Select existing, active clubs.' });
       }
       const existing = await ClubAccount.findOne({ email: value.email }).read('primary').readConcern('majority').lean();
+      // Custom assignments are edited in the role builder; built-in staff edits preserve them.
+      value.roleAssignments.push(...staffRoleAssignments(existing).filter(item => require('./staff-role-keys').isCustomRole(item.role)));
       if (staffRoleAssignments(existing).some(item => item.role === 'software_development')
         && !value.roleAssignments.some(item => item.role === 'software_development')
         && await countOtherSoftwareDevelopmentAccounts(ClubAccount, value.email) < 1) {

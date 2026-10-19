@@ -18,7 +18,8 @@ async function fixture(t) {
     findSpeakerInvite:async()=>({clubId:hostId,createdByRole:'supervisor',createdByEmail:'manager@example.test',_id:'invite'}),
     speakerUploadAttempts:new Map(),validatePublicSpeakerInvitePayload:require('../services/speaker-requests').validatePublicSpeakerInvitePayload,
     Club:{findOne:()=>query({id:hostId,name:'Club'})},publicSpeakerDuplicateKey:(id,email)=>id+':'+email,
-    SpeakerRequest:{exists:async()=>false,create:async record=>{records.push(record);return record;}},console});
+    SpeakerRequest:{exists:async()=>false,create:async record=>{records.push(record);return record;}},
+    dynamicWorkflowEngine:{createNew:async(kind,record)=>{assert.equal(kind,'speaker');records.push(record);return record;}},console});
   const server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));t.after(()=>server.close());
   const request=async(path,role='supervisor',body,headers={})=>fetch('http://127.0.0.1:'+server.address().port+path,{method:body?'POST':'GET',headers:{'content-type':'application/json',...(role?{'x-role':role}:{}),...headers},...(body?{body:JSON.stringify(body)}:{})});
   return {request,writes,records,setHost:id=>hostId=id};

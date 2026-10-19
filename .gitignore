@@ -32,3 +32,6 @@ Desktop.ini
 ses_*.json
 *.bak
 *.bak.enc
+
+# Local workspace archive; may contain private configuration.
+/pr project LAST NEW.rar

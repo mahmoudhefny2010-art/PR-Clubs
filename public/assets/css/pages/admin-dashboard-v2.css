@@ -60,6 +60,31 @@ html.admin-v2-shell[data-theme="dark"] { color-scheme: dark; }
 .v2-nav button:hover { background: var(--bg-soft); color: var(--text-main); }
 .v2-nav button.is-active { background: #a92340; color: #fff; box-shadow: 0 6px 20px #0002; }
 .v2-nav svg { width: 19px; height: 19px; flex-shrink: 0; }
+.v2-nav .v2-blocked-link { display: flex; align-items: center; gap: 9px; padding: 14px 12px; border-radius: 10px; color: var(--text-muted); font-size: 12px; font-weight: 600; text-decoration: none; }
+.v2-nav .v2-blocked-link:hover, .v2-nav .v2-blocked-link[aria-current="page"] { background: var(--bg-soft); color: var(--text-main); }
+.v2-request-badge { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; min-width: 23px; height: 23px; padding-inline: 6px; margin-inline-start: auto; border-radius: 999px; background: #b91c1c; color: #fff; font-size: 11px; font-weight: 750; line-height: 1; }
+.v2-request-badge[data-badge-state="pending"] { background: #facc15; color: #422006; }
+.v2-request-badge[hidden] { display: none; }
+.v2-widget .v2-request-badge { margin-inline-start: 8px; vertical-align: middle; }
+#managementTools { scroll-margin-top: 96px; }
+#toolGroupNavigation { margin-block: 16px 8px; }
+.v2-tools-compact [data-overview-only] { display: none; }
+.v2-tools-compact #toolGroupNavigation { margin-block: 20px 12px; }
+.v2-tools-compact .v2-tools-heading { margin-top: 0; }
+.v2-excel-row-log { margin-top: 24px; }
+.v2-excel-review > *, #excelReviewPreview > * { min-width: 0; max-width: 100%; box-sizing: border-box; }
+.v2-excel-row-log { min-width: 0; width: 100%; }
+.v2-excel-log-toolbar, .v2-excel-log-pagination { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-block: 12px; }
+.v2-excel-log-toolbar label { display: grid; gap: 6px; }
+.v2-excel-log-toolbar select { min-height: 40px; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 9px; color: var(--text-main); background: var(--bg-panel); font: inherit; }
+.v2-excel-row-log td:last-child { min-width: 260px; overflow-wrap: anywhere; }
+.v2-excel-row-log .v2-excel-table th { background: var(--bg-soft); color: var(--text-main); }
+.v2-excel-row-state { display: inline-block; padding: 4px 8px; border-radius: 7px; background: var(--bg-soft); color: var(--text-main); font-size: .8rem; font-weight: 650; white-space: nowrap; }
+.v2-excel-row-state:is([data-state="inserted"], [data-state="updated"]) { background: #dcfce7; color: #166534; }
+.v2-excel-row-state:is([data-state="invalid"], [data-state="failed"], [data-state="not_imported"]) { background: #fee2e2; color: #991b1b; }
+.v2-excel-row-state[data-state="unconfirmed"] { background: #fef3c7; color: #92400e; }
+.v2-excel-row-state:is([data-state="skipped"], [data-state="undone"]) { color: var(--text-muted); }
+@media (max-width: 759px) { .v2-nav .v2-blocked-link { padding: 10px 12px; font-size: 11px; white-space: nowrap; } }
 .v2-sidebar-bottom { margin-top: auto; padding-top: 54px; display: grid; gap: 14px; }
 .v2-sidebar-bottom > a { color: var(--text-muted); text-decoration: none; padding-inline: 12px; font-size: 12px; display: flex; align-items: center; gap: 9px; }
 .v2-sidebar-bottom > a:hover { color: var(--primary-700); }

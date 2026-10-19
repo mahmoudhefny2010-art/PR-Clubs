@@ -5,7 +5,7 @@
   const dirtyKey = name => 'miu:public-dirty:' + name;
   const pending = new Map(), watchers = new Set();
   const nativeFetch = window.fetch.bind(window);
-  let source, notification;
+  let source, notification, fallbackTimer;
   const get = key => { try { return localStorage.getItem(key); } catch { return null; } };
   const set = (key, value) => { try { localStorage.setItem(key, value); } catch { /* Storage is optional. */ } };
   const memoryDirty = new Map();
@@ -24,13 +24,20 @@
     }
     notify();
   };
+  const stopFallback = () => { clearTimeout(fallbackTimer); fallbackTimer = null; };
+  const startFallback = () => {
+    if (fallbackTimer || document.visibilityState !== 'visible' || navigator.onLine === false) return;
+    invalidate();
+    fallbackTimer = setTimeout(() => { fallbackTimer = null; startFallback(); }, 30000);
+  };
   window.fetch = async (input, options = {}) => {
     const url = new URL(input instanceof Request ? input.url : input, location.href);
     const method = options.method || (input instanceof Request ? input.method : 'GET');
     const name = url.origin === location.origin && method === 'GET' ? urls[url.pathname + url.search] : null;
     if (!name) return nativeFetch(input, options);
     const saved = snapshot(name);
-    if (!dirty(name) && Array.isArray(saved)) return new Response(JSON.stringify(saved), { headers: { 'Content-Type': 'application/json' } });
+    const force = ['no-store', 'no-cache', 'reload'].includes(options.cache || (input instanceof Request ? input.cache : ''));
+    if (!force && !dirty(name) && Array.isArray(saved)) return new Response(JSON.stringify(saved), { headers: { 'Content-Type': 'application/json' } });
     if (pending.has(name)) return (await pending.get(name)).clone();
     const generation = dirty(name);
     const request = (async () => {
@@ -64,26 +71,30 @@
     if (Object.keys(keys).some(name => dirty(name))) notify();
   };
   const connect = () => {
-    if (document.visibilityState !== 'visible' || navigator.onLine === false) { source?.close(); source = null; return; }
+    if (document.visibilityState !== 'visible' || navigator.onLine === false) { source?.close(); source = null; stopFallback(); return; }
     if (!source && typeof EventSource !== 'undefined') {
       source = new EventSource('/api/site/public-data-stream?since=' + encodeURIComponent(get(tokenKey) || ''));
       source.addEventListener('invalidate', event => {
+        stopFallback();
         try { invalidate(JSON.parse(event.data).keys); } catch { invalidate(); }
         if (event.lastEventId) set(tokenKey, event.lastEventId);
       });
       source.addEventListener('ready', event => {
+        stopFallback();
         if (event.lastEventId) set(tokenKey, event.lastEventId);
         // A failed fetch remains dirty and is retried on the next connection.
         if (Object.keys(keys).some(name => dirty(name))) notify();
       });
+      source.addEventListener('error', startFallback);
     }
+    if (typeof EventSource === 'undefined') startFallback();
     notify();
   };
   window.miuLiveData = { watch, invalidate };
   document.addEventListener('visibilitychange', connect);
   window.addEventListener('online', connect);
   window.addEventListener('offline', connect);
-  window.addEventListener('pagehide', () => { source?.close(); source = null; });
+  window.addEventListener('pagehide', () => { source?.close(); source = null; stopFallback(); });
   window.addEventListener('pageshow', connect);
   window.addEventListener('storage', event => {
     if (Object.values(keys).includes(event.key) || event.key?.startsWith('miu:public-dirty:')) {

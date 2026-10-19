@@ -46,6 +46,8 @@
   const icon = name => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || paths.grid}</svg>`;
   const categories = { staff: 'Staff & access', website: 'Website & clubs', people: 'People & access', attendance: 'Events & attendance', insights: 'Insights & system' };
   const tools = window.adminDashboardTools;
+  const toolGroups = tools.groups || [];
+  let selectedGroup = toolGroups.find(group => group.key === new URLSearchParams(location.search).get('group')) || null;
   const activeTool = document.body.dataset.tool;
   const specialized = new Set(['staff', 'supervisors', 'publishing', 'miu-attendance', 'reports', 'attendance', 'open-attendance']);
   const route = id => '/admin/' + id;
@@ -72,18 +74,70 @@
   }
   const read = url => request(url);
   const invalidate = () => window.adminDashboardData.invalidate();
+  let blockedSnapshot = { total: 0, keys: [] }, blockedSeen = new Set(), blockedStorageKey, blockedGeneration = 0, blockedOpened = false;
+  const blockedReady = window.adminDashboardData.ready.then(state => {
+    blockedStorageKey = 'miu:admin-blocked-seen:' + state.cacheKey;
+    try { const saved = JSON.parse(localStorage.getItem(blockedStorageKey) || '[]'); if (Array.isArray(saved)) blockedSeen = new Set(saved.filter(key => typeof key === 'string')); } catch { /* Badges also work without browser storage. */ }
+  });
+  function paintBlockedBadge() {
+    const hasNew = blockedSnapshot.keys.some(key => !blockedSeen.has(key));
+    for (const badge of document.querySelectorAll('[data-blocked-badge]')) {
+      badge.hidden = blockedSnapshot.total === 0;
+      badge.textContent = blockedSnapshot.total > 99 ? '99+' : String(blockedSnapshot.total);
+      badge.dataset.badgeState = hasNew ? 'new' : 'pending';
+      badge.setAttribute('aria-label', `${blockedSnapshot.total} blocked requests${hasNew ? ', new requests available' : ', viewed and awaiting review'}`);
+      badge.title = badge.getAttribute('aria-label');
+    }
+  }
+  async function refreshBlockedBadge() {
+    const generation = ++blockedGeneration;
+    try {
+      await blockedReady;
+      const data = await request('/api/admin/workflows/blocked?summary=1', { siteStartupNonBlocking: true });
+      if (generation !== blockedGeneration || !Array.isArray(data.keys) || !Number.isSafeInteger(data.total) || data.total < 0) return;
+      blockedSnapshot = { total: data.total, keys: data.keys }; paintBlockedBadge();
+    } catch { /* Retain the last confirmed count during a connection failure. */ }
+  }
+  document.addEventListener('miu:blocked-inbox-loaded', async event => {
+    if (activeTool !== 'blocked-requests' || !Array.isArray(event.detail?.keys)) return;
+    try {
+      await blockedReady;
+      if (!blockedOpened || event.detail.markSeen) {
+        blockedOpened = true;
+        blockedSeen = new Set(event.detail.keys.filter(key => typeof key === 'string'));
+        try { localStorage.setItem(blockedStorageKey, JSON.stringify([...blockedSeen])); } catch { /* Keep seen state for this page if storage is unavailable. */ }
+      }
+      blockedSnapshot = { total: event.detail.total, keys: event.detail.keys }; paintBlockedBadge();
+      void refreshBlockedBadge();
+    } catch { /* Session verification must succeed before storing seen state. */ }
+  });
+  window.addEventListener('storage', event => {
+    if (event.key !== blockedStorageKey) return;
+    try { const saved = JSON.parse(event.newValue || '[]'); if (Array.isArray(saved)) { blockedSeen = new Set(saved); paintBlockedBadge(); } } catch { /* Ignore malformed storage updates. */ }
+  });
   function feedback(id, message = '', error = false) { $(id).textContent = message; $(id).classList.toggle('is-error', error); }
   function renderTools() {
     const query = $('toolSearch').value.trim().toLowerCase();
-    const visible = (window.adminDashboardLayout?.sortTools(tools) || tools).filter(tool => (category === 'all' || category === tool.category)
-      && `${tool.title} ${tool.description} ${categories[tool.category]}`.toLowerCase().includes(query));
+    const matchesCategory = tool => category === 'all' || category === tool.category;
+    const grouped = !query && !selectedGroup;
+    document.body.classList.toggle('v2-tools-compact', !activeTool && !grouped);
+    const candidates = grouped
+      ? toolGroups.map(group => ({ ...group, matchingTools: group.toolIds.map(id => tools.find(tool => tool.id === id)).filter(matchesCategory) })).filter(group => group.matchingTools.length)
+      : tools.filter(tool => matchesCategory(tool) && (query ? `${tool.title} ${tool.description} ${categories[tool.category]}`.toLowerCase().includes(query) : selectedGroup.toolIds.includes(tool.id)));
+    const visible = window.adminDashboardLayout?.sortTools(candidates) || candidates;
     $('widgetGrid').innerHTML = visible.map(tool => {
-      const attrs = `href="${route(tool.id)}" data-tool="${tool.id}"`;
+      const href = grouped ? `/admin?group=${tool.key}${category !== 'all' ? '&category=' + category : ''}#managementTools` : route(tool.id);
+      const attrs = `href="${href}" data-tool="${tool.id}"${grouped ? ` data-tool-group="${tool.key}"` : ''}`;
       const tag = 'a';
-      return `<${tag} class="v2-widget ${tool.color}" ${attrs}><span class="v2-widget-top"><span class="v2-widget-icon">${icon(tool.symbol)}</span><span class="v2-widget-arrow">${icon('arrow')}</span></span><h3>${tool.title}</h3><p>${tool.description}</p><span class="v2-widget-label">${categories[tool.category]}</span></${tag}>`;
+      const hasBlockedBadge = tool.id === 'blocked-requests' || grouped && tool.toolIds.includes('blocked-requests');
+      return `<${tag} class="v2-widget ${tool.color}" ${attrs}><span class="v2-widget-top"><span class="v2-widget-icon">${icon(tool.symbol)}</span><span class="v2-widget-arrow">${icon('arrow')}</span></span><h3>${tool.title}${hasBlockedBadge ? '<span class="v2-request-badge" data-blocked-badge hidden></span>' : ''}</h3><p>${tool.description}</p><span class="v2-widget-label">${grouped ? tool.matchingTools.length + ' tools · ' : ''}${categories[category !== 'all' ? category : tool.category]}</span></${tag}>`;
     }).join('');
     $('emptyTools').hidden = visible.length > 0;
-    $('toolsCount').textContent = `${visible.length} ${visible.length === 1 ? 'tool' : 'tools'} · Choose what you want to manage.`;
+    paintBlockedBadge();
+    $('toolsHeading').textContent = query ? 'Search results' : selectedGroup?.title || 'Management tools';
+    $('toolGroupNavigation').hidden = !selectedGroup && !query;
+    $('toolGroupBack').href = '/admin' + (category !== 'all' ? '?category=' + category : '') + '#managementTools';
+    $('toolsCount').textContent = grouped ? `${visible.length} groups · ${candidates.reduce((total, group) => total + group.matchingTools.length, 0)} tools · Choose a group.` : `${visible.length} ${visible.length === 1 ? 'tool' : 'tools'} · Choose what you want to manage.`;
     document.querySelectorAll('[data-category]').forEach(button => {
       const active = button.dataset.category === category;
       button.classList.toggle('is-active', active); button.setAttribute('aria-pressed', String(active));
@@ -128,7 +182,13 @@
     try {
       const data = urls[id] ? await read(urls[id]) : null;
       if (version !== panelVersion) return;
-      if (id === 'homepage') {
+      if (id === 'custom-roles') {
+        await window.MiuCustomRoles.mount($('toolContent'));
+      } else if (id === 'workflows') {
+        await window.MiuWorkflow.mountAdmin($('toolContent'));
+      } else if (id === 'blocked-requests') {
+        await window.MiuWorkflow.blockedRequests($('toolContent'));
+      } else if (id === 'homepage') {
         $('toolContent').innerHTML = `<form class="v2-form" id="homepageForm"><label>Welcome title<input name="title" maxlength="100" required value="${escape(data.title)}"></label><label>Introduction<textarea name="subtitle" maxlength="240" required>${escape(data.subtitle)}</textarea></label><button class="v2-action" type="submit">Save homepage</button></form>`;
         $('homepageForm').addEventListener('submit', event => saveForm(event, async form => {
           const saved = await request(urls.homepage, { method: 'PUT', body: JSON.stringify({ title: form.elements.title.value.trim(), subtitle: form.elements.subtitle.value.trim() }) });
@@ -278,13 +338,14 @@
     const form = event.target.form;
     if (form) form.dataset.v2EditVersion = String(Number(form.dataset.v2EditVersion || 0) + 1);
   }, true);
-  document.querySelectorAll('.v2-quick-nav a').forEach(anchor => {
+  document.querySelectorAll('.v2-quick-nav a, .v2-blocked-link').forEach(anchor => {
     if (new URL(anchor.href).pathname === location.pathname) anchor.setAttribute('aria-current', 'page');
   });
   document.querySelectorAll('[data-category]').forEach(button => button.addEventListener('click', () => {
     category = button.dataset.category;
     if (activeTool) { location.assign('/admin?category=' + category); return; }
-    const url = new URL(location.href); url.searchParams.set('category', category); history.replaceState(history.state, '', url);
+    selectedGroup = null;
+    const url = new URL(location.href); url.searchParams.set('category', category); url.searchParams.delete('group'); history.replaceState(history.state, '', url);
     renderTools();
   }));
   $('toolSearch').addEventListener('input', renderTools);
@@ -321,6 +382,7 @@
   $('refreshTool').addEventListener('click', () => refreshData(true));
   $('applyUpdates').addEventListener('click', () => refreshData(true));
   window.adminDashboardData.watch(({ keys, local }) => {
+    if (local || keys?.includes('blocked-requests')) void refreshBlockedBadge();
     if (local) return;
     if (activeTool && !keys.includes(activeTool) && !(keys.includes('reports') && specialized.has(activeTool))) return;
     if (!activeTool && !keys.some(key => ['clubs', 'applications', 'heads'].includes(key))) return;
@@ -328,6 +390,10 @@
   });
   window.addEventListener('online', () => { if (!activeTool || !specialized.has(activeTool)) void refreshData(); });
   renderTools();
+  void refreshBlockedBadge();
+  window.addEventListener('online', refreshBlockedBadge);
+  window.addEventListener('focus', () => void refreshBlockedBadge());
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') void refreshBlockedBadge(); });
   const initial = activeTool ? showTool(activeTool) : overview();
   async function loadIdentity() {
     const results = await Promise.allSettled([

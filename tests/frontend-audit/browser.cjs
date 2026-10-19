@@ -107,6 +107,8 @@ if (process.argv.includes('--all-pages')) {
   }
 }
 const extras = [
+  { name: 'account-menu-custom-role', url: '/', action: "document.getElementById('headerStudentProfileTrigger').click()", expect: "!document.getElementById('headerStudentProfileMenu').hidden && document.getElementById('headerAccountDashboardLink').hidden && document.querySelector('#headerDashboardChoiceList button').textContent==='Activities Review Team' && document.getElementById('headerStudentProfileLink').getAttribute('href')==='/dashboards/custom-role.html?role=custom_review'" },
+  { name: 'account-menu-multi-student', url: '/', action: "document.getElementById('headerStudentProfileTrigger').click()", expect: "document.getElementById('headerAccountDashboardLink').hidden && !document.getElementById('headerDashboardChoices').hidden && document.querySelectorAll('#headerDashboardChoiceList button').length===12 && [...document.querySelectorAll('#headerDashboardChoiceList button')].filter(button=>button.textContent==='My Dashboard').length===1" },
   { name: 'account-menu-visible', url: '/', action: "document.getElementById('headerStudentProfileTrigger').click()", expect: "(() => { const menu=document.getElementById('headerStudentProfileDropdown'), email=document.getElementById('headerStudentName'), options=document.querySelectorAll('#headerDashboardChoiceList button'), logout=document.getElementById('headerStudentSignoutBtn'); const r=menu.getBoundingClientRect(); if(menu.hidden || r.left<0 || r.right>innerWidth || r.bottom>innerHeight || options.length!==11 || getComputedStyle(email).whiteSpace==='nowrap' || email.scrollWidth>email.clientWidth+1)return false; menu.scrollTop=menu.scrollHeight; const end=logout.getBoundingClientRect(); const accessible=end.bottom<=r.bottom && end.top>=r.top; menu.scrollTop=0; return accessible; })()" },
   { name: 'account-menu-student-dashboard', url: '/', action: "document.getElementById('headerStudentProfileTrigger').click(); document.getElementById('headerStudentProfileLink').click()", expect: "location.pathname==='/' && new URLSearchParams(location.search).get('myForms')==='1' && !document.getElementById('myFormsView').classList.contains('hidden')" },
   ...Object.entries({ admin: '/admin', software_development: '/admin', president: '/club-dashboard', vice_president: '/club-dashboard', head: '/club-dashboard', supervisor: '/dashboards/supervisor-dashboard.html', pr: '/dashboards/pr-dashboard.html', english: '/dashboards/english-dashboard.html', security: '/dashboards/security-dashboard.html', sso: '/dashboards/sso-dashboard.html', dean: '/dashboards/dean-dashboard.html', miu_events: '/dashboards/miu-events-dashboard.html' }).map(([role, href]) => ({
@@ -144,7 +146,69 @@ const extras = [
   { name: 'event-required-validation', url: '/pages/event-form.html', action: "document.getElementById('contentForm').requestSubmit()", expect: "!document.getElementById('titleInput').checkValidity()", dismissNativeValidation: true },
   { name: 'theme-toggle', url: '/pages/event-form.html', action: "document.querySelector('.site-theme-toggle').click()", expect: "localStorage.getItem('miu-site-theme')===document.documentElement.dataset.theme" },
 ];
-const viewports = quick ? [{ name: 'desktop', width: 1366, height: 900 }] : [{ name: 'desktop', width: 1366, height: 900 }, { name: 'mobile', width: 390, height: 844 }];
+const viewports = process.argv.includes('--sidebar-viewports') ? [
+  { name: 'small-mobile', width: 320, height: 568 }, { name: 'mobile-375', width: 375, height: 812 },
+  { name: 'mobile-390', width: 390, height: 844 }, { name: 'tablet', width: 768, height: 1024 },
+  { name: 'desktop', width: 1366, height: 768 }, { name: 'short-mobile', width: 568, height: 320 }
+] : process.argv.includes('--narrow') ? [{ name: 'narrow', width: 320, height: 720 }]
+  : quick ? [{ name: 'desktop', width: 1366, height: 900 }] : [{ name: 'desktop', width: 1366, height: 900 }, { name: 'mobile', width: 390, height: 844 }];
+for (const section of ['feed', 'events', 'sponsors', 'booths']) {
+  const id = { feed: 'communityFeedList', events: 'eventsList', sponsors: 'sponsorsList', booths: 'boothsList' }[section];
+  extras.push({ name: `pagination-${section}-page-two`, url: `/pages/${section}.html`,
+    action: `new Promise((resolve,reject)=>{document.querySelector('.content-pagination button:last-child').click();const start=Date.now();const timer=setInterval(()=>{if(document.querySelector('.content-pagination [aria-current="page"]')?.textContent==='2'){clearInterval(timer);resolve()}else if(Date.now()-start>4000){clearInterval(timer);reject(Error('Page two did not load'))}},25)})`,
+    expect: `document.getElementById('${id}').innerText.includes('Pagination item ${section === 'events' || section === 'sponsors' ? 9 : 11}') && document.querySelector('.content-pagination [aria-current="page"]').textContent==='2' && document.querySelector('.content-pagination').getBoundingClientRect().right <= innerWidth && document.documentElement.scrollWidth <= innerWidth ${section === 'events' ? "&& !document.getElementById('feedTimelineSection') && document.querySelectorAll('.content-pagination').length===1 && !document.body.innerText.includes('Latest Club Updates')" : ''}`
+  });
+}
+extras.push({ name: 'pagination-feed-filter-reset', url: '/pages/feed.html?feedPage=2',
+  action: `new Promise((resolve,reject)=>{document.querySelector('[data-filter="announcements"]').click();const timer=setInterval(()=>{if(document.querySelector('.content-pagination').hidden){clearInterval(timer);resolve()}},25);setTimeout(()=>{clearInterval(timer);reject(Error('Filter did not reset pagination'))},4000)})`,
+  expect: `document.querySelector('.content-pagination').hidden && document.getElementById('communityFeedList').children.length===3 && !location.search.includes('feedPage=2')`
+});
+extras.push({ name: 'pagination-feed-empty', url: '/pages/feed.html', expect: `document.querySelector('.content-pagination').hidden && document.getElementById('communityFeedList').children.length===0 && !document.getElementById('communityFeedStatus').hidden` });
+extras.push({ name: 'pagination-feed-single', url: '/pages/feed.html', expect: `document.querySelector('.content-pagination').hidden && document.getElementById('communityFeedList').children.length===3` });
+const changeUniversity = `await fetch('/api/miu-events/content/702',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:'Updated MIU event',description:'Updated university details',date:'2026-10-09',time:'16:15',location:'Hall B'})});window.miuLiveData.invalidate(['universityContent']);`;
+for (const [name, url] of [['miu-sidebar-layout', '/dashboards/miu-events-dashboard.html'], ['pr-sidebar-layout', '/dashboards/pr-dashboard.html']]) extras.push({ name, url,
+  action: `window.__sidebarMetrics=(()=>{const s=document.querySelector('.committee-sidebar'),c=getComputedStyle(s),r=s.getBoundingClientRect();return {width:r.width,height:r.height,position:c.position,display:c.display,font:c.fontFamily,fontSize:c.fontSize,color:c.color,background:c.backgroundColor,padding:c.padding,borderRadius:c.borderRadius,links:[...s.querySelectorAll('a')].map(a=>[a.textContent.trim(),a.getAttribute('href')]),drawer:!!document.querySelector('.dashboard-drawer-toggle')}})()`
+});
+for (const [name, url] of [['miu-sidebar-contract', '/dashboards/miu-events-dashboard.html'], ['pr-sidebar-contract', '/dashboards/pr-dashboard.html']]) extras.push({ name, url,
+  action: require('./sidebar-checks.cjs').action, expect: 'window.__sidebarTestPassed===true'
+});
+const waitUniversity = condition => `const started=performance.now();while(!(${condition})){if(performance.now()-started>4000)throw Error('University view did not refresh: '+(document.getElementById('universityPostMessage')?.textContent||''));await new Promise(resolve=>setTimeout(resolve,30));}`;
+extras.push({ name: 'miu-sync-home', url: '/',
+  action: `(async()=>{${changeUniversity}${waitUniversity("document.querySelector('#todayEvents a[href=\"/pages/event.html?university=702\"]')")}document.querySelector('#todayEvents a[href="/pages/event.html?university=702"]').click()})()`,
+  expect: `!document.getElementById('eventModal').classList.contains('hidden') && document.getElementById('eventModalTitle').textContent==='Updated MIU event' && document.getElementById('eventModalClub').textContent==='Misr International University' && document.getElementById('eventModalDescription').textContent.includes('Updated university details')`
+});
+extras.push({ name: 'miu-sync-detail', url: '/pages/event.html?university=702',
+  action: `(async()=>{${changeUniversity}${waitUniversity("document.getElementById('eventPageDescription').textContent==='Updated university details'")}})()`,
+  expect: `document.getElementById('eventPageTitle').textContent==='Updated MIU event' && document.getElementById('eventPageClub').textContent==='Misr International University' && document.getElementById('eventPageMeta').textContent.includes('Hall B') && !document.getElementById('eventPageContent').hidden`
+});
+for (const section of ['feed', 'events']) {
+  const list = section === 'feed' ? 'communityFeedList' : 'eventsList';
+  extras.push({ name: `miu-sync-${section}`, url: `/pages/${section}.html`,
+    action: `(async()=>{${changeUniversity}${waitUniversity(`document.getElementById('${list}').innerText.includes('Updated MIU event')`)}})()`,
+    expect: `document.getElementById('${list}').textContent.includes('Misr International University') && document.getElementById('${list}').innerText.includes('Campus workshop') && document.getElementById('${list}').innerText.split('Updated MIU event').length===2`
+  });
+}
+extras.push({ name: 'miu-sync-dashboard-edit', url: '/dashboards/miu-events-dashboard.html#miuEventsPanel',
+  action: `(async()=>{document.querySelector('[data-dashboard-panel="miuEventsPanel"]').click();document.querySelector('[data-edit-university-post="702"]').click();document.getElementById('universityPostDescription').value='Edited through MIU dashboard';document.getElementById('universityPostTime').value='16:15';document.getElementById('universityPostForm').requestSubmit();${waitUniversity("document.getElementById('universityPostRecords').innerText.includes('Edited through MIU dashboard')")}})()`,
+  expect: `document.getElementById('miuEventsCount').textContent==='2' && !document.getElementById('universityPostType').disabled && document.getElementById('universityPostRecords').innerText.includes('Misr International University')`
+});
+extras.push({ name: 'miu-sync-dashboard-create', url: '/dashboards/miu-events-dashboard.html#miuEventsPanel',
+  action: `(async()=>{document.querySelector('[data-dashboard-panel="miuEventsPanel"]').click();document.getElementById('universityPostTitle').value='New MIU event';document.getElementById('universityPostDescription').value='New university event details';document.getElementById('universityPostAudience').value='all_students';document.getElementById('universityPostDate').value='2030-10-20';document.getElementById('universityPostForm').requestSubmit();${waitUniversity("document.getElementById('universityPostRecords').innerText.includes('New MIU event')")}})()`,
+  expect: `document.getElementById('miuEventsCount').textContent==='3' && document.getElementById('universityPostRecords').innerText.split('New MIU event').length===2`
+});
+for (const section of ['feed', 'events', 'sponsors', 'booths']) {
+  const modal = section === 'sponsors' ? 'sponsorDetail' : section === 'booths' ? 'boothDetail' : 'eventModal';
+  const trigger = section === 'feed' ? '[data-feed-event]' : section === 'events' ? '[data-event-open]' : `.${section === 'sponsors' ? 'sponsor' : 'booth'}-timeline-item`;
+  const title = section === 'events' || section === 'sponsors' ? 9 : 11;
+  extras.push({ name: `pagination-${section}-details`, url: `/pages/${section}.html?${section}Page=2`,
+    action: `new Promise((resolve,reject)=>{document.querySelector('${trigger}').click();const start=Date.now();const timer=setInterval(()=>{if(!document.getElementById('${modal}').classList.contains('hidden')){clearInterval(timer);resolve()}else if(Date.now()-start>4000){clearInterval(timer);reject(Error('Details did not open'))}},25)})`,
+    expect: `!document.getElementById('${modal}').classList.contains('hidden') && document.getElementById('${modal}').innerText.includes('Pagination item ${title}')`
+  });
+  extras.push({ name: `pagination-${section}-last-page`, url: `/pages/${section}.html?${section}Page=999`,
+    action: `document.querySelector('.content-pagination').scrollIntoView({block:'end',behavior:'instant'})`,
+    expect: `document.querySelector('.content-pagination button:last-child').disabled && document.querySelector('.content-pagination [aria-current="page"]') && document.querySelector('.content-pagination').getBoundingClientRect().right<=innerWidth && document.documentElement.scrollWidth<=innerWidth`
+  });
+}
 
 async function main() {
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -171,8 +235,24 @@ async function main() {
       const command = local ? client.send('Fetch.continueRequest', { requestId }) : client.send('Fetch.fulfillRequest', { requestId, responseCode: 200, responseHeaders: [{ name: 'Content-Type', value: resourceType === 'Stylesheet' ? 'text/css' : 'application/javascript' }], body: '' });
       command.catch(() => {});
     });
-    let exceptions = [];
+    let exceptions = [], consoleIssues = [], expectedConsoleIssues = [];
     client.on('Runtime.exceptionThrown', ({ exceptionDetails }) => exceptions.push((exceptionDetails.exception?.description || exceptionDetails.text).split('\n')[0]));
+    client.on('Runtime.consoleAPICalled', ({ type, args }) => {
+      if (['error', 'warning'].includes(type)) consoleIssues.push(`${type}: ${args.map(arg => arg.value ?? arg.description ?? '').join(' ')}`);
+    });
+    await client.send('Log.enable');
+    client.on('Log.entryAdded', ({ entry }) => {
+      if (!['error', 'warning'].includes(entry.level)) return;
+      const issue = `${entry.level}: ${entry.text}${entry.url ? ` (${entry.url})` : ''}`;
+      // The existing isolated fixtures explicitly reject workflow context without
+      // a workflow session. Keep that exact network diagnostic in the report;
+      // all other console errors (including other 401s) remain failures.
+      const expectedWorkflowDenial = entry.source === 'network'
+        && entry.url === `${origin}/api/workflow/context`
+        && entry.text === 'Failed to load resource: the server responded with a status of 401 (Unauthorized)'
+        && respond(new URL(entry.url), 'GET', '', null, activeScenario)?.[0] === 401;
+      (expectedWorkflowDenial ? expectedConsoleIssues : consoleIssues).push(issue);
+    });
     const merge = process.argv.includes('--merge');
     const previousResultsFile = path.join(output, 'results.json');
     const previousRun = merge && fs.existsSync(previousResultsFile) ? JSON.parse(fs.readFileSync(previousResultsFile, 'utf8')) : null;
@@ -193,7 +273,7 @@ async function main() {
       activeScenario = scenario.name;
       resetFixtures();
       const key = `${scenario.name}-${viewport.name}-${theme}`;
-      exceptions = []; serverRequests.length = 0;
+      exceptions = []; consoleIssues = []; expectedConsoleIssues = []; serverRequests.length = 0;
       await client.send('Emulation.setDeviceMetricsOverride', { width: viewport.width, height: viewport.height, deviceScaleFactor: 1, mobile: false });
       if (injection) await client.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: injection });
       ({ identifier: injection } = await client.send('Page.addScriptToEvaluateOnNewDocument', { source: `localStorage.clear(); ${settled ? 'sessionStorage.clear();' : ''} localStorage.setItem('miu-site-theme',${JSON.stringify(theme)}); const AuditDate=Date; window.Date=class extends AuditDate{constructor(...args){super(...(args.length?args:['2026-10-09T08:00:00.000Z']))}static now(){return 1791532800000}}; document.addEventListener('DOMContentLoaded',()=>{const s=document.createElement('style');s.textContent='*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}';document.head.append(s)});` }));
@@ -210,7 +290,11 @@ async function main() {
         await client.evaluate("Promise.all([...document.images].filter(image=>image.complete).map(image=>image.decode().catch(()=>{})))");
         await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 0, y: 0 });
       }
-      if (scenario.expect) assert.equal(await client.evaluate(scenario.expect), true, `Interaction failed: ${key}`);
+      if (scenario.expect) {
+        const passed = await client.evaluate(scenario.expect);
+        if (!passed && scenario.name.startsWith('miu-sync-')) console.log(await client.evaluate("document.querySelector('main').innerText.slice(0,2500)"));
+        assert.equal(passed, true, `Interaction failed: ${key}`);
+      }
       if (scenario.backForward) {
         await client.evaluate('history.back()');
         for (let i = 0; i < 40 && await client.evaluate("location.pathname!=='/'").catch(() => true); i++) await sleep(50);
@@ -230,12 +314,12 @@ async function main() {
       await client.evaluate(`new Promise((resolve,reject)=>{let last='',stable=0;const start=performance.now();function frame(){const positions=JSON.stringify([window.scrollX,window.scrollY,...[...document.querySelectorAll('*')].filter(e=>e.scrollHeight>e.clientHeight||e.scrollWidth>e.clientWidth).map(e=>[e.scrollLeft,e.scrollTop])]);stable=positions===last?stable+1:0;last=positions;if(stable>=8)return resolve();if(performance.now()-start>3000)return reject(new Error('Scroll positions did not settle'));requestAnimationFrame(frame)}requestAnimationFrame(frame)})`);
       const state = await client.evaluate(`(() => {
         const props=['display','color','backgroundColor','fontFamily','fontSize','fontWeight','lineHeight','borderRadius','borderColor','padding','margin','gap','gridTemplateColumns','textAlign','opacity','visibility'];
-        return {title:document.title,theme:document.documentElement.dataset.theme,text:document.body.innerText,elements:[...document.body.querySelectorAll('*')].filter(el=>!['SCRIPT','STYLE','LINK'].includes(el.tagName)).map(el=>{const r=el.getBoundingClientRect();if(!r.width&&!r.height)return null;const s=getComputedStyle(el);return [el.tagName,el.id,el.getAttribute('class'),[r.x,r.y,r.width,r.height].map(n=>Math.round(n*100)/100),props.map(p=>s[p]),el instanceof HTMLInputElement?{value:el.value,checked:el.checked,disabled:el.disabled}:null]}).filter(Boolean)};
+        return {title:document.title,theme:document.documentElement.dataset.theme,text:document.body.innerText,sidebarCheck:window.__sidebarCheck,sidebarMetrics:window.__sidebarMetrics,elements:[...document.body.querySelectorAll('*')].filter(el=>!['SCRIPT','STYLE','LINK'].includes(el.tagName)).map(el=>{const r=el.getBoundingClientRect();if(!r.width&&!r.height)return null;const s=getComputedStyle(el);return [el.tagName,el.id,el.getAttribute('class'),[r.x,r.y,r.width,r.height].map(n=>Math.round(n*100)/100),props.map(p=>s[p]),el instanceof HTMLInputElement?{value:el.value,checked:el.checked,disabled:el.disabled}:null]}).filter(Boolean)};
       })()`);
       const image = await client.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false, fromSurface: true });
       const png = Buffer.from(image.data, 'base64');
       fs.writeFileSync(path.join(output, key + '.png'), png);
-      const record = { key, pixel: pixels(png), stateHash: sha(JSON.stringify(state)), exceptions: [...new Set(exceptions)].sort(), api: [...serverRequests].map((r) => JSON.stringify(r)).sort() };
+      const record = { key, pixel: pixels(png), stateHash: sha(JSON.stringify(state)), exceptions: [...new Set(exceptions)].sort(), consoleIssues: scenario.name.includes('sidebar') ? [...new Set(consoleIssues)].sort() : undefined, expectedConsoleIssues: scenario.name.includes('sidebar') ? [...new Set(expectedConsoleIssues)].sort() : undefined, api: [...serverRequests].map((r) => JSON.stringify(r)).sort() };
       fs.writeFileSync(path.join(output, key + '.json'), JSON.stringify(state));
       if (expected && !process.argv.includes('--no-baseline')) {
         const before = expected.results.find((r) => r.key === key);
@@ -254,8 +338,8 @@ async function main() {
       if (capturedInRun.length % 10 === 0) console.log(`${stage}: ${capturedInRun.length} browser scenarios captured`);
     }
     const failures = results.filter((r) => r.matches && Object.values(r.matches).some((v) => !v));
-    console.log(JSON.stringify({ stage, scenarios: results.length, capturedInRun: capturedInRun.length, merged: merge, missingFixtures: [...missing], exceptions: results.filter((r) => r.exceptions.length).map((r) => ({ key: r.key, exceptions: r.exceptions })), mismatches: failures.map((r) => ({ key: r.key, matches: r.matches })) }, null, 2));
-    if (failures.length || missing.size) process.exitCode = 1;
+    console.log(JSON.stringify({ stage, scenarios: results.length, capturedInRun: capturedInRun.length, merged: merge, missingFixtures: [...missing], exceptions: results.filter((r) => r.exceptions.length).map((r) => ({ key: r.key, exceptions: r.exceptions })), consoleIssues: results.filter(r => r.consoleIssues?.length).map(r => ({ key: r.key, issues: r.consoleIssues })), expectedConsoleIssues: results.reduce((total, r) => total + (r.expectedConsoleIssues?.length || 0), 0), mismatches: failures.map((r) => ({ key: r.key, matches: r.matches })) }, null, 2));
+    if (failures.length || missing.size || results.some(r => r.consoleIssues?.length)) process.exitCode = 1;
   } finally {
     client?.close(); browser.kill(); server.close();
   }

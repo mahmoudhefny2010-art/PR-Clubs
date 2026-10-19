@@ -47,7 +47,8 @@ test('MIU events content API is isolated to the assigned role and handles databa
 test('MIU event registration list is protected and groups registrations under their event', async t => {
   const { request } = await fixture(t, { registrations: [
     { eventIndex: 17, eventRequestId: 17, eventTitle: 'Welcome', name: 'Student One', email: 'one@miuegypt.edu.eg', createdAt: '2026-10-01T10:00:00.000Z' },
-    { eventIndex: 18, eventRequestId: 18, eventTitle: 'Old Other title', name: 'Wrong Event', email: 'wrong@miuegypt.edu.eg' }
+    { eventIndex: 18, eventRequestId: 18, eventTitle: 'Old Other title', name: 'Returning Student', email: 'returning@miuegypt.edu.eg' },
+    { eventIndex: 18, eventRequestId: 999, eventTitle: 'Other', name: 'Wrong Event', email: 'wrong@miuegypt.edu.eg' }
   ], model: { find: () => query([
     { id: 17, type: 'event', registrationEnabled: true, title: 'Welcome', date: '2026-10-22' },
     { id: 18, type: 'event', registrationEnabled: true, title: 'Other' }
@@ -57,7 +58,7 @@ test('MIU event registration list is protected and groups registrations under th
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), [
     { id: 17, title: 'Welcome', date: '2026-10-22', time: '', location: '', registrations: [{ name: 'Student One', email: 'one@miuegypt.edu.eg', registeredAt: '2026-10-01T10:00:00.000Z' }] },
-    { id: 18, title: 'Other', date: '', time: '', location: '', registrations: [] }
+    { id: 18, title: 'Other', date: '', time: '', location: '', registrations: [{ name: 'Returning Student', email: 'returning@miuegypt.edu.eg' }] }
   ]);
 });
 

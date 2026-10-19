@@ -71,7 +71,7 @@ const ContentStudio = (() => {
         ${item.clubNotice ? `<details class="content-review-update"><summary title="Open the full review update">Review update</summary><p>${escapeHtml(item.clubNotice)}</p></details>` : ''}
         ${activeComment ? `<section class="review-comments" style="margin-top:10px"><strong>Active comment</strong><p class="meta" style="margin:5px 0;white-space:pre-wrap"><strong>${reviewerNames[activeComment.role]}:</strong> ${escapeHtml(activeComment.text)}</p></section>` : ''}
         <div class="content-task-actions">
-          ${accountRole === 'head'
+          ${item.workflow ? `<a class="primary-btn" href="/pages/workflow.html?kind=content&id=${Number(item.id)}">Open approval request</a>` : accountRole === 'head'
             ? `<a class="mini-btn" href="/pages/${escapeHtml(item.type.replace('_', '-'))}-form.html?edit=${Number(item.id)}">Open assigned task</a>`
             : `${['draft', 'changes_requested', 'rejected'].includes(item.status) ? `<button class="mini-btn" data-edit="${item.id}">Edit</button><button class="mini-btn" data-submit="${item.id}">Submit</button>` : ''}
               ${item.status !== 'deleted' ? `<button class="mini-btn" data-delete="${item.id}">Delete</button>` : ''}
@@ -202,6 +202,7 @@ const ContentStudio = (() => {
         if (!res.ok) throw new Error(items.message || 'Could not load this content.');
         const item = items.find((entry) => entry.id === id);
         if (!item || (type && item.type !== type)) throw new Error('This content could not be found.');
+        if (item.workflow) { window.location.assign(`/pages/workflow.html?kind=content&id=${Number(item.id)}`); return; }
         editingId = id;
         renderHeadAssignment(item);
         if (accountRole === 'head' && contentFormPanel) contentFormPanel.classList.remove('hidden');

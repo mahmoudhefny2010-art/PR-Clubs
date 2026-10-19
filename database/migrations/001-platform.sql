@@ -111,7 +111,6 @@ CREATE TABLE [dbo].[ClubAccount] (
   [_version] BIGINT NOT NULL DEFAULT 0,
   CONSTRAINT [PK_ClubAccount] PRIMARY KEY ([_id]),
   [_has_googleSub] BIT NOT NULL,
-  CHECK ([role] IS NULL OR [role] IN (N'president', N'vice_president', N'head', N'pr', N'english', N'security', N'sso', N'dean', N'supervisor', N'miu_events', N'software_development')),
   CHECK ([_id] IS NULL OR (LEN([_id]) = 24 AND [_id] NOT LIKE '%[^0-9a-f]%'))
 );
 CREATE UNIQUE NONCLUSTERED INDEX [IX_ClubAccount_0_b9890c] ON [dbo].[ClubAccount] ([googleSub] ASC) WHERE ([_has_googleSub] = 1);
@@ -458,6 +457,26 @@ CREATE UNIQUE NONCLUSTERED INDEX [IX_ContentRequest_0_037c92] ON [dbo].[ContentR
 CREATE NONCLUSTERED INDEX [IX_ContentRequest_1_8ee33f] ON [dbo].[ContentRequest] ([clubId] ASC);
 CREATE NONCLUSTERED INDEX [IX_ContentRequest_2_196406] ON [dbo].[ContentRequest] ([attendanceAudience] ASC);
 CREATE NONCLUSTERED INDEX [IX_ContentRequest_3_587fa9] ON [dbo].[ContentRequest] ([status] ASC);
+
+CREATE TABLE [dbo].[CustomStaffRole] (
+  [key] NVARCHAR(254) COLLATE Latin1_General_100_BIN2 NOT NULL,
+  [name] NVARCHAR(80) COLLATE Latin1_General_100_BIN2 NOT NULL,
+  [description] NVARCHAR(300) COLLATE Latin1_General_100_BIN2 NULL,
+  [enabled] BIT NULL,
+  [version] FLOAT(53) NULL,
+  [scope] NVARCHAR(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,
+  [updatedBy] NVARCHAR(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,
+  [_id] CHAR(24) COLLATE Latin1_General_100_BIN2 NOT NULL,
+  [createdAt] DATETIME2(3) NULL,
+  [updatedAt] DATETIME2(3) NULL,
+  [__v] FLOAT(53) NULL,
+  [_payload] NVARCHAR(MAX) NOT NULL CHECK (ISJSON([_payload]) = 1),
+  [_version] BIGINT NOT NULL DEFAULT 0,
+  CONSTRAINT [PK_CustomStaffRole] PRIMARY KEY ([_id]),
+  CHECK ([scope] IS NULL OR [scope] IN (N'global', N'clubs')),
+  CHECK ([_id] IS NULL OR (LEN([_id]) = 24 AND [_id] NOT LIKE '%[^0-9a-f]%'))
+);
+CREATE UNIQUE NONCLUSTERED INDEX [IX_CustomStaffRole_0_b781d5] ON [dbo].[CustomStaffRole] ([key] ASC);
 
 CREATE TABLE [dbo].[EventRegistration] (
   [studentAccountId] CHAR(24) COLLATE Latin1_General_100_BIN2 NULL,
@@ -855,6 +874,51 @@ CREATE UNIQUE NONCLUSTERED INDEX [IX_UniversityContent_0_037c92] ON [dbo].[Unive
 CREATE NONCLUSTERED INDEX [IX_UniversityContent_1_e126f1] ON [dbo].[UniversityContent] ([type] ASC);
 CREATE NONCLUSTERED INDEX [IX_UniversityContent_2_196406] ON [dbo].[UniversityContent] ([attendanceAudience] ASC);
 CREATE NONCLUSTERED INDEX [IX_UniversityContent_3_4e977d] ON [dbo].[UniversityContent] ([createdAt] DESC, [id] DESC);
+
+CREATE TABLE [dbo].[WorkflowDefinition] (
+  [type] NVARCHAR(254) COLLATE Latin1_General_100_BIN2 NOT NULL,
+  [version] FLOAT(53) NOT NULL,
+  [updatedBy] NVARCHAR(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,
+  [_id] CHAR(24) COLLATE Latin1_General_100_BIN2 NOT NULL,
+  [createdAt] DATETIME2(3) NULL,
+  [updatedAt] DATETIME2(3) NULL,
+  [__v] FLOAT(53) NULL,
+  [_payload] NVARCHAR(MAX) NOT NULL CHECK (ISJSON([_payload]) = 1),
+  [_version] BIGINT NOT NULL DEFAULT 0,
+  CONSTRAINT [PK_WorkflowDefinition] PRIMARY KEY ([_id]),
+  CHECK ([_id] IS NULL OR (LEN([_id]) = 24 AND [_id] NOT LIKE '%[^0-9a-f]%'))
+);
+CREATE UNIQUE NONCLUSTERED INDEX [IX_WorkflowDefinition_0_e126f1] ON [dbo].[WorkflowDefinition] ([type] ASC);
+
+CREATE TABLE [dbo].[WorkflowNotification] (
+  [eventKey] NVARCHAR(254) COLLATE Latin1_General_100_BIN2 NOT NULL,
+  [recipientEmail] NVARCHAR(254) COLLATE Latin1_General_100_BIN2 NOT NULL,
+  [kind] NVARCHAR(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,
+  [requestRef] NVARCHAR(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,
+  [title] NVARCHAR(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,
+  [message] NVARCHAR(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,
+  [link] NVARCHAR(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,
+  [readAt] DATETIME2(3) NULL,
+  [emailStatus] NVARCHAR(254) COLLATE Latin1_General_100_BIN2 NULL,
+  [attempts] FLOAT(53) NULL,
+  [nextAttemptAt] DATETIME2(3) NULL,
+  [leaseUntil] DATETIME2(3) NULL,
+  [leaseId] NVARCHAR(MAX) COLLATE Latin1_General_100_BIN2 NULL,
+  [providerMessageId] NVARCHAR(MAX) COLLATE Latin1_General_100_BIN2 NULL,
+  [errorCode] NVARCHAR(MAX) COLLATE Latin1_General_100_BIN2 NULL,
+  [_id] CHAR(24) COLLATE Latin1_General_100_BIN2 NOT NULL,
+  [createdAt] DATETIME2(3) NULL,
+  [updatedAt] DATETIME2(3) NULL,
+  [__v] FLOAT(53) NULL,
+  [_payload] NVARCHAR(MAX) NOT NULL CHECK (ISJSON([_payload]) = 1),
+  [_version] BIGINT NOT NULL DEFAULT 0,
+  CONSTRAINT [PK_WorkflowNotification] PRIMARY KEY ([_id]),
+  CHECK ([emailStatus] IS NULL OR [emailStatus] IN (N'pending', N'sending', N'sent', N'failed', N'unconfigured')),
+  CHECK ([_id] IS NULL OR (LEN([_id]) = 24 AND [_id] NOT LIKE '%[^0-9a-f]%'))
+);
+CREATE UNIQUE NONCLUSTERED INDEX [IX_WorkflowNotification_0_701d7a] ON [dbo].[WorkflowNotification] ([eventKey] ASC);
+CREATE NONCLUSTERED INDEX [IX_WorkflowNotification_1_83ba78] ON [dbo].[WorkflowNotification] ([recipientEmail] ASC);
+CREATE NONCLUSTERED INDEX [IX_WorkflowNotification_2_d550b5] ON [dbo].[WorkflowNotification] ([emailStatus] ASC);
 ALTER TABLE [dbo].[ClubAccount] ADD [_clubReference] BIGINT NULL;
 ALTER TABLE [dbo].[ClubAccount] ADD CONSTRAINT [CK_ClubAccount_clubReference] CHECK (([clubId] IS NULL AND [_clubReference] IS NULL) OR ([clubId] = 0 AND [_clubReference] IS NULL) OR ([clubId] <> 0 AND [_clubReference] = [clubId] AND [_clubReference] IS NOT NULL));
 ALTER TABLE [dbo].[ClubAccount] ADD CONSTRAINT [FK_ClubAccount_Club] FOREIGN KEY ([_clubReference]) REFERENCES [dbo].[Club] ([id]);

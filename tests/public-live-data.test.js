@@ -91,6 +91,27 @@ test('private APIs always use the network and failed refreshes remain dirty for 
   assert.equal(downloads.filter(url => url === '/api/clubs?media=links').length, 3);
 });
 
+test('explicit fresh reads bypass saved university data even before a live invalidation arrives', async () => {
+  let downloads = 0;
+  const app = browser(seed(), async () => { downloads++; return new Response('[{"id":3,"title":"Current university event"}]'); });
+  const result = await (await app.window.fetch('/api/university-content', { cache: 'no-store' })).json();
+  assert.equal(result[0].id, 3); assert.equal(downloads, 1);
+  assert.equal(JSON.parse(app.storage.get('miu-public-university-content-v1')).data[0].id, 3);
+});
+
+test('stream outages invalidate cached university records and enable bounded fallback; recovery stops it', async () => {
+  const app = browser(seed());
+  await app.flush();
+  app.sources[0].send('error');
+  assert.ok(app.storage.get('miu:public-dirty:universityContent'));
+  assert.equal(app.timers.size, 2, 'One refresh notification and one fallback timer');
+  app.sources[0].send('error');
+  assert.equal(app.timers.size, 2, 'Repeated stream errors share the same fallback');
+  app.sources[0].send('ready');
+  await app.flush();
+  assert.equal(app.timers.size, 0, 'A healthy live stream needs no polling timer');
+});
+
 async function streamRequest({ token, changes = [], ready = true, sql = false, expired = false } = {}) {
   let handler, closed = 0;
   const opens = [], output = [], headers = {};

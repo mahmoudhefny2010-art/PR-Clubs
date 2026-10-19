@@ -40,6 +40,16 @@ test('Google cannot grant a role to an unknown email or replace a bound staff id
   const state = staffModel(); state.set({ ...state.get(), googleSub: 'other-subject' });
   await assert.rejects(resolveStaffGoogleAccount(state.model, identity), /STAFF_GOOGLE_ACCOUNT_CONFLICT/);
 });
+
+test('custom staff Google sign-in resolves an assigned dashboard and disabled custom grants fall through without staff access', async () => {
+  const state = staffModel('custom_review');
+  const active = account => ({ ...account, roleAssignments: [{ role: 'custom_review', clubId: 12, assignedClubIds: [12], committee: '' }], customRoles: [{ key: 'custom_review', name: 'Review team', enabled: true }] });
+  const result = await resolveStaffGoogleAccount(state.model, identity, async account => active(account));
+  assert.equal(result.redirect, '/dashboards/custom-role.html?role=custom_review'); assert.equal(result.account.googleSub, identity.googleSub);
+  assert.equal(await resolveStaffGoogleAccount(state.model, identity, async () => null), null);
+  state.set({ ...state.get(), googleSub: 'different-subject' });
+  await assert.rejects(resolveStaffGoogleAccount(state.model, identity, async account => active(account)), /CONFLICT/);
+});
 test('subject collisions, unsupported roles and concurrent account changes fail closed', async () => {
   const collision = staffModel(); collision.owner({ _id: 'different-staff' });
   await assert.rejects(resolveStaffGoogleAccount(collision.model, identity), /STAFF_GOOGLE_ACCOUNT_CONFLICT/);

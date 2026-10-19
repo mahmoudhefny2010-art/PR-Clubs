@@ -396,6 +396,10 @@ document.addEventListener('DOMContentLoaded', () => {
             miu_events: { label: 'MIU Events Dashboard', href: '/dashboards/miu-events-dashboard.html' },
             student: { label: 'My Dashboard', href: '/?myForms=1' }
           };
+          for (const choice of session.dashboards || []) {
+            if (!/^custom_[a-z_]{1,30}$/.test(choice.role)) continue;
+            destinations[choice.role] = { label: choice.label, href: '/dashboards/custom-role.html?role=' + encodeURIComponent(choice.role) };
+          }
           const account = session?.authenticated
             ? destinations[session.type === 'club' ? session.role : session.type]
             : null;
@@ -435,6 +439,9 @@ document.addEventListener('DOMContentLoaded', () => {
               choices.unshift({ role: 'student', label: destinations.student.label });
             }
             if (dashboardChoices) dashboardChoices.hidden = choices.length === 0;
+            // The role list already includes the current/student dashboard.
+            // Keep the standalone link only as a fallback for accounts without it.
+            if (accountDashboardLink && account) accountDashboardLink.hidden = choices.length > 0;
             choices.forEach(choice => {
               const button = document.createElement('button');
               button.type = 'button';
@@ -529,8 +536,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  inject('site-header', '/components/site-header.html?v=20261014accountphoto2');
+  inject('site-header', '/components/site-header.html?v=20261018dashboardMenu1');
   inject('site-footer', '/components/site-footer.html?v=20261017mobilecolon1');
+  const workflowShortcuts = document.createElement('script');
+  workflowShortcuts.src = '/assets/js/workflow-shortcuts.js?v=20261018workflowNavigation1';
+  document.head.appendChild(workflowShortcuts);
 
   // "Find Your Club" quiz launcher and modal. Kept dependency-free and lazy:
   // the module creates the launcher itself; nothing opens automatically.

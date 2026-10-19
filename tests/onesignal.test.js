@@ -104,7 +104,7 @@ test('keeps identity lookup behind account authentication and exposes no client-
   assert.match(serverSource, /app\.put\('\/api\/notifications\/email-preference',\s*requireStudentAuth/);
   assert.match(serverSource, /dispatchPublishedContentNotifications\(\{/);
   assert.match(serverSource, /emailNotificationsEnabled === true/);
-  assert.match(serverSource, /source: 'university'/);
+  assert.match(fs.readFileSync(require.resolve('../services/university-content-admin'), 'utf8'), /source: 'university'/);
   assert.match(serverSource, /app\.patch\('\/api\/applications\/:id\/status',\s*requireClubAuth/);
   assert.match(serverSource, /async function dispatchSpeakerRequestStatusPush\(request\)/);
   assert.match(serverSource, /request\?\.requesterType !== 'student'/);

@@ -1,8 +1,6 @@
 ﻿// Events page logic (public/pages/events.html)
 (function () {
   const listEl = document.getElementById('eventsList');
-  const feedTimelineSection = document.getElementById('feedTimelineSection');
-  const feedTimelineEl = document.getElementById('feedTimeline');
 
   const parseDate = (value) => {
     const d = new Date(value);
@@ -11,33 +9,9 @@
 
   const escapeHtml = window.MiuUI.escapeHtml;
 
-  let clubs = window.miuPublicDataCache?.read('clubs') || [];
-  let universityContent = window.miuPublicDataCache?.read('universityContent') || [];
-  const allEvents = () => clubs.flatMap((club) =>
-    (Array.isArray(club.events) ? club.events : []).map((event, eventIndex) => ({
-      ...event,
-      clubId: club.id,
-      clubName: club.name,
-      clubImage: club.image,
-      eventIndex,
-    }))).concat(universityContent.filter((item) => item.type === 'event').map((event, eventIndex) => ({
-      ...event, clubId: 0, clubName: 'Misr International University',
-      clubImage: '/assets/img/pics/logo.svg.png', eventIndex, university: true,
-      universityContentId: event.id
-    })));
-
-  const allFeeds = () => clubs.flatMap((club) =>
-    (Array.isArray(club.posts) ? club.posts : []).map((post, postIndex) => ({
-      ...post,
-      clubId: club.id,
-      clubName: club.name,
-      clubImage: club.image,
-      postIndex,
-    }))).concat(universityContent.filter((item) => item.type === 'announcement').map((post) => ({
-      ...post, text: post.description, date: post.createdAt, clubName: 'Misr International University',
-      clubImage: '/assets/img/pics/logo.svg.png', university: true
-    })));
-
+  let eventItems = [];
+  const flatten = row => ({ ...row.item, clubId: row.club.id, clubName: row.club.name, clubImage: row.club.image,
+    eventIndex: row.index, university: row.university, universityContentId: row.university ? row.item.id : undefined });
   const dayLabel = (value) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -57,18 +31,7 @@
   }
 
   function renderList() {
-    const events = allEvents()
-      .map((event) => ({ ...event, parsed: parseDate(event.date) }))
-      .filter((event) => event.parsed || event.university)
-      .sort((left, right) => {
-        if (!left.parsed || !right.parsed) {
-          if (left.parsed) return -1;
-          if (right.parsed) return 1;
-          return new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime();
-        }
-        if (left.parsed.getTime() !== right.parsed.getTime()) return left.parsed - right.parsed;
-        return new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime();
-      });
+    const events = eventItems;
     if (!events.length) {
       listEl.innerHTML = '<p class="events-empty">No upcoming events right now.</p>';
       return;
@@ -104,88 +67,10 @@
     }));
   }
 
-  function renderFeedTimeline() {
-    const feeds = allFeeds()
-      .map((feed) => ({ ...feed, parsed: parseDate(feed.date || feed.createdAt) }))
-      .filter((feed) => feed.parsed)
-      .sort((left, right) => right.parsed - left.parsed); // Newest first
-
-    if (!feeds.length) {
-      feedTimelineSection.hidden = true;
-      return;
-    }
-
-    feedTimelineSection.hidden = false;
-    feedTimelineEl.innerHTML = feeds.map((feed) => `
-      <article class="feed-timeline-item">
-        <div class="feed-timeline-marker"></div>
-        <div class="feed-timeline-content">
-          <div class="feed-timeline-header">
-            <img src="${escapeHtml(feed.clubImage)}" alt="${escapeHtml(feed.clubName)}" class="feed-timeline-avatar${feed.university ? ' university-brand-avatar' : ''}" loading="lazy" decoding="async" />
-            <div class="feed-timeline-meta">
-              <span class="feed-timeline-club">${escapeHtml(feed.clubName || '')}</span>
-              <span class="feed-timeline-date">${formatDateForTimeline(feed.date)}</span>
-            </div>
-          </div>
-          <div class="feed-timeline-body">
-            <h3 class="feed-timeline-title">${escapeHtml(feed.title || 'Feed post')}</h3>
-            <span class="content-type-badge feed">Latest Feed</span>
-            <p class="feed-timeline-text">${escapeHtml(feed.text || feed.description || '')}</p>
-            ${feed.university ? window.studentFeedbackForm('university', feed.id, feed.interaction, feed.question, feed.options) : ''}
-            ${feed.image && feed.image !== feed.clubImage ? '<img src="' + escapeHtml(feed.image) + '" alt="' + escapeHtml(feed.title || 'Feed image') + '" class="feed-timeline-image" loading="lazy" decoding="async" />' : ''}
-          </div>
-        </div>
-      </article>
-    `).join('');
-  }
-
-  let universityRefreshId = 0;
-  async function refreshUniversityContent() {
-    const refreshId = ++universityRefreshId;
-    try {
-      const response = await fetch('/api/university-content', { cache: 'no-store' });
-      if (!response.ok) throw new Error('University updates are unavailable.');
-      const latest = await response.json();
-      if (refreshId !== universityRefreshId) return;
-      if (!Array.isArray(latest) || window.miuPublicDataCache?.same(universityContent, latest)) return;
-      universityContent = Array.isArray(latest) ? latest : [];
-      window.miuPublicDataCache?.write('universityContent', universityContent);
-    } catch {
-      if (refreshId !== universityRefreshId) return;
-      return;
-    }
-    renderList();
-    renderFeedTimeline();
-  }
-
-  if (clubs.length) { renderList(); renderFeedTimeline(); }
-  if (universityContent.length) { renderList(); renderFeedTimeline(); }
-
-  async function refreshClubs() {
-    try {
-      const response = await fetch('/api/clubs?media=links', { cache: 'no-store' });
-      if (!response.ok) throw new Error('Could not load events.');
-      const records = await response.json();
-      const next = Array.isArray(records) ? records : [];
-      const changed = !window.miuPublicDataCache?.same(clubs, next);
-      clubs = next;
-      window.miuPublicDataCache?.write('clubs', clubs);
-      if (changed) { renderList(); renderFeedTimeline(); }
-      return true;
-    } catch {
-      if (!clubs.length && listEl) listEl.innerHTML = '<p class="events-empty">Could not load events right now.</p>';
-      return false;
-    }
-  }
-
-  void refreshClubs().then((loaded) => {
-      if (!loaded) return;
-      if (universityContent.length) { renderList(); renderFeedTimeline(); }
-      if (window.siteStartup?.afterStartup) window.siteStartup.afterStartup(refreshUniversityContent);
-      else void refreshUniversityContent();
-    });
-  window.siteStartup.watch(async () => {
-    await refreshClubs();
-    await refreshUniversityContent();
+  const pager = window.MiuPagination.create({ section: 'events', list: listEl,
+    render(rows) { eventItems = rows.map(flatten); renderList(); },
+    onError(error) { if (!eventItems.length) listEl.textContent = error.message; }
   });
+  void pager.load();
+  window.siteStartup.watch(() => pager.load());
 })();

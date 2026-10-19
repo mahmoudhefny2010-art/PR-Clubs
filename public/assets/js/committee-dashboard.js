@@ -1146,6 +1146,7 @@ async function returnToCommittee(targetRole, actionButton) {
 }
 
 async function act(item, action, fromDialog = false, source = 'queue') {
+  if (item.workflow) { window.location.assign(`/pages/workflow.html?kind=content&id=${Number(item.id)}`); return; }
   const list = source === 'status' ? statusOverviewList : requestsList;
   const card = list?.querySelector(`[data-comment="${item.id}"]`)?.closest('.req-card');
   const comment = fromDialog

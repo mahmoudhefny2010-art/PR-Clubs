@@ -4,7 +4,7 @@
   const toggle = document.getElementById('arrangeCards');
   const reset = document.getElementById('resetCardOrder');
   const status = document.getElementById('cardOrderStatus');
-  const defaults = window.adminDashboardTools.map(tool => tool.id);
+  const defaults = [...(window.adminDashboardTools.groups || []).map(group => group.id), ...window.adminDashboardTools.map(tool => tool.id)];
   let order = [...defaults], storageKey, arranging = false, drag, scrollFrame;
   const cards = () => [...grid.querySelectorAll('.v2-widget')];
   function persist() {

@@ -3,6 +3,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { toolIds } = require('./admin-dashboard-pages');
 const dependencies = {
+  workflows: ['WorkflowDefinition', 'ContentRequest', 'SpeakerRequest', 'WorkflowNotification', 'ClubAccount', 'CustomStaffRole'],
+  'blocked-requests': ['ContentRequest', 'SpeakerRequest', 'ClubAccount', 'CustomStaffRole'],
+  'custom-roles': ['CustomStaffRole', 'ClubAccount', 'Club'],
   'quiz-points': ['QuizSubmission', 'Club'],
   committees: ['Club', 'ClubAccount'], 'club-order': ['Club'], 'application-forms': ['Club'],
   'club-feedback': ['StudentFeedback', 'Club'], 'university-feedback': ['StudentFeedback', 'UniversityContent'],

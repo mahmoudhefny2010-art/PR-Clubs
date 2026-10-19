@@ -1,8 +1,8 @@
 const assert = require('node:assert/strict');
 module.exports = async ({ cdp, origin, requests, homepage, fixtures, setFailSave, emitUpdate, until, screenshot }) => {
-  const destinations = await cdp.evaluate("[...document.querySelectorAll('.v2-widget[href]')].map(link=>link.getAttribute('href'))");
+  await require('./admin-tool-groups-checks.cjs')({ cdp, origin, until, screenshot });
+  const destinations = require('../../public/assets/js/admin-dashboard-tools').map(tool => '/admin/' + tool.id);
   for (const destination of destinations) {
-    assert.ok(destination.startsWith('/admin/'), 'Every card belongs to the new dashboard');
     const response = await fetch(origin + destination, { headers: { cookie: 'fixture_admin=1' } });
     assert.equal(response.status, 200, destination);
     const html = await response.text();
@@ -11,24 +11,6 @@ module.exports = async ({ cdp, origin, requests, homepage, fixtures, setFailSave
   }
   await until("!!document.querySelector('#adminWorkspaceHeader .topbar-container') && !!document.querySelector('#site-footer footer')");
   await screenshot('desktop');
-  await until("!document.getElementById('arrangeCards').disabled");
-  await cdp.evaluate("document.getElementById('arrangeCards').click(); document.querySelector('.v2-widget').scrollIntoView({block:'center',behavior:'instant'})");
-  const positions = await cdp.evaluate("[...document.querySelectorAll('.v2-widget')].slice(0,2).map(card=>{const r=card.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})");
-  await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', ...positions[0], button: 'left', clickCount: 1 });
-  await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...positions[1], button: 'left', buttons: 1 });
-  await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...positions[1], button: 'left', clickCount: 1 });
-  assert.equal(await cdp.evaluate("document.querySelector('.v2-widget').dataset.tool"), 'heads', 'Pointer drag rearranges dashboard cards');
-  assert.equal(await cdp.evaluate('location.pathname'), '/admin', 'Dragging does not navigate');
-  await cdp.send('Page.reload');
-  await until("document.querySelector('.v2-widget')?.dataset.tool==='heads' && !document.getElementById('arrangeCards').disabled");
-  await cdp.evaluate("document.getElementById('arrangeCards').click(); document.querySelector('#categoryFilters [data-category=staff]').click()");
-  assert.equal(await cdp.evaluate("document.querySelectorAll('.v2-widget').length"), 6);
-  await cdp.evaluate("document.querySelector('.v2-widget').dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}))");
-  assert.equal(await cdp.evaluate("document.querySelector('.v2-widget').dataset.tool"), 'staff', 'Keyboard reordering works within a filter');
-  await cdp.evaluate("document.querySelector('#categoryFilters [data-category=all]').click()");
-  assert.equal(await cdp.evaluate("document.querySelectorAll('.v2-widget').length"), 27, 'Filtered arrangement preserves every tool');
-  await cdp.evaluate("document.getElementById('resetCardOrder').click(); document.getElementById('arrangeCards').click()");
-  assert.equal(await cdp.evaluate("document.querySelector('.v2-widget').dataset.tool"), 'staff', 'Reset restores default priorities');
   async function openTool(id) {
     await cdp.send('Page.navigate', { url: origin + '/admin/' + id });
     await until(`document.body?.dataset.tool==='${id.split('?')[0]}' && !!document.getElementById('toolContent') && !document.getElementById('toolContent').textContent.includes('Loading…')`);
@@ -156,10 +138,10 @@ module.exports = async ({ cdp, origin, requests, homepage, fixtures, setFailSave
     }
   }
   await cdp.send('Page.navigate', { url: origin + '/admin' });
-  await until("document.querySelectorAll('.v2-widget').length===27");
+  await until("document.querySelectorAll('[data-tool-group]').length===10");
   await cdp.evaluate("document.querySelector('#categoryFilters [data-category=attendance]').click()");
-  assert.equal(await cdp.evaluate("document.querySelectorAll('.v2-widget').length"), 4);
-  await cdp.send('Page.reload'); await until("document.querySelectorAll('.v2-widget').length===4");
+  assert.equal(await cdp.evaluate("document.querySelectorAll('.v2-widget').length"), 1);
+  await cdp.send('Page.reload'); await until("document.querySelectorAll('[data-tool-group]').length===1");
   await cdp.evaluate("document.querySelector('#categoryFilters [data-category=all]').click()");
   for (const [width, height] of [[1920, 1080], [1366, 768], [1280, 600], [1024, 440], [820, 1180], [375, 812]]) {
     await cdp.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 760 });
@@ -174,7 +156,7 @@ module.exports = async ({ cdp, origin, requests, homepage, fixtures, setFailSave
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ ...touchPositions[0], id: 1 }] });
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ ...touchPositions[1], id: 1 }] });
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-  assert.equal(await cdp.evaluate("document.querySelector('.v2-widget').dataset.tool"), 'heads', 'Touch drag rearranges cards on mobile');
+  assert.equal(await cdp.evaluate("document.querySelector('.v2-widget').dataset.tool"), 'group-account-security', 'Touch drag rearranges group cards on mobile');
   await cdp.evaluate("document.getElementById('resetCardOrder').click(); document.getElementById('arrangeCards').click(); scrollTo(0,0)");
   await cdp.evaluate("document.querySelector('.site-theme-toggle').click()");
   await screenshot('mobile-dark');
@@ -184,5 +166,5 @@ module.exports = async ({ cdp, origin, requests, homepage, fixtures, setFailSave
   await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
   await until("!document.body.innerText.includes('You are offline.')");
   await cdp.send('Page.navigate', { url: origin + '/admin' });
-  await until("document.querySelectorAll('.v2-widget').length===27");
+  await until("document.querySelectorAll('[data-tool-group]').length===10");
 };

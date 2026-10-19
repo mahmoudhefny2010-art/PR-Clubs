@@ -8,10 +8,13 @@
   <link rel="stylesheet" href="/assets/css/responsive.css?v=20261015mainadmin1">
   <link rel="stylesheet" href="/assets/css/dark.css?v=20261015mainadmin1">
   <link rel="stylesheet" href="/assets/css/features.css?v=20261018fullwidthreviewnotice1">
+  <link rel="stylesheet" href="/assets/css/modal-controls.css?v=20261018fullwidthreviewnotice1">
   <link rel="stylesheet" href="/assets/css/pages/event-reports.css?v=20261014mobileoptions1">
-  <link rel="stylesheet" href="/assets/css/pages/miu-events-dashboard.css?v=20261018registrations1">
+  <link rel="stylesheet" href="/assets/css/pages/miu-events-dashboard.css?v=20261019miusync1">
   <script src="/assets/js/shared.js?v=20261015mainadmin1"></script>
   <script src="/assets/js/site-loading.js?v=20261014promptqueue1"></script>
+  <script src="/assets/js/layout.js?v=20261018customRoles1" defer></script>
+  <script src="/assets/js/public-live-data.js?v=20261019miusync1"></script>
   <script src="/assets/js/theme.js?v=20261009c" defer></script>
   <script src="/assets/js/install-welcome.js?v=20261014promptqueue1" defer></script>
   <script src="/assets/js/cloudinary-upload.js?v=20261013audience1" defer></script>
@@ -38,7 +41,7 @@
         <header class="miu-events-section-heading"><div><span class="committee-label">MIU POSTS</span><h2>Manage MIU events and posts</h2><p>Changes publish to the existing public Events &amp; News and Community Feed.</p></div><div class="miu-events-section-actions"><button id="refreshUniversityPostsBtn" class="secondary-btn" type="button">Refresh from database</button></div></header>
         <div class="miu-events-management-grid">
           <form id="universityPostForm" class="university-publisher-form">
-            <h3>New university update</h3>
+            <h3 id="universityPostFormTitle">New university update</h3>
             <label for="universityPostType">Post type<select id="universityPostType" name="type"><option value="event">Event</option><option value="announcement">Announcement</option></select></label>
             <label for="universityPostTitle">Title<input id="universityPostTitle" name="title" required maxlength="140" placeholder="e.g. University welcome event"></label>
             <label for="universityPostDescription">Details<textarea id="universityPostDescription" name="description" required maxlength="2000" placeholder="Write the information students need to know"></textarea></label>
@@ -74,5 +77,5 @@
   <script src="/assets/js/committee-sidebar.js?v=20261013lighter1" defer></script>
   <script src="/assets/js/pages/report-downloads.js?v=20261014progressive1" defer></script>
   <script src="/assets/js/report-dashboard-panels.js?v=20261014progressive1" defer></script>
-  <script src="/assets/js/miu-events-dashboard.js?v=20261018registrations1" defer></script>
+  <script src="/assets/js/miu-events-dashboard.js?v=20261019miusync1" defer></script>
 </body></html>

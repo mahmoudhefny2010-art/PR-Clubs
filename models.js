@@ -150,7 +150,7 @@ const siteVisitorPresenceSchema = new mongoose.Schema({
 }, { versionKey: false });
 
 const clubRoleAssignmentSchema = new mongoose.Schema({
-  role: { type: String, enum: ['president', 'vice_president', 'head', 'pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'miu_events', 'software_development'], required: true },
+  role: { type: String, validate: require('./services/staff-role-keys').isStaffRole, required: true },
   clubId: { type: Number, required: true, default: 0 },
   assignedClubIds: { type: [Number], default: [] },
   committee: { type: String, default: '' }
@@ -165,13 +165,14 @@ const clubAccountSchema = new mongoose.Schema({
   sessionVersion: { type: Number, default: 0 },
   passwordChangedAt: { type: Date, default: null },
   lastLoginAt: { type: Date, default: null },
-  role: { type: String, enum: ['president', 'vice_president', 'head', 'pr', 'english', 'security', 'sso', 'dean', 'supervisor', 'miu_events', 'software_development'], default: 'president' },
+  role: { type: String, validate: require('./services/staff-role-keys').isStaffRole, default: 'president' },
   roleAssignments: { type: [clubRoleAssignmentSchema], default: [] },
   assignedClubIds: { type: [Number], default: [] },
   committee: { type: String, default: '' }
 }, { timestamps: true, autoIndex: false });
 
 const contentRequestSchema = new mongoose.Schema({
+  workflow: { type: mongoose.Schema.Types.Mixed, default: undefined },
   id: { type: Number, required: true, unique: true, index: true },
   clubId: { type: Number, required: true, index: true },
   clubName: { type: String, default: '' },
@@ -253,6 +254,7 @@ const contentRequestSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 const speakerRequestSchema = new mongoose.Schema({
+  workflow: { type: mongoose.Schema.Types.Mixed, default: undefined },
   clubId: { type: Number, required: true, index: true },
   clubName: { type: String, required: true, trim: true, maxlength: 120 },
   hostingType: { type: String, enum: ['club', 'miu'], default: 'club', index: true },

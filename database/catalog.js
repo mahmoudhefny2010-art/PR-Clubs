@@ -4,7 +4,9 @@ function catalog() {
     AccountPhoto: require('../services/account-photo').AccountPhoto,
     EventReport: require('../services/event-reports').EventReport,
     StudentFeedback: require('../services/student-feedback').StudentFeedback,
-    QuizSubmission: require('../services/quiz-analytics').QuizSubmission
+    QuizSubmission: require('../services/quiz-analytics').QuizSubmission,
+    ...require('../services/workflow-models'),
+    ...require('../services/custom-staff-role-model')
   };
   // Parent order is explicit; references cannot be inferred from field names.
   const parents = ['Club', 'StudentAccount', 'ClubAccount', 'SpeakerInvite', 'AttendanceSession'];

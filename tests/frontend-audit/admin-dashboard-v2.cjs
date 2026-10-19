@@ -16,6 +16,13 @@ const { respond } = require('./fixtures.cjs');
 app.use(express.json());
 const feedChecks = require('./feed-video-checks.cjs');
 const feedState = feedChecks.install(app);
+const workflowChecks = require('./workflow-checks.cjs');
+const workflowState = workflowChecks.install(app);
+const excelRowLogChecks = require('./excel-row-log-checks.cjs');
+const excelRowLogState = excelRowLogChecks.install(app);
+const customRoleChecks = require('./custom-role-checks.cjs');
+const customRoleState = customRoleChecks.install(app);
+workflowState.customRoleState = customRoleState;
 app.get(['/club-dashboard', '/club-login'], (req, res) => res.sendFile(path.join(root, 'public/index.html')));
 const serverSource = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
 const guardSource = serverSource.slice(serverSource.indexOf('async function requireAdmin('), serverSource.indexOf('async function requireMiuEventsDashboard('));
@@ -203,7 +210,7 @@ async function screenshot(name) {
   await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1100, deviceScaleFactor: 1, mobile: false });
   await cdp.evaluate("document.getElementById('adminPasswordInput').value='Fixture-password-123'; document.getElementById('adminLoginForm').requestSubmit()");
   await until("location.pathname==='/admin'");
-  await until(`document.querySelectorAll('.v2-widget').length===${toolIds.length} && document.getElementById('totalClubs').textContent==='2'`);
+  await until(`document.querySelectorAll('.v2-widget').length===${require('../../public/assets/js/admin-dashboard-tools').groups.length} && document.getElementById('totalClubs').textContent==='2'`);
   assert.equal(await cdp.evaluate("getComputedStyle(document.getElementById('widgetGrid')).gridTemplateColumns.split(' ').length"), 4);
   assert.equal(await cdp.evaluate("document.querySelector('.v2-main').getBoundingClientRect().left >= document.querySelector('.v2-sidebar').getBoundingClientRect().right"), true, 'Sidebar stays next to content on desktop');
   assert.equal(await cdp.evaluate("document.getElementById('openClubs').textContent"), '1');
@@ -223,7 +230,32 @@ async function screenshot(name) {
   }
   await cdp.evaluate("document.documentElement.dataset.theme='light'");
   await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1100, deviceScaleFactor: 1, mobile: false });
+  if (process.argv.includes('--excel-row-log-only')) {
+    await excelRowLogChecks.run({ cdp, origin, until, screenshot, state: excelRowLogState, root, output });
+    assert.deepEqual(cdp.events.filter(event => event.method === 'Runtime.exceptionThrown'), [], 'No browser script errors');
+    console.log('PASS: Excel row logs cover validation, skipped rows, inserts, updates, batch failures, upload failures, unconfirmed saves, undo and responsive layout. Fixture data only.');
+    return;
+  }
+  if (process.argv.includes('--groups-only')) {
+    await require('./admin-tool-groups-checks.cjs')({ cdp, origin, until, screenshot });
+    assert.deepEqual(cdp.events.filter(event => event.method === 'Runtime.exceptionThrown'), [], 'No browser script errors');
+    console.log('PASS: ten tool groups, complete membership, direct search, category filters, saved arrangement and responsive light/dark layout. Fixture data only.');
+    return;
+  }
+  if (process.argv.includes('--workflow-only')) {
+    await workflowChecks.run({ cdp, origin, until, screenshot, state: workflowState, emitUpdate });
+    assert.deepEqual(cdp.events.filter(event => event.method === 'Runtime.exceptionThrown'), [], 'No browser script errors');
+    console.log('PASS: workflow stage configuration save, description-only corrections, locked fields, resubmission and responsive light/dark views. Fixture data only.');
+    return;
+  }
+  if (process.argv.includes('--custom-roles-only')) {
+    await customRoleChecks.run({ cdp, origin, until, screenshot, state: customRoleState });
+    assert.deepEqual(cdp.events.filter(event => event.method === 'Runtime.exceptionThrown'), [], 'No browser script errors');
+    console.log('PASS: custom role creation, staff email and club assignment, permission edits, generated dashboard modules and light/dark responsive layout. Fixture data only.');
+    return;
+  }
   if (process.argv.includes('--quiz-only')) {
+    await cdp.evaluate("document.getElementById('toolSearch').value='quiz points'; document.getElementById('toolSearch').dispatchEvent(new Event('input'))");
     assert.ok(await cdp.evaluate("!!document.querySelector('.v2-widget[data-tool=\"quiz-points\"]')"));
     await cdp.send('Page.navigate', { url: origin + '/admin/quiz-points' });
     await until("document.querySelectorAll('.v2-quiz-points-row').length===2");

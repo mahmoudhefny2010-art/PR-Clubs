@@ -108,11 +108,11 @@ function registerSupervisorDashboard(app, deps) {
       const club = await Club.findOne({ id: clubId }).select('id name image category description status events').lean();
       if (!club) return res.status(404).json({ message: 'Assigned club not found.' });
       const [requests, speakers, attendance, reviews] = await Promise.all([
-        ContentRequest.aggregate([{ $match: { clubId } }, { $sort: { createdAt: -1 } }, { $project: {
+        ContentRequest.aggregate([{ $match: { clubId, workflow: { $exists: false } } }, { $sort: { createdAt: -1 } }, { $project: {
           ...Object.fromEntries('id clubId type title description date time location budget registrationEnabled attendanceEnabled attendanceAudience sponsorName sponsorCompany sponsorContact sponsorEmail sponsorPhone sponsorType sponsorAmount sponsorBenefits sponsorDescription sponsorLogo sponsorNotes boothName boothPurpose boothDescription boothLocation boothSize boothEquipment boothSetupDate boothOpenDate boothCloseDate boothContact boothNotes permitItems status clubNotice comments supervisorNextStage workflowHistory commentHistory submittedAt createdAt updatedAt'.split(' ').map(key => [key, 1])),
           image: { $cond: [{ $and: [{ $eq: ['$type', 'feed'] }, { $regexMatch: { input: { $ifNull: ['$image', ''] }, regex: '^https://res[.]cloudinary[.]com/[^/]+/video/upload/' } }] }, '$image', ''] }
         } }]),
-        SpeakerRequest.find({ clubId }).sort({ submittedAt: -1 }).lean(),
+        SpeakerRequest.find({ clubId, workflow: { $exists: false } }).sort({ submittedAt: -1 }).lean(),
         AttendanceRecord.aggregate([{ $match: { clubId } }, { $group: {
           _id: { eventRequestId: '$eventRequestId', itemType: '$itemType', approvalStatus: '$approvalStatus', attendanceAudience: '$attendanceAudience' },
           title: { $first: '$eventTitle' }, date: { $first: '$eventDate' }, count: { $sum: 1 },

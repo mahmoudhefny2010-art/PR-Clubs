@@ -9,7 +9,7 @@
     if (!document.getElementById('eventModal')) document.body.append(template.content);
     await new Promise((resolve, reject) => {
       const script = document.createElement('script');
-      script.src = '/assets/js/event-modal.js?v=20261017mobilepopup1';
+      script.src = '/assets/js/event-modal.js?v=20261019miusync1';
       script.onload = resolve;
       script.onerror = () => { script.remove(); reject(new Error('Event details could not be loaded. Please try again.')); };
       document.body.append(script);

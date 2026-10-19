@@ -21,6 +21,8 @@ function renderDashboardPage(root, tool = '') {
   if (tool === 'clubs') scripts.push('cloudinary-upload');
   if (tool === 'excel-review') scripts.push('cloudinary-upload', 'pages/admin-excel-import');
   if (tool === 'profile') scripts.push('cloudinary-upload');
+  if (['workflows', 'blocked-requests'].includes(tool)) { scripts.push('workflow-ui'); assets.push('workflow'); }
+  if (tool === 'custom-roles') { scripts.push('custom-role-admin'); assets.push('workflow'); }
   const main = relative => source(relative).match(/<main\b[^>]*>([\s\S]*?)<\/main>/i)[1];
   if (['staff', 'supervisors'].includes(tool)) {
     content = '<div class="supervisor-main supervisor-management v2-management-content">' + main(`dashboards/${tool === 'staff' ? 'staff' : 'supervisor'}-management.html`)
@@ -40,8 +42,8 @@ function renderDashboardPage(root, tool = '') {
   }
   html = html.replace('data-tool=""', `data-tool="${tool}"`)
     .replace('<!-- TOOL_CONTENT -->', content)
-    .replace('<!-- TOOL_STYLES -->', assets.map(name => `<link rel="stylesheet" href="/assets/css/pages/${name}.css">`).join('\n'))
-    .replace('<!-- TOOL_SCRIPTS -->', scripts.map(name => `<script src="/assets/js/${name}.js?v=20261017clubimport2" defer></script>`).join('\n'));
+    .replace('<!-- TOOL_STYLES -->', assets.map(name => `<link rel="stylesheet" href="/assets/css/pages/${name}.css${name === 'miu-events-dashboard' ? '?v=20261019miusync1' : name === 'workflow' ? '?v=20261019blockedBadge1' : ''}">`).join('\n'))
+    .replace('<!-- TOOL_SCRIPTS -->', scripts.map(name => `<script src="/assets/js/${name}.js?v=${name === 'pages/admin-excel-import' ? '20261019excelRowLog1' : name === 'workflow-ui' ? '20261019blockedBadge1' : name === 'miu-events-dashboard' ? '20261019miusync1' : ['custom-role-admin', 'staff-management'].includes(name) ? '20261018customRoles1' : '20261017clubimport2'}" defer></script>`).join('\n'));
   if (tool) html = html.replace('id="overviewPage"', 'id="overviewPage" hidden').replace('id="toolPage" hidden', 'id="toolPage"');
   return html;
 }

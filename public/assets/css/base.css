@@ -2602,6 +2602,15 @@ html.quiz-scroll-lock {
   100% { scale: 0.83; }
 }
 
+.quiz-launcher-quiet .quiz-launcher-circle {
+  animation: none;
+  scale: 0.83;
+}
+
+.quiz-launcher-quiet .quiz-launcher-circle svg {
+  animation: none;
+}
+
 html.quiz-scroll-lock .quiz-launcher-circle,
 .quiz-launcher-circle:active,
 .quiz-launcher-circle:focus-visible {

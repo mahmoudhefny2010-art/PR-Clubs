@@ -170,12 +170,15 @@ const row = (name, index, presidentEmail = 'president@miuegypt.edu.eg', vicePres
 
 test('club import creates clubs, verifies images, and saves both MIU dashboard roles atomically', async () => {
   const harness = createImportHarness();
-  const result = await harness.importBatch([row('New Club', 1)]);
+  const result = await harness.importBatch([{ ...row('New Club', 1), rowNumber: 43 }]);
   assert.equal(result.statusCode, 200);
   assert.equal(result.body.imported, 1);
   assert.equal(result.body.created, 1);
   assert.equal(result.body.updated, 0);
   assert.equal(result.body.rolesAssigned, 2);
+  assert.equal(result.body.rowResults[0].rowNumber, 43);
+  assert.equal(result.body.rowResults[0].status, 'inserted');
+  assert.equal(result.body.rowResults[0].clubId, harness.state.clubs[0].id);
   assert.equal(harness.state.clubs.length, 1);
   assert.equal(harness.state.clubs[0].name, 'New Club');
   assert.equal(harness.state.clubs[0].imagePublicId, image(1).publicId);
@@ -220,6 +223,8 @@ test('known club name variants update the existing record and use the workbook n
   assert.equal(result.statusCode, 200);
   assert.equal(result.body.created, 0);
   assert.equal(result.body.updated, 1);
+  assert.equal(result.body.rowResults[0].status, 'updated');
+  assert.match(result.body.rowResults[0].reason, /no duplicate/);
   assert.equal(harness.state.clubs.length, 1);
   assert.equal(harness.state.clubs[0].id, 14);
   assert.equal(harness.state.clubs[0].name, 'MIU Theatre');
@@ -318,8 +323,10 @@ test('club import replaces the old officers, preserves their unrelated roles, an
 test('club import rejects malformed manager identities before making any database changes', async () => {
   const harness = createImportHarness();
   const invalid = row('Invalid Club', 3, 'student@example.com');
+  invalid.rowNumber = 53;
   const result = await harness.importBatch([invalid]);
   assert.equal(result.statusCode, 400);
+  assert.match(result.body.message, /row 53/);
   assert.equal(harness.state.clubs.length, 0);
   assert.equal(harness.state.accounts.length, 0);
 });
@@ -329,9 +336,8 @@ test('ambiguous transaction commit keeps uploaded images and tells the admin to 
   const result = await harness.importBatch([row('Unconfirmed Club', 4)]);
   assert.equal(result.statusCode, 503);
   assert.equal(result.body.commitUncertain, true);
+  assert.equal(result.body.rowResults, undefined);
   assert.equal(harness.state.clubs.length, 0);
   assert.equal(harness.state.accounts.length, 0);
   assert.deepEqual(harness.state.imagesDeleted, []);
 });
-
-\n

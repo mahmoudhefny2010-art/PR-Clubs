@@ -160,6 +160,7 @@
           for (const [action, label, className] of [['approve', 'Approve', 'primary-btn'], ['reject', 'Reject', 'secondary-btn'], ['request_changes', 'Request changes', 'secondary-btn']]) {
             const button = document.createElement('button'); button.type = 'button'; button.className = className; button.textContent = label;
             button.addEventListener('click', async () => {
+              if (item.workflow) { window.location.assign(`/pages/workflow.html?kind=speaker&id=${encodeURIComponent(item.id)}`); return; }
               button.disabled = true;
               try { await api(`/api/dean/speaker-requests/${encodeURIComponent(item.id)}/decision`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, comment: comment.value }) }); await load(); }
               catch (error) { feedback(error.message, true); button.disabled = false; }

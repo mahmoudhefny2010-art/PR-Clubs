@@ -4,10 +4,7 @@
   const filters = [...document.querySelectorAll('.feed-filter')];
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  let loadedClubs = window.miuPublicDataCache?.read('clubs') || [];
-  let universityEntries = window.miuPublicDataCache?.read('universityContent') || [];
   let entries = [];
-  let universityRefreshScheduled = false;
   let activeFilter = 'all';
   const requestedPost = Number(new URLSearchParams(window.location.search).get('post'));
   let requestedPostFocused = false;
@@ -21,48 +18,8 @@
   const formatDate = (date) => date ? date.toLocaleString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
   }) : '';
-  entries = buildEntries(loadedClubs, universityEntries);
-
-  function buildEntries(clubs, universityContent = []) {
-    const clubEntries = clubs.flatMap((club) => {
-      const events = (Array.isArray(club.events) ? club.events : []).map((event, index) => {
-        const eventDate = parseDate(event.date);
-        if (!eventDate || !String(event.title || '').trim()) return null;
-        const publishedAt = parseDate(event.publishedAt || event.createdAt || event.submittedAt || event.date) || eventDate;
-        return { kind: 'event', category: 'events', label: eventDate < today ? 'Past Event' : 'Upcoming Event', club, item: event, index, publishedAt, eventDate };
-      }).filter(Boolean);
-      const posts = (Array.isArray(club.posts) ? club.posts : []).map((post, index) => {
-        const title = String(post.title || '').trim();
-        const message = String(post.text || post.description || '').trim();
-        if (!title && !message) return null;
-        const publishedAt = parseDate(post.publishedAt || post.createdAt || post.date);
-        const typeText = String(post.type || post.category || post.kind || '').toLowerCase();
-        const isAnnouncement = /announcement|notice/.test(typeText);
-        return { kind: 'post', category: isAnnouncement ? 'announcements' : 'activities', label: isAnnouncement ? 'Announcement' : (post.type || post.category || 'Club Update'), club, item: post, index, publishedAt };
-      }).filter(Boolean);
-      return [...events, ...posts];
-    });
-    const universityEntries = universityContent.map((item) => {
-      const publishedAt = parseDate(item.createdAt) || parseDate(item.date);
-      const club = { id: 0, name: 'Misr International University', image: '/assets/img/pics/logo.svg.png' };
-      const isEvent = item.type === 'event';
-      const eventDate = isEvent ? parseDate(item.date) : null;
-      return {
-        kind: isEvent ? 'event' : 'post', category: isEvent ? 'events' : 'announcements',
-        label: isEvent ? (eventDate && eventDate < today ? 'Past Event' : 'Upcoming Event') : 'University Announcement',
-        club, item: { ...item, text: item.description }, index: item.id, publishedAt, eventDate,
-        university: true
-      };
-    });
-    return [...clubEntries, ...universityEntries].sort((a, b) => (b.publishedAt?.getTime() || 0) - (a.publishedAt?.getTime() || 0));
-  }
-
   function render() {
-    const visible = entries.filter((entry) => {
-      if (activeFilter === 'events') return entry.kind === 'event'
-        && (entry.eventDate ? entry.eventDate >= today : entry.university === true);
-      return activeFilter === 'all' || entry.category === activeFilter;
-    });
+    const visible = entries;
     if (!visible.length) {
       list.innerHTML = '';
       status.textContent = entries.length ? 'No updates match this filter right now.' : 'No club updates have been published yet.';
@@ -82,7 +39,7 @@
       if (entry.kind === 'event') {
         const eventDate = formatDate(entry.eventDate);
         const meta = [eventDate, item.time && window.formatSiteTime ? window.formatSiteTime(item.time) : item.time, item.location].filter(Boolean).join(' · ');
-        return `<article class="feed-post-card">
+        return `<article class="feed-post-card"${entry.university ? ` data-university-content-id="${escapeHtml(item.id)}"` : ''}>
           <header class="feed-timeline-header">${avatar}<span class="feed-timeline-meta"><span class="feed-timeline-club">${escapeHtml(club.name || '')}</span>${dateText}</span><span class="feed-post-type type-event">${escapeHtml(entry.label)}</span></header>
           <div class="feed-timeline-body"><h2 class="feed-timeline-title">${escapeHtml(title)}</h2>${meta ? `<p class="feed-timeline-date feed-event-meta">${escapeHtml(meta)}</p>` : ''}${item.attendanceEnabled === true ? '<p class="event-attendance-status">Attendance taken</p>' : ''}${image}
             <div class="feed-event-footer">${message ? `<p class="feed-timeline-text">${escapeHtml(message)}</p>` : '<span></span>'}<button class="primary-btn feed-post-action" type="button" data-feed-event="${visibleIndex}" aria-haspopup="dialog">View event details</button></div>
@@ -121,52 +78,29 @@
       filter.classList.toggle('is-active', selected);
       filter.setAttribute('aria-pressed', selected ? 'true' : 'false');
     });
-    render();
+    void pager.setFilter(activeFilter);
   }));
 
-  const refreshUniversityFeed = async () => {
-    try {
-      const response = await fetch('/api/university-content', { cache: 'no-store' });
-      if (!response.ok) throw new Error('University updates are unavailable.');
-      const latest = await response.json();
-      if (!Array.isArray(latest) || window.miuPublicDataCache?.same(universityEntries, latest)) return;
-      universityEntries = Array.isArray(latest) ? latest : [];
-      window.miuPublicDataCache?.write('universityContent', universityEntries);
-      entries = buildEntries(loadedClubs, universityEntries);
+  const pager = window.MiuPagination.create({ section: 'feed', list, post: requestedPost,
+    render(rows) {
+      entries = rows.map(row => {
+        const item = row.item, eventDate = row.collection === 'events' ? parseDate(item.date) : null;
+        const isEvent = row.collection === 'events';
+        const announcement = row.university || /announcement|notice/.test(String(item.type || item.category || item.kind || '').toLowerCase());
+        return { ...row, kind: isEvent ? 'event' : 'post', eventDate,
+          publishedAt: parseDate(item.publishedAt || item.createdAt || item.submittedAt || item.date),
+          label: isEvent ? (eventDate && eventDate < today ? 'Past Event' : 'Upcoming Event')
+            : row.university ? 'University Announcement' : announcement ? 'Announcement' : (item.type || item.category || 'Club Update') };
+      });
       render();
-    } catch {
-      if (!entries.length) { entries = buildEntries(loadedClubs); render(); }
-    }
-  };
-
-  if (entries.length) render();
-  const refreshClubs = async () => {
-    try {
-      const response = await fetch('/api/clubs?media=links', { cache: 'no-store' });
-      if (!response.ok) throw new Error('Could not load community updates.');
-      const latest = await response.json();
-      if (!Array.isArray(latest)) throw new Error('Could not load community updates.');
-      const changed = !window.miuPublicDataCache?.same(loadedClubs, latest);
-      loadedClubs = latest;
-      window.miuPublicDataCache?.write('clubs', loadedClubs);
-      if (changed) { entries = buildEntries(loadedClubs, universityEntries); render(); }
-      if (!universityRefreshScheduled) {
-        universityRefreshScheduled = true;
-        if (window.siteStartup?.afterStartup) window.siteStartup.afterStartup(refreshUniversityFeed);
-        else void refreshUniversityFeed();
-      }
-    } catch {
-      if (!loadedClubs.length) {
-        status.textContent = 'Community updates are unavailable right now. Please try again later.';
-        status.hidden = false;
-        list.innerHTML = '';
-      }
-    }
-  };
-  void refreshClubs();
-
-  window.siteStartup.watch(async () => {
-    await refreshClubs();
-    await refreshUniversityFeed();
+    },
+    onError(error) { status.hidden = false; status.textContent = error.message; }
   });
+  activeFilter = pager.filter;
+  filters.forEach(button => {
+    const selected = button.dataset.filter === activeFilter;
+    button.classList.toggle('is-active', selected); button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+  });
+  void pager.load();
+  window.siteStartup.watch(() => pager.load());
 })();

@@ -7,6 +7,9 @@
     ['recovery', 'Account recovery', 'Send a reset link to a registered club or dashboard account.', 'staff', 'key', 'amber'],
     ['admin-settings', 'Administrator login', 'View the current administrator and permitted login settings.', 'staff', 'settings', 'violet'],
     ['clubs', 'Club management', 'Create and edit club details, images and registration settings.', 'website', 'clubs', 'violet'],
+    ['workflows', 'Workflow management', 'Configure approval stages, roles, revision fields and review current requests.', 'website', 'sort', 'violet'],
+    ['blocked-requests', 'Blocked approval requests', 'Find requests waiting for eligible reviewers and resolve missing staff assignments.', 'website', 'clipboard', 'amber'],
+    ['custom-roles', 'Roles & dashboards', 'Create staff roles, choose their dashboard tools and assign MIU staff emails.', 'staff', 'shield', 'violet'],
     ['excel-review', 'Import clubs from Excel', 'Review club details and embedded logos, then create or update clubs and assign their President and Vice President roles.', 'people', 'file', 'green'],
     ['applications', 'Applications', 'Review full applications, interview notes, ratings and decisions.', 'people', 'clipboard', 'amber'],
     ['members', 'Member directory', 'Look up member profiles, committees and club rosters.', 'people', 'addressBook', 'amber'],
@@ -33,6 +36,20 @@
     ['profile', 'My account photo', 'Add, change or remove your administrator profile photo.', 'people', 'camera', 'green']
   ];
   const tools = rows.map(([id, title, description, category, symbol, color]) => ({ id, title, description, category, symbol, color }));
+  const groupRows = [
+    ['staff-roles', 'Staff & roles', 'Staff accounts, committee heads, supervisors and dashboard roles.', 'staff', 'shield', 'blue', ['staff', 'heads', 'supervisors', 'custom-roles']],
+    ['account-security', 'Accounts & security', 'Passwords, account recovery, administrator login and your profile photo.', 'staff', 'lock', 'amber', ['account-passwords', 'recovery', 'admin-settings', 'profile']],
+    ['club-setup', 'Clubs & registration', 'Club details, Excel imports, committee registration and archived clubs.', 'website', 'clubs', 'violet', ['clubs', 'excel-review', 'committees', 'archives']],
+    ['approvals', 'Workflows & approvals', 'Approval stages, reviewer permissions and requests waiting for reviewers.', 'website', 'clipboard', 'amber', ['workflows', 'blocked-requests']],
+    ['applications-members', 'Applications & members', 'Applications, interview decisions, application questions and member records.', 'people', 'addressBook', 'green', ['applications', 'application-forms', 'members']],
+    ['website-publishing', 'Publishing & website', 'University publishing, published club content, homepage text and club card order.', 'website', 'globe', 'blue', ['publishing', 'website-content', 'homepage', 'club-order']],
+    ['attendance-reports', 'Attendance & reports', 'University, club and open-event attendance, plus event reports.', 'attendance', 'calendarCheck', 'green', ['miu-attendance', 'attendance', 'open-attendance', 'reports']],
+    ['feedback', 'Feedback & evaluations', 'Student club feedback, university poll votes and evaluation responses.', 'insights', 'messageStar', 'amber', ['club-feedback', 'university-feedback']],
+    ['performance', 'Analytics & points', 'Club and event performance, club quiz points and website visitor analytics.', 'insights', 'chart', 'violet', ['club-analytics', 'event-analytics', 'quiz-points', 'analytics']],
+    ['activity-system', 'Activity & system', 'All activity, developer activity and database status.', 'insights', 'history', 'violet', ['all-activity-log', 'developer-activity-log', 'data']]
+  ];
+  const groups = groupRows.map(([key, title, description, category, symbol, color, toolIds]) => ({ id: 'group-' + key, key, title, description, category, symbol, color, toolIds }));
+  Object.defineProperty(tools, 'groups', { value: groups });
   if (typeof module !== 'undefined' && module.exports) module.exports = tools;
   else window.adminDashboardTools = tools;
 })();

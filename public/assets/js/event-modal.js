@@ -31,19 +31,13 @@
 
   let activeEvent = null;
 
-  window.openEventModal = function (event) {
-    if (!event) return;
-    window.unmountStudentEventRegistration?.(form);
-    activeEvent = event;
-    if (!event.university && Number.isInteger(Number(event.clubId)) && Number.isInteger(Number(event.eventIndex))) {
-      fetch(`/api/events/${encodeURIComponent(event.clubId)}/${encodeURIComponent(event.eventIndex)}/view`, { method: 'POST', cache: 'no-store' }).catch(() => {});
-    }
+  function renderEventCopy(event) {
     image.src = event.image || event.clubImage || '';
     image.alt = event.title || 'Event';
     image.classList.toggle('university-brand-image', event.university === true && (event.image || '/assets/img/pics/logo.svg.png') === '/assets/img/pics/logo.svg.png');
-    club.textContent = event.clubName || '';
+    club.textContent = event.university ? (event.organization?.name || 'Misr International University') : event.clubName || '';
     title.textContent = event.title || 'Event';
-    meta.textContent = [formatDate(event.date), window.formatSiteTime ? window.formatSiteTime(event.time) : event.time, event.location].filter(Boolean).join(' · ');
+    meta.textContent = [event.date ? formatDate(event.date) : 'Date to be announced', window.formatSiteTime ? window.formatSiteTime(event.time) : event.time, event.location].filter(Boolean).join(' · ');
     attendance.hidden = event.attendanceEnabled !== true;
     attendance.textContent = 'Attendance taken';
     description.textContent = event.description || '';
@@ -52,6 +46,16 @@
         ? event.university ? 'MIU club members only.' : 'Club members only.'
         : 'Open to all university students, including non-members.'}`;
     }
+  }
+
+  window.openEventModal = function (event) {
+    if (!event) return;
+    window.unmountStudentEventRegistration?.(form);
+    activeEvent = event;
+    if (!event.university && Number.isInteger(Number(event.clubId)) && Number.isInteger(Number(event.eventIndex))) {
+      fetch(`/api/events/${encodeURIComponent(event.clubId)}/${encodeURIComponent(event.eventIndex)}/view`, { method: 'POST', cache: 'no-store' }).catch(() => {});
+    }
+    renderEventCopy(event);
     feedback.textContent = '';
     form.reset();
     form.hidden = event.registrationEnabled === false;
@@ -66,6 +70,33 @@
     closeButton.focus({ preventScroll: true });
     modal.querySelector('.event-modal-panel').scrollTop = 0;
   };
+
+  let universityRefresh;
+  window.siteStartup?.watch(() => {
+    if (!activeEvent?.university || modal.classList.contains('hidden')) return;
+    if (universityRefresh) return universityRefresh;
+    const previous = activeEvent;
+    universityRefresh = (async () => {
+      try {
+        const response = await fetch('/api/university-content/' + (previous.universityContentId || previous.id), { cache: 'no-store' });
+        if (activeEvent !== previous || modal.classList.contains('hidden')) return;
+        if (response.status === 404) { close(); activeEvent = null; return; }
+        if (!response.ok) return;
+        const event = await response.json();
+        if (activeEvent !== previous || modal.classList.contains('hidden')) return;
+        const next = { ...event, university: true, universityContentId: event.id, clubId: 0,
+          clubName: event.organization?.name || 'Misr International University', clubImage: event.organization?.image || '/assets/img/pics/logo.svg.png' };
+        const registrationChanged = event.registrationEnabled !== previous.registrationEnabled || event.attendanceAudience !== previous.attendanceAudience;
+        if (registrationChanged) {
+          const nameInput = document.getElementById('eventModalName'), emailInput = document.getElementById('eventModalEmail');
+          const nameValue = nameInput.value, emailValue = emailInput.value;
+          window.openEventModal(next); nameInput.value = nameValue; emailInput.value = emailValue;
+        } else { activeEvent = next; renderEventCopy(next); }
+      } catch { /* Keep the visible saved event while the connection recovers. */ }
+      finally { universityRefresh = null; }
+    })();
+    return universityRefresh;
+  });
 
   closeButton.addEventListener('click', close);
   modal.addEventListener('click', (event) => { if (event.target === modal) close(); });

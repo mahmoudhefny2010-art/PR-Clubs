@@ -37,7 +37,7 @@ function publicClubProjection() {
   return projection;
 }
 
-function registerPublicClubMedia(app, { Club, requireLiveDatabase }) {
+function registerPublicClubMedia(app, { Club, requireLiveDatabase, readMedia, ensureDatabaseReady }) {
   app.get('/api/public-club-media/:clubId/:collection/:index/:field', async (req, res) => {
     const { collection, field } = req.params;
     const clubId = Number(req.params.clubId);
@@ -47,15 +47,16 @@ function registerPublicClubMedia(app, { Club, requireLiveDatabase }) {
       || !Number.isSafeInteger(clubId) || clubId < 1 || !Number.isSafeInteger(index) || index < 0
       || !/^\d+$/.test(String(req.query.v)) || !Number.isSafeInteger(version) || version < 0
       || !Number.isFinite(new Date(version).getTime())) return res.status(400).end();
-    if (!requireLiveDatabase(res)) return;
     try {
-      const [record] = await Club.aggregate([
+      if (ensureDatabaseReady) await ensureDatabaseReady();
+      if (!requireLiveDatabase(res)) return;
+      const record = readMedia ? { value: await readMedia({ clubId, collection, index, field, version }) } : (await Club.aggregate([
         { $match: { id: clubId, archivedAt: null,
           ...(version ? { updatedAt: new Date(version) } : { updatedAt: null }) } },
         { $project: { _id: 0, value: { $let: {
           vars: { item: { $arrayElemAt: [`$${collection}`, index] } }, in: `$$item.${field}`
         } } } }
-      ]).read('primary').readConcern('majority');
+      ]).read('primary').readConcern('majority'))[0];
       const match = typeof record?.value === 'string'
         && /^data:([\w.+/-]+);base64,([A-Za-z0-9+/=\r\n]+)$/.exec(record.value);
       if (!match) return res.status(404).end();

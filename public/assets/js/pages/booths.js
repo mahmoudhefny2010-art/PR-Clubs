@@ -16,32 +16,10 @@
 
   const escapeHtml = window.MiuUI.escapeHtml;
 
-  let clubs = [];
-  const allBooths = () => clubs.flatMap((club) =>
-    (Array.isArray(club.booths) ? club.booths : []).map((booth, index) => ({
-      ...booth,
-      contentType: booth.contentType || 'booth',
-      clubId: club.id,
-      clubName: club.name,
-      clubImage: club.image,
-      index,
-    })));
-
-  // Upcoming items sort by the nearest date first; equal dates show the most recently created item first.
-  const compareUpcoming = (left, right) => {
-    const leftDate = parseDate(left.boothOpenDate || left.date);
-    const rightDate = parseDate(right.boothOpenDate || right.date);
-    if (leftDate && rightDate && leftDate.getTime() !== rightDate.getTime()) return leftDate - rightDate;
-    if (leftDate && !rightDate) return -1;
-    if (!leftDate && rightDate) return 1;
-    const leftCreated = new Date(left.createdAt || 0).getTime();
-    const rightCreated = new Date(right.createdAt || 0).getTime();
-    if (leftCreated !== rightCreated) return rightCreated - leftCreated;
-    return (Number(right.requestId) || 0) - (Number(left.requestId) || 0);
-  };
+  let items = [];
 
   function renderList() {
-    const booths = allBooths().sort(compareUpcoming);
+    const booths = items;
     if (!booths.length) {
       listEl.innerHTML = '<p class="events-empty">No approved booths right now.</p>';
       return;
@@ -70,8 +48,8 @@
   }
 
   function openDetail(clubId, idx) {
-    const club = clubs.find((c) => Number(c.id) === Number(clubId));
-    const booth = club && Array.isArray(club.booths) ? club.booths[idx] : null;
+    const booth = items.find(item => Number(item.clubId) === Number(clubId) && Number(item.index) === Number(idx));
+    const club = booth ? { name: booth.clubName, image: booth.clubImage } : null;
     if (!booth) return;
     detailImg.src = club.image || '';
     detailClub.textContent = club.name || '';
@@ -98,27 +76,10 @@
     });
   }
 
-  clubs = window.miuPublicDataCache?.read('clubs') || [];
-  if (clubs.length) renderList();
-  fetch('/api/clubs?media=links', { cache: 'no-store' })
-    .then((response) => response.json())
-    .then((data) => {
-      clubs = Array.isArray(data) ? data : [];
-      window.miuPublicDataCache?.write('clubs', clubs);
-      renderList();
-    })
-    .catch(() => {
-      if (!clubs.length && listEl) listEl.innerHTML = '<p class="events-empty">Could not load booths right now.</p>';
-    });
-  window.siteStartup.watch(async () => {
-    try {
-      const response = await fetch('/api/clubs?media=links', { cache: 'no-store' });
-      if (!response.ok) return;
-      const latest = await response.json();
-      if (!Array.isArray(latest) || window.miuPublicDataCache?.same(clubs, latest)) return;
-      clubs = latest;
-      window.miuPublicDataCache?.write('clubs', clubs);
-      renderList();
-    } catch { /* Keep the last loaded club list visible. */ }
+  const pager = window.MiuPagination.create({ section: 'booths', list: listEl,
+    render(rows) { items = rows.map(row => ({ ...row.item, clubId: row.club.id, clubName: row.club.name, clubImage: row.club.image, index: row.index })); renderList(); },
+    onError(error) { if (!items.length) listEl.textContent = error.message; }
   });
+  void pager.load();
+  window.siteStartup.watch(() => pager.load());
 })();

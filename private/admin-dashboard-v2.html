@@ -12,18 +12,18 @@
   <link rel="stylesheet" href="/assets/css/dark.css">
   <link rel="stylesheet" href="/assets/css/features.css?v=20261015videopopup1">
   <!-- TOOL_STYLES -->
-  <link rel="stylesheet" href="/assets/css/pages/admin-dashboard-v2.css?v=20261018quizpoints1">
+  <link rel="stylesheet" href="/assets/css/pages/admin-dashboard-v2.css?v=20261019excelRowLog1">
   <script src="/assets/js/feed-media.js?v=20261015videopopup1"></script>
-  <script src="/assets/js/admin-dashboard-tools.js?v=20261018quizpoints1"></script>
+  <script src="/assets/js/admin-dashboard-tools.js?v=20261019toolGroups1"></script>
   <script src="/assets/js/admin-dashboard-data.js?v=20261018quizpoints1"></script>
   <script src="/assets/js/theme.js" defer></script>
   <script src="/assets/js/pwa-register.js?v=20261014localfresh1" defer></script>
-  <script src="/assets/js/layout.js?v=20261017footercache2" defer></script>
+  <script src="/assets/js/layout.js?v=20261018customRoles1" defer></script>
   <script src="/assets/js/admin-dashboard-editors.js?v=20261017clubformautofill1" defer></script>
   <script src="/assets/js/admin-dashboard-features.js?v=20261015removedirectory1" defer></script>
-  <script src="/assets/js/admin-dashboard-layout.js?v=20261015arrange1" defer></script>
+  <script src="/assets/js/admin-dashboard-layout.js?v=20261019toolGroups1" defer></script>
   <!-- TOOL_SCRIPTS -->
-  <script src="/assets/js/pages/admin-dashboard-v2.js?v=20261018quizpoints1" defer></script>
+  <script src="/assets/js/pages/admin-dashboard-v2.js?v=20261019compactGroups1" defer></script>
 </head>
 <body class="admin-v2" data-tool="">
   <header id="adminWorkspaceHeader" class="v2-admin-header">
@@ -41,6 +41,7 @@
     <p class="v2-nav-label">WORKSPACE</p>
     <nav class="v2-nav" id="dashboardNavigation" aria-label="Tool categories">
       <button class="is-active" type="button" data-category="all" aria-pressed="true"><span data-icon="grid"></span>Overview</button>
+      <a class="v2-blocked-link" href="/admin/blocked-requests"><span data-icon="clipboard"></span><span>Blocked approvals</span><span class="v2-request-badge" data-blocked-badge hidden></span></a>
       <button type="button" data-category="staff" aria-pressed="false"><span data-icon="shield"></span>Staff &amp; access</button>
       <button type="button" data-category="website" aria-pressed="false"><span data-icon="globe"></span>Website &amp; clubs</button>
       <button type="button" data-category="people" aria-pressed="false"><span data-icon="users"></span>People &amp; access</button>
@@ -53,19 +54,20 @@
   </aside>
   <main id="dashboardMain" class="v2-main">
     <div id="overviewPage">
-    <header class="v2-topbar"><span>Workspace <span aria-hidden="true">/</span> <strong>Overview</strong></span><span id="dashboardDate"></span></header>
-    <section class="v2-heading">
+    <header class="v2-topbar" data-overview-only><span>Workspace <span aria-hidden="true">/</span> <strong>Overview</strong></span><span id="dashboardDate"></span></header>
+    <section class="v2-heading" data-overview-only>
       <div><div class="v2-eyebrow">YOUR CONTROL CENTER</div><h1>Admin Dashboard</h1><p>Everything you need to manage your university clubs, in one place.</p></div>
       <button class="v2-refresh" id="refreshDashboard" type="button"><span data-icon="refresh"></span>Refresh overview</button>
     </section>
-    <section class="v2-summary" aria-label="Website overview" aria-busy="true" id="dashboardSummary">
+    <section class="v2-summary" data-overview-only aria-label="Website overview" aria-busy="true" id="dashboardSummary">
       <article><span class="v2-summary-icon blue" data-icon="clubs"></span><div><span>Active clubs</span><strong id="totalClubs">—</strong></div></article>
       <article><span class="v2-summary-icon violet" data-icon="clipboard"></span><div><span>Applications</span><strong id="totalApplications">—</strong></div></article>
       <article><span class="v2-summary-icon amber" data-icon="users"></span><div><span>Committee heads</span><strong id="totalHeads">—</strong></div></article>
       <article><span class="v2-summary-icon green" data-icon="door"></span><div><span>Clubs accepting members</span><strong id="openClubs">—</strong></div></article>
     </section>
-    <p id="overviewFeedback" class="v2-feedback" role="status" aria-live="polite"></p>
-    <section aria-labelledby="toolsHeading">
+    <p id="overviewFeedback" data-overview-only class="v2-feedback" role="status" aria-live="polite"></p>
+    <section id="managementTools" aria-labelledby="toolsHeading">
+      <nav id="toolGroupNavigation" aria-label="Tool group navigation" hidden><a id="toolGroupBack" class="v2-action secondary" href="/admin#managementTools">← All tool groups</a></nav>
       <div class="v2-tools-heading"><div><h2 id="toolsHeading">Management tools</h2><p id="toolsCount">Choose a tool to get started.</p></div><label class="v2-search"><span data-icon="search"></span><span class="v2-sr">Search management tools</span><input id="toolSearch" type="search" placeholder="Search tools…" autocomplete="off"></label></div>
       <div class="v2-layout-controls"><button type="button" id="arrangeCards" class="v2-action secondary" aria-pressed="false" aria-controls="widgetGrid" disabled>Arrange cards</button><button type="button" id="resetCardOrder" class="v2-action secondary" hidden>Reset order</button></div>
       <p id="cardOrderStatus" class="v2-panel-note" role="status" aria-live="polite" hidden></p>

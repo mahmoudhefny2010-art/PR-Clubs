@@ -335,6 +335,39 @@ function openQuiz(doc) {
 }
 
 describe('quiz launcher', () => {
+  function mountAt(pathname, sessionStorage) {
+    const doc = createFakeDocument(pathname);
+    if (sessionStorage) doc.sessionStorage = sessionStorage;
+    const quiz = createQuiz({ dom: doc, window: { location: doc.location, sessionStorage: doc.sessionStorage } });
+    quiz.mount();
+    return { doc, quiz, bubble: doc.querySelector('.quiz-launcher-bubble') };
+  }
+
+  it('greets only on the first home visit, including across refreshes and site navigation', () => {
+    const first = mountAt('/');
+    assert.equal(first.bubble.style.display, '');
+    const session = first.doc.sessionStorage;
+    for (const path of ['/', '/pages/events.html', '/index.html']) {
+      const next = mountAt(path, session);
+      assert.equal(next.bubble.style.display, 'none');
+      assert.ok(next.doc.querySelector('.quiz-launcher').classList.contains('quiz-launcher-quiet'));
+    }
+  });
+
+  it('visiting another page first does not consume the home greeting', () => {
+    const other = mountAt('/pages/feed.html');
+    assert.equal(other.bubble.style.display, 'none');
+    const home = mountAt('/index.html', other.doc.sessionStorage);
+    assert.equal(home.bubble.style.display, '');
+  });
+
+  it('shows the greeting again in a fresh session after a previous dismissal', () => {
+    const first = mountAt('/');
+    first.quiz.dismissMessage();
+    assert.equal(mountAt('/', first.doc.sessionStorage).bubble.style.display, 'none');
+    assert.equal(mountAt('/').bubble.style.display, '');
+  });
+
   it('mounts a launcher and a dismissible message without opening the quiz', () => {
     const doc = createFakeDocument();
     const { quiz, launcher, bubble } = openQuiz(doc);

@@ -981,9 +981,13 @@ async function getClubAccountFromRequest(req, res = null) {
   }
   if (!account || ['supervisor', 'miu_events', 'software_development'].includes(account.role) && ![5, 6].includes(cookieParts.length)) return null;
   if (mongoReady) {
-    const storedAccount = await ClubAccount.findOne(cookieParts.length === 6
+    let storedAccount = await ClubAccount.findOne(cookieParts.length === 6
       ? { email: account.email } : { clubId: Number(clubIdText), email: account.email }).lean();
     if (!storedAccount || Number(storedAccount.sessionVersion) !== version) return null;
+    if (storedAccount.role?.startsWith('custom_') || storedAccount.roleAssignments?.some(item => item.role.startsWith('custom_'))) {
+      storedAccount = await require('./services/custom-staff-access').decorateCustomStaff(storedAccount);
+      if (!storedAccount) return null;
+    }
     const accountIndex = clubAccounts.findIndex((item) => item.clubId === storedAccount.clubId && item.email === storedAccount.email);
     if (accountIndex >= 0) clubAccounts[accountIndex] = storedAccount;
     else clubAccounts.push(storedAccount);
@@ -1012,13 +1016,13 @@ function setClubSessionCookie(req, res, account, assignment = null) {
 }
 
 function getStaffDashboardOptions(account) {
-  const { STAFF_ROUTES, STAFF_ROLE_LABELS, staffRoleAssignments } = require('./services/staff-google-auth');
+  const { STAFF_ROUTES, STAFF_ROLE_LABELS, staffRoleAssignments, staffRoute } = require('./services/staff-google-auth');
   return staffRoleAssignments(account).map(assignment => ({
     role: assignment.role,
     clubId: assignment.clubId,
     committee: assignment.committee,
-    label: STAFF_ROLE_LABELS[assignment.role] || assignment.role,
-    href: STAFF_ROUTES[assignment.role],
+    label: account.customRoles?.find(role => role.key === assignment.role)?.name || STAFF_ROLE_LABELS[assignment.role] || assignment.role,
+    href: staffRoute(assignment.role),
     clubName: (assignment.role === 'supervisor' ? assignment.assignedClubIds
       : ['president', 'vice_president', 'head'].includes(assignment.role) ? [assignment.clubId] : [])
       .map(id => clubs.find(club => Number(club.id) === Number(id))?.name).filter(Boolean).join(', ')
@@ -1029,7 +1033,7 @@ async function requireClubAuth(req, res, next) {
   try {
     const account = await getClubAccountFromRequest(req, res);
     if (!account) return res.status(401).json({ message: 'Club login required.' });
-    if (['supervisor', 'miu_events', 'software_development'].includes(account.role)) return res.status(403).json({ message: 'Use your assigned dashboard for access.' });
+    if (['supervisor', 'miu_events', 'software_development'].includes(account.role) || account.role.startsWith('custom_')) return res.status(403).json({ message: 'Use your assigned dashboard for access.' });
     req.clubAccount = account;
     next();
   } catch (error) {
@@ -1255,6 +1259,7 @@ function publicSpeakerRequest(record) {
     decidedAt: record.decidedAt,
     attachments: attachments.map((item, index) => ({ index, name: item.name || `speaker-material.${item.format || 'pdf'}`, format: item.format || 'pdf' })),
     cvAvailable: attachments.length > 0, cvName: attachments[0]?.name || record.cvName || '',
+    ...(record.workflow ? { workflow: { state: record.workflow.state, stageId: record.workflow.stageId, revision: record.workflow.revision } } : {}),
     ...(record.requesterType ? { requesterName: record.requesterName || '' } : {})
   };
 }
@@ -1298,7 +1303,7 @@ function sanitizeSpeakerAttachmentName(value, format) {
   return name;
 }
 
-async function verifySpeakerCvUploads(items, identity) {
+async function verifySpeakerCvUploads(items, identity, session) {
   if (!Array.isArray(items)) return { error: 'The attachment list is invalid.' };
   if (items.length > 5) return { error: 'Choose up to five supporting documents.' };
   if (!items.length) return { attachments: [] };
@@ -1308,9 +1313,10 @@ async function verifySpeakerCvUploads(items, identity) {
   }
   const ownerKey = requesterKey(identity, identity.type === 'club' ? identity.clubId : 0);
   try {
-    const grants = await Promise.all(ids.map((id) => SpeakerCvUpload.findOne({
-      _id: id, requesterKey: ownerKey, consumedAt: null, expiresAt: { $gt: new Date() }
-    }).lean()));
+    const grants = await Promise.all(ids.map((id) => {
+      const query = SpeakerCvUpload.findOne({ _id: id, requesterKey: ownerKey, consumedAt: null, expiresAt: { $gt: new Date() } });
+      return (session ? query.session(session) : query).lean();
+    }));
     if (grants.some((grant) => !grant)) return { error: 'An upload expired or belongs to another account. Upload the files again.' };
     const assets = await Promise.all(grants.map((grant) => cloudinary.api.resource(grant.publicId, { resource_type: 'raw', type: 'authenticated' })));
     if (assets.some((asset) => !validateSpeakerCvAsset(asset))) {
@@ -1319,10 +1325,11 @@ async function verifySpeakerCvUploads(items, identity) {
     const consumedAt = new Date();
     const claimed = [];
     for (const grant of grants) {
-      const result = await SpeakerCvUpload.findOneAndUpdate(
+      const claimQuery = SpeakerCvUpload.findOneAndUpdate(
         { _id: grant._id, requesterKey: ownerKey, consumedAt: null, expiresAt: { $gt: consumedAt } },
         { $set: { consumedAt } }, { new: true }
-      ).lean();
+      );
+      const result = await (session ? claimQuery.session(session) : claimQuery).lean();
       if (!result) return { error: 'An upload was already used. Select and upload the files again.' };
       claimed.push(result);
     }
@@ -1342,8 +1349,8 @@ async function verifySpeakerCvUploads(items, identity) {
   }
 }
 
-async function verifySpeakerRequestAttachments(body, identity) {
-  if (Array.isArray(body?.attachmentUploads)) return verifySpeakerCvUploads(body.attachmentUploads, identity);
+async function verifySpeakerRequestAttachments(body, identity, session) {
+  if (Array.isArray(body?.attachmentUploads)) return verifySpeakerCvUploads(body.attachmentUploads, identity, session);
   const legacy = await verifySpeakerCvUpload(body?.cvUploadId, identity);
   if (legacy.error) return legacy;
   if (!legacy.publicId) return { attachments: [] };
@@ -1418,6 +1425,91 @@ function speakerInviteResponse(invite, token, reused) {
   };
 }
 
+async function workflowActor(req, res) {
+  if (await isAdminSessionValid(req, res)) return { admin: true, email: getConfiguredAdminEmail().toLowerCase(), assignments: [{ role: 'admin' }] };
+  const account = await getClubAccountFromRequest(req, res);
+  if (account) {
+    const assignments = require('./services/staff-google-auth').staffRoleAssignments(account);
+    if (account.role.startsWith('custom_')) return { email: account.email.toLowerCase(), role: account.role,
+      assignments: assignments.filter(item => item.role === account.role), customRoles: (account.customRoles || []).filter(role => role.key === account.role), admin: false };
+    return { email: account.email.toLowerCase(), role: account.role, assignments, customRoles: account.customRoles || [], admin: assignments.some(item => item.role === 'software_development') };
+  }
+  const student = await getStudentAccountFromRequest(req, res, false);
+  return student ? { email: student.email.toLowerCase(), role: 'student', assignments: [] } : null;
+}
+const dynamicWorkflowEngine = require('./services/workflow-engine').createWorkflowEngine({
+  database: mongoose, ContentRequest, SpeakerRequest, ClubAccount, AuditLog, adminEmail: getConfiguredAdminEmail,
+  customRoles: require('./services/custom-staff-role-model').CustomStaffRole,
+  transport: getPasswordRecoveryTransport,
+  afterCommit: async record => {
+    if (record.type && record.status === 'published') await dispatchPublishedContentNotifications({ source: 'club', contentId: record.id, revision: record.publishedAt?.getTime() || Date.now(), type: record.type, title: record.title });
+  },
+  publish: async (record, session) => {
+    if (record.type === 'entry_permit') return;
+    if (missingRequiredPublicContentImage(record.type, record)) throw new (require('./services/workflow-policy').WorkflowError)(422, 'Add the required image before final approval.');
+    const club = await Club.findOne({ id: record.clubId, archivedAt: null }).session(session);
+    if (!club) throw new (require('./services/workflow-policy').WorkflowError)(409, 'The club is no longer available.');
+    const field = contentClubField[record.type];
+    club[field] = (club[field] || []).filter(item => Number(item.requestId) !== Number(record.id));
+    club[field].push(buildPublishedItem({ ...record, publishedAt: new Date() }, club));
+    await club.save({ session });
+  },
+  validatePatch: async (record, patch, actor, session) => {
+    const { WorkflowError } = require('./services/workflow-policy');
+    if (patch.image !== undefined) patch.image = await validateFeedMedia(record.type, { image: patch.image }, record.image || '', { cloudinary, cloudName: cloudinaryCredentials?.cloud_name });
+    if (patch.sponsorAttachment !== undefined && !validSponsorAttachment(patch.sponsorAttachment)) throw new WorkflowError(422, 'Choose a valid supporting attachment.');
+    if (patch.sponsorLogo !== undefined && patch.sponsorLogo && !/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=\r\n]+$/.test(patch.sponsorLogo)) throw new WorkflowError(422, 'Choose a valid company logo image.');
+    if (!record.type) {
+      const merged = { ...record, ...patch };
+      if (record.requesterType === 'club') {
+        const result = validateSpeakerPayload(merged);
+        if (result.error) throw new WorkflowError(422, result.error);
+      } else {
+        const result = validatePublicSpeakerInvitePayload({ ...merged, fullName: merged.speakerName, email: merged.speakerEmail });
+        if (result.error) throw new WorkflowError(422, result.error);
+      }
+      if (patch.speakerAttachments) {
+        const upload = await verifySpeakerRequestAttachments({ attachmentUploads: patch.speakerAttachments }, { type: 'club', email: actor.email, id: `club:${record.clubId}:${actor.email}`, clubId: record.clubId }, session);
+        if (upload.error) throw new WorkflowError(422, upload.error);
+        patch.speakerAttachments = upload.attachments;
+        // CV aliases are internal derivatives, never arbitrary client properties.
+        patch.cvPublicId = upload.attachments[0]?.publicId || '';
+        patch.cvFormat = upload.attachments[0]?.format || 'pdf';
+        patch.cvName = upload.attachments[0]?.name || '';
+      }
+    }
+  }
+});
+const workflowDeliveryTimer = setInterval(() => { if (mongoReady) { void dynamicWorkflowEngine.deliver(); void dynamicWorkflowEngine.reconcile().catch(error => console.error('Workflow reviewer availability check failed:', error.name)); } }, 30000);
+workflowDeliveryTimer.unref();
+const customStaffRoleService = require('./services/custom-staff-roles').createCustomRoleService({
+  database: mongoose, ClubAccount, Club, AuditLog,
+  refreshAccount(account) { const index = clubAccounts.findIndex(item => item.email === account.email); if (index < 0) clubAccounts.push(account); else clubAccounts[index] = account; },
+  removeAccount(account) { clubAccounts = clubAccounts.filter(item => item.email !== account.email); }
+});
+require('./services/custom-staff-role-routes').registerCustomStaffRoleRoutes(app, { service: customStaffRoleService, engine: dynamicWorkflowEngine,
+  actorFor: workflowActor, ready: ensureReady, sameOrigin: isSameOriginRequest, requireAdmin, root: __dirname });
+require('./services/workflow-routes').registerWorkflowRoutes(app, { engine: dynamicWorkflowEngine, actorFor: workflowActor,
+  requireAdmin, ready: ensureReady, sameOrigin: isSameOriginRequest,
+  attachmentUrl: async attachment => {
+    if (!cloudinaryConfigured) throw new (require('./services/workflow-policy').WorkflowError)(503, 'Private attachment storage is unavailable.');
+    return cloudinary.utils.private_download_url(attachment.publicId, attachment.format || 'pdf', { resource_type: 'raw', type: 'authenticated', expires_at: Math.floor(Date.now() / 1000) + 300, attachment: true });
+  },
+  uploadAttachment: async (record, actor, body) => {
+    const { WorkflowError } = require('./services/workflow-policy');
+    if (!cloudinaryConfigured) throw new WorkflowError(503, 'Private attachment storage is unavailable.');
+    const decoded = decodeSpeakerCvData(body.fileData);
+    if (decoded.error) throw new WorkflowError(422, decoded.error);
+    const publicId = `miu-speaker-cvs/${crypto.randomUUID()}.${decoded.format}`;
+    const asset = await uploadSpeakerCv(decoded.buffer, publicId);
+    if (!validateSpeakerCvAsset(asset)) { await cloudinary.uploader.destroy(publicId, { resource_type: 'raw', type: 'authenticated' }).catch(() => {}); throw new WorkflowError(422, 'Choose a supported document up to 5 MB.'); }
+    const uploadId = crypto.randomUUID();
+    try { await SpeakerCvUpload.create({ _id: uploadId, publicId, requesterKey: requesterKey({ type: 'club', id: `club:${record.clubId}:${actor.email}`, email: actor.email }, record.clubId), expiresAt: new Date(Date.now() + CV_UPLOAD_TTL_MS) }); }
+    catch (error) { await cloudinary.uploader.destroy(publicId, { resource_type: 'raw', type: 'authenticated' }).catch(() => {}); throw error; }
+    return { uploadId };
+  }
+});
+
 app.post('/api/club/speaker-invites', requireClubAuth, requireSpeakerManager, async (req, res) => {
   if (!isSameOriginRequest(req)) return res.status(403).json({ message: 'Reload the page and try again.' });
   if (!['president', 'head'].includes(req.clubAccount?.role)) return res.status(403).json({ message: 'Only the club president or a committee head can create speaker invitation links.' });
@@ -1489,7 +1581,7 @@ app.post('/api/public/speaker-invites/:token/submit', async (req, res) => {
       }
     }
     const speakerAttachments = uploadedPublicId ? [{ publicId: uploadedPublicId, name: materialName, format: materialFormat }] : [];
-    const record = await SpeakerRequest.create({
+    const speakerValues = {
       ...validated.value, clubId: club.id, clubName: club.name,
       requesterType: 'speaker', requesterId: `speaker:${validated.value.speakerEmail}`,
       requesterEmail: validated.value.speakerEmail, requesterRole: 'speaker',
@@ -1499,12 +1591,14 @@ app.post('/api/public/speaker-invites/:token/submit', async (req, res) => {
       inviteId: invite._id,
       cvPublicId: uploadedPublicId, cvFormat: materialFormat, cvName: materialName, speakerAttachments, status: club.id === 0 ? 'pending_dean' : 'pending_club', activeRequesterKey,
       decisionHistory: [{ action: 'submitted', role: 'speaker', email: validated.value.speakerEmail }]
-    });
+    };
+    const record = await dynamicWorkflowEngine.createNew('speaker', speakerValues, { email: validated.value.speakerEmail, role: 'speaker' });
     res.status(201).json({ message: 'Thank you for your interest! Your response has been submitted successfully. Our team will contact you soon.' });
   } catch (error) {
     if (uploadedPublicId) await cloudinary.uploader.destroy(uploadedPublicId, { resource_type: 'raw', type: 'authenticated' }).catch(() => {});
     if (error?.code === 11000) return res.status(409).json({ message: 'You already have an active speaker request with this club.' });
     console.error('Public speaker request submission failed:', error.name);
+    if (error.status) return res.status(error.status).json({ message: error.message });
     res.status(503).json({ message: 'Your proposal could not be saved. Please try again.' });
   }
 });
@@ -1526,7 +1620,8 @@ app.get('/api/speaker-requests/context', requireSpeakerManager, async (req, res)
     const requests = await SpeakerRequest.find(identity.type === 'student'
       ? { requesterType: 'student', requesterId: identity.id }
       : clubRequestFilter).sort({ submittedAt: -1 }).lean();
-    res.json({ identity: { type: identity.type, name: identity.name, email: identity.email, role: identity.role, clubId: identity.clubId || null }, club, clubs, requests: requests.map(publicSpeakerRequest) });
+    const visibleRequests = requests.filter(record => !record.workflow || require('./services/workflow-policy').mayView({ email: identity.email, assignments: [{ role: identity.role, clubId: identity.clubId }] }, record));
+    res.json({ identity: { type: identity.type, name: identity.name, email: identity.email, role: identity.role, clubId: identity.clubId || null }, club, clubs, requests: visibleRequests.map(publicSpeakerRequest) });
   } catch (error) {
     console.error('Speaker request context failed:', error.name);
     res.status(503).json({ message: 'Could not load speaker request information. Please try again.' });
@@ -1586,7 +1681,7 @@ app.get('/api/speaker-requests', requireSpeakerManager, async (req, res) => {
         ? { clubId: identity.clubId, $or: [{ assignedHeadEmail: { $in: ['', null] } }, { assignedHeadEmail: identity.email.toLowerCase() }] }
         : { clubId: identity.clubId };
     const records = await SpeakerRequest.find(filter).sort({ submittedAt: -1 }).lean();
-    res.json(records.map(publicSpeakerRequest));
+    res.json(records.filter(record => !record.workflow || require('./services/workflow-policy').mayView({ email: identity.email, assignments: [{ role: identity.role, clubId: identity.clubId }] }, record)).map(publicSpeakerRequest));
   } catch (error) {
     console.error('Speaker request list failed:', error.name);
     res.status(503).json({ message: 'Could not load your speaker requests.' });
@@ -1617,20 +1712,22 @@ app.post('/api/speaker-requests', requireSpeakerManager, async (req, res) => {
     if (upload.error) return res.status(400).json({ message: upload.error });
     const attachments = upload.attachments || [];
     const primaryAttachment = attachments[0];
-    const record = await SpeakerRequest.create({
+    const speakerValues = {
       ...validated.value, clubId, clubName: club.name, hostingType, requesterType: identity.type,
       requesterId: identity.id, requesterEmail: identity.email, requesterRole: identity.role,
       requesterName: identity.name, speakerAttachments: attachments,
       cvPublicId: primaryAttachment?.publicId || '', cvFormat: primaryAttachment?.format || 'pdf', cvName: primaryAttachment?.name || '',
       status: identity.type === 'club' ? 'pending_supervisor' : hostingType === 'miu' ? 'pending_dean' : 'pending_club', activeRequesterKey,
       decisionHistory: [{ action: 'submitted', role: identity.role, email: identity.email }]
-    });
-    await notifySpeakerWorkflow(record.toObject());
+    };
+    const record = typeof dynamicWorkflowEngine !== 'undefined'
+      ? await dynamicWorkflowEngine.createNew('speaker', speakerValues, { email: identity.email, role: identity.role })
+      : await SpeakerRequest.create(speakerValues);
     res.status(201).json(publicSpeakerRequest(record.toObject()));
   } catch (error) {
     if (error?.code === 11000) return res.status(409).json({ message: 'You already have an active speaker request for this hosting organization. Update that request instead.' });
     console.error('Speaker request submission failed:', error.name);
-    res.status(503).json({ message: 'The speaker request was not saved. Please try again.' });
+    res.status(error.status || 503).json({ message: error.status ? error.message : 'The speaker request was not saved. Please try again.' });
   }
 });
 
@@ -1748,7 +1845,7 @@ app.get('/api/dean/speaker-requests', requireClubAuth, async (req, res) => {
   if (req.clubAccount?.role !== 'dean') return res.status(403).json({ message: 'Only the Dean can review external speaker requests.' });
   if (!requireLiveDatabase(res)) return;
   try {
-    const records = await SpeakerRequest.find({ $or: [
+    const records = await SpeakerRequest.find({ workflow: { $exists: false }, $or: [
       { status: 'pending_dean' },
       { status: { $in: ['approved', 'rejected', 'changes_requested'] }, reviewerRole: 'dean', $or: [{ hostingType: 'miu' }, { clubReviewedAt: { $ne: null } }] }
     ] }).sort({ submittedAt: -1 }).lean();
@@ -1981,6 +2078,8 @@ function studentApplicationOwnerFilter(account) {
 
 async function initializeMongoData() {
   await Promise.all([
+    ...Object.values(require('./services/workflow-models')).map(model => model.init()),
+    require('./services/custom-staff-role-model').CustomStaffRole.init(),
     require('./services/event-reports').EventReport.init(),
     Club.init(), Application.init(), SiteSetting.init(), UniversityContent.init(), SiteVisitor.init(), SiteNetwork.init(), SiteVisitorPresence.init(), EventRegistration.init(), AttendanceSession.init(), AttendanceAssignment.init(), AttendanceRecord.init(), LoginAttempt.init(),
     PasswordResetToken.init(), PasswordRecoveryRateLimit.init(), NotificationDispatch.init(), AdminAuthState.init()
@@ -2031,7 +2130,7 @@ async function initializeMongoData() {
   await ContentRequest.updateMany({ type: 'post' }, { $set: { type: 'feed' } });
 
   // Permits previously sent from Security directly to the Dean need the PR's final approval.
-  const permitsAwaitingDean = await ContentRequest.find({ type: 'entry_permit', status: 'pending_dean' });
+  const permitsAwaitingDean = await ContentRequest.find({ type: 'entry_permit', status: 'pending_dean', workflow: { $exists: false } });
   for (const record of permitsAwaitingDean) {
     record.status = 'pending_pr';
     record.resubmitTo = 'pending_pr';
@@ -2062,7 +2161,13 @@ function accountCanReviewApplication(account, application) {
     && (account.role !== 'head' || application.committee === account.committee);
 }
 
-registerPublicClubMedia(app, { Club, requireLiveDatabase });
+registerPublicClubMedia(app, { Club, requireLiveDatabase,
+  readMedia: mongoose.isSqlProvider ? require('./database/public-club-media').readPublicClubMedia : null,
+  ensureDatabaseReady: ensureReady });
+require('./services/public-content-pagination').registerPublicContentPagination(app, {
+  Club, UniversityContent, ensureReady, requireLiveDatabase,
+  readPage: mongoose.isSqlProvider ? require('./database/public-content-pagination').readPublicContentPage : null
+});
 require('./services/public-data-stream').registerPublicDataStream(app, {
   database: mongoose, ready: () => mongoReady,
   collections: {
@@ -2075,6 +2180,7 @@ require('./services/public-data-stream').registerPublicDataStream(app, {
 
 app.get('/api/clubs', async (req, res) => {
   try {
+    if (!mongoReady) await ensureReady();
     if (!requireLiveDatabase(res)) return;
     const [clubsFromDatabase, acceptedMemberGroups] = await Promise.all([
       req.query.media === 'links'
@@ -2141,25 +2247,19 @@ app.get('/api/clubs', async (req, res) => {
 
 app.get('/api/university-content', async (req, res) => {
   try {
+    if (!mongoReady) await ensureReady();
     if (!mongoReady) return res.status(503).json({ message: 'University updates are temporarily unavailable.' });
     const records = await UniversityContent.find()
-      .select('id type title description interaction question options date time location image registrationEnabled attendanceEnabled attendanceAudience createdAt')
+      .select(require('./services/university-content').publicFields)
       .read('primary').readConcern('majority').sort({ createdAt: -1, id: -1 }).lean();
-    sendRevalidatedPublicJson(req, res, records.map((record) => ({
-      id: record.id, type: record.type, title: record.title, description: record.description,
-      interaction: record.interaction || 'none', question: record.question || '', options: record.options || [],
-      date: record.date, time: record.time, location: record.location, image: record.image,
-      registrationEnabled: record.type === 'event' && record.registrationEnabled === true,
-      attendanceEnabled: record.type === 'event' && record.registrationEnabled === true
-        ? (typeof record.attendanceEnabled === 'boolean' ? record.attendanceEnabled : null) : false,
-      attendanceAudience: record.type === 'event' ? (record.attendanceAudience === 'members' ? 'members' : 'all_students') : undefined,
-      createdAt: record.createdAt
-    })));
+    sendRevalidatedPublicJson(req, res, records.map(require('./services/university-content').toPublicUniversityContent));
   } catch (error) {
     console.error('University content read failed:', error.name);
     res.status(503).json({ message: 'University updates are temporarily unavailable.' });
   }
 });
+
+require('./services/university-content').registerPublicUniversityContentDetail(app, { UniversityContent, ensureReady, requireLiveDatabase });
 
 // Track a club view (called when a user opens a club's detail view).
 app.post('/api/clubs/:id/view', (req, res) => {
@@ -2254,9 +2354,9 @@ app.get('/api/site/account-session', async (req, res) => {
         committee: clubAccount.committee || '',
         email: clubAccount.email || '',
         hasStudentDashboard: Boolean(await StudentAccount.exists({ email: clubAccount.email }).catch(() => null)),
-        name: ['pr', 'english', 'security', 'sso', 'dean'].includes(clubAccount.role)
+        name: clubAccount.customRoles?.find(role => role.key === clubAccount.role)?.name || (['pr', 'english', 'security', 'sso', 'dean'].includes(clubAccount.role)
           ? `${committeeRoleLabels[clubAccount.role] || clubAccount.role} Dashboard`
-          : club?.name || '',
+          : club?.name || ''),
         dashboards: getStaffDashboardOptions(clubAccount)
       });
     }
@@ -5107,7 +5207,7 @@ async function createContentRequest(req, res, type) {
       : '';
     if (assignedHeadEmail === null) return res.status(400).json({ message: 'Choose a committee head assigned to this club.' });
     const last = await ContentRequest.findOne().sort({ id: -1 }).lean();
-    const record = await ContentRequest.create({
+    const contentValues = {
       id: (last?.id || 0) + 1,
       clubId: req.clubAccount.clubId,
       clubName: club?.name || '',
@@ -5128,9 +5228,13 @@ async function createContentRequest(req, res, type) {
       ...extractContentFields(type, req.body),
       status: req.body.submit === true ? 'pending_supervisor' : 'draft',
       clubNotice: req.body.submit === true ? `Club submitted a new ${contentSingularLabel(type)} for supervisor review.` : ''
-    });
-    if (req.body.submit === true) appendWorkflowEvent(record, 'club', 'submitted', 'draft', 'pending_supervisor', '', req.clubAccount);
-    if (req.body.submit === true) {
+    };
+    const managed = req.body.submit === true && typeof dynamicWorkflowEngine !== 'undefined';
+    const record = managed
+      ? await dynamicWorkflowEngine.createNew('content', contentValues, { email: req.clubAccount.email, role: req.clubAccount.role })
+      : await ContentRequest.create(contentValues);
+    if (req.body.submit === true && !managed) appendWorkflowEvent(record, 'club', 'submitted', 'draft', 'pending_supervisor', '', req.clubAccount);
+    if (req.body.submit === true && !managed) {
       await record.save();
       await notifyContentRequest(record);
     }
@@ -5138,7 +5242,7 @@ async function createContentRequest(req, res, type) {
     res.status(201).json(rest);
   } catch (error) {
     console.error('Database operation failed:', error.name);
-    res.status(503).json({ message: 'Could not save content right now.' });
+    res.status(error.status || 503).json({ message: error.status ? error.message : 'Could not save content right now.' });
   }
 }
 
@@ -5219,6 +5323,10 @@ app.put('/api/club/content/:id', requireClubAuth, async (req, res) => {
       record.date = record.boothOpenDate || record.date;
       record.location = record.boothLocation || record.location;
     }
+    if (req.body.submit === true && !record.workflow && typeof dynamicWorkflowEngine !== 'undefined') {
+      await dynamicWorkflowEngine.submitNew(record, { email: req.clubAccount.email, role: req.clubAccount.role });
+      return res.json(shapeClubContentRecord(record.toObject()));
+    }
     if (record.status === 'changes_requested' && !record.editRequestedBy && type === 'entry_permit' && record.comments?.security) {
       record.resubmitTo = 'pending_security';
     } else if (record.status === 'changes_requested' && !record.editRequestedBy && record.comments?.english) {
@@ -5289,6 +5397,7 @@ app.get('/api/committee/requests', requireClubAuth, requireCommitteeRole, async 
       : req.clubAccount.role === 'english'
         ? { status: stage, type: { $ne: 'entry_permit' } }
         : { status: stage };
+    filter.workflow = { $exists: false };
     const records = await ContentRequest.find(filter).sort({ id: -1 }).lean();
     res.json(records.map(addCommitteeClubImage));
   } catch (error) {
@@ -5303,6 +5412,7 @@ app.get('/api/committee/status', requireClubAuth, requireCommitteeRole, async (r
     const filter = req.clubAccount.role === 'security'
       ? { type: 'entry_permit' }
       : req.clubAccount.role === 'english' ? { type: { $ne: 'entry_permit' } } : {};
+    filter.workflow = { $exists: false };
     const records = await ContentRequest.find(filter)
       .select('id clubId clubName type title date time status image submittedAt publishedAt clubNotice editRequestedBy comments commentHistory hiddenCommentRoles createdAt sponsorName sponsorCompany sponsorContact sponsorEmail sponsorPhone sponsorType sponsorAmount sponsorBenefits sponsorDescription sponsorLogo sponsorAttachment sponsorNotes boothName boothPurpose boothDescription boothLocation boothSize boothEquipment boothSetupDate boothOpenDate boothCloseDate boothContact boothNotes')
       .sort({ id: -1 })
@@ -5317,7 +5427,7 @@ app.get('/api/committee/status', requireClubAuth, requireCommitteeRole, async (r
 app.get('/api/committee/status/:id', requireClubAuth, requireCommitteeRole, async (req, res) => {
   try {
     if (!mongoReady) return res.status(503).json({ message: 'Content storage needs MongoDB.' });
-    const record = await ContentRequest.findOne({ id: Number(req.params.id) }).lean();
+    const record = await ContentRequest.findOne({ id: Number(req.params.id), workflow: { $exists: false } }).lean();
     if (!record) return res.status(404).json({ message: 'Request not found.' });
     if (!committeeCanAccessRequest(req.clubAccount.role, record.type)) {
       return res.status(404).json({ message: 'Request not found.' });
@@ -5974,6 +6084,11 @@ app.post('/api/auth/login', async (req, res) => {
     return res.status(503).json({ message: 'Login is temporarily unavailable. Please try again shortly.' });
   }
   if (account && typeof password === 'string' && clubPasswordMatches(password, account)) {
+    if (account.role?.startsWith('custom_')) {
+      try { account = await require('./services/custom-staff-access').decorateCustomStaff(account); }
+      catch { return res.status(503).json({ message: 'Role access is temporarily unavailable.' }); }
+      if (!account) return res.status(403).json({ message: 'Your dashboard assignment is no longer active.' });
+    }
     if (!await clearLoginSourceFailures(req, res)) return;
     await recordSuccessfulSignIn('club', account.email);
     setClubSessionCookie(req, res, account);
@@ -5992,7 +6107,7 @@ app.post('/api/auth/login', async (req, res) => {
       sso: '/dashboards/sso-dashboard.html',
       dean: '/dashboards/dean-dashboard.html',
     };
-    return res.json({ authenticated: true, role: account.role, redirect: roleRedirects[account.role] || '/club-login' });
+    return res.json({ authenticated: true, role: account.role, redirect: roleRedirects[account.role] || require('./services/staff-google-auth').staffRoute(account.role) || '/club-login' });
   }
 
   if (account) {
@@ -6447,11 +6562,13 @@ require('./services/supervisor-admin').registerSupervisorAdmin(app, {
     writePrivateClubAccountsFile();
   }
 });
-require('./services/miu-event-admin').registerMiuEventAdmin(app, {
+const universityPublishingDeps = {
   UniversityContent, EventRegistration, databaseReady: () => mongoReady, sameOrigin: isSameOriginRequest, cleanText, parseInteraction,
   readCloudinaryAsset, cloudinary, cloudinaryFolders, cloudinaryConfigured,
-  dispatchPublishedContentNotifications, toApiRecord, requireMiuEventsDashboard
-});
+  dispatchPublishedContentNotifications, toApiRecord, requireMiuEventsDashboard,
+  actorEmail: req => req.clubAccount?.email || getConfiguredAdminEmail() || 'MIU Admin'
+};
+require('./services/miu-event-admin').registerMiuEventAdmin(app, universityPublishingDeps);
 require('./services/report-downloads').registerReportDownloads(app, {
   Club, UniversityContent, ContentRequest, AttendanceRecord, AttendanceSession, EventRegistration, StudentAccount,
   databaseReady: () => mongoReady,
@@ -6538,100 +6655,7 @@ app.post('/api/admin/accounts/password', limitPasswordResetRequests, async (req,
   }
 });
 
-app.get('/api/admin/university-content', async (req, res) => {
-  try {
-    if (!requireLiveDatabase(res)) return;
-    res.setHeader('Cache-Control', 'no-store');
-    const records = await UniversityContent.find().read('primary').readConcern('majority').sort({ createdAt: -1, id: -1 }).lean();
-    res.json(records.map(toApiRecord));
-  } catch (error) {
-    console.error('Admin university content read failed:', error.name);
-    res.status(503).json({ message: 'Could not load university posts right now.' });
-  }
-});
-
-app.post('/api/admin/university-content', async (req, res) => {
-  if (!requireLiveDatabase(res)) return;
-  let interactionFields;
-  try { interactionFields = parseInteraction(req.body); }
-  catch (error) { return res.status(400).json({ message: error.message }); }
-  const type = ['event', 'announcement'].includes(req.body.type) ? req.body.type : '';
-  const title = cleanText(req.body.title, 140);
-  const description = cleanText(req.body.description, 2000);
-  const date = cleanText(req.body.date, 40);
-  const time = cleanText(req.body.time, 40);
-  const location = cleanText(req.body.location, 160);
-  const useCustomImage = req.body.imageChoice === 'custom';
-  if (!type || !title || !description) {
-    return res.status(400).json({ message: 'Enter a title and description.' });
-  }
-  if (type === 'event' && !['members', 'all_students'].includes(req.body.attendanceAudience)) {
-    return res.status(400).json({ message: 'Choose who can register and check in for this MIU event.' });
-  }
-  let image = '/assets/img/pics/logo.svg.png';
-  let imagePublicId = '';
-  if (useCustomImage) {
-    const uploadedImage = await readCloudinaryAsset(req.body.imageUrl, req.body.imagePublicId, cloudinaryFolders.university);
-    if (!uploadedImage) return res.status(400).json({ message: 'Choose a valid PNG, JPG, or WebP image up to 10 MB.' });
-    try {
-      image = uploadedImage.url;
-      imagePublicId = uploadedImage.publicId;
-    } catch (error) {
-      console.error('University image upload failed:', error.name);
-      return res.status(503).json({ message: 'The image could not be uploaded. Please try again.' });
-    }
-  }
-  try {
-    const last = await UniversityContent.findOne().read('primary').readConcern('majority').sort({ id: -1 }).select('id').lean();
-    const record = new UniversityContent({
-      ...interactionFields,
-      id: (last?.id || 0) + 1, type, title, description, date, time,
-      registrationEnabled: type === 'event' && req.body.registrationEnabled === true,
-      attendanceEnabled: type === 'event' && req.body.registrationEnabled === true && req.body.attendanceEnabled === true,
-      attendanceAudience: type === 'event' ? req.body.attendanceAudience : undefined,
-      location,
-      image, imagePublicId, publishedBy: getConfiguredAdminEmail() || 'MIU Admin'
-    });
-    await record.save({ w: 'majority' });
-    const persistedRecord = await UniversityContent.findById(record._id).read('primary').readConcern('majority').lean();
-    if (!persistedRecord) throw new Error('University post was not confirmed in the database.');
-    await dispatchPublishedContentNotifications({
-      source: 'university',
-      contentId: persistedRecord.id,
-      revision: persistedRecord.createdAt?.getTime() || Date.now(),
-      type: persistedRecord.type,
-      title: persistedRecord.title
-    });
-    res.setHeader('Cache-Control', 'no-store');
-    res.status(201).json(toApiRecord(persistedRecord));
-  } catch (error) {
-    if (imagePublicId && cloudinaryConfigured) cloudinary.uploader.destroy(imagePublicId, { resource_type: 'image' }).catch(() => {});
-    console.error('University content publish failed:', error.name);
-    res.status(503).json({ message: 'Could not publish this update. Please try again.' });
-  }
-});
-
-app.delete('/api/admin/university-content/:id', async (req, res) => {
-  const id = Number(req.params.id);
-  if (!Number.isSafeInteger(id) || id < 1) return res.status(400).json({ message: 'Choose a valid university post.' });
-  try {
-    if (!requireLiveDatabase(res)) return;
-    const record = await UniversityContent.findOne({ id }).read('primary').lean();
-    if (!record) return res.status(404).json({ message: 'University post not found.' });
-    const deletion = await UniversityContent.deleteOne({ id }, { writeConcern: { w: 'majority' } });
-    if (deletion.deletedCount !== 1) throw new Error('University post deletion was not confirmed.');
-    const stillExists = await UniversityContent.exists({ id }).read('primary').readConcern('majority');
-    if (stillExists) throw new Error('University post deletion was not confirmed.');
-    if (record.imagePublicId && cloudinaryConfigured) {
-      cloudinary.uploader.destroy(record.imagePublicId, { resource_type: 'image' }).catch(() => {});
-    }
-    res.setHeader('Cache-Control', 'no-store');
-    res.status(204).end();
-  } catch (error) {
-    console.error('University content delete failed:', error.name);
-    res.status(503).json({ message: 'Could not delete this university post.' });
-  }
-});
+require('./services/university-content-admin').registerUniversityContentAdmin(app, universityPublishingDeps, '/api/admin/university-content');
 
 app.get('/api/admin/visitor-analytics', async (req, res) => {
   if (!mongoReady || mongoose.connection.readyState !== 1) {
@@ -7015,10 +7039,11 @@ app.post('/api/admin/clubs/import', async (req, res) => {
     const normalized = [];
     for (let index = 0; index < records.length; index += 1) {
       const row = records[index] || {};
+      const rowNumber = Number.isSafeInteger(row.rowNumber) && row.rowNumber >= 2 && row.rowNumber <= 1048576 ? row.rowNumber : index + 2;
       const rawName = typeof row.name === 'string' ? row.name.trim() : '';
       const name = cleanText(rawName, 80);
       const key = importKey(name);
-      if (!key || rawName.length > 80 || names.has(key)) throw Object.assign(new Error(`Club name is empty, longer than 80 characters, or duplicated at data row ${index + 2}.`), { status: 400 });
+      if (!key || rawName.length > 80 || names.has(key)) throw Object.assign(new Error(`Club name is empty, longer than 80 characters, or duplicated at data row ${rowNumber}.`), { status: 400 });
       names.add(key);
       const presidentEmail = String(row.presidentEmail || '').trim().toLowerCase();
       const vicePresidentEmail = String(row.vicePresidentEmail || '').trim().toLowerCase();
@@ -7027,18 +7052,18 @@ app.post('/api/admin/clubs/import', async (req, res) => {
       if (!name || presidentEmail && (!validEmail(presidentEmail) || String(row.presidentName || '').trim().length > 120)
         || vicePresidentEmail && (!validEmail(vicePresidentEmail) || String(row.vicePresidentName || '').trim().length > 120)
         || presidentEmail && vicePresidentEmail && presidentEmail === vicePresidentEmail) {
-        throw Object.assign(new Error(`Check the supplied President/Vice President names and MIU emails on data row ${index + 2}.`), { status: 400 });
+        throw Object.assign(new Error(`Check the supplied President/Vice President names and MIU emails on data row ${rowNumber}.`), { status: 400 });
       }
       if (emailMatches(presidentEmail) || emailMatches(vicePresidentEmail)) {
-        throw Object.assign(new Error(`A club manager email on data row ${index + 2} cannot be the configured admin account.`), { status: 400 });
+        throw Object.assign(new Error(`A club manager email on data row ${rowNumber} cannot be the configured admin account.`), { status: 400 });
       }
       const category = cleanText(row.category, 80);
       const description = cleanText(row.description, 1200);
       if (!description || !row.image || typeof row.image.url !== 'string' || !isTemporaryClubImageId(row.image.publicId)) {
-        throw Object.assign(new Error(`Description and an embedded club image are required on data row ${index + 2}.`), { status: 400 });
+        throw Object.assign(new Error(`Description and an embedded club image are required on data row ${rowNumber}.`), { status: 400 });
       }
       const image = await readCloudinaryAsset(row.image.url, row.image.publicId, cloudinaryFolders.club);
-      if (!image) throw Object.assign(new Error(`The club image could not be verified on data row ${index + 2}. Upload it again and retry.`), { status: 400 });
+      if (!image) throw Object.assign(new Error(`The club image could not be verified on data row ${rowNumber}. Upload it again and retry.`), { status: 400 });
       const newDetails = row.newClub && typeof row.newClub === 'object' ? row.newClub : row;
       normalized.push({ name, category, description, image, presidentEmail, vicePresidentEmail,
         presidentName, vicePresidentName,
@@ -7191,6 +7216,9 @@ app.post('/api/admin/clubs/import', async (req, res) => {
     try { writePrivateClubAccountsFile(); } catch (error) { console.error('Club credential cache update failed:', error.name); }
     return res.json({ imported: importedClubs.length, created: importedClubs.filter(club => !currentClubs.some(old => old.id === club.id)).length,
       updated: importedClubs.filter(club => currentClubs.some(old => old.id === club.id)).length,
+      rowResults: importedClubs.map((club, index) => ({ rowNumber: Number.isSafeInteger(records[index]?.rowNumber) && records[index].rowNumber >= 2 && records[index].rowNumber <= 1048576 ? records[index].rowNumber : index + 2,
+        name: club.name, clubId: club.id, status: currentClubs.some(old => old.id === club.id) ? 'updated' : 'inserted',
+        reason: currentClubs.some(old => old.id === club.id) ? 'Updated the existing club matched by name; no duplicate was inserted.' : 'Inserted a new club.' })),
       rolesAssigned: savedAccounts.length, undoAvailable: true, importId,
       message: `Imported ${importedClubs.length} clubs and verified ${savedAccounts.length} dashboard role assignments.` });
   } catch (error) {
@@ -7205,7 +7233,7 @@ app.post('/api/admin/clubs/import', async (req, res) => {
     console.error('Club spreadsheet import failed:', error.name, error.code || error.originalError?.code || '', error.message || error.originalError?.message || '');
     return res.status(error.status || 503).json({
       message: error.status ? error.message : 'The import could not be confirmed. Reload and check the clubs before retrying.',
-      commitUncertain: commitAttempted && !committed
+      commitUncertain: commitAttempted || committed
     });
   }
 });

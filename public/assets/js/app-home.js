@@ -296,6 +296,10 @@ async function removeMyForm(item) {
 }
 
 async function loadClubs(force = false) {
+  if (!universityContentPrefetchScheduled) {
+    universityContentPrefetchScheduled = true;
+    void loadUniversityContentInBackground();
+  }
   if (!force && clubsLoaded && Date.now() - clubsLoadedAt < 30_000) {
     renderClubGrid();
     return;
@@ -331,15 +335,13 @@ async function loadClubs(force = false) {
   } finally {
     clubsLoadPromise = null;
   }
-  if (!universityContentPrefetchScheduled && window.siteStartup?.afterStartup) {
-    universityContentPrefetchScheduled = true;
-    window.siteStartup.afterStartup(loadUniversityContentInBackground);
-  } else if (!window.siteStartup?.afterStartup) {
-    void loadUniversityContentInBackground();
-  }
 }
 
 async function loadUniversityContentInBackground() {
+  if (!publicContentRefreshStarted) {
+    publicContentRefreshStarted = true;
+    window.siteStartup.watch(() => Promise.allSettled([loadClubs(true), refreshUniversityContentFromDatabase()]));
+  }
   if (universityContentLoaded) return;
   if (!universityContentLoaded) {
     const cachedContent = readPublicDataCache(publicDataCacheKeys.universityContent);
@@ -357,13 +359,6 @@ async function loadUniversityContentInBackground() {
       .finally(() => { universityContentLoadPromise = null; });
   }
   await universityContentLoadPromise;
-  if (!publicContentRefreshStarted) {
-    publicContentRefreshStarted = true;
-    window.siteStartup.watch(async () => {
-      await loadClubs(true);
-      await refreshUniversityContentFromDatabase();
-    });
-  }
 }
 
 async function loadHomepageSettings(force = false) {
@@ -374,7 +369,9 @@ async function loadHomepageSettings(force = false) {
       if (!response.ok) return;
       const settings = await response.json();
       homePageTitle.textContent = settings.title;
-      homePageSubtitle.textContent = settings.subtitle;
+      homePageSubtitle.textContent = settings.subtitle === 'Explore all clubs and apply to the ones that match your interests.'
+        ? 'Explore university clubs and apply.'
+        : settings.subtitle;
       homepageSettingsLoadedAt = Date.now();
     })();
   }
@@ -1177,8 +1174,8 @@ function getAllEvents() {
     (Array.isArray(club.events) ? club.events : []).map((event, eventIndex) => ({ ...event, clubId: club.id, clubName: club.name, clubImage: club.image, eventIndex }))
   );
   const universityEvents = (state.universityContent || []).filter((item) => item.type === 'event').map((event, index) => ({
-    ...event, clubId: 0, clubName: 'Misr International University',
-    clubImage: '/assets/img/pics/logo.svg.png', eventIndex: index, university: true,
+    ...event, clubId: 0, clubName: event.organization?.name || 'Misr International University',
+    clubImage: event.organization?.image || '/assets/img/pics/logo.svg.png', eventIndex: event.id, university: true,
     universityContentId: event.id
   }));
   return [...clubEvents, ...universityEvents];
@@ -1201,6 +1198,7 @@ async function refreshUniversityContentFromDatabase() {
   }
   renderEventsSlideshow();
   renderTodayEvents();
+  window.refreshOpenCalendar?.();
 }
 
 function parseEventDate(value) {
@@ -1261,8 +1259,8 @@ function collectClubContent(kind) {
 // The upcoming section shows events, sponsors and booths. Feeds stay in the feed section.
 function getAllUpcomingContent() {
   const universityEvents = (state.universityContent || []).filter((item) => item.type === 'event').map((item, index) => ({
-    ...item, contentType: 'event', clubId: 0, clubName: 'Misr International University',
-    clubImage: '/assets/img/pics/logo.svg.png', index, eventIndex: index, university: true
+    ...item, contentType: 'event', clubId: 0, clubName: item.organization?.name || 'Misr International University',
+    clubImage: item.organization?.image || '/assets/img/pics/logo.svg.png', index: item.id, eventIndex: item.id, university: true, universityContentId: item.id
   }));
   return [...collectClubContent('events'), ...universityEvents, ...collectClubContent('sponsors'), ...collectClubContent('booths')];
 }
@@ -1291,7 +1289,7 @@ function renderTodayEvents() {
   }
   strip.innerHTML = `<span class="today-events-label" id="todayEventsLabel">Happening today</span><div class="today-events-viewport" tabindex="0" role="region" aria-labelledby="todayEventsLabel" aria-roledescription="carousel">${events.map((event) => {
     return `
-      <a class="today-event-chip" href="/pages/event.html?club=${event.clubId}&event=${event.eventIndex}" data-club="${event.clubId}" data-idx="${event.eventIndex}">
+      <a class="today-event-chip" href="${event.university ? `/pages/event.html?university=${event.id}` : `/pages/event.html?club=${event.clubId}&event=${event.eventIndex}`}" data-club="${event.clubId}" data-idx="${event.eventIndex}">
         <span class="today-event-badge">Today · New</span>
         <img class="${event.university && (event.image || '/assets/img/pics/logo.svg.png') === '/assets/img/pics/logo.svg.png' ? 'university-brand-image' : ''}" src="${escapeHtml(event.image || event.clubImage)}" alt="" loading="lazy" decoding="async" />
         <span class="today-event-title">${escapeHtml(event.title || 'Event')}</span>
@@ -1452,8 +1450,8 @@ function renderEventsSlideshow() {
   const todayStart = startOfLocalDay(new Date());
   const universityItems = (state.universityContent || []).map((item) => ({
     ...item, contentType: item.type === 'event' ? 'event' : 'feed',
-    clubId: 0, clubName: 'Misr International University',
-    clubImage: '/assets/img/pics/logo.svg.png', university: true,
+    clubId: 0, clubName: item.organization?.name || 'Misr International University',
+    clubImage: item.organization?.image || '/assets/img/pics/logo.svg.png', university: true,
     universityContentId: item.id, index: item.id,
     parsedDate: parseEventDate(item.date || item.createdAt) || todayStart
   }));
@@ -1546,15 +1544,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const dayEventsTitle = document.getElementById('calendarDayEventsTitle');
   const dayEventsList = document.getElementById('calendarDayEventsList');
   const dayEventsClose = document.getElementById('calendarDayEventsClose');
-  let selectedCalendarDay = null;
+  let selectedCalendarDay = null, calendarYear = new Date().getFullYear(), calendarMonth = new Date().getMonth();
   const openCalendar = async () => {
     window.MiuUI.modals.open(calendarModal);
     selectedCalendarDay = null;
     calendarGrid.innerHTML = '<p class="calendar-month-prompt">Loading events...</p>';
     try {
-      if (clubsLoadPromise) await clubsLoadPromise;
-      else if (!clubsLoaded) await loadClubs();
-      await loadUniversityContentInBackground();
+      await Promise.allSettled([clubsLoadPromise || (!clubsLoaded ? loadClubs() : Promise.resolve()), loadUniversityContentInBackground()]);
       const today = new Date();
       renderCalendar(today.getFullYear(), today.getMonth());
     } catch {
@@ -1615,6 +1611,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderCalendar(year = new Date().getFullYear(), month = new Date().getMonth()) {
+    calendarYear = year; calendarMonth = month;
     const events = getAllEvents().map((e) => ({ ...e, parsed: parseDate(e.date) })).filter((e) => e.parsed);
     const monthDate = new Date(year, month, 1);
     year = monthDate.getFullYear();
@@ -1693,6 +1690,15 @@ document.addEventListener('DOMContentLoaded', () => {
     selectedCalendarDay = Number.isInteger(day) ? day : null;
     renderCalendar(year, month);
     if (selectedCalendarDay) calendarGrid.querySelector(`[data-day="${selectedCalendarDay}"]`)?.scrollIntoView({ block: 'nearest' });
+  };
+  window.refreshOpenCalendar = () => {
+    if (calendarModal.classList.contains('hidden')) return;
+    renderCalendar(calendarYear, calendarMonth);
+    if (dayEventsModal && !dayEventsModal.classList.contains('hidden') && selectedCalendarDay) {
+      const events = getAllEvents().map(event => ({ ...event, parsed: parseDate(event.date) })).filter(event => event.parsed
+        && event.parsed.getFullYear() === calendarYear && event.parsed.getMonth() === calendarMonth && event.parsed.getDate() === selectedCalendarDay);
+      openDayEventsModal(events, calendarYear, calendarMonth, selectedCalendarDay);
+    }
   };
 });
 

@@ -1,3 +1,5 @@
+.university-publisher-form [hidden] { display: none !important; }
+
 .miu-events-dashboard-page .miu-events-dashboard-content {
   width: 100%;
   min-width: 0;

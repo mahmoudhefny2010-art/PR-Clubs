@@ -39,6 +39,27 @@
         .admin-login-panel h2, .club-login-panel h2 { font-size: 1.3rem; }
       }
 
+/* Bring the approval timeline higher without changing its scale. */
+@media (max-width: 640px) {
+  #headDashboardView > .committee-card { padding-top: 12px; }
+  #headDashboardView .committee-top { gap: 10px; margin-bottom: 8px; padding-bottom: 8px; }
+  #headDashboardView .club-dashboard-identity { gap: 10px; }
+  #headDashboardView .club-dashboard-identity > div { min-width: 0; }
+  #headDashboardView .club-dashboard-logo { width: 48px; height: 48px; flex-basis: 48px; }
+  #headDashboardView .committee-label { font-size: .62rem; line-height: 1.4; letter-spacing: .05em; }
+  #headDashboardView .club-dashboard-identity h2 { margin-top: 2px; font-size: 1.2rem; line-height: 1.25; }
+  #headDashboardView .committee-top .top-actions { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+  #headDashboardView .committee-top .top-actions > :is(#openContentStudioBtn, #backHomeBtn) {
+    grid-column: auto;
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    padding: 8px 10px;
+    font-size: .78rem;
+    line-height: 1.25;
+  }
+}
+
 /* Keep the club snapshot compact and visually grouped on wide screens. */
 #homeView .stats-summary {
   width: min(100%, 1180px);
@@ -210,6 +231,14 @@
 #homeView .events-slideshow-dots { margin-top: 4px; }
 
 @media (max-width: 640px) {
+  #homeView > .hero-panel {
+    padding: 8px 16px !important;
+    margin-bottom: 12px;
+  }
+  #homeView > .hero-panel h1 { margin: 0; line-height: 1.15; }
+  #homeView > .hero-panel p { margin-top: 4px; font-size: .82rem; line-height: 1.4; }
+  #homeView > .events-slideshow { margin-top: 10px; margin-bottom: 12px; }
+  #homeView .stats-summary { margin-top: 10px; margin-bottom: 12px; }
   #homeView .events-slideshow-track { touch-action: pan-y; }
   #homeView .events-slideshow .slide-arrow { display: none !important; }
   #homeView > .events-slideshow {

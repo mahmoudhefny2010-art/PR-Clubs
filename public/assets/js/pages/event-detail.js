@@ -75,59 +75,60 @@
   });
 
   if (Number.isInteger(universityContentId) && universityContentId > 0) {
-    fetch('/api/university-content', { cache: 'no-store' })
-      .then((response) => {
-        if (!response.ok) throw new Error('This event could not be found.');
-        return response.json();
-      })
-      .then((items) => {
-        const event = Array.isArray(items) ? items.find((item) => Number(item.id) === universityContentId && item.type === 'event') : null;
-        if (!event) {
-          statusEl.textContent = 'This university event could not be found.';
-          return;
-        }
-        imageEl.src = event.image || '/assets/img/pics/logo.svg.png';
-        imageEl.alt = event.title || 'University event';
-        imageEl.classList.toggle('university-brand-image', !event.image || event.image === '/assets/img/pics/logo.svg.png');
-        clubEl.textContent = 'Misr International University';
-        titleEl.textContent = event.title || 'University event';
-        metaEl.textContent = [event.date ? formatDate(event.date) : 'Date to be announced', window.formatSiteTime ? window.formatSiteTime(event.time) : event.time, event.location].filter(Boolean).join(' · ');
-        descriptionEl.textContent = event.description || '';
-        showAttendanceStatus(event);
-        if (event.registrationEnabled === true) {
-          const audience = document.createElement('p');
-          audience.className = 'event-timeline-location';
-          audience.textContent = event.attendanceAudience === 'members' ? 'Registration and QR check-in are limited to current members of any MIU club.' : 'Open to all university students, including non-members.';
-          descriptionEl.before(audience);
-        }
-        contentEl.insertAdjacentHTML('beforeend', window.studentFeedbackForm('university', event.id, event.interaction, event.question, event.options));
-        registrationForm.hidden = event.registrationEnabled !== true;
-        registrationForm.dataset.studentManaged = event.attendanceAudience === 'members' ? 'true' : 'false';
-        if (event.registrationEnabled === true && event.attendanceAudience === 'members') {
-          import('/assets/js/student-event-registration.js?v=20261014registrationbuttons1').then(() => window.mountStudentEventRegistration(registrationForm, feedbackEl, `/api/university-content/${event.id}/registrations`))
-            .catch(() => { feedbackEl.textContent = 'Registration controls could not load. Please reload.'; });
-        }
-        statusEl.hidden = true;
-        contentEl.hidden = false;
-        document.title = `${event.title || 'University Event'} - MIU`;
-      })
-      .catch(() => { statusEl.textContent = 'Could not load this event right now.'; });
-    window.setInterval(async () => {
-      if (document.visibilityState !== 'visible') return;
-      try {
-        const response = await fetch('/api/university-content', { cache: 'no-store' });
-        if (!response.ok) throw new Error('University event details are temporarily unavailable.');
-        const latest = await response.json();
-        const exists = Array.isArray(latest) && latest.some((item) => Number(item.id) === universityContentId && item.type === 'event');
-        if (!exists) throw new Error('This university event is no longer available.');
-        statusEl.hidden = true;
-        contentEl.hidden = false;
-      } catch (error) {
-        contentEl.hidden = true;
-        statusEl.hidden = false;
-        statusEl.textContent = error.message || 'University event details are temporarily unavailable.';
+    let pending, lastSignature, generation = 0;
+    const audience = document.createElement('p');
+    audience.className = 'event-timeline-location'; audience.hidden = true;
+    descriptionEl.before(audience);
+    const interaction = document.createElement('div');
+    contentEl.append(interaction);
+    function renderUniversityEvent(event) {
+      imageEl.src = event.image || event.organization?.image || '/assets/img/pics/logo.svg.png';
+      imageEl.alt = event.title || 'University event';
+      imageEl.classList.toggle('university-brand-image', !event.image || event.image === '/assets/img/pics/logo.svg.png');
+      clubEl.textContent = event.organization?.name || 'Misr International University';
+      titleEl.textContent = event.title || 'University event';
+      metaEl.textContent = [event.date ? formatDate(event.date) : 'Date to be announced', window.formatSiteTime ? window.formatSiteTime(event.time) : event.time, event.location].filter(Boolean).join(' ? ');
+      descriptionEl.textContent = event.description || '';
+      showAttendanceStatus(event);
+      audience.hidden = event.registrationEnabled !== true;
+      audience.textContent = event.attendanceAudience === 'members' ? 'Registration and QR check-in are limited to current members of any MIU club.' : 'Open to all university students, including non-members.';
+      interaction.innerHTML = window.studentFeedbackForm('university', event.id, event.interaction, event.question, event.options);
+      window.unmountStudentEventRegistration?.(registrationForm);
+      registrationForm.hidden = event.registrationEnabled !== true;
+      registrationForm.dataset.studentManaged = event.attendanceAudience === 'members' ? 'true' : 'false';
+      const ticket = ++generation;
+      if (event.registrationEnabled === true && event.attendanceAudience === 'members') {
+        import('/assets/js/student-event-registration.js?v=20261014registrationbuttons1').then(() => {
+          if (ticket === generation) window.mountStudentEventRegistration(registrationForm, feedbackEl, '/api/university-content/' + event.id + '/registrations');
+        }).catch(() => { feedbackEl.textContent = 'Registration controls could not load. Please reload.'; });
       }
-    }, 60_000);
+      document.title = (event.title || 'University Event') + ' - MIU';
+    }
+    function refreshUniversityEvent() {
+      if (pending) return pending;
+      pending = (async () => {
+        try {
+          const response = await fetch('/api/university-content/' + universityContentId, { cache: 'no-store' });
+          if (!response.ok) {
+            if (response.status === 404) {
+              generation++; lastSignature = null;
+              window.unmountStudentEventRegistration?.(registrationForm);
+              contentEl.hidden = true;
+            }
+            throw new Error(response.status === 404 ? 'This university event is no longer available.' : 'University event details are temporarily unavailable.');
+          }
+          const event = await response.json();
+          const next = JSON.stringify(event);
+          if (lastSignature !== next) { renderUniversityEvent(event); lastSignature = next; }
+          statusEl.hidden = true; contentEl.hidden = false;
+        } catch (error) {
+          statusEl.hidden = false; statusEl.textContent = error.message || 'Could not load this event right now.';
+        } finally { pending = null; }
+      })();
+      return pending;
+    }
+    void refreshUniversityEvent();
+    window.siteStartup.watch(refreshUniversityEvent);
     return;
   }
 
